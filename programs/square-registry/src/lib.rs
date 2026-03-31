@@ -5,16 +5,17 @@ declare_id!("CgchXu2dRV3r9E1YjRhp4kbeLLtv1Xz61yoerJzp1Vbc");
 /// AIP Agent Registry Program
 ///
 /// On-chain agent card storage and discovery.
-/// Agents register their card data on Solana — anyone can query and discover them.
+/// One wallet can register multiple agents, each with a unique agent_id.
+/// PDA seeds: ["agent", owner, agent_id]
 #[program]
 pub mod aip_registry {
     use super::*;
 
     /// Register a new agent on-chain.
-    /// PDA seeds: ["agent", did_seed] where did_seed = sha256(did)[0..32]
+    /// agent_id is a unique slug per owner (max 32 chars, immutable after creation).
     pub fn register_agent(
         ctx: Context<RegisterAgent>,
-        did_seed: [u8; 32],
+        agent_id: String,
         did: String,
         name: String,
         endpoint: String,
@@ -23,6 +24,7 @@ pub mod aip_registry {
         capabilities_json: String,
         version: String,
     ) -> Result<()> {
+        require!(agent_id.len() > 0 && agent_id.len() <= 32, RegistryError::AgentIdInvalid);
         require!(did.len() <= 100, RegistryError::DidTooLong);
         require!(name.len() <= 64, RegistryError::NameTooLong);
         require!(endpoint.len() <= 200, RegistryError::EndpointTooLong);
@@ -32,7 +34,7 @@ pub mod aip_registry {
 
         let record = &mut ctx.accounts.agent_record;
         record.owner = ctx.accounts.owner.key();
-        record.did_seed = did_seed;
+        record.agent_id = agent_id;
         record.did = did;
         record.name = name;
         record.endpoint = endpoint;
@@ -44,12 +46,12 @@ pub mod aip_registry {
         record.updated_at = Clock::get()?.unix_timestamp;
         record.bump = ctx.bumps.agent_record;
 
-        msg!("Agent registered: {}", record.name);
+        msg!("Agent registered: {} ({})", record.name, record.agent_id);
         Ok(())
     }
 
     /// Update an existing agent record.
-    /// Only the original owner can update.
+    /// Only the original owner can update. agent_id cannot change.
     pub fn update_agent(
         ctx: Context<UpdateAgent>,
         name: String,
@@ -74,7 +76,7 @@ pub mod aip_registry {
         record.version = version;
         record.updated_at = Clock::get()?.unix_timestamp;
 
-        msg!("Agent updated: {}", record.name);
+        msg!("Agent updated: {} ({})", record.name, record.agent_id);
         Ok(())
     }
 
@@ -90,7 +92,7 @@ pub mod aip_registry {
 // ---------------------------------------------------------------
 
 #[derive(Accounts)]
-#[instruction(did_seed: [u8; 32])]
+#[instruction(agent_id: String)]
 pub struct RegisterAgent<'info> {
     #[account(mut)]
     pub owner: Signer<'info>,
@@ -99,7 +101,7 @@ pub struct RegisterAgent<'info> {
         init,
         payer = owner,
         space = AgentRecord::SIZE,
-        seeds = [b"agent", did_seed.as_ref()],
+        seeds = [b"agent", owner.key().as_ref(), agent_id.as_bytes()],
         bump
     )]
     pub agent_record: Account<'info, AgentRecord>,
@@ -117,7 +119,7 @@ pub struct UpdateAgent<'info> {
 
     #[account(
         mut,
-        seeds = [b"agent", agent_record.did_seed.as_ref()],
+        seeds = [b"agent", owner.key().as_ref(), agent_record.agent_id.as_bytes()],
         bump = agent_record.bump,
     )]
     pub agent_record: Account<'info, AgentRecord>,
@@ -132,7 +134,7 @@ pub struct DeregisterAgent<'info> {
         mut,
         close = owner,
         constraint = owner.key() == agent_record.owner @ RegistryError::Unauthorized,
-        seeds = [b"agent", agent_record.did_seed.as_ref()],
+        seeds = [b"agent", owner.key().as_ref(), agent_record.agent_id.as_bytes()],
         bump = agent_record.bump,
     )]
     pub agent_record: Account<'info, AgentRecord>,
@@ -145,8 +147,8 @@ pub struct DeregisterAgent<'info> {
 #[account]
 pub struct AgentRecord {
     pub owner: Pubkey,              // 32
-    pub did_seed: [u8; 32],         // 32 — sha256(did)[0..32]
-    pub did: String,                // 4 + 100
+    pub agent_id: String,           // 4 + 32 — unique slug per owner
+    pub did: String,                // 4 + 100 — auto-generated DID
     pub name: String,               // 4 + 64
     pub endpoint: String,           // 4 + 200
     pub wallet_address: Pubkey,     // 32
@@ -159,8 +161,8 @@ pub struct AgentRecord {
 }
 
 impl AgentRecord {
-    // 8 (disc) + 32 + 32 + 104 + 68 + 204 + 32 + 1 + 516 + 20 + 8 + 8 + 1 = 1034
-    pub const SIZE: usize = 1040; // with padding
+    // 8 + 32 + 36 + 104 + 68 + 204 + 32 + 1 + 516 + 20 + 8 + 8 + 1 = 1038
+    pub const SIZE: usize = 1048;
 }
 
 // ---------------------------------------------------------------
@@ -169,6 +171,8 @@ impl AgentRecord {
 
 #[error_code]
 pub enum RegistryError {
+    #[msg("Agent ID invalid: 1-32 characters required")]
+    AgentIdInvalid,
     #[msg("DID too long: maximum 100 characters")]
     DidTooLong,
     #[msg("Name too long: maximum 64 characters")]
