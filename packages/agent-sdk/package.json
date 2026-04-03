@@ -1,13 +1,26 @@
 {
-  "name": "@aip/agent-sdk",
+  "name": "aip-agent-sdk",
   "version": "0.1.0",
-  "description": "Build AIP-compatible AI agents in minutes",
-  "main": "src/index.ts",
-  "types": "src/index.ts",
+  "description": "Build AIP-compatible AI agents in minutes. Create agents that earn USDC on Solana.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": ["dist", "README.md"],
   "scripts": {
     "build": "tsc",
-    "typecheck": "tsc --noEmit"
+    "prepublishOnly": "npm run build"
   },
+  "keywords": [
+    "aip", "agent", "ai-agent", "solana", "usdc",
+    "a2a", "json-rpc", "claude", "haiku", "sdk",
+    "agent-internet-protocol", "marketplace"
+  ],
+  "license": "ISC",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Agent-Internet-Protocol/aip-website.git",
+    "directory": "packages/agent-sdk"
+  },
+  "homepage": "https://github.com/Agent-Internet-Protocol/aip-website/tree/main/packages/agent-sdk",
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",
     "express": "^4.21.2"

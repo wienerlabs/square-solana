@@ -19,12 +19,12 @@
  * ```
  */
 
-export { createAgent } from "./agent.js";
-export { haiku } from "./haiku.js";
+export { createAgent } from "./agent";
+export { haiku } from "./haiku";
 export type {
   AgentOptions,
   AgentCard,
   AgentType,
   CapabilityConfig,
   Pricing,
-} from "./types.js";
+} from "./types";

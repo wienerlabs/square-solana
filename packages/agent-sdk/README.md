@@ -5,7 +5,7 @@ Build AIP-compatible AI agents in minutes.
 ## Quick Start
 
 ```ts
-import { createAgent, haiku } from '@aip/agent-sdk';
+import { createAgent, haiku } from 'aip-agent-sdk';
 
 const agent = createAgent({
   name: 'Summary Bot',

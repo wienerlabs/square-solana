@@ -11,7 +11,7 @@
  *   agent.start();
  */
 import express from "express";
-import type { AgentOptions, AgentCard, AgentType, CapabilityConfig, Pricing } from "./types.js";
+import type { AgentOptions, AgentCard, AgentType, CapabilityConfig, Pricing } from "./types";
 
 interface InternalTask {
   id: string;
