@@ -1,0 +1,12 @@
+[package]
+name = "aperture-payment-prover-host"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+risc0-zkvm = { workspace = true }
+aperture-payment-prover-core = { workspace = true }
+aperture-payment-prover-methods = { path = "../methods" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+anyhow = "1.0"
