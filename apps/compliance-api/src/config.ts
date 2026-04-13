@@ -36,4 +36,9 @@ export const config = {
     secretKey: requireEnv('MPP_SECRET_KEY'),
     realm: optionalEnv('MPP_REALM', 'aperture-compliance'),
   },
+  light: {
+    rpcUrl: optionalEnv('LIGHT_RPC_URL', ''),
+    compressedMint: optionalEnv('COMPRESSED_ATTESTATION_MINT', ''),
+    payerPrivateKey: optionalEnv('LIGHT_PAYER_PRIVATE_KEY', ''),
+  },
 } as const;

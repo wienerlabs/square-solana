@@ -10,6 +10,7 @@ import attestationRouter from './routes/attestation.js';
 import complianceReportRouter from './routes/compliance-report.js';
 import mppReportRouter from './routes/mpp-report.js';
 import healthRouter from './routes/health.js';
+import compressedAttestationRouter from './routes/compressed-attestation.js';
 import { swaggerSpec } from './swagger.js';
 
 const app = express();
@@ -34,6 +35,7 @@ app.use('/api/v1/proofs', proofRouter);
 app.use('/api/v1/attestations', attestationRouter);
 app.use('/api/v1/compliance', complianceReportRouter);
 app.use('/api/v1/compliance', mppReportRouter);
+app.use('/api/v1/compliance', compressedAttestationRouter);
 
 app.use(errorHandler);
 

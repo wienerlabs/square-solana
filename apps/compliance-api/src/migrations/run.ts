@@ -3,6 +3,7 @@ import { logger } from '../utils/logger.js';
 import * as migration001 from './001_create_compliance_tables.js';
 import * as migration002 from './002_add_tx_signature.js';
 import * as migration003 from './003_add_proof_tx_signature.js';
+import * as migration004 from './004_add_compressed_tx_signature.js';
 
 interface Migration {
   name: string;
@@ -14,6 +15,7 @@ const migrations: Migration[] = [
   { name: '001_create_compliance_tables', ...migration001 },
   { name: '002_add_tx_signature', ...migration002 },
   { name: '003_add_proof_tx_signature', ...migration003 },
+  { name: '004_add_compressed_tx_signature', ...migration004 },
 ];
 
 async function ensureMigrationsTable(client: import('pg').PoolClient): Promise<void> {

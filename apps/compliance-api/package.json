@@ -14,6 +14,8 @@
     "migrate:rollback": "tsx src/migrations/rollback.ts"
   },
   "dependencies": {
+    "@lightprotocol/compressed-token": "^0.23.3",
+    "@lightprotocol/stateless.js": "^0.23.3",
     "@solana/web3.js": "^1.98.4",
     "@aperture/types": "*",
     "cors": "^2.8.5",

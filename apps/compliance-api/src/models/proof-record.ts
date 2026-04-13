@@ -14,6 +14,7 @@ interface ProofRecordRow {
   token_mint: string;
   is_compliant: boolean;
   tx_signature: string | null;
+  compressed_tx_signature: string | null;
   verified_at: Date;
   created_at: Date;
 }
@@ -30,6 +31,7 @@ function rowToProofRecord(row: ProofRecordRow): ProofRecord {
     token_mint: row.token_mint,
     is_compliant: row.is_compliant,
     tx_signature: row.tx_signature ?? null,
+    compressed_tx_signature: row.compressed_tx_signature ?? null,
     verified_at: row.verified_at,
     created_at: row.created_at,
   };
@@ -116,6 +118,22 @@ export async function updateProofTxSignature(
   );
   if (result.rows.length === 0) return null;
   logger.info('Proof tx_signature updated', { proof_id: id, tx_signature: txSignature });
+  return rowToProofRecord(result.rows[0]);
+}
+
+export async function updateCompressedTxSignature(
+  id: string,
+  compressedTxSignature: string
+): Promise<ProofRecord | null> {
+  const result = await query<ProofRecordRow>(
+    'UPDATE proof_records SET compressed_tx_signature = $1 WHERE id = $2 RETURNING *',
+    [compressedTxSignature, id]
+  );
+  if (result.rows.length === 0) return null;
+  logger.info('Proof compressed_tx_signature updated', {
+    proof_id: id,
+    compressed_tx_signature: compressedTxSignature,
+  });
   return rowToProofRecord(result.rows[0]);
 }
 
