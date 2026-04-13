@@ -5,7 +5,7 @@ pub mod state;
 
 use instructions::*;
 
-declare_id!("HrYMqPEiMnYSskmi3iAp57X8Ke6BiP2WsjGvMPEqBtmr");
+declare_id!("AzKirEv7h5PstLNYNqLj7fCXU9EFA6nSnuoed3QkmUfU");
 
 #[program]
 pub mod verifier {

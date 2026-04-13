@@ -5,7 +5,7 @@ pub mod state;
 
 use instructions::*;
 
-declare_id!("CZxdDpayJuLT1GVQcmhRKahLM6gTdBFpkirHjrvSGKVs");
+declare_id!("FXD7ycSguBQw7o3DXqq4VUBHtdx5ZQpu9P2zb4KG4ZEU");
 
 #[program]
 pub mod policy_registry {
@@ -39,20 +39,29 @@ pub mod policy_registry {
         instructions::deactivate_policy::handler(ctx)
     }
 
+    pub fn set_multisig(
+        ctx: Context<SetMultisig>,
+        vault_index: u8,
+    ) -> Result<()> {
+        instructions::set_multisig::handler(ctx, vault_index)
+    }
+
     pub fn register_policy_multisig(
         ctx: Context<RegisterPolicyMultisig>,
         policy_id: [u8; 32],
         merkle_root: [u8; 32],
         policy_data_hash: [u8; 32],
+        vault_index: u8,
     ) -> Result<()> {
-        instructions::register_policy_multisig::handler(ctx, policy_id, merkle_root, policy_data_hash)
+        instructions::register_policy_multisig::handler(ctx, policy_id, merkle_root, policy_data_hash, vault_index)
     }
 
     pub fn update_policy_multisig(
         ctx: Context<UpdatePolicyMultisig>,
         new_merkle_root: [u8; 32],
         new_policy_data_hash: [u8; 32],
+        vault_index: u8,
     ) -> Result<()> {
-        instructions::update_policy_multisig::handler(ctx, new_merkle_root, new_policy_data_hash)
+        instructions::update_policy_multisig::handler(ctx, new_merkle_root, new_policy_data_hash, vault_index)
     }
 }
