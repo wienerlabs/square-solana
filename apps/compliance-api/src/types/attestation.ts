@@ -9,6 +9,7 @@ export interface ProofRecord {
   readonly token_mint: string;
   readonly is_compliant: boolean;
   readonly tx_signature: string | null;
+  readonly compressed_tx_signature: string | null;
   readonly verified_at: Date;
   readonly created_at: Date;
 }
