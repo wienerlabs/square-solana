@@ -17,7 +17,7 @@ const app = express();
 
 app.use(helmet());
 app.use(cors({
-  origin: ['http://localhost:3000', 'http://localhost:3333'],
+  origin: [/^http:\/\/localhost:\d+$/],
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'x-402-payment', 'x-mpp-credential'],
   exposedHeaders: ['WWW-Authenticate', 'Payment-Receipt'],
