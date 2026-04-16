@@ -2,7 +2,7 @@ use anyhow::{Context, Result};
 use risc0_zkvm::{default_prover, ExecutorEnv};
 use tracing::info;
 use aperture_payment_prover_core::{ProverInput, ProverOutput};
-use aperture_payment_prover_methods::Aperture_PAYMENT_PROVER_GUEST_ELF;
+use aperture_payment_prover_methods::APERTURE_PAYMENT_PROVER_GUEST_ELF;
 
 pub struct ProofResult {
     pub output: ProverOutput,
@@ -38,13 +38,13 @@ fn generate_proof_blocking(input: ProverInput) -> Result<ProofResult> {
 
     // Run the guest program in the zkVM and generate a proof
     let receipt = prover
-        .prove(env, Aperture_PAYMENT_PROVER_GUEST_ELF)
+        .prove(env, APERTURE_PAYMENT_PROVER_GUEST_ELF)
         .context("Failed to generate ZK proof in RISC Zero zkVM")?
         .receipt;
 
     // Verify the receipt locally before returning
     receipt
-        .verify(aperture_payment_prover_methods::Aperture_PAYMENT_PROVER_GUEST_ID)
+        .verify(aperture_payment_prover_methods::APERTURE_PAYMENT_PROVER_GUEST_ID)
         .context("Receipt verification failed")?;
 
     info!("Receipt verified successfully");
@@ -65,7 +65,7 @@ fn generate_proof_blocking(input: ProverInput) -> Result<ProofResult> {
     let receipt_bytes =
         bincode::serialize(&receipt).context("Failed to serialize receipt to bytes")?;
 
-    let image_id = aperture_payment_prover_methods::Aperture_PAYMENT_PROVER_GUEST_ID;
+    let image_id = aperture_payment_prover_methods::APERTURE_PAYMENT_PROVER_GUEST_ID;
 
     Ok(ProofResult {
         output,

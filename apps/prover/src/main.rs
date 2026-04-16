@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use std::time::Instant;
 use tracing::{error, info};
 
+mod openapi;
 mod prover;
 
 #[derive(Debug, Deserialize)]
@@ -105,9 +106,9 @@ async fn prove(body: web::Json<ProveRequest>) -> HttpResponse {
             })
         }
         Err(e) => {
-            error!(error = %e, "Proof generation failed");
+            error!(error = ?e, error_chain = %format!("{e:#}"), "Proof generation failed");
             HttpResponse::InternalServerError().json(ErrorResponse {
-                error: format!("Proof generation failed: {e}"),
+                error: format!("Proof generation failed: {e:#}"),
             })
         }
     }
@@ -140,6 +141,7 @@ async fn main() -> std::io::Result<()> {
             .wrap(cors)
             .wrap(middleware::Logger::default())
             .route("/health", web::get().to(health))
+            .route("/api-docs.json", web::get().to(openapi::openapi_json))
             .route("/prove", web::post().to(prove))
     })
     .bind(("0.0.0.0", port))?
