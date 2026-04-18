@@ -12,7 +12,7 @@ use crate::state::{ProofRecord, ComplianceStatus};
 )]
 pub struct VerifyPaymentProofV2<'info> {
     #[account(
-        init,
+        init_if_needed,
         payer = payer,
         space = 8 + ProofRecord::INIT_SPACE,
         seeds = [b"proof", operator.key().as_ref(), &public_inputs[1]],
