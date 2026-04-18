@@ -86,12 +86,15 @@ export async function generateProof(request) {
     // dashboard can render meaningful values without reshaping its schema.
 
     // Amount range buckets mirror the old RISC Zero privacy pattern —
-    // report a 1 USDC bucket around the payment so the UI's min/max
-    // range shows a number instead of 0..0.
+    // report a 1 USDC bucket (in lamports) around the payment so the UI's
+    // min/max range shows meaningful numbers after its /1_000_000 decode.
     proof_hash: journalDigestHex,
     image_id: [0, 0, 0, 0, 0, 0, 0, 0],
-    amount_range_min: Math.floor(Number(request.payment_amount_lamports) / 1_000_000),
-    amount_range_max: Math.floor(Number(request.payment_amount_lamports) / 1_000_000) + 1,
+    amount_range_min:
+      Math.floor(Number(request.payment_amount_lamports) / 1_000_000) * 1_000_000,
+    amount_range_max:
+      (Math.floor(Number(request.payment_amount_lamports) / 1_000_000) + 1) *
+      1_000_000,
     verification_timestamp: new Date().toISOString(),
     // The "receipt" concept from RISC Zero does not exist here; surface the
     // concatenated Groth16 proof bytes instead so dashboards that count
