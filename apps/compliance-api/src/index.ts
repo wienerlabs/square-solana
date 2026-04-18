@@ -15,9 +15,14 @@ import { swaggerSpec } from './swagger.js';
 
 const app = express();
 
+const extraOrigins = (process.env.CORS_ORIGINS ?? '')
+  .split(',')
+  .map((s) => s.trim())
+  .filter(Boolean);
+
 app.use(helmet());
 app.use(cors({
-  origin: [/^http:\/\/localhost:\d+$/],
+  origin: [/^http:\/\/localhost:\d+$/, ...extraOrigins],
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'x-402-payment', 'x-mpp-credential'],
   exposedHeaders: ['WWW-Authenticate', 'Payment-Receipt'],
