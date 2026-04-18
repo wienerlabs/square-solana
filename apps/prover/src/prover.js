@@ -82,13 +82,26 @@ export async function generateProof(request) {
 
     // Backwards-compatible shape for call sites still using the legacy
     // compliance-api submitProof body. Fields that do not map onto the
-    // Circom model are populated with sentinel values so downstream schemas
-    // accept them without custom casing.
+    // Circom model are populated with best-effort equivalents so the
+    // dashboard can render meaningful values without reshaping its schema.
+
+    // Amount range buckets mirror the old RISC Zero privacy pattern —
+    // report a 1 USDC bucket around the payment so the UI's min/max
+    // range shows a number instead of 0..0.
     proof_hash: journalDigestHex,
     image_id: [0, 0, 0, 0, 0, 0, 0, 0],
-    amount_range_min: 0,
-    amount_range_max: 0,
+    amount_range_min: Math.floor(Number(request.payment_amount_lamports) / 1_000_000),
+    amount_range_max: Math.floor(Number(request.payment_amount_lamports) / 1_000_000) + 1,
     verification_timestamp: new Date().toISOString(),
-    receipt_bytes: [],
+    // The "receipt" concept from RISC Zero does not exist here; surface the
+    // concatenated Groth16 proof bytes instead so dashboards that count
+    // receipt size see the actual on-chain payload size (~256 bytes).
+    receipt_bytes: Array.from(
+      Buffer.concat([
+        Buffer.from(encoded.proof_a, 'base64'),
+        Buffer.from(encoded.proof_b, 'base64'),
+        Buffer.from(encoded.proof_c, 'base64'),
+      ]),
+    ),
   };
 }
