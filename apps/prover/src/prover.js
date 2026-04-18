@@ -64,6 +64,14 @@ export async function generateProof(request) {
   const [isCompliantStr, journalDigestStr] = publicSignals;
   const encoded = encodeForGroth16Solana(proof, publicSignals);
 
+  // journal_digest as hex for legacy callers that store it under `proof_hash`.
+  // The Circom circuit's Poseidon output is the single cryptographic binding
+  // to the inputs, so it serves the same deduplication / lookup role that the
+  // RISC Zero proof_hash played before.
+  const journalDigestHex = BigInt(journalDigestStr)
+    .toString(16)
+    .padStart(64, '0');
+
   return {
     is_compliant: isCompliantStr === '1',
     journal_digest: journalDigestStr,
@@ -71,5 +79,16 @@ export async function generateProof(request) {
     // Raw snarkjs output is kept for debugging and off-chain verification.
     raw_proof: proof,
     raw_public: publicSignals,
+
+    // Backwards-compatible shape for call sites still using the legacy
+    // compliance-api submitProof body. Fields that do not map onto the
+    // Circom model are populated with sentinel values so downstream schemas
+    // accept them without custom casing.
+    proof_hash: journalDigestHex,
+    image_id: [0, 0, 0, 0, 0, 0, 0, 0],
+    amount_range_min: 0,
+    amount_range_max: 0,
+    verification_timestamp: new Date().toISOString(),
+    receipt_bytes: [],
   };
 }
