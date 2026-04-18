@@ -45,34 +45,24 @@ pub mod verifier {
         )
     }
 
-    /// v2: Verifies a RISC Zero Groth16-compressed payment proof via on-chain
-    /// BN254 pairings. Replaces the SHA-256 integrity check with real
-    /// cryptographic verification.
+    /// v2: Verifies a Circom-generated Groth16 proof for the payment-compliance
+    /// circuit via on-chain alt_bn128 pairings (groth16-solana). The two
+    /// public inputs carry is_compliant and journal_digest; no other fields
+    /// from the old receipt-based flow are needed.
     pub fn verify_payment_proof_v2(
         ctx: Context<VerifyPaymentProofV2>,
-        proof_hash: [u8; 32],
-        image_id: [u32; 8],
-        journal_digest: [u8; 32],
         proof_a: [u8; 64],
         proof_b: [u8; 128],
         proof_c: [u8; 64],
         public_inputs: [[u8; 32]; PAYMENT_NR_INPUTS],
-        is_compliant: bool,
     ) -> Result<()> {
-        instructions::verify_payment_v2::handler(
-            ctx,
-            proof_hash,
-            image_id,
-            journal_digest,
-            proof_a,
-            proof_b,
-            proof_c,
-            public_inputs,
-            is_compliant,
-        )
+        instructions::verify_payment_v2::handler(ctx, proof_a, proof_b, proof_c, public_inputs)
     }
 
-    /// v2: Verifies a RISC Zero Groth16-compressed batch attestation proof.
+    /// v2: Verifies a Circom-generated Groth16 proof for the batch-aggregator
+    /// circuit. The Circom batch circuit does not exist yet; this instruction
+    /// is kept for API shape parity and fails closed against the zeroed
+    /// placeholder VK in groth16_vk.rs until the circuit ships.
     pub fn verify_batch_attestation_v2(
         ctx: Context<VerifyBatchAttestationV2>,
         batch_hash: [u8; 32],

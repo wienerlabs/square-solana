@@ -3,21 +3,19 @@ use groth16_solana::groth16::Groth16Verifier;
 use crate::groth16_vk::{APERTURE_PAYMENT_VK, PAYMENT_NR_INPUTS};
 use crate::state::{ProofRecord, ComplianceStatus};
 
-/// Expected image_id for the Aperture payment prover guest program.
-///
-/// Populated at deployment via a one-time initialize instruction (TODO).
-/// A zeroed value disables enforcement, which is only acceptable before the
-/// real RISC Zero guest ELF digest is wired in.
-const EXPECTED_PAYMENT_IMAGE_ID: [u32; 8] = [0; 8];
-
 #[derive(Accounts)]
-#[instruction(proof_hash: [u8; 32])]
+#[instruction(
+    proof_a: [u8; 64],
+    proof_b: [u8; 128],
+    proof_c: [u8; 64],
+    public_inputs: [[u8; 32]; PAYMENT_NR_INPUTS],
+)]
 pub struct VerifyPaymentProofV2<'info> {
     #[account(
         init,
         payer = payer,
         space = 8 + ProofRecord::INIT_SPACE,
-        seeds = [b"proof", operator.key().as_ref(), &proof_hash],
+        seeds = [b"proof", operator.key().as_ref(), &public_inputs[1]],
         bump,
     )]
     pub proof_record: Account<'info, ProofRecord>,
@@ -31,7 +29,9 @@ pub struct VerifyPaymentProofV2<'info> {
     )]
     pub compliance_status: Account<'info, ComplianceStatus>,
 
-    /// CHECK: Policy account from policy-registry program, validated by seed derivation.
+    /// CHECK: Policy account from policy-registry program, referenced by the
+    /// operator off-chain to derive the circuit inputs. The verifier does not
+    /// read it; it only records the key alongside the proof.
     pub policy_account: UncheckedAccount<'info>,
 
     pub operator: Signer<'info>,
@@ -42,32 +42,18 @@ pub struct VerifyPaymentProofV2<'info> {
     pub system_program: Program<'info, System>,
 }
 
-/// Verifies a RISC Zero Groth16-compressed proof using on-chain BN254 pairings.
-///
-/// Unlike the legacy handler which only checked SHA-256 integrity, this
-/// performs real cryptographic verification via `groth16-solana` against the
-/// Aperture payment-prover verification key.
+/// Verify a Circom-generated Groth16 proof for the payment-compliance
+/// circuit. The proof commits two public inputs:
+///   public_inputs[0] = is_compliant  (0 or 1, big-endian 32-byte encoding)
+///   public_inputs[1] = journal_digest (Poseidon commitment over policy+payment)
 pub fn handler(
     ctx: Context<VerifyPaymentProofV2>,
-    proof_hash: [u8; 32],
-    image_id: [u32; 8],
-    journal_digest: [u8; 32],
     proof_a: [u8; 64],
     proof_b: [u8; 128],
     proof_c: [u8; 64],
     public_inputs: [[u8; 32]; PAYMENT_NR_INPUTS],
-    is_compliant: bool,
 ) -> Result<()> {
-    // Step 1: Enforce expected image_id if configured.
-    let expected_is_zero = EXPECTED_PAYMENT_IMAGE_ID.iter().all(|&x| x == 0);
-    if !expected_is_zero {
-        require!(
-            image_id == EXPECTED_PAYMENT_IMAGE_ID,
-            VerifierV2Error::UnexpectedImageId
-        );
-    }
-
-    // Step 2: Cryptographically verify the Groth16 proof.
+    // 1. Cryptographic Groth16 verification via alt_bn128 syscalls.
     let mut verifier = Groth16Verifier::<PAYMENT_NR_INPUTS>::new(
         &proof_a,
         &proof_b,
@@ -81,23 +67,44 @@ pub fn handler(
         .verify()
         .map_err(|_| error!(VerifierV2Error::ProofVerificationFailed))?;
 
-    // Step 3: Persist the verified proof record.
+    // 2. Decode is_compliant from the first public input. The circuit writes
+    //    the boolean as a BN254 field element, so we accept only the two
+    //    canonical encodings; anything else indicates tampering.
+    let is_compliant_bytes = public_inputs[0];
+    let is_compliant = match is_compliant_bytes {
+        b if b == [0u8; 32] => false,
+        mut b => {
+            let last = b[31];
+            b[31] = 0;
+            if b == [0u8; 32] && last == 1 {
+                true
+            } else {
+                return err!(VerifierV2Error::MalformedPublicInput);
+            }
+        }
+    };
+
+    // 3. journal_digest is the second public input, kept as the 32-byte
+    //    commitment used to seed the ProofRecord PDA.
+    let journal_digest = public_inputs[1];
+
+    // 4. Persist the proof record and update the operator compliance status
+    //    so the transfer hook can enforce gating downstream.
     let clock = Clock::get()?;
     let proof = &mut ctx.accounts.proof_record;
     proof.operator = ctx.accounts.operator.key();
     proof.policy_id = ctx.accounts.policy_account.key().to_bytes();
-    proof.proof_hash = proof_hash;
-    proof.image_id = image_id;
+    proof.proof_hash = journal_digest;
+    proof.image_id = [0u32; 8];
     proof.journal_digest = journal_digest;
     proof.timestamp = clock.unix_timestamp;
     proof.verified = true;
     proof.bump = ctx.bumps.proof_record;
 
-    // Step 4: Update compliance status for the transfer hook.
     let status = &mut ctx.accounts.compliance_status;
     status.operator = ctx.accounts.operator.key();
     status.is_compliant = is_compliant;
-    status.last_proof_hash = proof_hash;
+    status.last_proof_hash = journal_digest;
     status.last_verified_at = clock.unix_timestamp;
     status.total_proofs = status.total_proofs.saturating_add(1);
     status.bump = ctx.bumps.compliance_status;
@@ -113,10 +120,10 @@ pub fn handler(
 
 #[error_code]
 pub enum VerifierV2Error {
-    #[msg("Image ID does not match the expected payment prover program")]
-    UnexpectedImageId,
     #[msg("Groth16 proof is malformed or has invalid byte layout")]
     MalformedProof,
     #[msg("Groth16 proof verification failed on-chain")]
     ProofVerificationFailed,
+    #[msg("Public input has an invalid canonical encoding")]
+    MalformedPublicInput,
 }
