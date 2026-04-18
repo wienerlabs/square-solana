@@ -72,17 +72,31 @@ export function requireX402Payment(
         return;
       }
 
-      // Verify transaction on-chain
+      // Verify transaction on-chain with retries. Public devnet RPC
+      // occasionally fails transient fetches and a freshly-submitted tx may
+      // not have been indexed yet — both look identical to a missing tx, so
+      // we poll for up to ~12s before giving up.
       const connection = new Connection(SOLANA_RPC, 'confirmed');
-      const txInfo = await connection.getTransaction(proof.txSignature, {
-        commitment: 'confirmed',
-        maxSupportedTransactionVersion: 0,
-      });
+      let txInfo: Awaited<ReturnType<typeof connection.getTransaction>> = null;
+      let lastFetchError: unknown = null;
+      for (let attempt = 0; attempt < 6; attempt++) {
+        try {
+          txInfo = await connection.getTransaction(proof.txSignature, {
+            commitment: 'confirmed',
+            maxSupportedTransactionVersion: 0,
+          });
+          if (txInfo) break;
+        } catch (fetchErr) {
+          lastFetchError = fetchErr;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+      }
 
       if (!txInfo) {
+        const hint = lastFetchError instanceof Error ? lastFetchError.message : 'not confirmed yet';
         res.status(402).json({
           success: false,
-          error: 'Transaction not found on-chain. It may not be confirmed yet.',
+          error: `Transaction ${proof.txSignature.slice(0, 12)}... not found on-chain: ${hint}`,
           data: null,
         });
         return;
