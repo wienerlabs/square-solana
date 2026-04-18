@@ -16,13 +16,17 @@ infrastructure and produces proofs verifiable on Solana via the
   endpoint category) with fixed-size arrays + mask signals for list
   membership, Poseidon-based journal digest, and `is_compliant` output.
   Tested against fixtures under `test-inputs/`.
-- **Phase 3:** rewrite the prover HTTP service in Node.js using snarkjs;
-  convert the snarkjs proof.json format into the byte layout that
-  `groth16-solana` expects.
-- **Phase 4:** wire up the on-chain verifier by extracting the trusted
-  setup VK into `programs/verifier/src/groth16_vk.rs` and updating the
-  v2 instructions to accept the two public outputs (is_compliant,
-  journal_digest).
+- **Phase 3 (complete):** Node.js `services/prover-service/` wraps snarkjs,
+  accepts the legacy request shape, and returns Groth16 bytes in the
+  layout `groth16-solana` expects. Proof latency ~640 ms on CPU.
+- **Phase 4 (complete):** `programs/verifier/src/groth16_vk.rs` contains
+  the real VK extracted from `payment_vk.json`. `verify_payment_proof_v2`
+  takes (proof_a, proof_b, proof_c, public_inputs[2]) and performs real
+  on-chain Groth16 verification via alt_bn128 syscalls. Dashboard helper
+  `buildVerifyPaymentProofV2Ix` wires clients to the new instruction.
+- **Phase 5:** production trusted-setup ceremony (Hermez ptau drop-in),
+  devnet deploy, end-to-end test with real wallet + real proof, and
+  migrate existing v1 call sites in PaymentsTab / AIPAgentsTab / docs.
 
 ## Prerequisites
 
