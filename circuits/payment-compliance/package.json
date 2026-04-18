@@ -1,0 +1,16 @@
+{
+  "name": "payment-prover",
+  "version": "1.0.0",
+  "description": "This is the Circom + snarkjs rewrite of the payment-prover zero-knowledge circuit. It replaces the archived RISC Zero implementation under `_archive/risc0/` with a Groth16 pipeline that runs on commodity infrastructure and produces proofs verifiable on Solana via the `groth16-solana` crate.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "circomlib": "^2.0.5"
+  }
+}

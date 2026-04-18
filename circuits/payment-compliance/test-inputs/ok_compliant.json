@@ -1,0 +1,15 @@
+{
+  "max_per_tx_lamports": "10000000",
+  "max_daily_lamports": "100000000",
+  "token_whitelist": ["1234", "0", "0", "0", "0", "0", "0", "0", "0", "0"],
+  "token_whitelist_mask": ["1", "0", "0", "0", "0", "0", "0", "0", "0", "0"],
+  "blocked_addresses": ["9999", "0", "0", "0", "0", "0", "0", "0", "0", "0"],
+  "blocked_addresses_mask": ["1", "0", "0", "0", "0", "0", "0", "0", "0", "0"],
+  "allowed_categories": ["5678", "0", "0", "0", "0", "0", "0", "0"],
+  "allowed_categories_mask": ["1", "0", "0", "0", "0", "0", "0", "0"],
+  "daily_spent_lamports": "50000000",
+  "payment_amount_lamports": "5000000",
+  "payment_token": "1234",
+  "payment_recipient": "7777",
+  "payment_category": "5678"
+}

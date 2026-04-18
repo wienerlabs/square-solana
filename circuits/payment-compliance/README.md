@@ -11,12 +11,18 @@ infrastructure and produces proofs verifiable on Solana via the
 - **Phase 1 (complete):** toolchain validated end-to-end with `hello.circom`
   — compile, powers of tau, phase 2 setup, witness, prove, verify all
   green.
-- **Phase 2 (in progress):** write the real `payment.circom` that enforces
-  the five policy rules (per-tx limit, daily spend, token whitelist,
-  blocked addresses, endpoint category).
-- **Phase 3:** rewrite the prover HTTP service in Node.js using snarkjs.
+- **Phase 2 (complete):** `payment.circom` enforces all five policy rules
+  (per-tx limit, daily spend, token whitelist, blocked addresses,
+  endpoint category) with fixed-size arrays + mask signals for list
+  membership, Poseidon-based journal digest, and `is_compliant` output.
+  Tested against fixtures under `test-inputs/`.
+- **Phase 3:** rewrite the prover HTTP service in Node.js using snarkjs;
+  convert the snarkjs proof.json format into the byte layout that
+  `groth16-solana` expects.
 - **Phase 4:** wire up the on-chain verifier by extracting the trusted
-  setup VK into `programs/verifier/src/groth16_vk.rs`.
+  setup VK into `programs/verifier/src/groth16_vk.rs` and updating the
+  v2 instructions to accept the two public outputs (is_compliant,
+  journal_digest).
 
 ## Prerequisites
 
@@ -57,6 +63,38 @@ snarkjs groth16 verify hello_vk.json public.json proof.json
 ```
 
 All intermediate artifacts live under `build/` and are gitignored.
+
+## Payment circuit end-to-end
+
+After installing `circomlib` via `npm install`, run:
+
+```bash
+cd circuits/payment-prover
+mkdir -p build
+circom payment.circom --r1cs --wasm --sym -l node_modules -o build
+cd build
+
+# Ceremony sized for payment.circom's ~2300 constraints
+snarkjs powersoftau new bn128 14 pot14_0.ptau -v
+snarkjs powersoftau contribute pot14_0.ptau pot14_1.ptau --name="dev" -v -e="any"
+snarkjs powersoftau prepare phase2 pot14_1.ptau pot14_final.ptau -v
+snarkjs groth16 setup payment.r1cs pot14_final.ptau payment_0.zkey
+snarkjs zkey contribute payment_0.zkey payment_final.zkey --name="dev" -e="any"
+snarkjs zkey export verificationkey payment_final.zkey payment_vk.json
+
+# Prove with a sample compliant input
+cp ../test-inputs/ok_compliant.json input.json
+node payment_js/generate_witness.js payment_js/payment.wasm input.json witness.wtns
+snarkjs groth16 prove payment_final.zkey witness.wtns proof.json public.json
+snarkjs groth16 verify payment_vk.json public.json proof.json
+# Expected: [INFO] snarkJS: OK!
+# public.json: ["1", "<journal_digest>"]
+```
+
+Non-compliant fixtures (`bad_amount_exceeds_per_tx.json`,
+`bad_token_not_whitelisted.json`) exercise the rules and should yield
+`is_compliant = 0` while the proof still verifies — the circuit proves
+the check was performed, not that the outcome is positive.
 
 ## Production trusted setup
 
