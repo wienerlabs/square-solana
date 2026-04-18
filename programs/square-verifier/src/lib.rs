@@ -1,8 +1,10 @@
 use anchor_lang::prelude::*;
 
+pub mod groth16_vk;
 pub mod instructions;
 pub mod state;
 
+use groth16_vk::{BATCH_NR_INPUTS, PAYMENT_NR_INPUTS};
 use instructions::*;
 
 declare_id!("AzKirEv7h5PstLNYNqLj7fCXU9EFA6nSnuoed3QkmUfU");
@@ -40,6 +42,62 @@ pub mod verifier {
             period_start,
             period_end,
             receipt_data,
+        )
+    }
+
+    /// v2: Verifies a RISC Zero Groth16-compressed payment proof via on-chain
+    /// BN254 pairings. Replaces the SHA-256 integrity check with real
+    /// cryptographic verification.
+    pub fn verify_payment_proof_v2(
+        ctx: Context<VerifyPaymentProofV2>,
+        proof_hash: [u8; 32],
+        image_id: [u32; 8],
+        journal_digest: [u8; 32],
+        proof_a: [u8; 64],
+        proof_b: [u8; 128],
+        proof_c: [u8; 64],
+        public_inputs: [[u8; 32]; PAYMENT_NR_INPUTS],
+        is_compliant: bool,
+    ) -> Result<()> {
+        instructions::verify_payment_v2::handler(
+            ctx,
+            proof_hash,
+            image_id,
+            journal_digest,
+            proof_a,
+            proof_b,
+            proof_c,
+            public_inputs,
+            is_compliant,
+        )
+    }
+
+    /// v2: Verifies a RISC Zero Groth16-compressed batch attestation proof.
+    pub fn verify_batch_attestation_v2(
+        ctx: Context<VerifyBatchAttestationV2>,
+        batch_hash: [u8; 32],
+        image_id: [u32; 8],
+        journal_digest: [u8; 32],
+        total_payments: u32,
+        period_start: i64,
+        period_end: i64,
+        proof_a: [u8; 64],
+        proof_b: [u8; 128],
+        proof_c: [u8; 64],
+        public_inputs: [[u8; 32]; BATCH_NR_INPUTS],
+    ) -> Result<()> {
+        instructions::verify_batch_v2::handler(
+            ctx,
+            batch_hash,
+            image_id,
+            journal_digest,
+            total_payments,
+            period_start,
+            period_end,
+            proof_a,
+            proof_b,
+            proof_c,
+            public_inputs,
         )
     }
 }

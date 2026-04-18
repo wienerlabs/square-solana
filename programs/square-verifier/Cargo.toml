@@ -17,3 +17,4 @@ idl-build = ["anchor-lang/idl-build"]
 [dependencies]
 anchor-lang = { version = "0.31.1", features = ["init-if-needed"] }
 sha2 = "0.10"
+groth16-solana = "0.2"
