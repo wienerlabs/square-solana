@@ -29,4 +29,4 @@ COPY --from=deps /app/package.json ./package.json
 USER appuser
 WORKDIR /app/services/compliance-api
 EXPOSE 3002
-CMD ["node", "dist/index.js"]
+CMD ["sh", "-c", "node dist/migrations/run.js && node dist/index.js"]
