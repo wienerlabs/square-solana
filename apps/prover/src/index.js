@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import { generateProof } from './prover.js';
+import { openapiSpec } from './openapi.js';
 
 const app = express();
 const port = Number(process.env.PROVER_SERVICE_PORT ?? 3003);
@@ -19,6 +20,10 @@ app.use(
   }),
 );
 app.use(express.json({ limit: '256kb' }));
+
+app.get('/api-docs.json', (_req, res) => {
+  res.json(openapiSpec);
+});
 
 app.get('/health', (_req, res) => {
   res.json({
