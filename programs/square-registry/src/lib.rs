@@ -20,17 +20,17 @@ pub mod aip_registry {
         name: String,
         endpoint: String,
         wallet_address: Pubkey,
-        agent_type: u8,
-        capabilities_json: String,
+        agent_type: AgentType,
+        capabilities: Vec<Capability>,
+        price_per_task: u64,
         version: String,
     ) -> Result<()> {
         require!(agent_id.len() > 0 && agent_id.len() <= 32, RegistryError::AgentIdInvalid);
         require!(did.len() <= 100, RegistryError::DidTooLong);
         require!(name.len() <= 64, RegistryError::NameTooLong);
         require!(endpoint.len() <= 200, RegistryError::EndpointTooLong);
-        require!(capabilities_json.len() <= 512, RegistryError::CapabilitiesTooLong);
         require!(version.len() <= 16, RegistryError::VersionTooLong);
-        require!(agent_type <= 2, RegistryError::InvalidAgentType);
+        validate_capabilities(&capabilities)?;
 
         let record = &mut ctx.accounts.agent_record;
         record.owner = ctx.accounts.owner.key();
@@ -40,7 +40,8 @@ pub mod aip_registry {
         record.endpoint = endpoint;
         record.wallet_address = wallet_address;
         record.agent_type = agent_type;
-        record.capabilities_json = capabilities_json;
+        record.capabilities = capabilities;
+        record.price_per_task = price_per_task;
         record.version = version;
         record.registered_at = Clock::get()?.unix_timestamp;
         record.updated_at = Clock::get()?.unix_timestamp;
@@ -57,22 +58,23 @@ pub mod aip_registry {
         name: String,
         endpoint: String,
         wallet_address: Pubkey,
-        agent_type: u8,
-        capabilities_json: String,
+        agent_type: AgentType,
+        capabilities: Vec<Capability>,
+        price_per_task: u64,
         version: String,
     ) -> Result<()> {
         require!(name.len() <= 64, RegistryError::NameTooLong);
         require!(endpoint.len() <= 200, RegistryError::EndpointTooLong);
-        require!(capabilities_json.len() <= 512, RegistryError::CapabilitiesTooLong);
         require!(version.len() <= 16, RegistryError::VersionTooLong);
-        require!(agent_type <= 2, RegistryError::InvalidAgentType);
+        validate_capabilities(&capabilities)?;
 
         let record = &mut ctx.accounts.agent_record;
         record.name = name;
         record.endpoint = endpoint;
         record.wallet_address = wallet_address;
         record.agent_type = agent_type;
-        record.capabilities_json = capabilities_json;
+        record.capabilities = capabilities;
+        record.price_per_task = price_per_task;
         record.version = version;
         record.updated_at = Clock::get()?.unix_timestamp;
 
@@ -80,11 +82,24 @@ pub mod aip_registry {
         Ok(())
     }
 
-    /// Deregister an agent — close the PDA and return rent to owner.
+    /// Deregister an agent - close the PDA and return rent to owner.
     pub fn deregister_agent(_ctx: Context<DeregisterAgent>) -> Result<()> {
         msg!("Agent deregistered");
         Ok(())
     }
+}
+
+// ---------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------
+
+fn validate_capabilities(caps: &[Capability]) -> Result<()> {
+    require!(caps.len() <= AgentRecord::MAX_CAPABILITIES, RegistryError::TooManyCapabilities);
+    for cap in caps {
+        require!(cap.name.len() > 0 && cap.name.len() <= 32, RegistryError::CapabilityNameInvalid);
+        require!(cap.description.len() <= 64, RegistryError::CapabilityDescriptionTooLong);
+    }
+    Ok(())
 }
 
 // ---------------------------------------------------------------
@@ -144,25 +159,69 @@ pub struct DeregisterAgent<'info> {
 // State
 // ---------------------------------------------------------------
 
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq, Debug)]
+pub enum AgentType {
+    Llm,        // 0
+    Task,       // 1
+    Execution,  // 2
+}
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, PartialEq, Eq, Debug)]
+pub struct Capability {
+    pub name: String,        // 4 + 32 - capability identifier (e.g., "text-completion")
+    pub description: String, // 4 + 64 - short human-readable summary
+}
+
 #[account]
 pub struct AgentRecord {
-    pub owner: Pubkey,              // 32
-    pub agent_id: String,           // 4 + 32 — unique slug per owner
-    pub did: String,                // 4 + 100 — auto-generated DID
-    pub name: String,               // 4 + 64
-    pub endpoint: String,           // 4 + 200
-    pub wallet_address: Pubkey,     // 32
-    pub agent_type: u8,             // 1 — 0=LLM, 1=Task, 2=Execution
-    pub capabilities_json: String,  // 4 + 512
-    pub version: String,            // 4 + 16
-    pub registered_at: i64,         // 8
-    pub updated_at: i64,            // 8
-    pub bump: u8,                   // 1
+    pub owner: Pubkey,                 // 32
+    pub agent_id: String,              // 4 + 32 - unique slug per owner
+    pub did: String,                   // 4 + 100 - auto-generated DID
+    pub name: String,                  // 4 + 64
+    pub endpoint: String,              // 4 + 200
+    pub wallet_address: Pubkey,        // 32 - off-chain signing key (may differ from owner)
+    pub agent_type: AgentType,         // 1 - Borsh-encoded enum tag
+    pub capabilities: Vec<Capability>, // 4 + N * 104, max N = 8
+    pub price_per_task: u64,           // 8 - base price in lamports per capability invocation
+    pub version: String,               // 4 + 16
+    pub registered_at: i64,            // 8
+    pub updated_at: i64,               // 8
+    pub bump: u8,                      // 1
 }
 
 impl AgentRecord {
-    // 8 + 32 + 36 + 104 + 68 + 204 + 32 + 1 + 516 + 20 + 8 + 8 + 1 = 1038
-    pub const SIZE: usize = 1048;
+    pub const MAX_CAPABILITIES: usize = 8;
+    pub const CAP_SIZE: usize = (4 + 32) + (4 + 64); // 104
+
+    // 8 (discriminator)
+    // + 32 (owner)
+    // + 36 (agent_id)
+    // + 104 (did)
+    // + 68 (name)
+    // + 204 (endpoint)
+    // + 32 (wallet_address)
+    // + 1 (agent_type)
+    // + 4 + 8*104 = 836 (capabilities)
+    // + 8 (price_per_task)
+    // + 20 (version)
+    // + 8 (registered_at)
+    // + 8 (updated_at)
+    // + 1 (bump)
+    // = 1366
+    pub const SIZE: usize = 8
+        + 32
+        + (4 + 32)
+        + (4 + 100)
+        + (4 + 64)
+        + (4 + 200)
+        + 32
+        + 1
+        + (4 + Self::MAX_CAPABILITIES * Self::CAP_SIZE)
+        + 8
+        + (4 + 16)
+        + 8
+        + 8
+        + 1;
 }
 
 // ---------------------------------------------------------------
@@ -179,12 +238,14 @@ pub enum RegistryError {
     NameTooLong,
     #[msg("Endpoint too long: maximum 200 characters")]
     EndpointTooLong,
-    #[msg("Capabilities JSON too long: maximum 512 characters")]
-    CapabilitiesTooLong,
     #[msg("Version too long: maximum 16 characters")]
     VersionTooLong,
-    #[msg("Invalid agent type: must be 0 (LLM), 1 (Task), or 2 (Execution)")]
-    InvalidAgentType,
+    #[msg("Too many capabilities: maximum 8 allowed")]
+    TooManyCapabilities,
+    #[msg("Capability name invalid: 1-32 characters required")]
+    CapabilityNameInvalid,
+    #[msg("Capability description too long: maximum 64 characters")]
+    CapabilityDescriptionTooLong,
     #[msg("Unauthorized: only the owner can modify this record")]
     Unauthorized,
 }
