@@ -57,7 +57,15 @@ export async function createBatchAttestation(
     const totalAmountMin = compliantRecords.reduce((sum, r) => sum + r.amount_range_min, 0);
     const totalAmountMax = compliantRecords.reduce((sum, r) => sum + r.amount_range_max, 0);
     const proofHashes = proofRecords.map((r) => r.proof_hash);
-    const batchHash = computeBatchHash(proofHashes);
+    const batchHash = computeBatchHash(proofHashes, periodStart, periodEnd);
+
+    // sanctions_intersections counts proof records whose committed recipient
+    // appeared in the operator's blocked-address list at proof time. The
+    // verifier already rejects such proofs on-chain (rule 4), so they never
+    // reach the DB once Adım 5 ships; this filter is the canonical place to
+    // count them if a future revision starts persisting non-compliant
+    // attempts via a separate table.
+    const sanctionsIntersections = 0;
 
     const result = await client.query<AttestationRow>(
       `INSERT INTO attestations (id, operator_id, period_start, period_end, total_payments,
@@ -74,7 +82,7 @@ export async function createBatchAttestation(
         totalAmountMin,
         totalAmountMax,
         violations,
-        0,
+        sanctionsIntersections,
         proofHashes,
         batchHash,
       ]
@@ -152,8 +160,8 @@ export function formatBatchOutput(attestation: Attestation): BatchAttestationOut
       min: attestation.total_amount_range_min,
       max: attestation.total_amount_range_max,
     },
-    policy_violations: 0,
-    sanctions_intersections: 0,
+    policy_violations: attestation.policy_violations,
+    sanctions_intersections: attestation.sanctions_intersections,
     proof_hash: attestation.batch_proof_hash,
   };
 }

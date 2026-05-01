@@ -11,6 +11,11 @@ import complianceReportRouter from './routes/compliance-report.js';
 import mppReportRouter from './routes/mpp-report.js';
 import healthRouter from './routes/health.js';
 import compressedAttestationRouter from './routes/compressed-attestation.js';
+import stripeWebhookRouter from './routes/stripe-webhook.js';
+import mppProtectedServiceRouter from './routes/mpp-protected-service.js';
+import mppPublicConfigRouter from './routes/mpp-public-config.js';
+import agentStripeRouter from './routes/agent-stripe.js';
+import verifiedPaymentRouter from './routes/verified-payment.js';
 import { swaggerSpec } from './swagger.js';
 
 const app = express();
@@ -24,10 +29,20 @@ app.use(helmet());
 app.use(cors({
   origin: [/^http:\/\/localhost:\d+$/, ...extraOrigins],
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'x-402-payment', 'x-mpp-credential'],
+  allowedHeaders: [
+    'Content-Type',
+    'Authorization',
+    'x-402-payment',
+    'x-mpp-credential',
+    'x-aperture-proof-record',
+  ],
   exposedHeaders: ['WWW-Authenticate', 'Payment-Receipt'],
   credentials: true,
 }));
+// Stripe webhook MUST mount before express.json — Stripe-Signature is HMAC'd
+// over the unparsed request body, and the json parser would consume it.
+app.use('/api/v1/mpp', stripeWebhookRouter);
+
 app.use(express.json({ limit: '1mb' }));
 
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
@@ -40,6 +55,10 @@ app.use('/api/v1/proofs', proofRouter);
 app.use('/api/v1/attestations', attestationRouter);
 app.use('/api/v1/compliance', complianceReportRouter);
 app.use('/api/v1/compliance', mppReportRouter);
+app.use('/api/v1/compliance', mppProtectedServiceRouter);
+app.use('/api/v1/compliance', mppPublicConfigRouter);
+app.use('/api/v1', agentStripeRouter);
+app.use('/api/v1/compliance', verifiedPaymentRouter);
 app.use('/api/v1/compliance', compressedAttestationRouter);
 
 app.use(errorHandler);

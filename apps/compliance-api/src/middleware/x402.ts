@@ -3,8 +3,28 @@ import { Connection } from '@solana/web3.js';
 import { logger } from '../utils/logger.js';
 
 const SOLANA_RPC = process.env.SOLANA_RPC_URL ?? 'https://api.devnet.solana.com';
-const USDC_MINT = process.env.USDC_MINT_ADDRESS ?? '4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU';
-const PUBLISHER_WALLET = process.env.PUBLISHER_WALLET ?? 'CBDjvUkZZ6ucrVGrU3vRraasTytha8oVg2NLCxAHE25b';
+// Production x402 advertises USDC (Circle's devnet/mainnet stablecoin) as
+// the default payment rail. Compliance is enforced at the Anchor program
+// level via verify_payment_proof_v2_with_transfer (ZK proof + atomic
+// recipient/mint/amount byte-binding) and at the API level via the
+// ProofRecord PDA lookup downstream — neither path needs a Token-2022
+// transfer hook on the mint, which is why aUSDC is no longer the default.
+// Operators can override via PAYMENT_MINT_ADDRESS for USDT or any other
+// SPL token; legacy AUSDC_MINT_ADDRESS / VUSDC_MINT_ADDRESS env values
+// are still accepted as a backwards-compatible fallback.
+const PAYMENT_MINT =
+  process.env.PAYMENT_MINT_ADDRESS ??
+  process.env.USDC_MINT_ADDRESS ??
+  process.env.AUSDC_MINT_ADDRESS ??
+  process.env.VUSDC_MINT_ADDRESS ??
+  '4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU';
+// Treasury wallet that receives x402 aUSDC payments. MUST be different
+// from the paying operator wallet — otherwise transfers are self-transfers
+// and the operator's net aUSDC balance never moves. Pre-generated keypair
+// lives at scripts/deploy/aperture-treasury.json; only the pubkey is
+// surfaced here.
+const PUBLISHER_WALLET =
+  process.env.PUBLISHER_WALLET ?? 'GRyQkYHeqEYT9KmANxAA9mtw6iJoqCtxVNCNRQD8PrMq';
 
 export interface X402PaymentRequirement {
   readonly version: '1';
@@ -41,7 +61,7 @@ export function requireX402Payment(
         version: '1',
         scheme: 'exact',
         network: 'solana-devnet',
-        token: USDC_MINT,
+        token: PAYMENT_MINT,
         amount: String(priceLamports),
         recipient: PUBLISHER_WALLET,
         description,

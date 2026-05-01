@@ -31,6 +31,29 @@ export const config = {
   stripe: {
     secretKey: requireEnv('STRIPE_SECRET_KEY'),
     apiVersion: optionalEnv('STRIPE_API_VERSION', '2026-03-04.preview'),
+    /// Stripe webhook signing secret (whsec_xxx). The signature on every
+    /// webhook payload is verified against this; without it the endpoint
+    /// would accept arbitrary attacker-shaped events. Optional at process
+    /// boot so the compliance-api can start without Stripe webhooks
+    /// configured (the /api/v1/mpp/webhook route returns 503 in that case);
+    /// production deployments MUST set the value.
+    webhookSecret: process.env.STRIPE_WEBHOOK_SECRET ?? '',
+    /// Stripe publishable key (pk_test_… / pk_live_…). Surfaced to the
+    /// dashboard via /api/v1/compliance/mpp/public-config so the browser
+    /// can mount Stripe Elements without bundling the key. Optional —
+    /// when unset the dashboard's MPP card hides the card-input UI and
+    /// shows an "MPP unavailable" hint instead.
+    publishableKey: process.env.STRIPE_PUBLISHABLE_KEY ?? '',
+  },
+  /// Ed25519 keypair the compliance-api uses to attest verified Stripe
+  /// PaymentIntents to the on-chain verifier. The public key is the value
+  /// the verifier program hardcodes as `MPP_AUTHORITY_PUBKEY` (Adım 8c).
+  /// Stored as a 64-byte base58 secret, same encoding as Solana keypairs,
+  /// so the same KMS-managed Solana key can serve both purposes if desired.
+  /// Optional at boot for dev parity with stripe.webhookSecret above; the
+  /// /verified-payment endpoint returns 503 when unset.
+  mppAuthority: {
+    keypairBase58: process.env.MPP_AUTHORITY_KEYPAIR_BASE58 ?? '',
   },
   mpp: {
     secretKey: requireEnv('MPP_SECRET_KEY'),
