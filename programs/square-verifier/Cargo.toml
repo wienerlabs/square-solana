@@ -18,3 +18,8 @@ idl-build = ["anchor-lang/idl-build"]
 anchor-lang = { version = "0.31.1", features = ["init-if-needed"] }
 sha2 = "0.10"
 groth16-solana = "0.2"
+# Cross-program: lets verify_payment_proof_v2 deserialize the PolicyAccount
+# written by the policy-registry program so it can byte-check policy_data_hash
+# against the proof's public_inputs[1]. cpi feature is on so we link the
+# struct definitions without trying to instantiate a second program entry point.
+policy-registry = { path = "../policy-registry", features = ["cpi"] }

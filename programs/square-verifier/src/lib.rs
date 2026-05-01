@@ -90,4 +90,77 @@ pub mod verifier {
             public_inputs,
         )
     }
+
+    /// Allocates the OperatorState PDA used to anchor on-chain daily spend.
+    /// One-time setup per operator wallet; safe to skip because the
+    /// record_payment instruction added in Adım 6 will lazily initialize
+    /// the same PDA via `init_if_needed`.
+    pub fn initialize_operator_state(
+        ctx: Context<InitializeOperatorState>,
+    ) -> Result<()> {
+        instructions::initialize_operator_state::handler(ctx)
+    }
+
+    /// Called by the SPL Token-2022 transfer-hook to atomically advance the
+    /// operator's daily spend counter once a verified ZK proof has been
+    /// matched against the actual transfer parameters. See record_payment.rs
+    /// for the full safety argument.
+    pub fn record_payment(
+        ctx: Context<RecordPayment>,
+        expected_recipient: [u8; 32],
+        expected_token_mint: [u8; 32],
+        expected_amount: u64,
+    ) -> Result<()> {
+        instructions::record_payment::handler(
+            ctx,
+            expected_recipient,
+            expected_token_mint,
+            expected_amount,
+        )
+    }
+
+    /// MPP B-flow verifier: cross-checks a Stripe-attested ZK proof against
+    /// the compliance-api's ed25519 signature (provided as the preceding
+    /// instruction in the same tx via the Solana ed25519 native precompile),
+    /// then atomically advances daily_spent in-line.
+    pub fn verify_mpp_payment_proof(
+        ctx: Context<VerifyMppPaymentProof>,
+        proof_a: [u8; 64],
+        proof_b: [u8; 128],
+        proof_c: [u8; 64],
+        public_inputs: [[u8; 32]; PAYMENT_NR_INPUTS],
+    ) -> Result<()> {
+        instructions::verify_mpp_payment_proof::handler(
+            ctx,
+            proof_a,
+            proof_b,
+            proof_c,
+            public_inputs,
+        )
+    }
+
+    /// Adım 9 — atomic verify + transfer for x402 payments.
+    /// Equivalent to running verify_payment_proof_v2 followed by a
+    /// transferCheckedWithTransferHook in the same tx, but bundled into a
+    /// single instruction. The compliance gate the transfer-hook used to
+    /// enforce (recipient/mint/amount byte-binding + daily_spent ceiling)
+    /// is enforced here before the Token-2022 CPI fires, so skipping the
+    /// hook does not weaken the security envelope.
+    pub fn verify_payment_proof_v2_with_transfer<'info>(
+        ctx: Context<'_, '_, '_, 'info, VerifyPaymentProofV2WithTransfer<'info>>,
+        proof_a: [u8; 64],
+        proof_b: [u8; 128],
+        proof_c: [u8; 64],
+        public_inputs: [[u8; 32]; PAYMENT_NR_INPUTS],
+        transfer_amount: u64,
+    ) -> Result<()> {
+        instructions::verify_payment_v2_with_transfer::handler(
+            ctx,
+            proof_a,
+            proof_b,
+            proof_c,
+            public_inputs,
+            transfer_amount,
+        )
+    }
 }
