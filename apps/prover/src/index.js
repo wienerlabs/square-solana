@@ -48,6 +48,15 @@ app.post('/prove', async (req, res) => {
         journal_digest: result.journal_digest,
       }),
     );
+    if (!result.is_compliant) {
+      console.error(
+        JSON.stringify({
+          event: 'compliance_violation_input',
+          input: req.body,
+          public_signals: result.public_signals,
+        }),
+      );
+    }
 
     res.json({
       ...result,

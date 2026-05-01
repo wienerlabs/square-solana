@@ -1,7 +1,16 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as snarkjs from 'snarkjs';
-import { padAddressList, padCategoryList, hashSolanaAddress, hashCategory } from './hash.js';
+import {
+  padAddressList,
+  padCategoryList,
+  hashSolanaAddress,
+  hashCategory,
+  hashUuid,
+  daysToBitmask,
+  decodeAddress32,
+  splitBytes,
+} from './hash.js';
 import { encodeForGroth16Solana } from './convert.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -18,11 +27,43 @@ const MAX_WHITELIST = 10;
 const MAX_BLOCKED = 10;
 const MAX_CATEGORIES = 8;
 
-// Shape the HTTP request payload into the circuit input format and run snarkjs
-// to produce a Groth16 proof. The payload mirrors what the legacy
-// prover-service accepted so the existing agent-service and compliance-api
-// callers do not need to change their request bodies.
+// Validate that an incoming request carries every field the payment.circom
+// circuit needs. Surface a clear error per missing field instead of letting
+// snarkjs crash deep inside witness generation.
+function validateRequest(req) {
+  const required = [
+    'policy_id',
+    'operator_id',
+    'max_daily_spend_lamports',
+    'max_per_transaction_lamports',
+    'allowed_endpoint_categories',
+    'blocked_addresses',
+    'token_whitelist',
+    'payment_amount_lamports',
+    'payment_token_mint',
+    'payment_recipient',
+    'payment_endpoint_category',
+    'daily_spent_before_lamports',
+    'current_unix_timestamp',
+    // stripe_receipt_hash is OPTIONAL — defaults to '0' for Solana flow.
+    // The MPP B-flow (Adım 8) sends a non-zero Poseidon-of-canonical-receipt
+    // value the verify_mpp_payment_proof instruction will ed25519-check
+    // against the compliance-api's authority signature.
+  ];
+  const missing = required.filter((k) => req[k] === undefined || req[k] === null);
+  if (missing.length > 0) {
+    throw new Error(`Missing required field(s): ${missing.join(', ')}`);
+  }
+}
+
+// Shape an incoming HTTP payload into the witness inputs payment.circom expects.
+// The payload mirrors the on-chain truth at proof time (recipient, amount,
+// mint, daily_spent_before, current_unix_timestamp) — none of these may be
+// fabricated by the caller because the verifier and the transfer-hook will
+// cross-check them in Adım 5/6.
 export async function generateProof(request) {
+  validateRequest(request);
+
   const tokens = await padAddressList(
     request.token_whitelist ?? [],
     MAX_WHITELIST,
@@ -36,23 +77,60 @@ export async function generateProof(request) {
     MAX_CATEGORIES,
   );
 
+  // Time restriction. Default = inactive (no time gate). The circuit MUX
+  // forces hash(time) == 0 when time_active == 0, so the off-chain backend's
+  // computePolicyDataHash and the in-circuit hash agree.
+  const tr = Array.isArray(request.time_restrictions) ? request.time_restrictions[0] : null;
+  const timeActive = tr ? '1' : '0';
+  const timeDaysBitmask = tr ? String(daysToBitmask(tr.allowed_days ?? [])) : '0';
+  const timeStartHourUtc = tr ? String(tr.allowed_hours_start ?? 0) : '0';
+  const timeEndHourUtc = tr ? String(tr.allowed_hours_end ?? 0) : '0';
+  if (tr && tr.timezone && tr.timezone !== 'UTC') {
+    throw new Error(`Only timezone='UTC' supported in MVP, got '${tr.timezone}'`);
+  }
+
+  // Split the payment recipient and token mint into 16+16 byte halves the
+  // circuit will expose verbatim as public outputs (recipient_high/low,
+  // token_mint_high/low). The on-chain verifier reads these directly off the
+  // proof and compares them against the actual transfer instruction.
+  const recipientBytes = decodeAddress32(request.payment_recipient);
+  const tokenBytes = decodeAddress32(request.payment_token_mint);
+  const [recipientHigh, recipientLow] = splitBytes(recipientBytes);
+  const [tokenHigh, tokenLow] = splitBytes(tokenBytes);
+
+  const operatorIdField = await hashSolanaAddress(request.operator_id);
+  const policyIdField = await hashUuid(request.policy_id);
+  const paymentCategoryField = await hashCategory(request.payment_endpoint_category);
+
   const circuitInput = {
+    // Policy (private)
     max_per_tx_lamports: String(request.max_per_transaction_lamports),
     max_daily_lamports: String(request.max_daily_spend_lamports),
-
     token_whitelist: tokens.values,
     token_whitelist_mask: tokens.mask,
     blocked_addresses: blocked.values,
     blocked_addresses_mask: blocked.mask,
     allowed_categories: categories.values,
     allowed_categories_mask: categories.mask,
+    payment_category: paymentCategoryField,
+    operator_id_field: operatorIdField,
+    policy_id_field: policyIdField,
+    time_active: timeActive,
+    time_days_bitmask: timeDaysBitmask,
+    time_start_hour_utc: timeStartHourUtc,
+    time_end_hour_utc: timeEndHourUtc,
 
-    daily_spent_lamports: String(request.daily_spent_so_far_lamports),
-
-    payment_amount_lamports: String(request.payment_amount_lamports),
-    payment_token: await hashSolanaAddress(request.payment_token_mint),
-    payment_recipient: await hashSolanaAddress(request.payment_recipient),
-    payment_category: await hashCategory(request.payment_endpoint_category),
+    // Payment (mirrored to public outputs)
+    recipient_high_in: recipientHigh.toString(),
+    recipient_low_in: recipientLow.toString(),
+    amount_lamports_in: String(request.payment_amount_lamports),
+    token_mint_high_in: tokenHigh.toString(),
+    token_mint_low_in: tokenLow.toString(),
+    daily_spent_before_in: String(request.daily_spent_before_lamports),
+    current_unix_timestamp_in: String(request.current_unix_timestamp),
+    // Stripe receipt commitment (decimal field element string). Zero when
+    // the proof is for a pure Solana payment.
+    stripe_receipt_hash_in: String(request.stripe_receipt_hash ?? '0'),
   };
 
   const { proof, publicSignals } = await snarkjs.groth16.fullProve(
@@ -61,44 +139,67 @@ export async function generateProof(request) {
     ZKEY_PATH,
   );
 
-  const [isCompliantStr, journalDigestStr] = publicSignals;
+  // publicSignals layout (matches payment.circom output order):
+  //   [0] is_compliant
+  //   [1] policy_data_hash
+  //   [2] recipient_high
+  //   [3] recipient_low
+  //   [4] amount_lamports
+  //   [5] token_mint_high
+  //   [6] token_mint_low
+  //   [7] daily_spent_before
+  //   [8] current_unix_timestamp
+  if (publicSignals.length !== 10) {
+    throw new Error(
+      `Circuit produced ${publicSignals.length} public signals, expected 10 — ` +
+      `circuit and prover-service are out of sync.`
+    );
+  }
+  const [
+    isCompliantStr,
+    policyDataHashStr,
+    recipientHighStr,
+    recipientLowStr,
+    amountLamportsStr,
+    tokenMintHighStr,
+    tokenMintLowStr,
+    dailySpentBeforeStr,
+    currentUnixTimestampStr,
+    stripeReceiptHashStr,
+  ] = publicSignals;
+
   const encoded = encodeForGroth16Solana(proof, publicSignals);
 
-  // journal_digest as hex for legacy callers that store it under `proof_hash`.
-  // The Circom circuit's Poseidon output is the single cryptographic binding
-  // to the inputs, so it serves the same deduplication / lookup role that the
-  // RISC Zero proof_hash played before.
-  const journalDigestHex = BigInt(journalDigestStr)
+  const policyDataHashHex = BigInt(policyDataHashStr)
     .toString(16)
     .padStart(64, '0');
 
   return {
     is_compliant: isCompliantStr === '1',
-    journal_digest: journalDigestStr,
+    policy_data_hash: policyDataHashStr,
+    policy_data_hash_hex: policyDataHashHex,
+    public_signals: {
+      is_compliant: isCompliantStr,
+      policy_data_hash: policyDataHashStr,
+      recipient_high: recipientHighStr,
+      recipient_low: recipientLowStr,
+      amount_lamports: amountLamportsStr,
+      token_mint_high: tokenMintHighStr,
+      token_mint_low: tokenMintLowStr,
+      daily_spent_before: dailySpentBeforeStr,
+      current_unix_timestamp: currentUnixTimestampStr,
+      stripe_receipt_hash: stripeReceiptHashStr,
+    },
     groth16: encoded,
-    // Raw snarkjs output is kept for debugging and off-chain verification.
     raw_proof: proof,
     raw_public: publicSignals,
 
-    // Backwards-compatible shape for call sites still using the legacy
-    // compliance-api submitProof body. Fields that do not map onto the
-    // Circom model are populated with best-effort equivalents so the
-    // dashboard can render meaningful values without reshaping its schema.
-
-    // Amount range buckets mirror the old RISC Zero privacy pattern —
-    // report a 1 USDC bucket (in lamports) around the payment so the UI's
-    // min/max range shows meaningful numbers after its /1_000_000 decode.
-    proof_hash: journalDigestHex,
-    image_id: [0, 0, 0, 0, 0, 0, 0, 0],
-    amount_range_min:
-      Math.floor(Number(request.payment_amount_lamports) / 1_000_000) * 1_000_000,
-    amount_range_max:
-      (Math.floor(Number(request.payment_amount_lamports) / 1_000_000) + 1) *
-      1_000_000,
+    // The verifier seeds the ProofRecord PDA by policy_data_hash, so callers
+    // can derive the same PDA off-chain by hex-decoding policy_data_hash_hex.
+    // proof_hash kept as an alias for legacy callers that recorded the field
+    // under that name; it is the same 32-byte commitment.
+    proof_hash: policyDataHashHex,
     verification_timestamp: new Date().toISOString(),
-    // The "receipt" concept from RISC Zero does not exist here; surface the
-    // concatenated Groth16 proof bytes instead so dashboards that count
-    // receipt size see the actual on-chain payload size (~256 bytes).
     receipt_bytes: Array.from(
       Buffer.concat([
         Buffer.from(encoded.proof_a, 'base64'),
