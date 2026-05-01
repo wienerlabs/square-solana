@@ -4,6 +4,8 @@ import type { Stripe as StripeType } from 'stripe';
 import NodeCache from 'node-cache';
 import { config } from '../config.js';
 import { logger } from '../utils/logger.js';
+import { getVerifiedPaymentIntent } from '../models/verified-payment-intent.js';
+import { getOperatorStripeCredentials } from '../models/operator-stripe-credentials.js';
 
 export interface MPPChallenge {
   readonly id: string;
@@ -35,6 +37,13 @@ export interface MPPReceipt {
   readonly reference: string;
   readonly amount: string;
   readonly currency: string;
+  /// Poseidon commitment over the canonical Stripe receipt — the ZK circuit
+  /// (Adım 8b) reproduces this value as public_inputs[9].
+  readonly poseidon_hash_hex: string;
+  /// Compliance-api MPP authority's ed25519 signature over poseidon_hash_hex.
+  /// The B-flow verifier (Adım 8c) checks this in-program via the Solana
+  /// ed25519 native precompile.
+  readonly authority_signature_b58: string;
 }
 
 const challengeCache = new NodeCache({ stdTTL: 300 });
@@ -83,14 +92,30 @@ export function requireMPPPayment(
     if (!credentialHeader) {
       try {
         const stripe = await getStripe();
+        // If the caller advertised an operator_id and that operator has a
+        // saved Stripe Customer (configured from dashboard Settings → Agent
+        // Stripe Configuration), pin the PaymentIntent to that customer.
+        // The agent then confirms with off_session=true against the saved
+        // payment_method; without the customer link Stripe rejects the
+        // off_session confirm with "PaymentIntent has no Customer".
+        const operatorIdHint =
+          (req.query.operator_id as string | undefined) ?? undefined;
+        let savedCustomer: string | null = null;
+        if (operatorIdHint) {
+          const creds = await getOperatorStripeCredentials(operatorIdHint);
+          savedCustomer = creds?.stripe_customer_id ?? null;
+        }
+
         const paymentIntent = await stripe.paymentIntents.create({
           amount: amountCents,
           currency,
           payment_method_types: ['card'],
+          ...(savedCustomer ? { customer: savedCustomer } : {}),
           metadata: {
             mpp_version: '1',
             mpp_resource: req.originalUrl,
             mpp_description: description,
+            ...(operatorIdHint ? { aperture_operator_id: operatorIdHint } : {}),
           },
         });
 
@@ -195,15 +220,25 @@ export function requireMPPPayment(
         return;
       }
 
-      const stripe = await getStripe();
-      const paymentIntent = await stripe.paymentIntents.retrieve(
-        credential.paymentIntentId,
-      );
-
-      if (paymentIntent.status !== 'succeeded') {
+      // Authoritative source for "did this PaymentIntent succeed?" is the
+      // signed Stripe webhook event we persisted in verified_payment_intents
+      // (Adım 8a). Going back to Stripe's REST API would burn a round-trip
+      // per request and bypass the canonical Poseidon hash + ed25519 sig
+      // the on-chain verifier consumes downstream.
+      const verified = await getVerifiedPaymentIntent(credential.paymentIntentId);
+      if (!verified) {
         res.status(402).json({
           success: false,
-          error: `Payment not completed. Status: ${paymentIntent.status}`,
+          error:
+            'Stripe webhook for this PaymentIntent has not yet been received. The compliance-api only acts on signature-verified webhook events; retry shortly after the Stripe Dashboard shows the charge as succeeded.',
+          data: null,
+        });
+        return;
+      }
+      if (verified.status !== 'succeeded') {
+        res.status(402).json({
+          success: false,
+          error: `Webhook recorded PaymentIntent status as "${verified.status}", not "succeeded".`,
           data: null,
         });
         return;
@@ -212,14 +247,15 @@ export function requireMPPPayment(
       const receipt: MPPReceipt = {
         method: 'stripe',
         status: 'success',
-        timestamp: new Date().toISOString(),
-        reference: paymentIntent.id,
+        timestamp: verified.stripe_paid_at.toISOString(),
+        reference: verified.stripe_payment_intent_id,
         amount: cachedChallenge.request.amount,
         currency: cachedChallenge.request.currency,
+        poseidon_hash_hex: verified.poseidon_hash_hex,
+        authority_signature_b58: verified.authority_signature_b58,
       };
 
       (req as Request & { mppReceipt: MPPReceipt }).mppReceipt = receipt;
-      (req as Request & { mppPaymentIntent: typeof paymentIntent }).mppPaymentIntent = paymentIntent;
 
       const receiptBase64 = Buffer.from(JSON.stringify(receipt)).toString(
         'base64',
@@ -229,7 +265,7 @@ export function requireMPPPayment(
       challengeCache.del(credential.challengeId);
 
       logger.info('MPP payment verified', {
-        paymentIntentId: paymentIntent.id,
+        paymentIntentId: verified.stripe_payment_intent_id,
         amount: cachedChallenge.request.amount,
         resource: req.originalUrl,
       });
