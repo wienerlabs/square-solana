@@ -60,7 +60,12 @@ export interface BatchAttestationOutput {
     readonly min: number;
     readonly max: number;
   };
-  readonly policy_violations: 0;
-  readonly sanctions_intersections: 0;
+  // Always non-negative; in production both currently surface as 0 because
+  // the on-chain verifier rejects non-compliant proofs before they ever
+  // reach the DB. Typed as `number` so future revisions that persist
+  // rejected attempts in a separate table can populate them without a
+  // type-system migration.
+  readonly policy_violations: number;
+  readonly sanctions_intersections: number;
   readonly proof_hash: string;
 }
