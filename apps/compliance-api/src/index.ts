@@ -16,6 +16,9 @@ import mppProtectedServiceRouter from './routes/mpp-protected-service.js';
 import mppPublicConfigRouter from './routes/mpp-public-config.js';
 import agentStripeRouter from './routes/agent-stripe.js';
 import verifiedPaymentRouter from './routes/verified-payment.js';
+import unattestedPaymentsRouter from './routes/unattested-payments.js';
+import { startSolanaWatcher, stopSolanaWatcher } from './watchers/solana-watcher.js';
+import { startStripeReconciler, stopStripeReconciler } from './watchers/stripe-watcher.js';
 import { swaggerSpec } from './swagger.js';
 
 const app = express();
@@ -60,6 +63,7 @@ app.use('/api/v1/compliance', mppPublicConfigRouter);
 app.use('/api/v1', agentStripeRouter);
 app.use('/api/v1/compliance', verifiedPaymentRouter);
 app.use('/api/v1/compliance', compressedAttestationRouter);
+app.use('/api/v1/unattested-payments', unattestedPaymentsRouter);
 
 app.use(errorHandler);
 
@@ -69,10 +73,14 @@ const server = app.listen(config.port, () => {
     env: config.nodeEnv,
     swagger: `http://localhost:${config.port}/api-docs`,
   });
+  startSolanaWatcher();
+  startStripeReconciler();
 });
 
 function gracefulShutdown(signal: string): void {
   logger.info(`Received ${signal}, shutting down gracefully`);
+  stopSolanaWatcher();
+  stopStripeReconciler();
   server.close(() => {
     logger.info('Server closed');
     process.exit(0);

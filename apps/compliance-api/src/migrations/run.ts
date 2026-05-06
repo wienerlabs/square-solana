@@ -6,6 +6,7 @@ import * as migration003 from './003_add_proof_tx_signature.js';
 import * as migration004 from './004_add_compressed_tx_signature.js';
 import * as migration005 from './005_create_verified_payment_intents.js';
 import * as migration006 from './006_create_operator_stripe_credentials.js';
+import * as migration007 from './007_create_unattested_payments.js';
 
 interface Migration {
   name: string;
@@ -20,6 +21,7 @@ const migrations: Migration[] = [
   { name: '004_add_compressed_tx_signature', ...migration004 },
   { name: '005_create_verified_payment_intents', ...migration005 },
   { name: '006_create_operator_stripe_credentials', ...migration006 },
+  { name: '007_create_unattested_payments', ...migration007 },
 ];
 
 async function ensureMigrationsTable(client: import('pg').PoolClient): Promise<void> {

@@ -64,4 +64,37 @@ export const config = {
     compressedMint: optionalEnv('COMPRESSED_ATTESTATION_MINT', ''),
     payerPrivateKey: optionalEnv('LIGHT_PAYER_PRIVATE_KEY', ''),
   },
+  /// Helius credentials power the unattested-payment watcher. Without an
+  /// API key the watcher logs a one-time warning and stays idle so the
+  /// rest of the compliance-api keeps working; an explicit failure mode
+  /// would block startup which we want to avoid in dev / CI.
+  helius: {
+    apiKey: process.env.HELIUS_API_KEY ?? '',
+    network: (process.env.HELIUS_NETWORK ?? 'devnet').toLowerCase(),
+  },
+  watcher: {
+    /// Polling cadence in milliseconds. Lower values catch unattested
+    /// payments faster but raise Helius RPC pressure linearly. 15 s keeps
+    /// us well within the free-tier rate budget.
+    intervalMs: parseInt(optionalEnv('COMPLIANCE_WATCHER_INTERVAL_MS', '15000'), 10),
+    /// Comma-separated mint allow list. Empty means "watch every SPL
+    /// transfer Helius returns" - useful when the operator policy uses an
+    /// unusual mint, but generates more reconcile noise.
+    mintAllowList: (process.env.COMPLIANCE_WATCHER_MINTS ?? '')
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean),
+    /// Stripe reconcile delay (ms) - how long after a verified Stripe
+    /// PaymentIntent lands we wait before checking proof_records for a
+    /// matching anchor. The agent / dashboard usually anchors within a
+    /// few seconds; 90 s gives slow paths room without dragging out the
+    /// detection window.
+    stripeReconcileDelayMs: parseInt(
+      optionalEnv('COMPLIANCE_STRIPE_RECONCILE_DELAY_MS', '90000'),
+      10,
+    ),
+  },
+  solana: {
+    rpcUrl: optionalEnv('SOLANA_RPC_URL', 'https://api.devnet.solana.com'),
+  },
 } as const;
