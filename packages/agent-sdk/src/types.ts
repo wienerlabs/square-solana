@@ -36,12 +36,27 @@ export interface AgentOptions {
   name: string;
   /** HTTP port to listen on */
   port: number;
+  /**
+   * Solana wallet address (base58 Ed25519 public key) for receiving
+   * payments AND for deriving the canonical did:aip identifier.
+   * REQUIRED as of @aip/agent-sdk 0.2.0 — the previous `did:aip:sdk:*`
+   * fallback violated the did:aip Method Specification §3.2.
+   */
+  walletAddress: string;
+  /**
+   * Owner-scoped slug used as the agent_id component of the DID.
+   * 1–32 chars from [a-z0-9_-]. If omitted, derived from `name`.
+   */
+  agentId?: string;
   /** Agent type */
   type?: AgentType;
   /** Semantic version */
   version?: string;
-  /** Solana wallet address for receiving payments */
-  walletAddress?: string;
-  /** Custom DID (auto-generated if omitted) */
+  /**
+   * Explicit DID override (advanced use only). When set, must be a
+   * canonical did:aip identifier matching the §3.2 ABNF. Most callers
+   * should leave this undefined and let the SDK construct it from
+   * walletAddress + agentId.
+   */
   did?: string;
 }
