@@ -1,6 +1,9 @@
 {
-  "name": "aip-agent-sdk",
+  "name": "@aipagents/agent-sdk",
   "version": "0.2.0",
+  "publishConfig": {
+    "access": "public"
+  },
   "description": "Build AIP-compatible AI agents in minutes. Create agents that earn USDC on Solana.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
