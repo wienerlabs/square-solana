@@ -2,7 +2,11 @@
  * @aip/agent-sdk — Agent builder with fluent API.
  *
  * Usage:
- *   const agent = createAgent({ name: 'My Bot', port: 4001 });
+ *   const agent = createAgent({
+ *     name: 'My Bot',
+ *     port: 4001,
+ *     walletAddress: 'YourSolanaWalletAddressBase58…',
+ *   });
  *   agent.capability('text.summarize', {
  *     description: 'Summarize Text',
  *     price: '0.10',
@@ -33,7 +37,37 @@ function normalizePricing(price: string | Pricing): { amount: string; token: str
   return { amount: price.amount, token: price.token ?? "USDC", network: price.network ?? "solana" };
 }
 
+/** Solana base58 pubkey: 32–44 chars from the Bitcoin alphabet (no 0OIl). */
+const SOLANA_PUBKEY_RE = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
+const AGENT_ID_RE = /^[a-z0-9_-]{1,32}$/;
+
+function sanitizeAgentId(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 32);
+}
+
 export function createAgent(options: AgentOptions) {
+  if (!options.walletAddress || !SOLANA_PUBKEY_RE.test(options.walletAddress)) {
+    throw new Error(
+      `createAgent: walletAddress must be a base58 Solana public key (32–44 chars). ` +
+      `Got: ${JSON.stringify(options.walletAddress)}. ` +
+      `As of @aip/agent-sdk 0.2.0 this field is required so the agent's DID can be ` +
+      `derived from the canonical did:aip format (spec §3.2).`
+    );
+  }
+
+  const agentId = options.agentId ?? sanitizeAgentId(options.name);
+  if (!AGENT_ID_RE.test(agentId)) {
+    throw new Error(
+      `createAgent: agentId must match /^[a-z0-9_-]{1,32}$/. ` +
+      `Resolved agentId="${agentId}" from options.agentId=${JSON.stringify(options.agentId)} ` +
+      `or fallback from options.name=${JSON.stringify(options.name)}.`
+    );
+  }
+
   const app = express();
   app.use(express.json());
 
@@ -42,8 +76,8 @@ export function createAgent(options: AgentOptions) {
 
   const agentType: AgentType = options.type ?? "Task";
   const version = options.version ?? "1.0.0";
-  const walletAddress = options.walletAddress ?? "";
-  const did = options.did ?? `did:aip:sdk:${options.name.toLowerCase().replace(/[^a-z0-9]/g, "-")}`;
+  const walletAddress = options.walletAddress;
+  const did = options.did ?? `did:aip:${walletAddress}:${agentId}`;
 
   /** Register a capability with its handler */
   function capability(id: string, config: CapabilityConfig) {
@@ -134,6 +168,7 @@ export function createAgent(options: AgentOptions) {
     const card = getCard();
     app.listen(options.port, () => {
       console.log(`[${options.name}] listening on http://localhost:${options.port}`);
+      console.log(`  DID:        ${did}`);
       console.log(`  Agent Card: http://localhost:${options.port}/.well-known/agent.json`);
       console.log(`  A2A:        http://localhost:${options.port}/a2a`);
       console.log(`  Capabilities: ${Array.from(capabilities.keys()).join(", ")}`);
