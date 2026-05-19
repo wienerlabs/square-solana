@@ -87,7 +87,46 @@ pub mod aip_registry {
         msg!("Agent deregistered");
         Ok(())
     }
+
+    /// Force-close a legacy account that uses a stale schema and can no
+    /// longer be deserialized (so `deregister_agent` panics on its
+    /// `Account<AgentRecord>` constraint). The account is treated as
+    /// raw bytes — we just transfer its lamports to the platform
+    /// authority and zero out the data so the runtime garbage-collects
+    /// it on the next rent sweep.
+    ///
+    /// Authorized only for the platform key hardcoded in
+    /// `LEGACY_CLOSE_AUTHORITY` (which is also the program upgrade
+    /// authority).
+    pub fn force_close_legacy(ctx: Context<ForceCloseLegacy>) -> Result<()> {
+        let account_info = ctx.accounts.account.to_account_info();
+        let authority_info = ctx.accounts.authority.to_account_info();
+
+        let lamports = account_info.lamports();
+        let new_auth_balance = authority_info
+            .lamports()
+            .checked_add(lamports)
+            .ok_or(RegistryError::Overflow)?;
+        **authority_info.try_borrow_mut_lamports()? = new_auth_balance;
+        **account_info.try_borrow_mut_lamports()? = 0;
+
+        let mut data = account_info.try_borrow_mut_data()?;
+        data.fill(0);
+
+        msg!("Force-closed legacy account: {}", account_info.key());
+        Ok(())
+    }
 }
+
+/// Platform key authorized to call `force_close_legacy`. Also the
+/// program upgrade authority on devnet.
+/// Base58: 33qU3JFkrehB2HkgdHzcpj9gDkFk8c2okQC51REWhjKh
+const LEGACY_CLOSE_AUTHORITY: Pubkey = Pubkey::new_from_array([
+    30, 113, 86, 28, 224, 160, 107, 29,
+    2, 32, 171, 122, 22, 51, 215, 105,
+    22, 36, 123, 130, 240, 165, 251, 25,
+    115, 130, 173, 24, 186, 227, 34, 84,
+]);
 
 // ---------------------------------------------------------------
 // Helpers
@@ -153,6 +192,27 @@ pub struct DeregisterAgent<'info> {
         bump = agent_record.bump,
     )]
     pub agent_record: Account<'info, AgentRecord>,
+}
+
+#[derive(Accounts)]
+pub struct ForceCloseLegacy<'info> {
+    /// Hardcoded platform authority; checked against
+    /// `LEGACY_CLOSE_AUTHORITY` so no other signer can call this.
+    #[account(
+        mut,
+        constraint = authority.key() == LEGACY_CLOSE_AUTHORITY @ RegistryError::Unauthorized,
+    )]
+    pub authority: Signer<'info>,
+
+    /// CHECK: Account is intentionally not deserialized — it may be a
+    /// stale-schema record from an earlier program deployment. We only
+    /// require that it is owned by this program so we don't accidentally
+    /// drain unrelated accounts.
+    #[account(
+        mut,
+        owner = crate::ID,
+    )]
+    pub account: UncheckedAccount<'info>,
 }
 
 // ---------------------------------------------------------------
@@ -248,4 +308,6 @@ pub enum RegistryError {
     CapabilityDescriptionTooLong,
     #[msg("Unauthorized: only the owner can modify this record")]
     Unauthorized,
+    #[msg("Arithmetic overflow during lamport transfer")]
+    Overflow,
 }
