@@ -17,7 +17,7 @@
     "a2a", "json-rpc", "claude", "haiku", "sdk",
     "agent-internet-protocol", "marketplace"
   ],
-  "license": "ISC",
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/Agent-Internet-Protocol/aip-website.git",
