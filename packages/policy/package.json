@@ -2,7 +2,7 @@
   "name": "@squaresdk/solana-policy",
   "version": "0.1.0",
   "description": "Kurum tarafı: politika commitment'ı, alıcı Merkle ağacı, release witness'ı, ispat ve bağlama — BE-35 imzaları (gövdeler BE-10)",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "private": true,
   "type": "module",
   "exports": {
