@@ -3,9 +3,9 @@ use crate::state::OperatorState;
 
 /// Allocates the OperatorState PDA for the signing operator. Called once,
 /// off the hot path, so the dashboard can show a meaningful "0 USDC spent
-/// today" value before the first transfer ever happens. The transfer-hook
-/// entry point added in Adım 6 will use `init_if_needed` so that operators
-/// who skip this step still get a valid state on their first payment.
+/// today" value before the first transfer ever happens. The verify
+/// instructions use `init_if_needed`, so operators who skip this step still
+/// get a valid state on their first payment.
 ///
 /// Seeds: ["operator_state", operator]
 /// Authority: any signer can pay the rent and trigger init for THEIR OWN

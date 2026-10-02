@@ -8,16 +8,17 @@ use anchor_lang::prelude::*;
 /// in-memory tracker that reset on every agent restart, letting an operator
 /// silently exceed their daily cap.
 ///
-/// `day_start_unix` pins the rolling window to UTC midnight; any record_payment
-/// instruction whose Solana clock has crossed into the next UTC day resets
+/// `day_start_unix` pins the rolling window to UTC midnight; any instruction
+/// that advances the counter after the Solana clock has crossed into the next UTC day resets
 /// `daily_spent_lamports` to 0 atomically before adding the new payment.
 ///
 /// `total_lifetime_payments` is a monotonic counter useful for audit trails
 /// and dashboards. It is never reset.
 ///
 /// PDA: ["operator_state", operator_pubkey]
-/// Owner: verifier program (this program). Mutated by record_payment (added
-/// in Adım 6 alongside the transfer-hook entry point).
+/// Owner: verifier program (this program). Mutated by verify_mpp_payment_proof.
+/// The transfer-hook path (`record_payment`) that advanced it for the Solana
+/// flow was removed in BC-11; BC-21 advances it through `record_release`.
 #[account]
 #[derive(InitSpace)]
 pub struct OperatorState {

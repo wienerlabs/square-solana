@@ -25,7 +25,7 @@ pnpm license:write
 | `anchor-lang` | cargo | Apache-2.0 | runtime | `policy-registry`, `square-escrow-contract`, `square-policy-contract`, `square-registry-contract`, `square-verifier-contract`, `verifier` | ✓ |
 | `anchor-spl` | cargo | Apache-2.0 | runtime | `square-escrow-contract` | ✓ |
 | `groth16-solana` | cargo | MIT | runtime | `verifier` | ✓ |
-| `sha2` | cargo | MIT OR Apache-2.0 | runtime | `policy-registry`, `verifier` | ✓ |
+| `sha2` | cargo | MIT OR Apache-2.0 | runtime | `policy-registry` | ✓ |
 | `turbo` | npm | MIT | dev | `@squaresdk/solana-monorepo` | ✓ |
 
 **Özet:** 1 npm, 4 Cargo doğrudan bağımlılık; lisans dağılımı: 2× Apache-2.0, 2× MIT, 1× MIT OR Apache-2.0.
