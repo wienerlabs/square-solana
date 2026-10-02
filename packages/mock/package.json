@@ -1,0 +1,34 @@
+{
+  "name": "@squaresdk/solana-mock",
+  "version": "0.1.0",
+  "description": "Square sözleşme mock'u: SquareApi'yi uygulayan sahte API, OpenAPI uçları için MSW handler'ları ve 8 adımlık senaryo fixture'ları — FE-24",
+  "license": "Apache-2.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./node": {
+      "types": "./dist/node.d.ts",
+      "import": "./dist/node.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "node --test \"test/*.test.mjs\""
+  },
+  "dependencies": {
+    "@squaresdk/solana-sdk": "workspace:*",
+    "@squaresdk/solana-types": "workspace:*",
+    "msw": "^3.0.1"
+  },
+  "devDependencies": {
+    "yaml": "^2.9.1"
+  }
+}

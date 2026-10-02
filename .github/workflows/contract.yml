@@ -27,8 +27,9 @@ jobs:
         run: pnpm --filter @squaresdk/solana-types gen:check
       - name: OpenAPI lint
         run: pnpm openapi:lint
-      - name: Derleme, tip kontrolü (IDL tip testleri dahil) ve hizalama testleri
+      - name: Derleme, tip kontrolü (IDL tip testleri dahil) ve hizalama testleri (FE-24 mock dahil)
         run: >-
           pnpm turbo run build typecheck test
           --filter=@squaresdk/solana-types --filter=@squaresdk/solana-sdk
           --filter=@squaresdk/solana-identity --filter=@squaresdk/solana-policy
+          --filter=@squaresdk/solana-mock
