@@ -7,8 +7,8 @@ apis:
     root: docs/api/openapi.yaml
 
 rules:
-  # Sözleşme taslağında gerçek sunucu adresi yok (BE-18 / BE-20 ile gelir).
-  no-server-example.com: off
+  # Sunucu adresi spec'te sabitlenmez; ortam yapılandırmasından gelir (BE-18 / BE-20).
+  no-empty-servers: off
   operation-4xx-response: error
   operation-operationId: error
   tag-description: error

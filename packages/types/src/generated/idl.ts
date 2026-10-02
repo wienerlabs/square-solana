@@ -672,11 +672,6 @@ export const IDL_PROGRAMS = {
         "code": 6006,
         "name": "InvalidScreeningTtl",
         "msg": "Screening TTL must be positive"
-      },
-      {
-        "code": 6007,
-        "name": "NotImplemented",
-        "msg": "Interface contract stub: not implemented"
       }
     ]
   },
@@ -729,11 +724,6 @@ export const IDL_PROGRAMS = {
         "code": 6004,
         "name": "InvalidMultisigVault",
         "msg": "Multisig vault does not match the Squads v4 derivation"
-      },
-      {
-        "code": 6005,
-        "name": "NotImplemented",
-        "msg": "Interface contract stub: not implemented"
       }
     ]
   },
@@ -814,11 +804,6 @@ export const IDL_PROGRAMS = {
         "code": 6010,
         "name": "InvalidMppAttestation",
         "msg": "MPP attestation missing or signed by an unexpected key"
-      },
-      {
-        "code": 6011,
-        "name": "NotImplemented",
-        "msg": "Interface contract stub: not implemented"
       }
     ]
   },
@@ -1119,11 +1104,6 @@ export const IDL_PROGRAMS = {
         "code": 6047,
         "name": "TravelRuleCommitmentRequired",
         "msg": "Travel Rule commitment required above the threshold"
-      },
-      {
-        "code": 6048,
-        "name": "NotImplemented",
-        "msg": "Interface contract stub: not implemented"
       }
     ]
   }

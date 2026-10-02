@@ -26,11 +26,9 @@ pub struct OperatorState {
     pub daily_spent_lamports: u64,
     pub day_start_unix: i64,
     pub total_lifetime_payments: u64,
-    /// `policy_data_hash` of the most-recently verified proof that is still
-    /// waiting to be consumed by an SPL Token-2022 transfer. Zero means
-    /// "nothing pending" — the operator must produce a fresh proof before the
-    /// transfer-hook will allow another transfer. Set by verify_payment_proof_v2,
-    /// cleared by record_payment once the matching transfer has been observed.
+    /// Written only by the transfer-hook flow that BC-11 removed; no remaining
+    /// instruction reads or writes it. Kept so the account layout stays
+    /// unchanged until BC-21 moves to the BC-44 `OperatorState` layout.
     pub pending_proof_hash: [u8; 32],
     pub bump: u8,
 }
