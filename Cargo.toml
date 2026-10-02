@@ -1,7 +1,6 @@
 [workspace]
 resolver = "2"
-# programs/* ilk program PR'ı (BC-05) ile eklenir: Cargo, hiçbir klasörle eşleşmeyen glob'da hata verir.
-members = ["crates/*"]
+members = ["programs/*", "crates/*"]
 
 [profile.release]
 overflow-checks = true
