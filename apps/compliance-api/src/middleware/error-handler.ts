@@ -1,7 +1,7 @@
 import type { Request, Response, NextFunction } from 'express';
 import { ZodError } from 'zod';
 import { logger } from '../utils/logger.js';
-import type { ApiError } from '@aperture/types';
+import type { ApiError } from '../types/api.js';
 
 export class AppError extends Error {
   constructor(

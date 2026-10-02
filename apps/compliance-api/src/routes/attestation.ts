@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import type { ApiResponse, PaginatedResponse, Attestation, BatchAttestationOutput } from '@aperture/types';
+import type { ApiResponse, PaginatedResponse } from '../types/api.js';
+import type { Attestation, BatchAttestationOutput } from '../types/attestation.js';
 import { validateBody } from '../middleware/validate.js';
 import { AppError } from '../middleware/error-handler.js';
 import {

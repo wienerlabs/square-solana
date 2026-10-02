@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { healthCheck } from '../utils/database.js';
-import type { ApiResponse } from '@aperture/types';
+import type { ApiResponse } from '../types/api.js';
 
 const router = Router();
 

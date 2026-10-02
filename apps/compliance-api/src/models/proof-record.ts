@@ -1,7 +1,7 @@
 import { v4 as uuidv4 } from 'uuid';
 import { query } from '../utils/database.js';
 import { logger } from '../utils/logger.js';
-import type { ProofRecord, ProofRecordInput } from '@aperture/types';
+import type { ProofRecord, ProofRecordInput } from '../types/attestation.js';
 
 interface ProofRecordRow {
   id: string;

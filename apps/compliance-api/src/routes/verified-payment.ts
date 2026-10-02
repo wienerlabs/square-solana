@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import type { ApiResponse } from '@aperture/types';
+import type { ApiResponse } from '../types/api.js';
 import {
   getVerifiedPaymentIntent,
   upsertVerifiedPaymentIntent,

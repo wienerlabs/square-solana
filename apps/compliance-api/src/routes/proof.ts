@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import type { ApiResponse, ProofRecord } from '@aperture/types';
+import type { ApiResponse } from '../types/api.js';
+import type { ProofRecord } from '../types/attestation.js';
 import { validateBody } from '../middleware/validate.js';
 import { AppError } from '../middleware/error-handler.js';
 import {

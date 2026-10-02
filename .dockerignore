@@ -1,0 +1,13 @@
+# Docker build bağlamı repo köküdür (ör. docker build -f apps/prover/Dockerfile .).
+# Bağımlılıklar imaj içinde pnpm ile kurulur; yerel çıktılar ve gizli dosyalar girmez.
+.git
+**/node_modules
+**/dist
+**/.turbo
+target
+.anchor
+test-ledger
+**/.env*
+!**/.env.example
+**/*keypair*.json
+.DS_Store

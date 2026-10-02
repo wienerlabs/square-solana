@@ -2,7 +2,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { query, transaction } from '../utils/database.js';
 import { logger } from '../utils/logger.js';
 import { computeBatchHash } from '../utils/crypto.js';
-import type { Attestation, BatchAttestationOutput, ProofRecord } from '@aperture/types';
+import type { Attestation, BatchAttestationOutput, ProofRecord } from '../types/attestation.js';
 
 interface AttestationRow {
   id: string;

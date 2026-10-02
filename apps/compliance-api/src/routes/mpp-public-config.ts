@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import type { ApiResponse } from '@aperture/types';
+import type { ApiResponse } from '../types/api.js';
 import { config } from '../config.js';
 import { getAuthorityPublicKeyBase58 } from '../utils/stripe-receipt.js';
 

@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import type { Request } from 'express';
-import type { ApiResponse } from '@aperture/types';
+import type { ApiResponse } from '../types/api.js';
 import { requireX402Payment, type X402PaymentProof } from '../middleware/x402.js';
 import { getProofRecordsByOperator } from '../models/proof-record.js';
 import { getAttestationsByOperator } from '../models/attestation.js';

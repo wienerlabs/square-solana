@@ -15,6 +15,7 @@
  *   agent.start();
  */
 import express from "express";
+import type { Express } from "express";
 import type { AgentOptions, AgentCard, AgentType, CapabilityConfig, Pricing } from "./types";
 
 interface InternalTask {
@@ -49,7 +50,15 @@ function sanitizeAgentId(name: string): string {
     .slice(0, 32);
 }
 
-export function createAgent(options: AgentOptions) {
+/** Agent returned by createAgent (explicit so the emitted .d.ts is portable under pnpm). */
+export interface Agent {
+  capability(id: string, config: CapabilityConfig): Agent;
+  start(): AgentCard;
+  getCard(): AgentCard;
+  app: Express;
+}
+
+export function createAgent(options: AgentOptions): Agent {
   if (!options.walletAddress || !SOLANA_PUBKEY_RE.test(options.walletAddress)) {
     throw new Error(
       `createAgent: walletAddress must be a base58 Solana public key (32–44 chars). ` +
@@ -176,6 +185,6 @@ export function createAgent(options: AgentOptions) {
     return card;
   }
 
-  const api = { capability, start, getCard, app };
+  const api: Agent = { capability, start, getCard, app };
   return api;
 }

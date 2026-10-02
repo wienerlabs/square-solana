@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { Keypair, PublicKey } from '@solana/web3.js';
-import type { ApiResponse } from '@aperture/types';
+import type { ApiResponse } from '../types/api.js';
 import { validateBody } from '../middleware/validate.js';
 import { AppError } from '../middleware/error-handler.js';
 import { config } from '../config.js';

@@ -1,23 +1,16 @@
-FROM node:22-alpine AS base
-WORKDIR /app
+# Build bağlamı repo kökü: docker build -f apps/prover/Dockerfile .
+FROM node:24-alpine AS build
+RUN corepack enable
+WORKDIR /repo
+COPY . .
+RUN pnpm install --frozen-lockfile --filter @squaresdk/solana-prover \
+    && pnpm --filter @squaresdk/solana-prover deploy --prod --legacy /out
 
-FROM base AS deps
-COPY services/prover-service/package.json services/prover-service/package-lock.json* ./
-RUN npm install --omit=dev
-
-FROM base AS runner
+FROM node:24-alpine AS runner
 ENV NODE_ENV=production
-ENV PROVER_SERVICE_PORT=3003
-
 RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 prover
-
-COPY --from=deps --chown=prover:nodejs /app/node_modules ./node_modules
-COPY --chown=prover:nodejs services/prover-service/src ./src
-COPY --chown=prover:nodejs services/prover-service/artifacts ./artifacts
-COPY --chown=prover:nodejs services/prover-service/package.json ./package.json
-
+WORKDIR /app
+COPY --from=build --chown=prover:nodejs /out ./
 USER prover
-EXPOSE 3003
-
 CMD ["node", "src/index.js"]

@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import type { Stripe as StripeType } from 'stripe';
-import type { ApiResponse } from '@aperture/types';
+import type { ApiResponse } from '../types/api.js';
 import { config } from '../config.js';
 import { logger } from '../utils/logger.js';
 import {

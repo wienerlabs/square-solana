@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import type { Request } from 'express';
-import type { ApiResponse } from '@aperture/types';
+import type { ApiResponse } from '../types/api.js';
 import {
   requireMPPPayment,
   type MPPReceipt,
