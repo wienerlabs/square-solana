@@ -2,7 +2,6 @@ import { config } from '../config.js';
 import { logger } from '../utils/logger.js';
 import {
   fetchEnhancedTransactions,
-  isHeliusConfigured,
   type HeliusEnhancedTransaction,
   type HeliusTokenTransfer,
 } from '../utils/helius.js';
@@ -222,7 +221,7 @@ export interface WatcherTickResult {
 }
 
 export async function runWatcherTick(): Promise<WatcherTickResult> {
-  if (!isHeliusConfigured()) {
+  if (!config.helius) {
     return { operators_scanned: 0, summaries: [] };
   }
   const operators = await listKnownOperatorIds();
@@ -248,16 +247,17 @@ export async function runWatcherTick(): Promise<WatcherTickResult> {
  */
 export function startSolanaWatcher(): void {
   if (watcherTimer) return;
-  if (!isHeliusConfigured()) {
+  const helius = config.helius;
+  if (!helius) {
     logger.warn(
       'Solana unattested-payment watcher not started: HELIUS_API_KEY is not set',
     );
     return;
   }
-  const interval = Math.max(5_000, config.watcher.intervalMs);
+  const interval = config.watcher.intervalMs;
   logger.info('Solana unattested-payment watcher starting', {
     interval_ms: interval,
-    network: config.helius.network,
+    api_url: helius.apiUrl,
     mint_filter_count: config.watcher.mintAllowList.length,
   });
   const tick = async (): Promise<void> => {

@@ -1,23 +1,18 @@
 import swaggerJsdoc from 'swagger-jsdoc';
-import { config } from './config.js';
+import { packageInfo } from './utils/package-info.js';
 
 const options: swaggerJsdoc.Options = {
   definition: {
     openapi: '3.0.3',
     info: {
       title: 'Aperture Compliance API',
-      version: '0.1.0',
+      version: packageInfo.version,
       description: 'Batch attestation service for Aperture ZK compliance layer. Aggregates proof records into operator attestations.',
       contact: {
         name: 'Aperture Team',
       },
     },
-    servers: [
-      {
-        url: `http://localhost:${config.port}`,
-        description: 'Local development',
-      },
-    ],
+    servers: [{ url: '/' }],
     components: {
       schemas: {
         ProofRecordInput: {

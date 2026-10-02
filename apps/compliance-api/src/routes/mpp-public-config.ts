@@ -2,6 +2,7 @@ import { Router } from 'express';
 import type { ApiResponse } from '../types/api.js';
 import { config } from '../config.js';
 import { getAuthorityPublicKeyBase58 } from '../utils/stripe-receipt.js';
+import { logger } from '../utils/logger.js';
 
 const router = Router();
 
@@ -32,12 +33,15 @@ router.get('/mpp/public-config', (_req, res) => {
     mppAuthorityPubkey = config.mppAuthority.keypairBase58
       ? getAuthorityPublicKeyBase58()
       : null;
-  } catch {
+  } catch (error) {
+    logger.error('MPP authority keypair could not be decoded', {
+      error: error instanceof Error ? error.message : String(error),
+    });
     mppAuthorityPubkey = null;
   }
 
-  const publishableKey = config.stripe.publishableKey || null;
-  const isTestMode = publishableKey?.startsWith('pk_test_') ?? true;
+  const publishableKey = config.stripe.publishableKey;
+  const isTestMode = publishableKey !== null && publishableKey.startsWith('pk_test_');
 
   const response: ApiResponse<MppPublicConfigResponse> = {
     success: true,

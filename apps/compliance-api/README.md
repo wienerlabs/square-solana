@@ -19,34 +19,27 @@ REST API for managing proof records and batch attestations. Receives individual 
 
 ```bash
 # From repo root
-npm install
+pnpm install
 
-# Copy environment
-cp .env.example .env
+# Every variable is listed (empty) in .env.example; src/config.ts validates
+# them at boot and refuses to start on a missing or invalid required value.
+cp apps/compliance-api/.env.example apps/compliance-api/.env
 
-# Run migrations
-npm run migrate
-
-# Start development server
-npm run dev
+pnpm --filter @squaresdk/solana-compliance-api migrate
+pnpm --filter @squaresdk/solana-compliance-api dev
 ```
 
 ## Environment Variables
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `POSTGRES_HOST` | PostgreSQL host | required |
-| `POSTGRES_PORT` | PostgreSQL port | `5432` |
-| `POSTGRES_USER` | PostgreSQL user | required |
-| `POSTGRES_PASSWORD` | PostgreSQL password | required |
-| `POSTGRES_DB` | Database name | required |
-| `COMPLIANCE_API_PORT` | Service port | `3002` |
-| `POLICY_SERVICE_URL` | Policy Service URL | `http://localhost:3001` |
-| `LOG_LEVEL` | Logging level | `info` |
+See `.env.example` for the full list. No variable has a built-in default:
+deployment-specific values (ports, URLs, program/wallet/mint addresses,
+prices) must be set explicitly. Optional variables (`STRIPE_WEBHOOK_SECRET`,
+`STRIPE_PUBLISHABLE_KEY`, `MPP_AUTHORITY_KEYPAIR_BASE58`, `HELIUS_API_KEY`,
+`COMPLIANCE_WATCHER_MINTS`) switch a feature on when present.
 
 ## API Documentation
 
-Swagger UI available at `http://localhost:3002/api-docs`
+Swagger UI is served at `/api-docs` and the raw document at `/api-docs.json`.
 
 ## Batch Attestation Output
 

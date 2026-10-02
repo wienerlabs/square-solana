@@ -1,5 +1,6 @@
 import type { Request, Response, NextFunction } from 'express';
 import { Connection, PublicKey } from '@solana/web3.js';
+import { config } from '../config.js';
 import { logger } from '../utils/logger.js';
 
 /**
@@ -23,17 +24,12 @@ import { logger } from '../utils/logger.js';
  * Stripe receipt itself is already validated upstream by requireMPPPayment.
  */
 
-const VERIFIER_PROGRAM = new PublicKey(
-  process.env.VERIFIER_PROGRAM ?? 'AzKirEv7h5PstLNYNqLj7fCXU9EFA6nSnuoed3QkmUfU',
-);
-
-const SOLANA_RPC_URL =
-  process.env.SOLANA_RPC_URL ?? 'https://api.devnet.solana.com';
+const VERIFIER_PROGRAM = new PublicKey(config.solana.verifierProgram);
 
 let cachedConnection: Connection | null = null;
 function getConnection(): Connection {
   if (!cachedConnection) {
-    cachedConnection = new Connection(SOLANA_RPC_URL, 'confirmed');
+    cachedConnection = new Connection(config.solana.rpcUrl, 'confirmed');
   }
   return cachedConnection;
 }

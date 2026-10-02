@@ -138,15 +138,6 @@ router.post('/verified-payment/sync/:id', async (req, res, next) => {
       return;
     }
 
-    if (!config.stripe.secretKey) {
-      res.status(503).json({
-        success: false,
-        error:
-          'STRIPE_SECRET_KEY is not configured on the compliance-api; cannot sync PaymentIntent server-side.',
-        data: null,
-      });
-      return;
-    }
     if (!config.mppAuthority.keypairBase58) {
       res.status(503).json({
         success: false,

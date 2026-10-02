@@ -1,35 +1,12 @@
 import type { Request, Response, NextFunction } from 'express';
 import { Connection } from '@solana/web3.js';
+import { config } from '../config.js';
 import { logger } from '../utils/logger.js';
-
-const SOLANA_RPC = process.env.SOLANA_RPC_URL ?? 'https://api.devnet.solana.com';
-// Production x402 advertises USDC (Circle's devnet/mainnet stablecoin) as
-// the default payment rail. Compliance is enforced at the Anchor program
-// level via verify_payment_proof_v2_with_transfer (ZK proof + atomic
-// recipient/mint/amount byte-binding) and at the API level via the
-// ProofRecord PDA lookup downstream — neither path needs a Token-2022
-// transfer hook on the mint, which is why aUSDC is no longer the default.
-// Operators can override via PAYMENT_MINT_ADDRESS for USDT or any other
-// SPL token; legacy AUSDC_MINT_ADDRESS / VUSDC_MINT_ADDRESS env values
-// are still accepted as a backwards-compatible fallback.
-const PAYMENT_MINT =
-  process.env.PAYMENT_MINT_ADDRESS ??
-  process.env.USDC_MINT_ADDRESS ??
-  process.env.AUSDC_MINT_ADDRESS ??
-  process.env.VUSDC_MINT_ADDRESS ??
-  '4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU';
-// Treasury wallet that receives x402 aUSDC payments. MUST be different
-// from the paying operator wallet — otherwise transfers are self-transfers
-// and the operator's net aUSDC balance never moves. Pre-generated keypair
-// lives at scripts/deploy/aperture-treasury.json; only the pubkey is
-// surfaced here.
-const PUBLISHER_WALLET =
-  process.env.PUBLISHER_WALLET ?? 'GRyQkYHeqEYT9KmANxAA9mtw6iJoqCtxVNCNRQD8PrMq';
 
 export interface X402PaymentRequirement {
   readonly version: '1';
   readonly scheme: 'exact';
-  readonly network: 'solana-devnet';
+  readonly network: typeof config.x402.network;
   readonly token: string;
   readonly amount: string;
   readonly recipient: string;
@@ -49,7 +26,7 @@ export interface X402PaymentProof {
  * If not, returns 402 with payment requirements.
  */
 export function requireX402Payment(
-  priceLamports: number,
+  priceBaseUnits: number,
   description: string
 ) {
   return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
@@ -60,10 +37,10 @@ export function requireX402Payment(
       const requirement: X402PaymentRequirement = {
         version: '1',
         scheme: 'exact',
-        network: 'solana-devnet',
-        token: PAYMENT_MINT,
-        amount: String(priceLamports),
-        recipient: PUBLISHER_WALLET,
+        network: config.x402.network,
+        token: config.x402.paymentMint,
+        amount: String(priceBaseUnits),
+        recipient: config.x402.publisherWallet,
         description,
         resource: req.originalUrl,
       };
@@ -92,11 +69,11 @@ export function requireX402Payment(
         return;
       }
 
-      // Verify transaction on-chain with retries. Public devnet RPC
+      // Verify transaction on-chain with retries. Public RPC endpoints
       // occasionally fails transient fetches and a freshly-submitted tx may
       // not have been indexed yet — both look identical to a missing tx, so
       // we poll for up to ~12s before giving up.
-      const connection = new Connection(SOLANA_RPC, 'confirmed');
+      const connection = new Connection(config.solana.rpcUrl, 'confirmed');
       let txInfo: Awaited<ReturnType<typeof connection.getTransaction>> = null;
       let lastFetchError: unknown = null;
       for (let attempt = 0; attempt < 6; attempt++) {

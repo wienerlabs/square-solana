@@ -7,12 +7,10 @@ import {
 } from '../middleware/mpp.js';
 import { getProofRecordsByOperator } from '../models/proof-record.js';
 import { getAttestationsByOperator } from '../models/attestation.js';
+import { config } from '../config.js';
 import { logger } from '../utils/logger.js';
 
 const router = Router();
-
-// Price: $0.50 USD = 50 cents (Stripe minimum for USD)
-const REPORT_PRICE_CENTS = 50;
 
 interface MPPComplianceReport {
   readonly operator_id: string;
@@ -66,7 +64,11 @@ interface MPPComplianceReport {
  */
 router.get(
   '/mpp-report',
-  requireMPPPayment(REPORT_PRICE_CENTS, 'usd', 'Aperture Compliance Report - $0.50'),
+  requireMPPPayment(
+    config.mpp.reportPriceCents,
+    config.mpp.reportCurrency,
+    'Aperture Compliance Report',
+  ),
   async (req, res, next) => {
     try {
       const operatorId = req.query.operator_id as string;

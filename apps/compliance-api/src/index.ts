@@ -11,7 +11,6 @@ import complianceReportRouter from './routes/compliance-report.js';
 import mppReportRouter from './routes/mpp-report.js';
 import healthRouter from './routes/health.js';
 import stripeWebhookRouter from './routes/stripe-webhook.js';
-import mppProtectedServiceRouter from './routes/mpp-protected-service.js';
 import mppPublicConfigRouter from './routes/mpp-public-config.js';
 import agentStripeRouter from './routes/agent-stripe.js';
 import verifiedPaymentRouter from './routes/verified-payment.js';
@@ -22,14 +21,9 @@ import { swaggerSpec } from './swagger.js';
 
 const app = express();
 
-const extraOrigins = (process.env.CORS_ORIGINS ?? '')
-  .split(',')
-  .map((s) => s.trim())
-  .filter(Boolean);
-
 app.use(helmet());
 app.use(cors({
-  origin: [/^http:\/\/localhost:\d+$/, ...extraOrigins],
+  origin: [...config.corsOrigins],
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: [
     'Content-Type',
@@ -57,7 +51,6 @@ app.use('/api/v1/proofs', proofRouter);
 app.use('/api/v1/attestations', attestationRouter);
 app.use('/api/v1/compliance', complianceReportRouter);
 app.use('/api/v1/compliance', mppReportRouter);
-app.use('/api/v1/compliance', mppProtectedServiceRouter);
 app.use('/api/v1/compliance', mppPublicConfigRouter);
 app.use('/api/v1', agentStripeRouter);
 app.use('/api/v1/compliance', verifiedPaymentRouter);
@@ -69,7 +62,6 @@ const server = app.listen(config.port, () => {
   logger.info(`Compliance API running on port ${config.port}`, {
     port: config.port,
     env: config.nodeEnv,
-    swagger: `http://localhost:${config.port}/api-docs`,
   });
   startSolanaWatcher();
   startStripeReconciler();

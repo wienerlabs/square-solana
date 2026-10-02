@@ -18,6 +18,9 @@ let cachedAuthority: Keypair | null = null;
 function getAuthorityKeypair(): Keypair {
   if (!cachedAuthority) {
     const raw = config.mppAuthority.keypairBase58;
+    if (!raw) {
+      throw new Error('MPP_AUTHORITY_KEYPAIR_BASE58 is not set; canonical receipts cannot be signed.');
+    }
     let secretKeyBytes: Uint8Array;
     if (raw.startsWith('[')) {
       secretKeyBytes = new Uint8Array(JSON.parse(raw) as number[]);

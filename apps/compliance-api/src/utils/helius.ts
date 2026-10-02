@@ -49,28 +49,13 @@ export interface FetchHeliusOptions {
   readonly until?: string | null;
 }
 
-export class HeliusUnconfiguredError extends Error {
-  constructor() {
-    super(
-      'HELIUS_API_KEY is not set; the unattested-payment watcher cannot pull parsed transactions.',
-    );
-    this.name = 'HeliusUnconfiguredError';
-  }
-}
+type HeliusSettings = NonNullable<typeof config.helius>;
 
-function heliusBaseUrl(): string {
-  // Helius routes per network through different subdomains. Mainnet uses
-  // `api.helius.xyz`; devnet uses `api-devnet.helius.xyz`. Production
-  // deployments always set HELIUS_NETWORK explicitly via env.
-  const net = config.helius.network;
-  if (net === 'mainnet' || net === 'mainnet-beta') {
-    return 'https://api.helius.xyz';
+function requireHelius(): HeliusSettings {
+  if (!config.helius) {
+    throw new Error('HELIUS_API_KEY is not set; the unattested-payment watcher is disabled.');
   }
-  return 'https://api-devnet.helius.xyz';
-}
-
-export function isHeliusConfigured(): boolean {
-  return Boolean(config.helius.apiKey);
+  return config.helius;
 }
 
 /**
@@ -83,16 +68,16 @@ export async function fetchEnhancedTransactions(
   address: string,
   options: FetchHeliusOptions = {},
 ): Promise<HeliusEnhancedTransaction[]> {
-  if (!isHeliusConfigured()) throw new HeliusUnconfiguredError();
+  const helius = requireHelius();
   const limit = Math.min(100, Math.max(1, options.limit ?? 50));
   const params = new URLSearchParams({
-    'api-key': config.helius.apiKey,
+    'api-key': helius.apiKey,
     limit: String(limit),
   });
   if (options.until) {
     params.set('until', options.until);
   }
-  const url = `${heliusBaseUrl()}/v0/addresses/${address}/transactions?${params.toString()}`;
+  const url = `${helius.apiUrl}/v0/addresses/${address}/transactions?${params.toString()}`;
   const res = await fetch(url);
   if (!res.ok) {
     const body = await res.text().catch(() => '');

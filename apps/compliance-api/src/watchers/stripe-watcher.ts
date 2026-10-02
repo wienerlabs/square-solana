@@ -114,7 +114,7 @@ let tickInFlight = false;
 export function startStripeReconciler(): void {
   if (timer) return;
   // Reuse the watcher cadence so the two watchers run on the same tick budget.
-  const interval = Math.max(5_000, config.watcher.intervalMs);
+  const interval = config.watcher.intervalMs;
   logger.info('Stripe unattested-payment reconciler starting', {
     interval_ms: interval,
     reconcile_delay_ms: config.watcher.stripeReconcileDelayMs,

@@ -4,12 +4,10 @@ import type { ApiResponse } from '../types/api.js';
 import { requireX402Payment, type X402PaymentProof } from '../middleware/x402.js';
 import { getProofRecordsByOperator } from '../models/proof-record.js';
 import { getAttestationsByOperator } from '../models/attestation.js';
+import { config } from '../config.js';
 import { logger } from '../utils/logger.js';
 
 const router = Router();
-
-// Price: 1 USDC = 1,000,000 lamports (6 decimals)
-const REPORT_PRICE_LAMPORTS = 1_000_000;
 
 interface ComplianceReport {
   readonly operator_id: string;
@@ -61,7 +59,7 @@ interface ComplianceReport {
  */
 router.get(
   '/protected-report',
-  requireX402Payment(REPORT_PRICE_LAMPORTS, 'Aperture Compliance Report - 1 USDC'),
+  requireX402Payment(config.x402.reportPrice, 'Aperture Compliance Report'),
   async (req, res, next) => {
     try {
       const operatorId = req.query.operator_id as string;

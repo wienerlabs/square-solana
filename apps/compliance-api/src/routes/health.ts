@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { healthCheck } from '../utils/database.js';
+import { packageInfo } from '../utils/package-info.js';
 import type { ApiResponse } from '../types/api.js';
 
 const router = Router();
@@ -30,8 +31,8 @@ router.get('/', async (_req, res) => {
 
   const status: HealthStatus = {
     status: dbHealthy ? 'healthy' : 'degraded',
-    service: 'compliance-api',
-    version: process.env.npm_package_version ?? '0.1.0',
+    service: packageInfo.name,
+    version: packageInfo.version,
     database: dbHealthy,
     uptime: process.uptime(),
     timestamp: new Date().toISOString(),
