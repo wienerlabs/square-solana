@@ -1,0 +1,4261 @@
+/**
+ * Program IDL in camelCase format in order to be used in JS/TS.
+ *
+ * Note that this is only a type helper and is not the actual IDL. The original
+ * IDL can be found at `target/idl/square_escrow_contract.json`.
+ */
+export type SquareEscrowContract = {
+  "address": "5hstj5grBUL1BeSaPLYpgkD6n3ALasmbseRvKRFfCVNT",
+  "metadata": {
+    "name": "squareEscrowContract",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Square escrow arayüz sözleşmesi — gövdesiz Anchor stub'ı (BC-44)"
+  },
+  "instructions": [
+    {
+      "name": "acceptJob",
+      "docs": [
+        "The job's agent wallet accepts a funded job; the agent record must be Active. `spec_hash`",
+        "guards against a swapped spec."
+      ],
+      "discriminator": [
+        43,
+        201,
+        124,
+        1,
+        19,
+        189,
+        96,
+        10
+      ],
+      "accounts": [
+        {
+          "name": "agent",
+          "docs": [
+            "Must equal `job.agent_wallet`."
+          ],
+          "signer": true
+        },
+        {
+          "name": "job",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  106,
+                  111,
+                  98
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "job.institution",
+                "account": "job"
+              },
+              {
+                "kind": "account",
+                "path": "job.spec_hash",
+                "account": "job"
+              }
+            ]
+          }
+        },
+        {
+          "name": "agentRecord",
+          "docs": [
+            "`accept_job` requires status Active."
+          ],
+          "relations": [
+            "job"
+          ]
+        }
+      ],
+      "args": [
+        {
+          "name": "specHash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "buyClaim",
+      "docs": [
+        "A screened buyer on the institution's approved list buys the receivable. `price` must equal",
+        "the listing price (front-running guard). Leaf = sha256(buyer || leaf_salt), checked against the",
+        "current `policy.buyer_root`; jobs without a policy or with an all-zero root are unrestricted."
+      ],
+      "discriminator": [
+        168,
+        110,
+        230,
+        142,
+        141,
+        246,
+        67,
+        232
+      ],
+      "accounts": [
+        {
+          "name": "buyer",
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "job",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  106,
+                  111,
+                  98
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "job.institution",
+                "account": "job"
+              },
+              {
+                "kind": "account",
+                "path": "job.spec_hash",
+                "account": "job"
+              }
+            ]
+          },
+          "relations": [
+            "claimListing"
+          ]
+        },
+        {
+          "name": "claimListing",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  108,
+                  97,
+                  105,
+                  109
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "job"
+              }
+            ]
+          }
+        },
+        {
+          "name": "policy",
+          "docs": [
+            "Omitted for jobs without a policy."
+          ],
+          "optional": true
+        },
+        {
+          "name": "buyerScreening",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  99,
+                  114,
+                  101,
+                  101,
+                  110,
+                  105,
+                  110,
+                  103
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "buyer"
+              }
+            ],
+            "program": {
+              "kind": "account",
+              "path": "config.registry_program",
+              "account": "escrowConfig"
+            }
+          }
+        },
+        {
+          "name": "buyerTokenAccount",
+          "writable": true
+        },
+        {
+          "name": "sellerTokenAccount",
+          "writable": true
+        },
+        {
+          "name": "mint",
+          "relations": [
+            "job"
+          ]
+        },
+        {
+          "name": "tokenProgram"
+        }
+      ],
+      "args": [
+        {
+          "name": "price",
+          "type": "u64"
+        },
+        {
+          "name": "leafSalt",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "merkleProof",
+          "type": {
+            "vec": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "cancelClaim",
+      "docs": [
+        "The seller withdraws an unsold listing; the account is closed and its rent returned."
+      ],
+      "discriminator": [
+        179,
+        1,
+        212,
+        49,
+        81,
+        144,
+        221,
+        140
+      ],
+      "accounts": [
+        {
+          "name": "seller",
+          "signer": true,
+          "relations": [
+            "claimListing"
+          ]
+        },
+        {
+          "name": "claimListing",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  108,
+                  97,
+                  105,
+                  109
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "claim_listing.job",
+                "account": "claimListing"
+              }
+            ]
+          }
+        },
+        {
+          "name": "rentPayer",
+          "writable": true,
+          "relations": [
+            "claimListing"
+          ]
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "cancelJob",
+      "docs": [
+        "The institution cancels an Open / Funded job, or an Accepted job after `deadline`; the vault",
+        "balance is refunded and the vault closed (rent to `job.rent_payer`)."
+      ],
+      "discriminator": [
+        126,
+        241,
+        155,
+        241,
+        50,
+        236,
+        83,
+        118
+      ],
+      "accounts": [
+        {
+          "name": "institution",
+          "signer": true,
+          "relations": [
+            "job"
+          ]
+        },
+        {
+          "name": "job",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  106,
+                  111,
+                  98
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "job.institution",
+                "account": "job"
+              },
+              {
+                "kind": "account",
+                "path": "job.spec_hash",
+                "account": "job"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  115,
+                  99,
+                  114,
+                  111,
+                  119,
+                  95,
+                  116,
+                  111,
+                  107,
+                  101,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "job"
+              }
+            ]
+          }
+        },
+        {
+          "name": "institutionTokenAccount",
+          "writable": true
+        },
+        {
+          "name": "mint",
+          "relations": [
+            "job"
+          ]
+        },
+        {
+          "name": "rentPayer",
+          "writable": true,
+          "relations": [
+            "job"
+          ]
+        },
+        {
+          "name": "tokenProgram"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "commitTravelRule",
+      "docs": [
+        "DRAFT (M5, BC-34): binds a salted Travel Rule commitment (no PII on chain). Required before",
+        "`fund_job` when `amount >= params.travel_rule_threshold` (threshold 0 = disabled)."
+      ],
+      "discriminator": [
+        33,
+        153,
+        32,
+        172,
+        217,
+        162,
+        134,
+        207
+      ],
+      "accounts": [
+        {
+          "name": "institution",
+          "signer": true,
+          "relations": [
+            "job"
+          ]
+        },
+        {
+          "name": "job",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  106,
+                  111,
+                  98
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "job.institution",
+                "account": "job"
+              },
+              {
+                "kind": "account",
+                "path": "job.spec_hash",
+                "account": "job"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "commitment",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "createJob",
+      "docs": [
+        "Flow step 3a: the institution opens a job for an active registered agent and creates its empty",
+        "vault. With the optional `policy` account the job is proof-gated and snapshots the policy's",
+        "commitment, daily ceiling and version. Funds move in `fund_job`."
+      ],
+      "discriminator": [
+        178,
+        130,
+        217,
+        110,
+        100,
+        27,
+        82,
+        119
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "docs": [
+            "Pays rent and fees; separate from the role signer (fee payer / sponsored transactions)."
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "institution",
+          "docs": [
+            "Institution wallet or its Squads vault; funds the job and receives refunds."
+          ],
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "agentRecord"
+        },
+        {
+          "name": "policy",
+          "docs": [
+            "job proof-gated and is snapshotted into the job."
+          ],
+          "optional": true
+        },
+        {
+          "name": "policyInstitution",
+          "optional": true
+        },
+        {
+          "name": "job",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  106,
+                  111,
+                  98
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "institution"
+              },
+              {
+                "kind": "arg",
+                "path": "specHash"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  115,
+                  99,
+                  114,
+                  111,
+                  119,
+                  95,
+                  116,
+                  111,
+                  107,
+                  101,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "job"
+              }
+            ]
+          }
+        },
+        {
+          "name": "mint"
+        },
+        {
+          "name": "tokenProgram"
+        },
+        {
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "specHash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "amount",
+          "type": "u64"
+        },
+        {
+          "name": "deadline",
+          "type": "i64"
+        },
+        {
+          "name": "challengePeriod",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "escalateMissingProof",
+      "docs": [
+        "DRAFT (M5, BC-24/BC-33): the agent's recourse when a policy job has no bound release proof",
+        "`proof_timeout_secs` after `challenge_end`: opens a dispute without bond."
+      ],
+      "discriminator": [
+        79,
+        103,
+        81,
+        24,
+        130,
+        202,
+        92,
+        47
+      ],
+      "accounts": [
+        {
+          "name": "agent",
+          "docs": [
+            "Must equal `job.agent_wallet`."
+          ],
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "job",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  106,
+                  111,
+                  98
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "job.institution",
+                "account": "job"
+              },
+              {
+                "kind": "account",
+                "path": "job.spec_hash",
+                "account": "job"
+              }
+            ]
+          }
+        },
+        {
+          "name": "releaseProof",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  101,
+                  108,
+                  101,
+                  97,
+                  115,
+                  101,
+                  95,
+                  112,
+                  114,
+                  111,
+                  111,
+                  102
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "job"
+              }
+            ],
+            "program": {
+              "kind": "account",
+              "path": "config.verifier_program",
+              "account": "escrowConfig"
+            }
+          }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "executeResolution",
+      "docs": [
+        "Permissionless: pays out a `Resolved` dispute. The agent-side amount goes through the same",
+        "payee resolution and proof gate as `finalize_payment` (no keeper fee); the bond is slashed to",
+        "the agent side (FavorAgent) or returned to the institution. Closes the vaults."
+      ],
+      "discriminator": [
+        1,
+        21,
+        239,
+        205,
+        18,
+        197,
+        46,
+        72
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "docs": [
+            "Permissionless caller; pays rent of the reputation/validation PDAs."
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "job",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  106,
+                  111,
+                  98
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "job.institution",
+                "account": "job"
+              },
+              {
+                "kind": "account",
+                "path": "job.spec_hash",
+                "account": "job"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  115,
+                  99,
+                  114,
+                  111,
+                  119,
+                  95,
+                  116,
+                  111,
+                  107,
+                  101,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "job"
+              }
+            ]
+          }
+        },
+        {
+          "name": "bondVault",
+          "docs": [
+            "Absent for an escalation without bond."
+          ],
+          "writable": true,
+          "optional": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  111,
+                  110,
+                  100
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "job"
+              }
+            ]
+          }
+        },
+        {
+          "name": "claimListing",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  108,
+                  97,
+                  105,
+                  109
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "job"
+              }
+            ]
+          }
+        },
+        {
+          "name": "payeeTokenAccount",
+          "writable": true
+        },
+        {
+          "name": "institutionTokenAccount",
+          "writable": true
+        },
+        {
+          "name": "mint",
+          "relations": [
+            "job"
+          ]
+        },
+        {
+          "name": "payeeScreening"
+        },
+        {
+          "name": "releaseProof",
+          "writable": true,
+          "optional": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  101,
+                  108,
+                  101,
+                  97,
+                  115,
+                  101,
+                  95,
+                  112,
+                  114,
+                  111,
+                  111,
+                  102
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "job"
+              }
+            ],
+            "program": {
+              "kind": "account",
+              "path": "config.verifier_program",
+              "account": "escrowConfig"
+            }
+          }
+        },
+        {
+          "name": "operatorState",
+          "writable": true,
+          "optional": true
+        },
+        {
+          "name": "verifierConfig",
+          "optional": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  101,
+                  114,
+                  105,
+                  102,
+                  105,
+                  101,
+                  114,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ],
+            "program": {
+              "kind": "account",
+              "path": "config.verifier_program",
+              "account": "escrowConfig"
+            }
+          }
+        },
+        {
+          "name": "verifierProgram",
+          "optional": true
+        },
+        {
+          "name": "escrowAuthority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  115,
+                  99,
+                  114,
+                  111,
+                  119,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "agentReputation",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  101,
+                  112,
+                  117,
+                  116,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "job.agent_record",
+                "account": "job"
+              }
+            ]
+          }
+        },
+        {
+          "name": "validationRecord",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  108,
+                  105,
+                  100,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "job"
+              }
+            ]
+          }
+        },
+        {
+          "name": "rentPayer",
+          "writable": true,
+          "relations": [
+            "job"
+          ]
+        },
+        {
+          "name": "tokenProgram"
+        },
+        {
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "finalizePayment",
+      "docs": [
+        "Flow steps 6-8, permissionless crank. After `challenge_end` with no dispute:",
+        "- no policy: pay the payee (claim buyer if sold, else agent wallet) `amount - keeper fee`;",
+        "- policy: read `ReleaseProof` [\"release_proof\", job] owned by square_verifier. Missing ->",
+        "`ProofRequired` (escrow waits). `Compliant` with matching payee / net / mint / daily counter",
+        "-> pay the payee, CPI `record_release`, `ReleaseVerified`. `Refused` -> refund the net to the",
+        "institution, `ReleaseRefused` with the reason code.",
+        "",
+        "The keeper fee is paid in every branch. Reputation goes to the agent record (not the buyer); a",
+        "`ValidationRecord` is written; the vault is closed and its rent returned to `job.rent_payer`."
+      ],
+      "discriminator": [
+        254,
+        254,
+        46,
+        40,
+        22,
+        126,
+        221,
+        128
+      ],
+      "accounts": [
+        {
+          "name": "keeper",
+          "docs": [
+            "Permissionless caller; receives the keeper fee and pays rent of the reputation/validation PDAs."
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "job",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  106,
+                  111,
+                  98
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "job.institution",
+                "account": "job"
+              },
+              {
+                "kind": "account",
+                "path": "job.spec_hash",
+                "account": "job"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  115,
+                  99,
+                  114,
+                  111,
+                  119,
+                  95,
+                  116,
+                  111,
+                  107,
+                  101,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "job"
+              }
+            ]
+          }
+        },
+        {
+          "name": "claimListing",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  108,
+                  97,
+                  105,
+                  109
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "job"
+              }
+            ]
+          }
+        },
+        {
+          "name": "payeeTokenAccount",
+          "docs": [
+            "Token account of the resolved payee (claim buyer or `job.agent_wallet`)."
+          ],
+          "writable": true
+        },
+        {
+          "name": "institutionTokenAccount",
+          "docs": [
+            "Refund target of a refused release."
+          ],
+          "writable": true
+        },
+        {
+          "name": "keeperTokenAccount",
+          "writable": true
+        },
+        {
+          "name": "mint",
+          "relations": [
+            "job"
+          ]
+        },
+        {
+          "name": "payeeScreening"
+        },
+        {
+          "name": "releaseProof",
+          "writable": true,
+          "optional": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  101,
+                  108,
+                  101,
+                  97,
+                  115,
+                  101,
+                  95,
+                  112,
+                  114,
+                  111,
+                  111,
+                  102
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "job"
+              }
+            ],
+            "program": {
+              "kind": "account",
+              "path": "config.verifier_program",
+              "account": "escrowConfig"
+            }
+          }
+        },
+        {
+          "name": "operatorState",
+          "docs": [
+            "for freshness and written by the CPI. Policy jobs only."
+          ],
+          "writable": true,
+          "optional": true
+        },
+        {
+          "name": "verifierConfig",
+          "optional": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  101,
+                  114,
+                  105,
+                  102,
+                  105,
+                  101,
+                  114,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ],
+            "program": {
+              "kind": "account",
+              "path": "config.verifier_program",
+              "account": "escrowConfig"
+            }
+          }
+        },
+        {
+          "name": "verifierProgram",
+          "optional": true
+        },
+        {
+          "name": "escrowAuthority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  115,
+                  99,
+                  114,
+                  111,
+                  119,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "agentReputation",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  101,
+                  112,
+                  117,
+                  116,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "job.agent_record",
+                "account": "job"
+              }
+            ]
+          }
+        },
+        {
+          "name": "validationRecord",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  108,
+                  105,
+                  100,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "job"
+              }
+            ]
+          }
+        },
+        {
+          "name": "rentPayer",
+          "writable": true,
+          "relations": [
+            "job"
+          ]
+        },
+        {
+          "name": "tokenProgram"
+        },
+        {
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "fundJob",
+      "docs": [
+        "Flow step 3b: locks `amount` in the vault. Both parties need a fresh, clear screening record.",
+        "CCTP (DRAFT M6, BC-36): runs in the same tx after the CCTP `receive_message` that mints USDC to",
+        "the institution's token account; no separate instruction is planned."
+      ],
+      "discriminator": [
+        244,
+        198,
+        4,
+        15,
+        41,
+        178,
+        169,
+        187
+      ],
+      "accounts": [
+        {
+          "name": "institution",
+          "signer": true,
+          "relations": [
+            "job"
+          ]
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "job",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  106,
+                  111,
+                  98
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "job.institution",
+                "account": "job"
+              },
+              {
+                "kind": "account",
+                "path": "job.spec_hash",
+                "account": "job"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  115,
+                  99,
+                  114,
+                  111,
+                  119,
+                  95,
+                  116,
+                  111,
+                  107,
+                  101,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "job"
+              }
+            ]
+          }
+        },
+        {
+          "name": "institutionTokenAccount",
+          "writable": true
+        },
+        {
+          "name": "mint",
+          "relations": [
+            "job"
+          ]
+        },
+        {
+          "name": "institutionScreening",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  99,
+                  114,
+                  101,
+                  101,
+                  110,
+                  105,
+                  110,
+                  103
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "institution"
+              }
+            ],
+            "program": {
+              "kind": "account",
+              "path": "config.registry_program",
+              "account": "escrowConfig"
+            }
+          }
+        },
+        {
+          "name": "agentScreening",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  99,
+                  114,
+                  101,
+                  101,
+                  110,
+                  105,
+                  110,
+                  103
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "job.agent_wallet",
+                "account": "job"
+              }
+            ],
+            "program": {
+              "kind": "account",
+              "path": "config.registry_program",
+              "account": "escrowConfig"
+            }
+          }
+        },
+        {
+          "name": "tokenProgram"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "initConfig",
+      "docs": [
+        "Creates the singleton config. Only the program upgrade authority (Squads vault) can call it.",
+        "`settlement_mint` is the only job mint (USDC); `linked` pins the registry / policy / verifier",
+        "program IDs used for account-read owner checks."
+      ],
+      "discriminator": [
+        23,
+        235,
+        115,
+        232,
+        168,
+        96,
+        1,
+        231
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "docs": [
+            "Must be the program upgrade authority."
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "program",
+          "address": "5hstj5grBUL1BeSaPLYpgkD6n3ALasmbseRvKRFfCVNT"
+        },
+        {
+          "name": "programData"
+        },
+        {
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "settlementMint",
+          "type": "pubkey"
+        },
+        {
+          "name": "arbitrators",
+          "type": {
+            "vec": "pubkey"
+          }
+        },
+        {
+          "name": "threshold",
+          "type": "u8"
+        },
+        {
+          "name": "params",
+          "type": {
+            "defined": {
+              "name": "escrowParams"
+            }
+          }
+        },
+        {
+          "name": "linked",
+          "type": {
+            "defined": {
+              "name": "linkedPrograms"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "lapseDispute",
+      "docs": [
+        "DRAFT (M5, BC-33): permissionless after `dispute.deadline` without a decision. Returns the bond",
+        "and drops the dispute: the job goes back to `Delivered` and settles through `finalize_payment`."
+      ],
+      "discriminator": [
+        252,
+        41,
+        150,
+        91,
+        62,
+        93,
+        216,
+        62
+      ],
+      "accounts": [
+        {
+          "name": "caller",
+          "docs": [
+            "Permissionless caller."
+          ],
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "job",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  106,
+                  111,
+                  98
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "job.institution",
+                "account": "job"
+              },
+              {
+                "kind": "account",
+                "path": "job.spec_hash",
+                "account": "job"
+              }
+            ]
+          }
+        },
+        {
+          "name": "bondVault",
+          "docs": [
+            "Absent for an escalation without bond."
+          ],
+          "writable": true,
+          "optional": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  111,
+                  110,
+                  100
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "job"
+              }
+            ]
+          }
+        },
+        {
+          "name": "institutionTokenAccount",
+          "docs": [
+            "Bond refund target (the challenger of a bonded dispute is the institution)."
+          ],
+          "writable": true
+        },
+        {
+          "name": "mint",
+          "relations": [
+            "job"
+          ]
+        },
+        {
+          "name": "rentPayer",
+          "writable": true,
+          "relations": [
+            "job"
+          ]
+        },
+        {
+          "name": "tokenProgram"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "listClaim",
+      "docs": [
+        "The agent lists its receivable on a delivered job below face value."
+      ],
+      "discriminator": [
+        170,
+        28,
+        51,
+        91,
+        64,
+        103,
+        21,
+        4
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "agent",
+          "docs": [
+            "Seller = `job.agent_wallet`."
+          ],
+          "signer": true
+        },
+        {
+          "name": "job",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  106,
+                  111,
+                  98
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "job.institution",
+                "account": "job"
+              },
+              {
+                "kind": "account",
+                "path": "job.spec_hash",
+                "account": "job"
+              }
+            ]
+          }
+        },
+        {
+          "name": "claimListing",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  108,
+                  97,
+                  105,
+                  109
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "job"
+              }
+            ]
+          }
+        },
+        {
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "price",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "raiseDispute",
+      "docs": [
+        "The institution disputes a delivery inside the challenge window with a bond",
+        "`>= max(amount * min_bond_bps / 10_000, min_bond_absolute)`. One dispute per job."
+      ],
+      "discriminator": [
+        41,
+        243,
+        1,
+        51,
+        150,
+        95,
+        246,
+        73
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "institution",
+          "signer": true,
+          "relations": [
+            "job"
+          ]
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "job",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  106,
+                  111,
+                  98
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "job.institution",
+                "account": "job"
+              },
+              {
+                "kind": "account",
+                "path": "job.spec_hash",
+                "account": "job"
+              }
+            ]
+          }
+        },
+        {
+          "name": "bondVault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  111,
+                  110,
+                  100
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "job"
+              }
+            ]
+          }
+        },
+        {
+          "name": "institutionTokenAccount",
+          "writable": true
+        },
+        {
+          "name": "mint",
+          "relations": [
+            "job"
+          ]
+        },
+        {
+          "name": "tokenProgram"
+        },
+        {
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "reasonHash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "bond",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "resolveDispute",
+      "docs": [
+        "One arbitrator vote. The first vote sets the pending resolution, later votes must match it;",
+        "reaching the threshold moves the job to `Resolved` (`DisputeDecided`). No funds move here."
+      ],
+      "discriminator": [
+        231,
+        6,
+        202,
+        6,
+        96,
+        103,
+        12,
+        230
+      ],
+      "accounts": [
+        {
+          "name": "arbitrator",
+          "docs": [
+            "One of `config.arbitrators[..arbitrator_count]`."
+          ],
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "job",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  106,
+                  111,
+                  98
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "job.institution",
+                "account": "job"
+              },
+              {
+                "kind": "account",
+                "path": "job.spec_hash",
+                "account": "job"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "resolution",
+          "type": {
+            "defined": {
+              "name": "disputeResolution"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "submitWork",
+      "docs": [
+        "Flow step 4: delivery; the challenge window opens (`challenge_end = now + challenge_period`)."
+      ],
+      "discriminator": [
+        158,
+        80,
+        101,
+        51,
+        114,
+        130,
+        101,
+        253
+      ],
+      "accounts": [
+        {
+          "name": "agent",
+          "docs": [
+            "Must equal `job.agent_wallet`."
+          ],
+          "signer": true
+        },
+        {
+          "name": "job",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  106,
+                  111,
+                  98
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "job.institution",
+                "account": "job"
+              },
+              {
+                "kind": "account",
+                "path": "job.spec_hash",
+                "account": "job"
+              }
+            ]
+          }
+        },
+        {
+          "name": "agentRecord",
+          "docs": [
+            "`accept_job` requires status Active."
+          ],
+          "relations": [
+            "job"
+          ]
+        }
+      ],
+      "args": [
+        {
+          "name": "workHash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "deliveryUri",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "syncAgentWallet",
+      "docs": [
+        "The agent record owner re-points an unsettled job to the record's current wallet (after a",
+        "wallet rotation with registry `update_agent`). A sold receivable keeps paying the buyer."
+      ],
+      "discriminator": [
+        120,
+        120,
+        238,
+        40,
+        146,
+        138,
+        114,
+        76
+      ],
+      "accounts": [
+        {
+          "name": "agentOwner",
+          "docs": [
+            "Must equal `AgentRecord.owner`."
+          ],
+          "signer": true
+        },
+        {
+          "name": "job",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  106,
+                  111,
+                  98
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "job.institution",
+                "account": "job"
+              },
+              {
+                "kind": "account",
+                "path": "job.spec_hash",
+                "account": "job"
+              }
+            ]
+          }
+        },
+        {
+          "name": "agentRecord",
+          "relations": [
+            "job"
+          ]
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "updateArbitrators",
+      "docs": [
+        "Replaces the arbitrator set (N <= 7, 2 <= M <= N) and bumps `arbitrator_set_version`.",
+        "DRAFT (M5, BC-32): rule for disputes that are active while the set changes."
+      ],
+      "discriminator": [
+        105,
+        34,
+        122,
+        221,
+        124,
+        230,
+        203,
+        120
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "signer": true,
+          "relations": [
+            "config"
+          ]
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "arbitrators",
+          "type": {
+            "vec": "pubkey"
+          }
+        },
+        {
+          "name": "threshold",
+          "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "updateParams",
+      "docs": [
+        "Updates challenge bounds, bond, keeper fee and the M5 draft parameters."
+      ],
+      "discriminator": [
+        108,
+        178,
+        190,
+        95,
+        94,
+        203,
+        116,
+        20
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "signer": true,
+          "relations": [
+            "config"
+          ]
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "params",
+          "type": {
+            "defined": {
+              "name": "escrowParams"
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "agentReputation",
+      "discriminator": [
+        245,
+        56,
+        239,
+        246,
+        36,
+        231,
+        227,
+        67
+      ]
+    },
+    {
+      "name": "claimListing",
+      "discriminator": [
+        199,
+        81,
+        5,
+        18,
+        89,
+        68,
+        6,
+        170
+      ]
+    },
+    {
+      "name": "escrowConfig",
+      "discriminator": [
+        138,
+        174,
+        227,
+        187,
+        239,
+        148,
+        1,
+        44
+      ]
+    },
+    {
+      "name": "job",
+      "discriminator": [
+        75,
+        124,
+        80,
+        203,
+        161,
+        180,
+        202,
+        80
+      ]
+    },
+    {
+      "name": "validationRecord",
+      "discriminator": [
+        237,
+        185,
+        26,
+        62,
+        250,
+        28,
+        178,
+        215
+      ]
+    }
+  ],
+  "events": [
+    {
+      "name": "arbitratorsUpdated",
+      "discriminator": [
+        36,
+        194,
+        175,
+        33,
+        168,
+        21,
+        198,
+        69
+      ]
+    },
+    {
+      "name": "claimBought",
+      "discriminator": [
+        41,
+        153,
+        48,
+        19,
+        242,
+        245,
+        21,
+        140
+      ]
+    },
+    {
+      "name": "claimCancelled",
+      "discriminator": [
+        219,
+        39,
+        67,
+        208,
+        89,
+        48,
+        164,
+        167
+      ]
+    },
+    {
+      "name": "claimListed",
+      "discriminator": [
+        149,
+        25,
+        205,
+        144,
+        73,
+        136,
+        112,
+        102
+      ]
+    },
+    {
+      "name": "disputeDecided",
+      "discriminator": [
+        178,
+        61,
+        187,
+        30,
+        188,
+        104,
+        151,
+        97
+      ]
+    },
+    {
+      "name": "disputeLapsed",
+      "discriminator": [
+        110,
+        243,
+        74,
+        196,
+        17,
+        87,
+        213,
+        241
+      ]
+    },
+    {
+      "name": "disputeRaised",
+      "discriminator": [
+        246,
+        167,
+        109,
+        37,
+        142,
+        45,
+        38,
+        176
+      ]
+    },
+    {
+      "name": "disputeResolved",
+      "discriminator": [
+        121,
+        64,
+        249,
+        153,
+        139,
+        128,
+        236,
+        187
+      ]
+    },
+    {
+      "name": "disputeVote",
+      "discriminator": [
+        242,
+        45,
+        21,
+        127,
+        27,
+        104,
+        251,
+        226
+      ]
+    },
+    {
+      "name": "escrowConfigUpdated",
+      "discriminator": [
+        165,
+        96,
+        64,
+        205,
+        127,
+        104,
+        174,
+        214
+      ]
+    },
+    {
+      "name": "finalized",
+      "discriminator": [
+        4,
+        77,
+        242,
+        80,
+        20,
+        152,
+        247,
+        252
+      ]
+    },
+    {
+      "name": "jobAccepted",
+      "discriminator": [
+        47,
+        54,
+        152,
+        59,
+        118,
+        195,
+        251,
+        114
+      ]
+    },
+    {
+      "name": "jobAgentWalletSynced",
+      "discriminator": [
+        236,
+        227,
+        176,
+        220,
+        1,
+        228,
+        206,
+        129
+      ]
+    },
+    {
+      "name": "jobCancelled",
+      "discriminator": [
+        203,
+        84,
+        143,
+        130,
+        48,
+        134,
+        74,
+        191
+      ]
+    },
+    {
+      "name": "jobCreated",
+      "discriminator": [
+        48,
+        110,
+        162,
+        177,
+        67,
+        74,
+        159,
+        131
+      ]
+    },
+    {
+      "name": "jobFunded",
+      "discriminator": [
+        109,
+        177,
+        206,
+        113,
+        255,
+        142,
+        11,
+        19
+      ]
+    },
+    {
+      "name": "missingProofEscalated",
+      "discriminator": [
+        250,
+        239,
+        248,
+        66,
+        226,
+        97,
+        62,
+        245
+      ]
+    },
+    {
+      "name": "releaseRefused",
+      "discriminator": [
+        16,
+        242,
+        196,
+        46,
+        234,
+        156,
+        113,
+        93
+      ]
+    },
+    {
+      "name": "releaseVerified",
+      "discriminator": [
+        200,
+        143,
+        83,
+        96,
+        75,
+        181,
+        243,
+        36
+      ]
+    },
+    {
+      "name": "reputationRecorded",
+      "discriminator": [
+        168,
+        248,
+        182,
+        143,
+        65,
+        154,
+        72,
+        131
+      ]
+    },
+    {
+      "name": "travelRuleCommitted",
+      "discriminator": [
+        54,
+        130,
+        87,
+        158,
+        15,
+        193,
+        83,
+        49
+      ]
+    },
+    {
+      "name": "validationRecorded",
+      "discriminator": [
+        1,
+        120,
+        141,
+        30,
+        206,
+        204,
+        177,
+        221
+      ]
+    },
+    {
+      "name": "workSubmitted",
+      "discriminator": [
+        136,
+        185,
+        210,
+        174,
+        216,
+        140,
+        64,
+        125
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "invalidStatus",
+      "msg": "Job is not in the required status for this operation"
+    },
+    {
+      "code": 6001,
+      "name": "deadlineExpired",
+      "msg": "Job deadline has passed"
+    },
+    {
+      "code": 6002,
+      "name": "deadlineNotExpired",
+      "msg": "Job deadline has not passed yet"
+    },
+    {
+      "code": 6003,
+      "name": "specHashMismatch",
+      "msg": "Spec hash provided does not match committed hash"
+    },
+    {
+      "code": 6004,
+      "name": "unauthorized",
+      "msg": "Signer is not authorized for this operation"
+    },
+    {
+      "code": 6005,
+      "name": "invalidAmount",
+      "msg": "Payment amount must be greater than zero"
+    },
+    {
+      "code": 6006,
+      "name": "invalidChallengePeriod",
+      "msg": "Challenge period must be within protocol min/max bounds"
+    },
+    {
+      "code": 6007,
+      "name": "deliveryUriTooLong",
+      "msg": "Delivery URI exceeds maximum length"
+    },
+    {
+      "code": 6008,
+      "name": "challengePeriodNotExpired",
+      "msg": "Challenge period has not expired yet"
+    },
+    {
+      "code": 6009,
+      "name": "mintMismatch",
+      "msg": "Token mint is not the settlement mint or the job mint"
+    },
+    {
+      "code": 6010,
+      "name": "mathOverflow",
+      "msg": "Math overflow"
+    },
+    {
+      "code": 6011,
+      "name": "jobNotFunded",
+      "msg": "Job is not funded"
+    },
+    {
+      "code": 6012,
+      "name": "agentNotRegistered",
+      "msg": "Agent record is not a registered square_registry account"
+    },
+    {
+      "code": 6013,
+      "name": "agentInactive",
+      "msg": "Agent record is not active"
+    },
+    {
+      "code": 6014,
+      "name": "agentMismatch",
+      "msg": "Signer does not match the job's agent wallet"
+    },
+    {
+      "code": 6015,
+      "name": "screeningRequired",
+      "msg": "Screening record missing or not owned by square_registry"
+    },
+    {
+      "code": 6016,
+      "name": "screeningExpired",
+      "msg": "Screening record has expired"
+    },
+    {
+      "code": 6017,
+      "name": "screeningFlagged",
+      "msg": "Wallet is flagged by sanctions screening"
+    },
+    {
+      "code": 6018,
+      "name": "disputeWindowClosed",
+      "msg": "Challenge window has already closed"
+    },
+    {
+      "code": 6019,
+      "name": "disputeAlreadyActive",
+      "msg": "Dispute is already active on this job"
+    },
+    {
+      "code": 6020,
+      "name": "disputeAlreadyRaised",
+      "msg": "This job already had a dispute"
+    },
+    {
+      "code": 6021,
+      "name": "noActiveDispute",
+      "msg": "No active dispute on this job"
+    },
+    {
+      "code": 6022,
+      "name": "insufficientBond",
+      "msg": "Insufficient dispute bond provided"
+    },
+    {
+      "code": 6023,
+      "name": "notArbitrator",
+      "msg": "Signer is not an active arbitrator"
+    },
+    {
+      "code": 6024,
+      "name": "alreadyVoted",
+      "msg": "Arbitrator has already voted on this dispute"
+    },
+    {
+      "code": 6025,
+      "name": "resolutionMismatch",
+      "msg": "Vote does not match the pending resolution"
+    },
+    {
+      "code": 6026,
+      "name": "resolutionNotDecided",
+      "msg": "Dispute has not reached the arbitrator threshold"
+    },
+    {
+      "code": 6027,
+      "name": "invalidSplitAmount",
+      "msg": "Split amount exceeds the escrowed amount"
+    },
+    {
+      "code": 6028,
+      "name": "invalidThreshold",
+      "msg": "Threshold must satisfy 2 <= M <= N"
+    },
+    {
+      "code": 6029,
+      "name": "invalidArbitratorSet",
+      "msg": "Arbitrator set exceeds MAX_ARBITRATORS or contains duplicates"
+    },
+    {
+      "code": 6030,
+      "name": "disputeNotExpired",
+      "msg": "Dispute deadline has not passed yet"
+    },
+    {
+      "code": 6031,
+      "name": "invalidClaimPrice",
+      "msg": "Claim price must be greater than zero and less than the face value"
+    },
+    {
+      "code": 6032,
+      "name": "invalidClaimStatus",
+      "msg": "Claim listing is not in the required status for this operation"
+    },
+    {
+      "code": 6033,
+      "name": "claimListingMismatch",
+      "msg": "Claim listing references a different job"
+    },
+    {
+      "code": 6034,
+      "name": "claimListingRequired",
+      "msg": "A bought claim exists; payment must route to the buyer"
+    },
+    {
+      "code": 6035,
+      "name": "notClaimSeller",
+      "msg": "Only the seller may cancel this listing"
+    },
+    {
+      "code": 6036,
+      "name": "buyerIsSeller",
+      "msg": "Buyer may not be the seller"
+    },
+    {
+      "code": 6037,
+      "name": "buyerNotEligible",
+      "msg": "Buyer is not in the institution's approved buyer set"
+    },
+    {
+      "code": 6038,
+      "name": "claimPriceChanged",
+      "msg": "Listing price differs from the expected price"
+    },
+    {
+      "code": 6039,
+      "name": "proofRequired",
+      "msg": "Policy job: a release proof must be bound before release"
+    },
+    {
+      "code": 6040,
+      "name": "invalidReleaseProof",
+      "msg": "Release proof has the wrong owner, seeds or job"
+    },
+    {
+      "code": 6041,
+      "name": "staleReleaseProof",
+      "msg": "Release proof is stale (payee, net amount, mint or daily counter changed)"
+    },
+    {
+      "code": 6042,
+      "name": "policyMismatch",
+      "msg": "Policy account does not match the job policy"
+    },
+    {
+      "code": 6043,
+      "name": "policyInactive",
+      "msg": "Policy is not active"
+    },
+    {
+      "code": 6044,
+      "name": "invalidKeeperFee",
+      "msg": "Keeper fee exceeds the allowed maximum"
+    },
+    {
+      "code": 6045,
+      "name": "linkedProgramMismatch",
+      "msg": "Account owner does not match the linked program in the config"
+    },
+    {
+      "code": 6046,
+      "name": "proofTimeoutNotReached",
+      "msg": "Proof timeout has not passed yet"
+    },
+    {
+      "code": 6047,
+      "name": "travelRuleCommitmentRequired",
+      "msg": "Travel Rule commitment required above the threshold"
+    },
+    {
+      "code": 6048,
+      "name": "notImplemented",
+      "msg": "Interface contract stub: not implemented"
+    }
+  ],
+  "types": [
+    {
+      "name": "agentReputation",
+      "docs": [
+        "seeds = [\"reputation\", agent_record] — bound to the registry agent, not to a wallet (BC-26)."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "agentRecord",
+            "type": "pubkey"
+          },
+          {
+            "name": "jobsCompleted",
+            "type": "u64"
+          },
+          {
+            "name": "jobsFailed",
+            "type": "u64"
+          },
+          {
+            "name": "jobsDisputed",
+            "type": "u64"
+          },
+          {
+            "name": "totalEarned",
+            "type": "u64"
+          },
+          {
+            "name": "firstJobAt",
+            "type": "i64"
+          },
+          {
+            "name": "lastJobAt",
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "arbitratorsUpdated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "arbitrators",
+            "type": {
+              "vec": "pubkey"
+            }
+          },
+          {
+            "name": "threshold",
+            "type": "u8"
+          },
+          {
+            "name": "arbitratorSetVersion",
+            "type": "u32"
+          }
+        ]
+      }
+    },
+    {
+      "name": "claimBought",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "job",
+            "type": "pubkey"
+          },
+          {
+            "name": "buyer",
+            "type": "pubkey"
+          },
+          {
+            "name": "price",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "claimCancelled",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "job",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "claimListed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "job",
+            "type": "pubkey"
+          },
+          {
+            "name": "seller",
+            "type": "pubkey"
+          },
+          {
+            "name": "price",
+            "type": "u64"
+          },
+          {
+            "name": "faceValue",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "claimListing",
+      "docs": [
+        "seeds = [\"claim\", job]"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "job",
+            "type": "pubkey"
+          },
+          {
+            "name": "seller",
+            "docs": [
+              "`job.agent_wallet` at listing time."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "buyer",
+            "docs": [
+              "`Pubkey::default()` until bought."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "rentPayer",
+            "docs": [
+              "Paid the listing rent; receives it back on `cancel_claim`."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "price",
+            "type": "u64"
+          },
+          {
+            "name": "faceValue",
+            "docs": [
+              "`job.amount` at listing time (informational)."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "listedAt",
+            "type": "i64"
+          },
+          {
+            "name": "boughtAt",
+            "type": "i64"
+          },
+          {
+            "name": "status",
+            "type": {
+              "defined": {
+                "name": "claimStatus"
+              }
+            }
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "claimStatus",
+      "docs": [
+        "`cancel_claim` closes the listing, so there is no Cancelled state."
+      ],
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "listed"
+          },
+          {
+            "name": "bought"
+          },
+          {
+            "name": "settled"
+          },
+          {
+            "name": "defaulted"
+          }
+        ]
+      }
+    },
+    {
+      "name": "disputeDecided",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "job",
+            "type": "pubkey"
+          },
+          {
+            "name": "resolution",
+            "type": {
+              "defined": {
+                "name": "disputeResolution"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "disputeInfo",
+      "docs": [
+        "Inline dispute state; `raised_at == 0` means no dispute. One dispute per job."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "challenger",
+            "docs": [
+              "Institution (`raise_dispute`) or agent wallet (`escalate_missing_proof`, DRAFT)."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "bond",
+            "docs": [
+              "0 for an escalation without bond."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "reasonHash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "raisedAt",
+            "type": "i64"
+          },
+          {
+            "name": "deadline",
+            "docs": [
+              "DRAFT (M5): `raised_at + dispute_timeout_secs`; `lapse_dispute` allowed after it."
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "decidedAt",
+            "docs": [
+              "When the threshold was reached."
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "closedAt",
+            "docs": [
+              "When `execute_resolution` or `lapse_dispute` closed the dispute."
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "lapsed",
+            "type": "bool"
+          },
+          {
+            "name": "approvalMask",
+            "docs": [
+              "Bit i = `config.arbitrators[i]` voted for `resolution`."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "approvalCount",
+            "type": "u8"
+          },
+          {
+            "name": "arbitratorSetVersion",
+            "docs": [
+              "`config.arbitrator_set_version` when the dispute was raised."
+            ],
+            "type": "u32"
+          },
+          {
+            "name": "resolution",
+            "type": {
+              "defined": {
+                "name": "disputeResolution"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "disputeLapsed",
+      "docs": [
+        "DRAFT (M5)."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "job",
+            "type": "pubkey"
+          },
+          {
+            "name": "bondRefunded",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "disputeRaised",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "job",
+            "type": "pubkey"
+          },
+          {
+            "name": "challenger",
+            "type": "pubkey"
+          },
+          {
+            "name": "bond",
+            "type": "u64"
+          },
+          {
+            "name": "reasonHash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "deadline",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "disputeResolution",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "pending"
+          },
+          {
+            "name": "favorAgent"
+          },
+          {
+            "name": "favorInstitution"
+          },
+          {
+            "name": "split",
+            "fields": [
+              {
+                "name": "agentAmount",
+                "type": "u64"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "disputeResolved",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "job",
+            "type": "pubkey"
+          },
+          {
+            "name": "resolution",
+            "type": {
+              "defined": {
+                "name": "disputeResolution"
+              }
+            }
+          },
+          {
+            "name": "agentSideAmount",
+            "type": "u64"
+          },
+          {
+            "name": "institutionRefund",
+            "type": "u64"
+          },
+          {
+            "name": "bondToAgentSide",
+            "type": "u64"
+          },
+          {
+            "name": "bondReturned",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "disputeVote",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "job",
+            "type": "pubkey"
+          },
+          {
+            "name": "arbitrator",
+            "type": "pubkey"
+          },
+          {
+            "name": "resolution",
+            "type": {
+              "defined": {
+                "name": "disputeResolution"
+              }
+            }
+          },
+          {
+            "name": "approvalCount",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "escrowConfig",
+      "docs": [
+        "Singleton. seeds = [\"config\"]"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "admin",
+            "type": "pubkey"
+          },
+          {
+            "name": "settlementMint",
+            "docs": [
+              "The only mint jobs can use (USDC). Policy ceilings and the daily counter are in its units."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "registryProgram",
+            "docs": [
+              "Owner of `AgentRecord` / `ScreeningRecord` accounts read by escrow."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "policyProgram",
+            "docs": [
+              "Owner of `Institution` / `Policy` accounts read by escrow."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "verifierProgram",
+            "docs": [
+              "Owner of `ReleaseProof`; target of the `record_release` CPI."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "arbitrators",
+            "type": {
+              "array": [
+                "pubkey",
+                7
+              ]
+            }
+          },
+          {
+            "name": "arbitratorCount",
+            "docs": [
+              "Active slots `arbitrators[..arbitrator_count]` (N)."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "threshold",
+            "docs": [
+              "Approvals required (M), 2 <= M <= N."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "arbitratorSetVersion",
+            "docs": [
+              "Bumped on every `update_arbitrators`; disputes snapshot it."
+            ],
+            "type": "u32"
+          },
+          {
+            "name": "params",
+            "type": {
+              "defined": {
+                "name": "escrowParams"
+              }
+            }
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "escrowConfigUpdated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "admin",
+            "type": "pubkey"
+          },
+          {
+            "name": "settlementMint",
+            "type": "pubkey"
+          },
+          {
+            "name": "params",
+            "type": {
+              "defined": {
+                "name": "escrowParams"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "escrowParams",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "minChallengePeriod",
+            "type": "u64"
+          },
+          {
+            "name": "maxChallengePeriod",
+            "type": "u64"
+          },
+          {
+            "name": "minBondBps",
+            "type": "u16"
+          },
+          {
+            "name": "minBondAbsolute",
+            "type": "u64"
+          },
+          {
+            "name": "keeperFeeBps",
+            "docs": [
+              "Share of the escrowed amount paid to the `finalize_payment` caller (BC-23)."
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "proofTimeoutSecs",
+            "docs": [
+              "DRAFT (M5, BC-24): `escalate_missing_proof` allowed after `challenge_end + proof_timeout_secs`."
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "disputeTimeoutSecs",
+            "docs": [
+              "DRAFT (M5, BC-33): `dispute.deadline = raised_at + dispute_timeout_secs`."
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "travelRuleThreshold",
+            "docs": [
+              "DRAFT (M5, BC-34): jobs at or above this amount need a Travel Rule commitment; 0 = disabled."
+            ],
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "finalized",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "job",
+            "type": "pubkey"
+          },
+          {
+            "name": "keeper",
+            "type": "pubkey"
+          },
+          {
+            "name": "keeperFee",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "job",
+      "docs": [
+        "seeds = [\"job\", institution, spec_hash]; vault = [\"escrow_token\", job], bond vault = [\"bond\", job]",
+        "(token authority of both = job)."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "institution",
+            "docs": [
+              "Institution wallet or Squads vault that created/funds the job; refund target."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "agentRecord",
+            "docs": [
+              "square_registry `AgentRecord` the job is bound to; reputation is written against it."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "agentWallet",
+            "docs": [
+              "`AgentRecord.wallet` at creation (or at the last `sync_agent_wallet`); signs accept/submit/list",
+              "and is the payee unless the receivable was sold."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "rentPayer",
+            "docs": [
+              "Paid the rent of the job and its vaults; receives it back when they close."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "specHash",
+            "docs": [
+              "SHA-256 of the off-chain job spec JSON (A2A task mapping, BE side)."
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "status",
+            "type": {
+              "defined": {
+                "name": "jobStatus"
+              }
+            }
+          },
+          {
+            "name": "createdAt",
+            "type": "i64"
+          },
+          {
+            "name": "fundedAt",
+            "type": "i64"
+          },
+          {
+            "name": "deadline",
+            "docs": [
+              "Deadline for delivery."
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "challengePeriod",
+            "type": "u64"
+          },
+          {
+            "name": "challengeEnd",
+            "docs": [
+              "Set in `submit_work`; finalize allowed after it."
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "deliveredAt",
+            "type": "i64"
+          },
+          {
+            "name": "settledAt",
+            "type": "i64"
+          },
+          {
+            "name": "workHash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "travelRuleCommitment",
+            "docs": [
+              "DRAFT (M5): salted Travel Rule commitment; all zeros = none."
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "policyCommitment",
+            "docs": [
+              "Policy snapshot taken at `create_job` (zeros when `policy` is None). The release proof is",
+              "checked against it, so later policy updates or deactivation cannot change this job's rules."
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "policyDailyCeiling",
+            "type": "u64"
+          },
+          {
+            "name": "policyVersion",
+            "type": "u32"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "vaultBump",
+            "type": "u8"
+          },
+          {
+            "name": "bondBump",
+            "docs": [
+              "Set by `raise_dispute`; 0 while no bond vault exists."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "policy",
+            "docs": [
+              "square_policy `Policy`; `Some` = proof-gated release."
+            ],
+            "type": {
+              "option": "pubkey"
+            }
+          },
+          {
+            "name": "dispute",
+            "type": {
+              "defined": {
+                "name": "disputeInfo"
+              }
+            }
+          },
+          {
+            "name": "deliveryUri",
+            "type": "string"
+          }
+        ]
+      }
+    },
+    {
+      "name": "jobAccepted",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "job",
+            "type": "pubkey"
+          },
+          {
+            "name": "agentRecord",
+            "type": "pubkey"
+          },
+          {
+            "name": "agentWallet",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "jobAgentWalletSynced",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "job",
+            "type": "pubkey"
+          },
+          {
+            "name": "agentWallet",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "jobCancelled",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "job",
+            "type": "pubkey"
+          },
+          {
+            "name": "refundedAmount",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "jobCreated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "job",
+            "type": "pubkey"
+          },
+          {
+            "name": "institution",
+            "type": "pubkey"
+          },
+          {
+            "name": "agentRecord",
+            "type": "pubkey"
+          },
+          {
+            "name": "agentWallet",
+            "type": "pubkey"
+          },
+          {
+            "name": "policy",
+            "type": {
+              "option": "pubkey"
+            }
+          },
+          {
+            "name": "policyVersion",
+            "type": "u32"
+          },
+          {
+            "name": "mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "specHash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "deadline",
+            "type": "i64"
+          },
+          {
+            "name": "challengePeriod",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "jobFunded",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "job",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "jobStatus",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "open"
+          },
+          {
+            "name": "funded"
+          },
+          {
+            "name": "accepted"
+          },
+          {
+            "name": "delivered"
+          },
+          {
+            "name": "disputed"
+          },
+          {
+            "name": "resolved"
+          },
+          {
+            "name": "released"
+          },
+          {
+            "name": "refunded"
+          },
+          {
+            "name": "cancelled"
+          }
+        ]
+      }
+    },
+    {
+      "name": "linkedPrograms",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "registryProgram",
+            "type": "pubkey"
+          },
+          {
+            "name": "policyProgram",
+            "type": "pubkey"
+          },
+          {
+            "name": "verifierProgram",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "missingProofEscalated",
+      "docs": [
+        "DRAFT (M5)."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "job",
+            "type": "pubkey"
+          },
+          {
+            "name": "agentWallet",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "releaseRefused",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "job",
+            "type": "pubkey"
+          },
+          {
+            "name": "refusalCode",
+            "type": "u16"
+          },
+          {
+            "name": "refundedAmount",
+            "type": "u64"
+          },
+          {
+            "name": "releaseProof",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "releaseVerified",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "job",
+            "type": "pubkey"
+          },
+          {
+            "name": "payee",
+            "type": "pubkey"
+          },
+          {
+            "name": "netAmount",
+            "type": "u64"
+          },
+          {
+            "name": "releaseProof",
+            "type": {
+              "option": "pubkey"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "reputationRecorded",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "agentRecord",
+            "type": "pubkey"
+          },
+          {
+            "name": "job",
+            "type": "pubkey"
+          },
+          {
+            "name": "jobsCompleted",
+            "type": "u64"
+          },
+          {
+            "name": "jobsFailed",
+            "type": "u64"
+          },
+          {
+            "name": "jobsDisputed",
+            "type": "u64"
+          },
+          {
+            "name": "totalEarned",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "travelRuleCommitted",
+      "docs": [
+        "DRAFT (M5)."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "job",
+            "type": "pubkey"
+          },
+          {
+            "name": "commitment",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "validationOutcome",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "verified"
+          },
+          {
+            "name": "refused"
+          },
+          {
+            "name": "noGate"
+          },
+          {
+            "name": "noPayout"
+          }
+        ]
+      }
+    },
+    {
+      "name": "validationRecord",
+      "docs": [
+        "seeds = [\"validation\", job] — gate outcome of a settled job (BC-26); written once per job."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "job",
+            "type": "pubkey"
+          },
+          {
+            "name": "agentRecord",
+            "type": "pubkey"
+          },
+          {
+            "name": "outcome",
+            "type": {
+              "defined": {
+                "name": "validationOutcome"
+              }
+            }
+          },
+          {
+            "name": "refusalCode",
+            "docs": [
+              "`ReleaseProof.refusal_code` when Refused, else 0."
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "recordedAt",
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "policy",
+            "type": {
+              "option": "pubkey"
+            }
+          },
+          {
+            "name": "releaseProof",
+            "type": {
+              "option": "pubkey"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "validationRecorded",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "job",
+            "type": "pubkey"
+          },
+          {
+            "name": "agentRecord",
+            "type": "pubkey"
+          },
+          {
+            "name": "outcome",
+            "type": {
+              "defined": {
+                "name": "validationOutcome"
+              }
+            }
+          },
+          {
+            "name": "refusalCode",
+            "type": "u16"
+          }
+        ]
+      }
+    },
+    {
+      "name": "workSubmitted",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "job",
+            "type": "pubkey"
+          },
+          {
+            "name": "workHash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "deliveryUri",
+            "type": "string"
+          },
+          {
+            "name": "challengeEnd",
+            "type": "i64"
+          }
+        ]
+      }
+    }
+  ],
+  "constants": [
+    {
+      "name": "bondSeed",
+      "type": "bytes",
+      "value": "[98, 111, 110, 100]"
+    },
+    {
+      "name": "claimSeed",
+      "type": "bytes",
+      "value": "[99, 108, 97, 105, 109]"
+    },
+    {
+      "name": "configSeed",
+      "type": "bytes",
+      "value": "[99, 111, 110, 102, 105, 103]"
+    },
+    {
+      "name": "escrowAuthoritySeed",
+      "type": "bytes",
+      "value": "[101, 115, 99, 114, 111, 119, 95, 97, 117, 116, 104, 111, 114, 105, 116, 121]"
+    },
+    {
+      "name": "jobSeed",
+      "type": "bytes",
+      "value": "[106, 111, 98]"
+    },
+    {
+      "name": "reputationSeed",
+      "type": "bytes",
+      "value": "[114, 101, 112, 117, 116, 97, 116, 105, 111, 110]"
+    },
+    {
+      "name": "validationSeed",
+      "type": "bytes",
+      "value": "[118, 97, 108, 105, 100, 97, 116, 105, 111, 110]"
+    },
+    {
+      "name": "vaultSeed",
+      "type": "bytes",
+      "value": "[101, 115, 99, 114, 111, 119, 95, 116, 111, 107, 101, 110]"
+    }
+  ]
+};

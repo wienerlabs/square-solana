@@ -7,10 +7,10 @@ TypeScript paketleri (pnpm workspace). Dizin adı kısa ad, npm adı **`@squares
 | Dizin | npm adı | İçerik | Issue |
 |---|---|---|---|
 | `config/` | `@squaresdk/solana-config` | tsconfig, eslint, prettier ortak ayarları | [BE-01] |
-| `types/` | `@squaresdk/solana-types` | ortak zod şemaları | [BE-07] |
-| `sdk/` | `@squaresdk/solana-sdk` | 4 program için IDL'den typed client, PDA'lar, event decoder, tx builder'lar | [BE-08] |
-| `identity/` | `@squaresdk/solana-identity` | `did:aip` resolver (v2 Solana + v1), agent card | [BE-09] |
-| `policy/` | `@squaresdk/solana-policy` | kurum tarafı: politika, commitment, alıcı listesi, ispat | [BE-10] |
+| [`types/`](types/) | `@squaresdk/solana-types` | ortak zod şemaları | [BE-07] |
+| [`sdk/`](sdk/) | `@squaresdk/solana-sdk` | 4 program için IDL'den typed client, PDA'lar, event decoder, tx builder'lar | [BE-08] |
+| [`identity/`](identity/) | `@squaresdk/solana-identity` | `did:aip` resolver (v2 Solana + v1), agent card | [BE-09] |
+| [`policy/`](policy/) | `@squaresdk/solana-policy` | kurum tarafı: politika, commitment, alıcı listesi, ispat | [BE-10] |
 | `observability/` | `@squaresdk/solana-observability` | logger, metrikler, health, alarm | [BE-12] |
 | `hardening/` | `@squaresdk/solana-hardening` | SSRF, idempotency, rate limit, RPC failover, imzalı eylemler | [BE-13] |
 | `a2a/` | `@squaresdk/solana-a2a` | JSON-RPC 2.0 görev protokolü, görev ↔ job durum eşlemesi | [BE-17] |

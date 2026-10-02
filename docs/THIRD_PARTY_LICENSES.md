@@ -26,9 +26,16 @@ pnpm license:write
 | `anchor-spl` | cargo | Apache-2.0 | runtime | `square-escrow-contract` | ✓ |
 | `groth16-solana` | cargo | MIT | runtime | `verifier` | ✓ |
 | `sha2` | cargo | MIT OR Apache-2.0 | runtime | `policy-registry` | ✓ |
+| `@coral-xyz/anchor` | npm | (MIT OR Apache-2.0) | runtime | `@squaresdk/solana-sdk` | ✓ |
+| `@redocly/cli` | npm | MIT | dev | `@squaresdk/solana-monorepo` | ✓ |
+| `@solana/web3.js` | npm | MIT | runtime | `@squaresdk/solana-identity`, `@squaresdk/solana-policy`, `@squaresdk/solana-sdk` | ✓ |
+| `@types/node` | npm | MIT | dev | `@squaresdk/solana-monorepo` | ✓ |
 | `turbo` | npm | MIT | dev | `@squaresdk/solana-monorepo` | ✓ |
+| `typescript` | npm | Apache-2.0 | dev | `@squaresdk/solana-monorepo` | ✓ |
+| `yaml` | npm | ISC | dev | `@squaresdk/solana-sdk`, `@squaresdk/solana-types` | ✓ |
+| `zod` | npm | MIT | runtime | `@squaresdk/solana-types` | ✓ |
 
-**Özet:** 1 npm, 4 Cargo doğrudan bağımlılık; lisans dağılımı: 2× Apache-2.0, 2× MIT, 1× MIT OR Apache-2.0.
+**Özet:** 8 npm, 4 Cargo doğrudan bağımlılık; lisans dağılımı: 6× MIT, 3× Apache-2.0, 1× (MIT OR Apache-2.0), 1× ISC, 1× MIT OR Apache-2.0.
 <!-- license-inventory:end -->
 
 Kaynak projelerin (Aperture, AIP, Covenant) kendi lisansları ve telif bildirimleri

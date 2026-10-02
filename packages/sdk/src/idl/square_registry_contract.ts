@@ -1,0 +1,1148 @@
+/**
+ * Program IDL in camelCase format in order to be used in JS/TS.
+ *
+ * Note that this is only a type helper and is not the actual IDL. The original
+ * IDL can be found at `target/idl/square_registry_contract.json`.
+ */
+export type SquareRegistryContract = {
+  "address": "CgchXu2dRV3r9E1YjRhp4kbeLLtv1Xz61yoerJzp1Vbc",
+  "metadata": {
+    "name": "squareRegistryContract",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Square registry arayüz sözleşmesi — gövdesiz Anchor stub'ı (BC-44)"
+  },
+  "instructions": [
+    {
+      "name": "deregisterAgent",
+      "docs": [
+        "Terminal: sets `Deregistered`. The record is kept (not closed) so the same (creator, agent_id)",
+        "can never be re-registered and inherit the agent's reputation or did:aip."
+      ],
+      "discriminator": [
+        227,
+        208,
+        166,
+        164,
+        48,
+        69,
+        111,
+        1
+      ],
+      "accounts": [
+        {
+          "name": "owner",
+          "signer": true,
+          "relations": [
+            "agentRecord"
+          ]
+        },
+        {
+          "name": "agentRecord",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  103,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agent_record.creator",
+                "account": "agentRecord"
+              },
+              {
+                "kind": "account",
+                "path": "agent_record.agent_id",
+                "account": "agentRecord"
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "initRegistryConfig",
+      "docs": [
+        "Creates the singleton registry config. Only the program upgrade authority (Squads vault) can",
+        "call it (checked through `program_data`), so the config cannot be front-run."
+      ],
+      "discriminator": [
+        157,
+        90,
+        204,
+        184,
+        92,
+        221,
+        52,
+        86
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "docs": [
+            "Must be the program upgrade authority."
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  101,
+                  103,
+                  105,
+                  115,
+                  116,
+                  114,
+                  121,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "program",
+          "address": "CgchXu2dRV3r9E1YjRhp4kbeLLtv1Xz61yoerJzp1Vbc"
+        },
+        {
+          "name": "programData"
+        },
+        {
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "screenerAuthority",
+          "type": "pubkey"
+        },
+        {
+          "name": "screeningTtlSecs",
+          "type": "i64"
+        }
+      ]
+    },
+    {
+      "name": "recordScreening",
+      "docs": [
+        "Flow step 3: the screener service (BE-16) records a sanctions screening result for a wallet.",
+        "Escrow reads it on `fund_job` (institution and agent), `buy_claim` (buyer) and release (payee)."
+      ],
+      "discriminator": [
+        29,
+        153,
+        28,
+        93,
+        95,
+        16,
+        166,
+        169
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "screenerAuthority",
+          "signer": true,
+          "relations": [
+            "config"
+          ]
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  101,
+                  103,
+                  105,
+                  115,
+                  116,
+                  114,
+                  121,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "screeningRecord",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  99,
+                  114,
+                  101,
+                  101,
+                  110,
+                  105,
+                  110,
+                  103
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "wallet"
+              }
+            ]
+          }
+        },
+        {
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "wallet",
+          "type": "pubkey"
+        },
+        {
+          "name": "status",
+          "type": {
+            "defined": {
+              "name": "screeningStatus"
+            }
+          }
+        },
+        {
+          "name": "sourceHash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "registerAgent",
+      "docs": [
+        "Flow step 2: an agent registers; it resolves as did:aip (Solana profile, BC-14).",
+        "`agent_id` is an immutable slug, unique per creator and never reusable (see `deregister_agent`)."
+      ],
+      "discriminator": [
+        135,
+        157,
+        66,
+        195,
+        2,
+        113,
+        175,
+        30
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "docs": [
+            "Pays rent and fees; separate from the role signer (fee payer / sponsored transactions)."
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "owner",
+          "docs": [
+            "Becomes both `creator` (seed) and the first `owner`."
+          ],
+          "signer": true
+        },
+        {
+          "name": "agentRecord",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  103,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "owner"
+              },
+              {
+                "kind": "arg",
+                "path": "agentId"
+              }
+            ]
+          }
+        },
+        {
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "agentId",
+          "type": "string"
+        },
+        {
+          "name": "agentCardUri",
+          "type": "string"
+        },
+        {
+          "name": "agentCardHash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "wallet",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "setAgentStatus",
+      "docs": [
+        "Pauses (`Inactive`) or resumes (`Active`) the agent. Escrow rejects `create_job` and",
+        "`accept_job` for a non-active agent; jobs already accepted can still be delivered and settled.",
+        "`Deregistered` is not accepted here."
+      ],
+      "discriminator": [
+        31,
+        193,
+        64,
+        189,
+        114,
+        155,
+        164,
+        218
+      ],
+      "accounts": [
+        {
+          "name": "owner",
+          "signer": true,
+          "relations": [
+            "agentRecord"
+          ]
+        },
+        {
+          "name": "agentRecord",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  103,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agent_record.creator",
+                "account": "agentRecord"
+              },
+              {
+                "kind": "account",
+                "path": "agent_record.agent_id",
+                "account": "agentRecord"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "status",
+          "type": {
+            "defined": {
+              "name": "agentStatus"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "transferAgentOwnership",
+      "docs": [
+        "Transfers ownership. The PDA is derived from the immutable `creator`, so the address stays stable."
+      ],
+      "discriminator": [
+        216,
+        78,
+        134,
+        193,
+        175,
+        186,
+        233,
+        25
+      ],
+      "accounts": [
+        {
+          "name": "owner",
+          "signer": true,
+          "relations": [
+            "agentRecord"
+          ]
+        },
+        {
+          "name": "agentRecord",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  103,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agent_record.creator",
+                "account": "agentRecord"
+              },
+              {
+                "kind": "account",
+                "path": "agent_record.agent_id",
+                "account": "agentRecord"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "newOwner",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "updateAgent",
+      "docs": [
+        "Updates the agent card pointer/hash and the agent wallet. Owner only. Jobs keep the wallet they",
+        "were created with until the owner calls escrow `sync_agent_wallet`."
+      ],
+      "discriminator": [
+        85,
+        2,
+        178,
+        9,
+        119,
+        139,
+        102,
+        164
+      ],
+      "accounts": [
+        {
+          "name": "owner",
+          "signer": true,
+          "relations": [
+            "agentRecord"
+          ]
+        },
+        {
+          "name": "agentRecord",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  103,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agent_record.creator",
+                "account": "agentRecord"
+              },
+              {
+                "kind": "account",
+                "path": "agent_record.agent_id",
+                "account": "agentRecord"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "agentCardUri",
+          "type": "string"
+        },
+        {
+          "name": "agentCardHash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "wallet",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "updateRegistryConfig",
+      "docs": [
+        "Rotates the screener authority and the screening record lifetime."
+      ],
+      "discriminator": [
+        205,
+        108,
+        204,
+        178,
+        107,
+        143,
+        150,
+        21
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "signer": true,
+          "relations": [
+            "config"
+          ]
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  101,
+                  103,
+                  105,
+                  115,
+                  116,
+                  114,
+                  121,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "screenerAuthority",
+          "type": "pubkey"
+        },
+        {
+          "name": "screeningTtlSecs",
+          "type": "i64"
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "agentRecord",
+      "discriminator": [
+        4,
+        201,
+        129,
+        70,
+        197,
+        134,
+        47,
+        169
+      ]
+    },
+    {
+      "name": "registryConfig",
+      "discriminator": [
+        23,
+        118,
+        10,
+        246,
+        173,
+        231,
+        243,
+        156
+      ]
+    },
+    {
+      "name": "screeningRecord",
+      "discriminator": [
+        123,
+        212,
+        47,
+        23,
+        190,
+        244,
+        88,
+        14
+      ]
+    }
+  ],
+  "events": [
+    {
+      "name": "agentDeregistered",
+      "discriminator": [
+        132,
+        69,
+        246,
+        19,
+        135,
+        65,
+        28,
+        134
+      ]
+    },
+    {
+      "name": "agentOwnershipTransferred",
+      "discriminator": [
+        202,
+        117,
+        136,
+        231,
+        121,
+        246,
+        202,
+        144
+      ]
+    },
+    {
+      "name": "agentRegistered",
+      "discriminator": [
+        191,
+        78,
+        217,
+        54,
+        232,
+        100,
+        189,
+        85
+      ]
+    },
+    {
+      "name": "agentStatusChanged",
+      "discriminator": [
+        210,
+        74,
+        73,
+        158,
+        205,
+        28,
+        137,
+        178
+      ]
+    },
+    {
+      "name": "agentUpdated",
+      "discriminator": [
+        210,
+        179,
+        162,
+        250,
+        123,
+        250,
+        210,
+        166
+      ]
+    },
+    {
+      "name": "registryConfigUpdated",
+      "discriminator": [
+        39,
+        92,
+        191,
+        32,
+        216,
+        166,
+        188,
+        161
+      ]
+    },
+    {
+      "name": "screeningRecorded",
+      "discriminator": [
+        9,
+        148,
+        143,
+        78,
+        10,
+        73,
+        170,
+        221
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "agentIdInvalid",
+      "msg": "Agent ID must be 1-32 bytes"
+    },
+    {
+      "code": 6001,
+      "name": "agentCardUriTooLong",
+      "msg": "Agent card URI exceeds 200 bytes"
+    },
+    {
+      "code": 6002,
+      "name": "unauthorized",
+      "msg": "Signer is not authorized for this operation"
+    },
+    {
+      "code": 6003,
+      "name": "agentInactive",
+      "msg": "Agent is not active"
+    },
+    {
+      "code": 6004,
+      "name": "agentDeregistered",
+      "msg": "Agent is deregistered"
+    },
+    {
+      "code": 6005,
+      "name": "invalidAgentStatus",
+      "msg": "Status cannot be set with this instruction"
+    },
+    {
+      "code": 6006,
+      "name": "invalidScreeningTtl",
+      "msg": "Screening TTL must be positive"
+    },
+    {
+      "code": 6007,
+      "name": "notImplemented",
+      "msg": "Interface contract stub: not implemented"
+    }
+  ],
+  "types": [
+    {
+      "name": "agentDeregistered",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "agentRecord",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "agentOwnershipTransferred",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "agentRecord",
+            "type": "pubkey"
+          },
+          {
+            "name": "previousOwner",
+            "type": "pubkey"
+          },
+          {
+            "name": "newOwner",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "agentRecord",
+      "docs": [
+        "seeds = [\"agent\", creator, agent_id]"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "creator",
+            "docs": [
+              "Original registrant; part of the PDA seeds, never changes."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "owner",
+            "docs": [
+              "Current owner; can change via `transfer_agent_ownership`."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "wallet",
+            "docs": [
+              "Agent wallet: signs escrow `accept_job` / `submit_work` / `list_claim` and is the default payee."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "agentCardHash",
+            "docs": [
+              "SHA-256 of the agent card JSON served at `agent_card_uri`."
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "status",
+            "type": {
+              "defined": {
+                "name": "agentStatus"
+              }
+            }
+          },
+          {
+            "name": "registeredAt",
+            "type": "i64"
+          },
+          {
+            "name": "updatedAt",
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "agentId",
+            "type": "string"
+          },
+          {
+            "name": "agentCardUri",
+            "type": "string"
+          }
+        ]
+      }
+    },
+    {
+      "name": "agentRegistered",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "agentRecord",
+            "type": "pubkey"
+          },
+          {
+            "name": "creator",
+            "type": "pubkey"
+          },
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "agentId",
+            "type": "string"
+          },
+          {
+            "name": "wallet",
+            "type": "pubkey"
+          },
+          {
+            "name": "agentCardHash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "agentStatus",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "active"
+          },
+          {
+            "name": "inactive"
+          },
+          {
+            "name": "deregistered"
+          }
+        ]
+      }
+    },
+    {
+      "name": "agentStatusChanged",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "agentRecord",
+            "type": "pubkey"
+          },
+          {
+            "name": "status",
+            "type": {
+              "defined": {
+                "name": "agentStatus"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "agentUpdated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "agentRecord",
+            "type": "pubkey"
+          },
+          {
+            "name": "wallet",
+            "type": "pubkey"
+          },
+          {
+            "name": "agentCardHash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "registryConfig",
+      "docs": [
+        "Singleton. seeds = [\"registry_config\"]"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "admin",
+            "type": "pubkey"
+          },
+          {
+            "name": "screenerAuthority",
+            "type": "pubkey"
+          },
+          {
+            "name": "screeningTtlSecs",
+            "docs": [
+              "Lifetime of a screening record; `expires_at = screened_at + screening_ttl_secs`."
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "registryConfigUpdated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "admin",
+            "type": "pubkey"
+          },
+          {
+            "name": "screenerAuthority",
+            "type": "pubkey"
+          },
+          {
+            "name": "screeningTtlSecs",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "screeningRecord",
+      "docs": [
+        "seeds = [\"screening\", wallet]"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "wallet",
+            "type": "pubkey"
+          },
+          {
+            "name": "status",
+            "type": {
+              "defined": {
+                "name": "screeningStatus"
+              }
+            }
+          },
+          {
+            "name": "sourceHash",
+            "docs": [
+              "Hash of the screening evidence (provider response / list version)."
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "screenedAt",
+            "type": "i64"
+          },
+          {
+            "name": "expiresAt",
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "screeningRecorded",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "wallet",
+            "type": "pubkey"
+          },
+          {
+            "name": "status",
+            "type": {
+              "defined": {
+                "name": "screeningStatus"
+              }
+            }
+          },
+          {
+            "name": "sourceHash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "expiresAt",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "screeningStatus",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "clear"
+          },
+          {
+            "name": "flagged"
+          }
+        ]
+      }
+    }
+  ],
+  "constants": [
+    {
+      "name": "agentSeed",
+      "type": "bytes",
+      "value": "[97, 103, 101, 110, 116]"
+    },
+    {
+      "name": "registryConfigSeed",
+      "type": "bytes",
+      "value": "[114, 101, 103, 105, 115, 116, 114, 121, 95, 99, 111, 110, 102, 105, 103]"
+    },
+    {
+      "name": "screeningSeed",
+      "type": "bytes",
+      "value": "[115, 99, 114, 101, 101, 110, 105, 110, 103]"
+    }
+  ]
+};

@@ -1,3 +1,9 @@
 packages:
   - "packages/*"
   - "apps/*"
+
+# @solana/web3.js → ws'nin isteğe bağlı native hızlandırıcıları; JS yedekleri var, kurulum
+# script'leri çalıştırılmaz (pnpm 10 varsayılanını açık karar olarak kaydeder).
+ignoredBuiltDependencies:
+  - bufferutil
+  - utf-8-validate
