@@ -2,7 +2,7 @@
   "name": "@squaresdk/solana-sdk",
   "version": "0.1.0",
   "description": "Square Solana SDK sözleşmesi: 4 programın IDL'leri, IDL'den türetilen tipler, client / PDA / tx builder / REST client arayüzleri (uygulama BE-08, BE-18)",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "private": true,
   "type": "module",
   "exports": {

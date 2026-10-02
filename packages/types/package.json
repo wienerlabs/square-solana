@@ -2,7 +2,7 @@
   "name": "@squaresdk/solana-types",
   "version": "0.1.0",
   "description": "Square ortak tipleri: API zarfı, görünümler, agent card, A2A görevi, event payload'ları (zod) — BE-35 sözleşmesi",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "private": true,
   "type": "module",
   "exports": {

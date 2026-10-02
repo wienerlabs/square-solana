@@ -1,0 +1,41 @@
+# Lisans kapısı (BC-02): üçüncü taraf bağımlılık lisansları ve docs/THIRD_PARTY_LICENSES.md'nin
+# güncelliği. Kurallar: docs/licensing.md.
+name: License
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  license:
+    name: Lisans envanteri
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
+      # Sürüm package.json → packageManager'dan okunur.
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413  # v6.1.0
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0
+        with:
+          node-version-file: .nvmrc
+
+      # cargo metadata için rust-toolchain.toml'daki sürüm. rustup 1.28+ argümansız
+      # `toolchain install` ile dosyadan kurar; daha eskisi bunu bilmez ama `show` ile kurar.
+      - name: Rust toolchain
+        run: rustup toolchain install || rustup show
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Politika testleri
+        run: node --test "scripts/**/*.test.mjs"
+
+      - name: Lisans kontrolü
+        run: pnpm license:check

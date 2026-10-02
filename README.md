@@ -129,5 +129,7 @@ Editör ayarları [`.editorconfig`](.editorconfig) ile paylaşılır.
 
 ## Lisans
 
-Bkz. [`LICENSE`](LICENSE). Hedef lisans Apache-2.0 + NOTICE'tir
-([§12.5](docs/analysis/square-solana-analysis.md#125-lisans)); geçiş BC-02 ile yapılır.
+[Apache-2.0](LICENSE) ([§12.5](docs/analysis/square-solana-analysis.md#125-lisans)). Kaynak
+projelerin kökenleri ve orijinal lisansları [`NOTICE`](NOTICE)'tedir. Taşınan kod ve bağımlılık
+lisansı kuralları [`docs/licensing.md`](docs/licensing.md)'de, üçüncü taraf envanteri
+[`docs/THIRD_PARTY_LICENSES.md`](docs/THIRD_PARTY_LICENSES.md)'dedir.
