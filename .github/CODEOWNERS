@@ -1,9 +1,0 @@
-# Varsayılan sahip: her PR için otomatik reviewer isteği (BC-43, #100).
-#
-# Kural sırası önemlidir: GitHub bir dosya için eşleşen SON kuralı uygular. Dizin bazlı
-# sahiplik (ör. programs/, circuits/) gerektiğinde bu satırın ALTINA eklenir.
-#
-# Not: Code owners, GitHub Free planında yalnızca public repolarda çalışır. Repo private
-# kaldığı sürece reviewer ataması için org'un Team (veya üstü) plana geçmesi gerekir.
-
-* @MuhammedAkinci
