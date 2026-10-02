@@ -14,18 +14,18 @@ wienerlabs/aperture
 Copyright (c) 2026 Makinci
 MIT License (full text below)
 
-  Imported at f5eaba9 (docs/provenance/BC-05.md):
+  Imported at f5eaba9 (docs/provenance/BC-05.md, docs/provenance/BC-06.md):
            programs/policy-registry  -> programs/square-policy
            programs/verifier         -> programs/square-verifier
-  Planned: circuits/payment-prover   -> circuits/payment-compliance
+           circuits/payment-prover   -> circuits/payment-compliance
 
 --------------------------------------------------------------------------------
 dr-wilson-empty/aip-beta (AIP, Agent Internet Protocol)
 Copyright (c) 2026 Agent Internet Protocol
 MIT License (full text below)
 
-  Imported paths: none yet.
-  Planned: programs/aip-escrow/programs/aip-registry -> programs/square-registry
+  Imported at 5a36fe0 (docs/provenance/BC-07.md):
+           programs/aip-escrow/programs/aip-registry -> programs/square-registry
 
 --------------------------------------------------------------------------------
 wienerlabs/covenant
