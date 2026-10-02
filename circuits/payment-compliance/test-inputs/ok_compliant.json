@@ -82,5 +82,6 @@
   "token_mint_high_in": "78778434590469691778792206732500675843",
   "token_mint_low_in": "57655239994631203757795580049291751079",
   "daily_spent_before_in": "50000000",
-  "current_unix_timestamp_in": "1735689600"
+  "current_unix_timestamp_in": "1735689600",
+  "stripe_receipt_hash_in": "0"
 }
