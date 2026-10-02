@@ -1,5 +1,5 @@
 {
-  "name": "payment-prover",
+  "name": "@squaresdk/solana-circuit-payment-compliance",
   "version": "1.0.0",
   "private": true,
   "description": "Square release-proof circuit (BC-19): Circom/Groth16 proof that an escrow release fits the institution policy. See docs/design/release-circuit.md.",
