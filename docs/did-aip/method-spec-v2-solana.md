@@ -41,10 +41,10 @@ one cross-registration model cover both ecosystems.
 | Identifier shape | `did:aip:eip155:{chainId}:{registry}:{agentId}` | `did:aip:solana:{chain-ref}:{registry}:{agent-record}` (§3) |
 | Chain | EIP-155 chain id, decimal | CAIP-2 reference: first 32 characters of the base58 genesis hash |
 | Registry | ERC-8004 Identity Registry, lowercase hex | registry program id, base58 |
-| Agent | ERC-721 `tokenId`, assigned by the registry | AgentRecord address, a PDA derived from the registrant and a slug (§3.4) |
+| Agent | ERC-721 `tokenId`, assigned by the registry | AgentRecord address, a PDA derived from the creator and a slug (§3.4) |
 | Owner key | known only as an address | the address **is** the Ed25519 public key, emitted when it is on the curve (§5.2) |
 | Agent card | Agent URI, no on-chain integrity | URI **and SHA-256** on-chain; a mismatching card is not used (§5.5) |
-| Deactivation | token burned, or `active: false` in the file | registry tombstone, or `active: false` in the card (§5.6) |
+| Deactivation | token burned, or `active: false` in the file | `Deregistered` (final) or `Inactive` (paused) on-chain, or `active: false` in the card (§5.6) |
 | Version discrimination, resolver never throws, cross-registration round trip | v2 §9.1, §6, §8 | unchanged |
 
 The key words MUST, MUST NOT, REQUIRED, SHALL, SHOULD, MAY are to be interpreted as described in
@@ -60,8 +60,8 @@ The key words MUST, MUST NOT, REQUIRED, SHALL, SHOULD, MAY are to be interpreted
 | **Chain reference** | The CAIP-2 reference of a cluster: the first 32 characters of its base58 genesis hash ([CAIP-2 Solana][caip2-solana]) |
 | **Registry** | A Solana program that keeps AgentRecords and satisfies §4.2. In this repository, `square_registry` |
 | **AgentRecord** | The account, owned by the Registry, that holds one agent's on-chain state (§4.1) |
-| **Registrant** | The account that signed the registration. Fixed for the life of the record |
-| **Owner** | The account that currently controls the record. Starts as the Registrant; transferable |
+| **Creator** | The account that signed the registration as owner. Fixed for the life of the record |
+| **Owner** | The account that currently controls the record. Starts as the Creator; transferable |
 | **Agent wallet** | Where the agent is paid. Defaults to the Owner |
 | **Agent card** | The JSON document the record's card URI resolves to. Its schema is defined by `@squaresdk/solana-identity` (BE-09); this profile reads only `services` and `active` |
 | **On the curve** | 32 bytes that decode to a point on edwards25519 ([RFC 8032] §5.1.3). Wallet keys are; PDAs are not |
@@ -117,7 +117,7 @@ did:aip:solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp:4sAy8cfTmn581JQLCzqHpQDhkKNutvTB
 ```
 
 The first is on devnet, the second on mainnet-beta. The registry is a test program id from the test
-vectors, not a deployed program. Both name a record derived from the same registrant and slug: a
+vectors, not a deployed program. Both name a record derived from the same creator and slug: a
 PDA depends only on the program id and the seeds, so the address is the same on every cluster, and
 only `chain-ref` tells the two agents apart.
 
@@ -132,15 +132,16 @@ only `chain-ref` tells the two agents apart.
 The last segment is the address of the AgentRecord account:
 
 ```
-agent-record = find_program_address(["agent", registrant, agent_id], registry).address
+agent-record = find_program_address(["agent", creator, agent_id], registry).address
 ```
 
-where `registrant` is the 32-byte key of the account that signed the registration and `agent_id` is
-an owner-chosen slug, `[A-Za-z0-9_-]{1,32}`, as UTF-8 bytes. These are the seeds of the v1 registry,
-kept so that a v1 operator recognises them.
+where `creator` is the 32-byte key of the account that signed the registration and `agent_id` is an
+owner-chosen slug, `[A-Za-z0-9_-]{1,32}`, as UTF-8 bytes. These are the seeds of the program
+interface contract (BC-44, `docs/design/program-interface.md` §5) and of the v1 registry, kept so
+that a v1 operator recognises them.
 
-The slug alone is not an identifier: it is unique only per registrant, and two registrants may both
-own a `scribe`. Putting both the registrant and the slug in the DID would need five segments and
+The slug alone is not an identifier: it is unique only per creator, and two creators may both own
+a `scribe`. Putting both the creator and the slug in the DID would need five segments and
 break v2's segment-count discrimination (v2 §9.1). The record address carries both, in one segment,
 and it is also the key the escrow and reputation programs use to refer to the agent. So the DID
 names the agent by the same 32 bytes the rest of Square does.
@@ -163,19 +164,20 @@ injective in both directions, as in v2 §1.3.
 
 ### 4.1 Logical view (Normative)
 
-A resolver reads the following fields. Their byte layout is the registry's IDL (BC-15, BC-44); this
+A resolver reads the following fields of `AgentRecord`. The names are those of the program interface
+contract (BC-44, `interfaces/square-registry-contract`); the byte layout is the registry's IDL. This
 profile fixes their meaning, not their encoding.
 
 | Field | Type | Meaning |
 |---|---|---|
-| `registrant` | 32 bytes | Signer of the registration. PDA seed. Immutable |
+| `creator` | 32 bytes | Signer of the registration as owner. PDA seed. Immutable |
 | `agent_id` | string, `[A-Za-z0-9_-]{1,32}` | Owner-chosen slug. PDA seed. Immutable |
 | `bump` | u8 | Canonical bump of the record PDA |
 | `owner` | 32 bytes | Current controller |
-| `agent_wallet` | 32 bytes | Payment destination; MAY equal `owner` |
+| `wallet` | 32 bytes | Agent wallet: payment destination, signs the agent's escrow actions; MAY equal `owner` |
 | `agent_card_uri` | string | MAY be empty |
 | `agent_card_hash` | 32 bytes | SHA-256 of the agent card's bytes; all zero when the URI is empty |
-| `status` | `active` \| `deactivated` | §5.6 |
+| `status` | `Active` \| `Inactive` \| `Deregistered` | §5.6 |
 | `registered_at`, `updated_at` | i64, Unix seconds | Cluster time of creation and of the last change |
 
 ### 4.2 Registry requirements (Normative)
@@ -188,19 +190,20 @@ each of them.
    cluster's genesis hash, so it could not check a supplied string anyway. Events carry the record
    address; indexers and clients derive the DID.
 2. **Fixed seeds.** The record address MUST be derived as in §3.4 and MUST NOT change for the life
-   of the record. `registrant` and `agent_id` MUST NOT change.
+   of the record. `creator` and `agent_id` MUST NOT change.
 3. **No reuse.** The registry MUST NOT close an AgentRecord. Deregistration sets `status` to
-   `deactivated` and leaves the account in place, permanently: a deactivated record MUST NOT become
-   active again. Otherwise a closed record could be registered again at the same address and its
-   DID would name a different agent, which v1 allowed (v1 §5.4) and this profile does not.
+   `Deregistered` and leaves the account in place, permanently: a deregistered record MUST NOT
+   change status again. Otherwise a closed record could be registered again at the same address and
+   its DID would name a different agent, which v1 allowed (v1 §5.4) and this profile does not.
+   `Active` and `Inactive` are the owner's reversible on/off switch.
 4. **Card and hash move together.** `agent_card_uri` and `agent_card_hash` MUST be written in the
    same instruction. An empty URI MUST come with an all-zero hash.
-5. **Transfer resets the wallet.** An ownership transfer MUST set `agent_wallet` to the new owner,
+5. **Transfer resets the wallet.** An ownership transfer MUST set `wallet` to the new owner,
    as ERC-8004 does on transfer (v2 §4.4). Payments then never follow an identity to a wallet its
    new owner did not choose.
-6. **Only the owner mutates.** Update, transfer and deregistration MUST require the owner's
-   signature. The owner may be a program-derived address that signs through its own program, for
-   example a Squads vault.
+6. **Only the owner mutates.** Update, status change, transfer and deregistration MUST require the
+   owner's signature. The owner may be a program-derived address that signs through its own
+   program, for example a Squads vault.
 
 ---
 
@@ -225,7 +228,7 @@ that documents compare deterministically.
 ### 5.2 Verification methods
 
 A Solana address that is on the curve is an Ed25519 public key, so unlike v2 the key itself can be
-published, not only the account. For `owner` and for `agent_wallet`, each independently, when the
+published, not only the account. For `owner` and for `wallet`, each independently, when the
 address is on the curve the resolver MUST emit:
 
 ```json
@@ -307,11 +310,15 @@ lowercase, whenever the URI is non-empty.
 
 | Source | Authority | Document | Metadata |
 |---|---|---|---|
-| `status = deactivated` | On-chain, final (§4.2.3) | `verificationMethod`, `authentication`, `capabilityInvocation`, `assertionMethod` and `service` are empty; the card is not fetched | `deactivated: true`, `deactivation: "registry"` |
-| Verified card with `active: false` | Owner's claim, reversible | Unchanged | `deactivated: true`, `deactivation: "agentCard"` |
+| `status = Deregistered` | On-chain, final (§4.2.3) | `verificationMethod`, `authentication`, `capabilityInvocation`, `assertionMethod` and `service` are empty; the card is not fetched | `deactivated: true`, `deactivation: "deregistered"` |
+| `status = Inactive` | On-chain, reversible by the owner | Unchanged | `deactivated: true`, `deactivation: "inactive"` |
+| Verified card with `active: false` | Owner's claim off-chain, reversible | Unchanged | `deactivated: true`, `deactivation: "agentCard"` |
 
-As in v2 §7.4, the two MUST be distinguished: a consumer deciding whether to pay an agent needs to
-know whether the identity is gone or merely parked. `deactivated` is absent when neither applies.
+When more than one applies, the first in this order wins. As in v2 §7.4, the sources MUST be
+distinguished: a consumer deciding whether to pay an agent needs to know whether the identity is
+gone or paused, and whether the chain says so or only the owner's file does. The escrow already
+refuses new jobs for an agent that is not `Active` (BC-44). `deactivated` is absent when none
+applies; `didDocumentMetadata.agentStatus` always reports the on-chain status.
 
 ### 5.7 Example
 
@@ -373,9 +380,9 @@ resolve(did):
   6. The account's owner program is not registry, or its data does not start with the
      AgentRecord discriminator of the registry's IDL → error "notFound".
   7. Decode the record per the IDL. Failure → error "internalError".
-  8. create_program_address(["agent", registrant, agent_id, [bump]], registry) MUST equal
+  8. create_program_address(["agent", creator, agent_id, [bump]], registry) MUST equal
      agent-record. Otherwise → error "notFound".
-  9. If status = deactivated → build the document of §5.6 and go to 12.
+  9. If status = Deregistered → build the document of §5.6 and go to 12.
  10. If agent_card_uri is non-empty → fetch and classify the card per §5.5.
  11. Build the document per §5.
  12. Return it with the metadata of §6.2.
@@ -396,11 +403,12 @@ an unexpected address cannot produce a DID that resolves.
 | `didResolutionMetadata.warnings` | `[{code, message}]`, present when non-empty: the codes of §5.5 |
 | `didDocumentMetadata.versionId` | The slot the account was read at (`context.slot` of the RPC response), as a decimal string |
 | `didDocumentMetadata.created`, `.updated` | `registered_at`, `updated_at` as UTC date-times without fractional seconds (`2026-09-21T14:13:20Z`) |
+| `didDocumentMetadata.agentStatus` | The on-chain status: `active` \| `inactive` \| `deregistered` |
 | `didDocumentMetadata.deactivated`, `.deactivation` | §5.6 |
 | `didDocumentMetadata.agentRegistry` | `solana:{chain-ref}:{registry}` (§3.5) |
 | `didDocumentMetadata.owner` | The owner's CAIP-10 account id, present whether or not it is on the curve |
 | `didDocumentMetadata.agentWallet` | The agent wallet's CAIP-10 account id, likewise |
-| `didDocumentMetadata.agentCard` | `absent` \| `unavailable` \| `unverified` \| `invalid` \| `verified` (§5.5); the field is omitted for a registry-deactivated record, whose card is not fetched |
+| `didDocumentMetadata.agentCard` | `absent` \| `unavailable` \| `unverified` \| `invalid` \| `verified` (§5.5); the field is omitted for a deregistered record, whose card is not fetched |
 | `didDocumentMetadata.agentCardUriScheme` | §5.5 |
 | `didDocumentMetadata.crossRegistrations` | As v2 §6.1, with §8 |
 
@@ -417,18 +425,20 @@ v2's. A deactivated DID is not an error.
 
 ## 7. DID Operations (Normative)
 
-Like v2, this method has no operations of its own: each is an instruction of the Registry. The
-instruction names below are descriptive; the registry's IDL (BC-15, BC-44) gives the real ones.
+Like v2, this method has no operations of its own: each is an instruction of the Registry. The names
+below are those of the program interface contract (BC-44, `docs/design/program-interface.md`
+v0.1.0); the registry's IDL is authoritative.
 
 ### 7.1 Create
 
-The registrant signs a registration with `agent_id`, and optionally `agent_wallet`,
-`agent_card_uri` and `agent_card_hash`. The registry creates the AgentRecord at the address of
-§3.4 with `owner = registrant`, `status = active`, and `agent_wallet = owner` unless given.
+`register_agent(agent_id, agent_card_uri, agent_card_hash, wallet)`, signed by `owner`, who becomes
+both `creator` (the seed) and the first `owner`. A separate `payer` signer pays rent and fees, so a
+sponsored transaction (BE-27, BC-35) does not make the sponsor the creator. The record starts
+`Active`.
 
-The DID can be computed before the transaction: the seeds include the registrant's key, so no one
-else can create that record, and if the record already exists the transaction fails. Still, a
-creator MUST NOT treat the DID as existing until the transaction is confirmed (v2 §7.1).
+The DID can be computed before the transaction: the seeds include the creator's key, so no one else
+can create that record, and if the record already exists the transaction fails. Still, a creator
+MUST NOT treat the DID as existing until the transaction is confirmed (v2 §7.1).
 
 A natural choice of `agent_card_hash` is to publish the card first, hash it, and register with
 both, so the card is verified from the first resolution.
@@ -439,19 +449,25 @@ both, so the card is verified from the first resolution.
 
 ### 7.3 Update
 
-The owner may change `agent_wallet`, and `agent_card_uri` together with `agent_card_hash`. The DID
-does not change; `updated_at` does.
+`update_agent(agent_card_uri, agent_card_hash, wallet)`, signed by the owner. The DID does not
+change; `updated_at` does. Jobs already open keep the wallet they were created with until the owner
+calls escrow `sync_agent_wallet` (BC-44); the DID Document always shows the record's current
+`wallet`.
 
-### 7.4 Transfer
+### 7.4 Pause and resume
 
-The owner may transfer the record to a new owner. The DID does not change, because it derives from
-the registrant, not from the owner. `controller` and `#owner` follow the new owner, and
-`agent_wallet` is reset to it (§4.2.5). See §10.2.
+`set_agent_status(Active | Inactive)`, signed by the owner. The DID does not change; §5.6 reports
+`Inactive`.
 
-### 7.5 Deactivate
+### 7.5 Transfer
 
-The owner sets `status = deactivated` (§4.2.3, §5.6). This is final. To pause an agent reversibly,
-the owner sets `"active": false` in the card instead.
+`transfer_agent_ownership(new_owner)`, signed by the owner. The DID does not change, because it
+derives from the creator, not from the owner. `controller` and `#owner` follow the new owner, and
+`wallet` is reset to it (§4.2.5). See §10.2.
+
+### 7.6 Deactivate
+
+`deregister_agent()`, signed by the owner, sets `Deregistered`. This is final (§4.2.3, §5.6).
 
 ---
 
@@ -494,12 +510,19 @@ Facts a v1 implementation needs and the v1 specification does not give:
   accounts with structured `capabilities` and `price_per_task`. The program was last deployed in
   slot 463520728 (2026-05-19T20:21:52Z), minutes before that commit. The copy in
   `wienerlabs/aip-beta` (9655c15) has an older 1048-byte layout with `capabilities_json`, which
-  matches no live account; a decoder built from it fails on every record.
+  matches no live account; a decoder built from it fails on every record. The AIP source for this
+  repository is `dr-wilson-empty/aip-beta` (BC-07).
 - At slot 506742046 there were 15 records. All re-derive from `["agent", owner, agent_id]`, and each
   stores the canonical v1 DID in its `did` field.
 - The v1 program's upgrade authority is `33qU3JFkrehB2HkgdHzcpj9gDkFk8c2okQC51REWhjKh`, outside
   Wiener Labs' control. What a v1 DID resolves to can change with a program upgrade nobody here
   approves (v1 §7.6).
+- `CgchXu2dRV3r9E1YjRhp4kbeLLtv1Xz61yoerJzp1Vbc` is the v1 program, not a Registry of this profile,
+  and a resolver MUST NOT accept it as the `registry` segment of a `solana` DID. The BC-44 interface
+  stubs declare this id until BC-09 assigns Square program ids, so a client that took the registry
+  address from today's IDL would build DIDs naming the v1 program. Both programs call their account
+  `AgentRecord` and so share its Anchor discriminator: step 6 of §6.1 cannot tell them apart, and only
+  the allowlist (§10.1) does.
 
 ### 9.3 `did:key`
 
@@ -535,7 +558,7 @@ An operator moving a v1 agent to this profile SHOULD follow v2 §9.3: register i
 publish the new DID in the v1 agent card, list the v1 DID as a `DID` service in the new card, and
 keep the v1 record rather than closing it.
 
-Unlike a v1 → EVM migration, both anchors here use Ed25519 keys. When the new record's registrant is
+Unlike a v1 → EVM migration, both anchors here use Ed25519 keys. When the new record's creator is
 the v1 record's owner, a consumer can check that the same key controls both. That is evidence of a
 common operator, not of a common identity, and neither DID inherits the other's reputation.
 
@@ -551,7 +574,7 @@ the record. Consumers SHOULD keep an allowlist of registry program ids.
 
 ### 10.2 Ownership and wallet mutability
 
-Owner and agent wallet change under the DID (§7.3, §7.4), as in v2 §10.2. Anything that authorises a
+Owner and agent wallet change under the DID (§7.3, §7.5), as in v2 §10.2. Anything that authorises a
 payment or accepts a signature MUST re-resolve, or check against the slot in `versionId`. This is a
 deliberate departure from v1, where ownership could not be transferred: Square needs institutions to
 move agents between operational keys and smart accounts.
@@ -592,7 +615,7 @@ no key, and authority is exercised on-chain.
 ## 11. Privacy Considerations
 
 All AgentRecord fields are public. The DID contains only the record address, but the record
-contains the registrant and owner, so every agent of one registrant is linkable with a single
+contains the creator and owner, so every agent of one creator is linkable with a single
 filtered `getProgramAccounts` query. Operators wanting unlinkable agents SHOULD register each from a
 fresh key, and note that a smart-account owner links the agents it owns just the same.
 
@@ -625,11 +648,11 @@ not require service types to be registered.
 
 | Item | Consequence |
 |---|---|
-| BC-15 `square_registry` | Implements §4.2: no DID field, `["agent", registrant, agent_id]` seeds, tombstone instead of close, card URI and hash written together, wallet reset on transfer |
-| BC-44 program interface | The registry's PDA table and account layout take §3.4 and §4.1 |
+| BC-15 `square_registry` | Implements §4.2: no DID field, `["agent", creator, agent_id]` seeds, `Deregistered` instead of close, card URI and hash written together, wallet reset on transfer |
+| BC-44 program interface | v0.1.0 already matches §3.4, §4.1 and §7: same seeds and field names, no DID field, no close, `Inactive` / `Deregistered`, card URI and hash. Not stated there yet: the wallet reset on transfer (§4.2.5). Its stubs declare the v1 program id until BC-09 (§9.2) |
 | BC-16 events | Registry events carry the record address; the DID is derived, not emitted |
 | BE-09 `@squaresdk/solana-identity` | Implements §6 and §9 and consumes `test-vectors.json`; the v1 path decodes the c427872 layout (§9.2) |
-| BC-07 registry import | The code actually deployed as v1 is `dr-wilson-empty/aip-beta` c427872, not the `wienerlabs/aip-beta` copy (§9.2) |
+| BC-07 registry import | Source: `dr-wilson-empty/aip-beta`. Its registry at c427872 is the code deployed as v1 (§9.2) |
 | W3C registry | [w3c/did-extensions#750][w3c-750], still open, changes the method's `verifiableDataRegistry` from Solana to ERC-8004. With this profile both apply, and the entry should say so |
 
 ---
@@ -667,11 +690,11 @@ bytes of `agentCardBody`. The `registry` is a test program id, not a deployed pr
 | `chains` | CAIP-2 references of mainnet-beta, devnet and testnet (§3.3) |
 | `keys` | Addresses with their on-curve status; for on-curve keys, `publicKeyMultibase` and `did:key` |
 | `didKeyDecoding` | The `did:key` decoding pitfall of §9.3, with the wrong result it produces |
-| `derivation` | `(registry, registrant, agent_id)` → record address, bump, DID; including a 32-character slug and a PDA registrant |
+| `derivation` | `(registry, creator, agent_id)` → record address, bump, DID; including a 32-character slug and a PDA creator |
 | `parse.valid` | Solana-profile, v2 (`eip155`) and v1 DIDs with their parsed parts |
 | `parse.rejected` | 18 identifiers rejected as `invalidDid`, each with the rule it breaks (§3.2, §9.3, §9.4) |
 | `parse.agentRegistry` | The `(agentRegistry, agentId)` ⇄ DID mapping of §3.5 |
-| `documents` | Nine resolution cases with an inline record and card: verified card, off-curve wallet and service-id collision, hash mismatch, unreachable card, invalid card, off-curve owner without a card, registry deactivation, card `active: false`, transferred owner |
+| `documents` | Ten resolution cases with an inline record and card: verified card, off-curve wallet and service-id collision, hash mismatch, unreachable card, invalid card, off-curve owner without a card, `Deregistered`, `Inactive`, card `active: false`, transferred owner |
 | `v1` | The derivation the v1 specification's Appendix A.1 names without a value, and two live devnet records (a snapshot at slot 506742046, not fixtures) with their v1 DID Documents |
 
 [v1]: https://github.com/dr-wilson-empty/aip-beta/blob/5689708a8f9eefba5ca57724adf0478e762b3ee3/standards/did-aip-method-spec.md

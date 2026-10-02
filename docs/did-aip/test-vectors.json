@@ -66,12 +66,12 @@
     "naiveWrongResult": "24Sosyc4HTsUWSBK3GWyZKHc1qJ1hQSe3BbxDTLGvrm9cdu"
   },
   "derivation": {
-    "$comment": "agentRecord = find_program_address([\"agent\", registrant, agent_id], registry). The DID uses the record address, never the slug.",
+    "$comment": "agentRecord = find_program_address([\"agent\", creator, agent_id], registry) (BC-44 seed table). The DID uses the record address, never the slug.",
     "cases": [
       {
         "chainRef": "EtWTRABZaYq6iMfeYKouRu166VU2xqa1",
         "registry": "4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK",
-        "registrant": "uRBJTVBUYM4H5dQHSUWSU5VaxJK8ApMBAQdHm1fDCuM",
+        "creator": "uRBJTVBUYM4H5dQHSUWSU5VaxJK8ApMBAQdHm1fDCuM",
         "agentId": "scribe",
         "agentRecord": "4VqS6uu2WPDR6EjpXDBKZxs9tjwc4WtksjXziWXcd6zk",
         "bump": 255,
@@ -80,7 +80,7 @@
       {
         "chainRef": "5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp",
         "registry": "4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK",
-        "registrant": "uRBJTVBUYM4H5dQHSUWSU5VaxJK8ApMBAQdHm1fDCuM",
+        "creator": "uRBJTVBUYM4H5dQHSUWSU5VaxJK8ApMBAQdHm1fDCuM",
         "agentId": "scribe",
         "agentRecord": "4VqS6uu2WPDR6EjpXDBKZxs9tjwc4WtksjXziWXcd6zk",
         "bump": 255,
@@ -89,7 +89,7 @@
       {
         "chainRef": "EtWTRABZaYq6iMfeYKouRu166VU2xqa1",
         "registry": "4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK",
-        "registrant": "9JeqKarf1k7TDwf2U3PrjEasY9k8mk5GFd3VRizQ9aZN",
+        "creator": "9JeqKarf1k7TDwf2U3PrjEasY9k8mk5GFd3VRizQ9aZN",
         "agentId": "ada-research-001",
         "agentRecord": "DMKXywzzYsD1ZXunrZQWpXddvnWyNMPDftZKSWxKq8EP",
         "bump": 254,
@@ -98,7 +98,7 @@
       {
         "chainRef": "EtWTRABZaYq6iMfeYKouRu166VU2xqa1",
         "registry": "4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK",
-        "registrant": "C3KH2UYKoD1PtxX3nzaErA6zya9TXVtfKRjNKv9UW33m",
+        "creator": "C3KH2UYKoD1PtxX3nzaErA6zya9TXVtfKRjNKv9UW33m",
         "agentId": "treasury-agent",
         "agentRecord": "ZbBgQ6ZxwQLFMFw159YwAppe8cgM3gfdtARdJnG6eoF",
         "bump": 255,
@@ -107,7 +107,7 @@
       {
         "chainRef": "EtWTRABZaYq6iMfeYKouRu166VU2xqa1",
         "registry": "4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK",
-        "registrant": "uRBJTVBUYM4H5dQHSUWSU5VaxJK8ApMBAQdHm1fDCuM",
+        "creator": "uRBJTVBUYM4H5dQHSUWSU5VaxJK8ApMBAQdHm1fDCuM",
         "agentId": "retired-agent",
         "agentRecord": "4pudpBMWjSuXKogfSaue2H5SvoSdnvHRhH2FrQvDyTBW",
         "bump": 255,
@@ -116,7 +116,16 @@
       {
         "chainRef": "EtWTRABZaYq6iMfeYKouRu166VU2xqa1",
         "registry": "4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK",
-        "registrant": "uRBJTVBUYM4H5dQHSUWSU5VaxJK8ApMBAQdHm1fDCuM",
+        "creator": "9JeqKarf1k7TDwf2U3PrjEasY9k8mk5GFd3VRizQ9aZN",
+        "agentId": "paused-agent",
+        "agentRecord": "Dn7VdgkAdeeaXXkgVEbTfmooK22ehPP29i3CSmXoKbw4",
+        "bump": 255,
+        "did": "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:Dn7VdgkAdeeaXXkgVEbTfmooK22ehPP29i3CSmXoKbw4"
+      },
+      {
+        "chainRef": "EtWTRABZaYq6iMfeYKouRu166VU2xqa1",
+        "registry": "4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK",
+        "creator": "uRBJTVBUYM4H5dQHSUWSU5VaxJK8ApMBAQdHm1fDCuM",
         "agentId": "transferred-agent",
         "agentRecord": "AUZasaHCAj9619JwyVoXvLbDRy94f21kZcxQjg16uk5",
         "bump": 255,
@@ -125,7 +134,7 @@
       {
         "chainRef": "EtWTRABZaYq6iMfeYKouRu166VU2xqa1",
         "registry": "4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK",
-        "registrant": "9JeqKarf1k7TDwf2U3PrjEasY9k8mk5GFd3VRizQ9aZN",
+        "creator": "9JeqKarf1k7TDwf2U3PrjEasY9k8mk5GFd3VRizQ9aZN",
         "agentId": "a-32-character-agent-slug-000001",
         "agentRecord": "FkYUGZCAK7L96yHEiG6VxMZmrQvobvCavDBRk4FQBLpG",
         "bump": 254,
@@ -287,7 +296,7 @@
     ]
   },
   "documents": {
-    "$comment": "Inline resolution cases at a fixed slot. record is the logical AgentRecord view of §4.1; agentCardBody is what the card URI serves (null: unreachable).",
+    "$comment": "Inline resolution cases at a fixed slot. record is the logical AgentRecord view of §4.1, with the field names of the BC-44 contract (status: Active | Inactive | Deregistered); agentCardBody is what the card URI serves (null: unreachable).",
     "cases": [
       {
         "name": "active-verified-card",
@@ -295,14 +304,14 @@
         "did": "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:4VqS6uu2WPDR6EjpXDBKZxs9tjwc4WtksjXziWXcd6zk",
         "slot": 412345678,
         "record": {
-          "registrant": "uRBJTVBUYM4H5dQHSUWSU5VaxJK8ApMBAQdHm1fDCuM",
+          "creator": "uRBJTVBUYM4H5dQHSUWSU5VaxJK8ApMBAQdHm1fDCuM",
           "agentId": "scribe",
           "bump": 255,
           "owner": "uRBJTVBUYM4H5dQHSUWSU5VaxJK8ApMBAQdHm1fDCuM",
-          "agentWallet": "uRBJTVBUYM4H5dQHSUWSU5VaxJK8ApMBAQdHm1fDCuM",
+          "wallet": "uRBJTVBUYM4H5dQHSUWSU5VaxJK8ApMBAQdHm1fDCuM",
           "agentCardUri": "https://scribe.example/.well-known/aip-card.json",
           "agentCardHash": "7fe8d9018df3e9263925583853844f50d6445edd0e10907af7e3aed06664ba28",
-          "status": "active",
+          "status": "Active",
           "registeredAt": 1790000000,
           "updatedAt": 1790086400
         },
@@ -367,6 +376,7 @@
             "agentRegistry": "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK",
             "owner": "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:uRBJTVBUYM4H5dQHSUWSU5VaxJK8ApMBAQdHm1fDCuM",
             "agentWallet": "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:uRBJTVBUYM4H5dQHSUWSU5VaxJK8ApMBAQdHm1fDCuM",
+            "agentStatus": "active",
             "agentCardUriScheme": "https",
             "agentCard": "verified"
           }
@@ -378,14 +388,14 @@
         "did": "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:DMKXywzzYsD1ZXunrZQWpXddvnWyNMPDftZKSWxKq8EP",
         "slot": 412345678,
         "record": {
-          "registrant": "9JeqKarf1k7TDwf2U3PrjEasY9k8mk5GFd3VRizQ9aZN",
+          "creator": "9JeqKarf1k7TDwf2U3PrjEasY9k8mk5GFd3VRizQ9aZN",
           "agentId": "ada-research-001",
           "bump": 254,
           "owner": "9JeqKarf1k7TDwf2U3PrjEasY9k8mk5GFd3VRizQ9aZN",
-          "agentWallet": "HLEdiAAXJFxLWs46LgVoXJW2RCxD7WTUiM3Km8CHD394",
+          "wallet": "HLEdiAAXJFxLWs46LgVoXJW2RCxD7WTUiM3Km8CHD394",
           "agentCardUri": "ipfs://bafkreihjvafff2lfkdpfl5rhhy4xswcwbmftlrwvdjzd7jrit54gci6ifq",
           "agentCardHash": "e9a80a52e96550de55f6273e397958560b0b35c6d51a723fa6289f786123c82c",
-          "status": "active",
+          "status": "Active",
           "registeredAt": 1790000000,
           "updatedAt": 1790086400
         },
@@ -448,6 +458,7 @@
             "agentRegistry": "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK",
             "owner": "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:9JeqKarf1k7TDwf2U3PrjEasY9k8mk5GFd3VRizQ9aZN",
             "agentWallet": "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:HLEdiAAXJFxLWs46LgVoXJW2RCxD7WTUiM3Km8CHD394",
+            "agentStatus": "active",
             "agentCardUriScheme": "ipfs",
             "agentCard": "verified"
           }
@@ -459,14 +470,14 @@
         "did": "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:4VqS6uu2WPDR6EjpXDBKZxs9tjwc4WtksjXziWXcd6zk",
         "slot": 412345678,
         "record": {
-          "registrant": "uRBJTVBUYM4H5dQHSUWSU5VaxJK8ApMBAQdHm1fDCuM",
+          "creator": "uRBJTVBUYM4H5dQHSUWSU5VaxJK8ApMBAQdHm1fDCuM",
           "agentId": "scribe",
           "bump": 255,
           "owner": "uRBJTVBUYM4H5dQHSUWSU5VaxJK8ApMBAQdHm1fDCuM",
-          "agentWallet": "uRBJTVBUYM4H5dQHSUWSU5VaxJK8ApMBAQdHm1fDCuM",
+          "wallet": "uRBJTVBUYM4H5dQHSUWSU5VaxJK8ApMBAQdHm1fDCuM",
           "agentCardUri": "https://scribe.example/.well-known/aip-card.json",
           "agentCardHash": "7fe8d9018df3e9263925583853844f50d6445edd0e10907af7e3aed06664ba28",
-          "status": "active",
+          "status": "Active",
           "registeredAt": 1790000000,
           "updatedAt": 1790086400
         },
@@ -527,6 +538,7 @@
             "agentRegistry": "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK",
             "owner": "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:uRBJTVBUYM4H5dQHSUWSU5VaxJK8ApMBAQdHm1fDCuM",
             "agentWallet": "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:uRBJTVBUYM4H5dQHSUWSU5VaxJK8ApMBAQdHm1fDCuM",
+            "agentStatus": "active",
             "agentCardUriScheme": "https",
             "agentCard": "unverified"
           }
@@ -538,14 +550,14 @@
         "did": "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:4VqS6uu2WPDR6EjpXDBKZxs9tjwc4WtksjXziWXcd6zk",
         "slot": 412345678,
         "record": {
-          "registrant": "uRBJTVBUYM4H5dQHSUWSU5VaxJK8ApMBAQdHm1fDCuM",
+          "creator": "uRBJTVBUYM4H5dQHSUWSU5VaxJK8ApMBAQdHm1fDCuM",
           "agentId": "scribe",
           "bump": 255,
           "owner": "uRBJTVBUYM4H5dQHSUWSU5VaxJK8ApMBAQdHm1fDCuM",
-          "agentWallet": "uRBJTVBUYM4H5dQHSUWSU5VaxJK8ApMBAQdHm1fDCuM",
+          "wallet": "uRBJTVBUYM4H5dQHSUWSU5VaxJK8ApMBAQdHm1fDCuM",
           "agentCardUri": "https://scribe.example/.well-known/aip-card.json",
           "agentCardHash": "7fe8d9018df3e9263925583853844f50d6445edd0e10907af7e3aed06664ba28",
-          "status": "active",
+          "status": "Active",
           "registeredAt": 1790000000,
           "updatedAt": 1790086400
         },
@@ -606,6 +618,7 @@
             "agentRegistry": "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK",
             "owner": "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:uRBJTVBUYM4H5dQHSUWSU5VaxJK8ApMBAQdHm1fDCuM",
             "agentWallet": "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:uRBJTVBUYM4H5dQHSUWSU5VaxJK8ApMBAQdHm1fDCuM",
+            "agentStatus": "active",
             "agentCardUriScheme": "https",
             "agentCard": "unavailable"
           }
@@ -617,14 +630,14 @@
         "did": "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:4VqS6uu2WPDR6EjpXDBKZxs9tjwc4WtksjXziWXcd6zk",
         "slot": 412345678,
         "record": {
-          "registrant": "uRBJTVBUYM4H5dQHSUWSU5VaxJK8ApMBAQdHm1fDCuM",
+          "creator": "uRBJTVBUYM4H5dQHSUWSU5VaxJK8ApMBAQdHm1fDCuM",
           "agentId": "scribe",
           "bump": 255,
           "owner": "uRBJTVBUYM4H5dQHSUWSU5VaxJK8ApMBAQdHm1fDCuM",
-          "agentWallet": "uRBJTVBUYM4H5dQHSUWSU5VaxJK8ApMBAQdHm1fDCuM",
+          "wallet": "uRBJTVBUYM4H5dQHSUWSU5VaxJK8ApMBAQdHm1fDCuM",
           "agentCardUri": "https://scribe.example/.well-known/aip-card.json",
           "agentCardHash": "ab5eb4ef20d198fb3dc5f16a557ad4691f718ca3ee01c9352356e838de03a0a1",
-          "status": "active",
+          "status": "Active",
           "registeredAt": 1790000000,
           "updatedAt": 1790086400
         },
@@ -685,6 +698,7 @@
             "agentRegistry": "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK",
             "owner": "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:uRBJTVBUYM4H5dQHSUWSU5VaxJK8ApMBAQdHm1fDCuM",
             "agentWallet": "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:uRBJTVBUYM4H5dQHSUWSU5VaxJK8ApMBAQdHm1fDCuM",
+            "agentStatus": "active",
             "agentCardUriScheme": "https",
             "agentCard": "invalid"
           }
@@ -692,18 +706,18 @@
       },
       {
         "name": "off-curve-owner-no-card",
-        "$comment": "The registrant and owner is a program-derived address (an institution's smart-account vault): no #owner verification method, so authentication and capabilityInvocation are empty; control is exercised on-chain through the owning program. The agent wallet is an ordinary key. No card.",
+        "$comment": "The creator and owner is a program-derived address (an institution's smart-account vault): no #owner verification method, so authentication and capabilityInvocation are empty; control is exercised on-chain through the owning program. The agent wallet is an ordinary key. No card.",
         "did": "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:ZbBgQ6ZxwQLFMFw159YwAppe8cgM3gfdtARdJnG6eoF",
         "slot": 412345678,
         "record": {
-          "registrant": "C3KH2UYKoD1PtxX3nzaErA6zya9TXVtfKRjNKv9UW33m",
+          "creator": "C3KH2UYKoD1PtxX3nzaErA6zya9TXVtfKRjNKv9UW33m",
           "agentId": "treasury-agent",
           "bump": 255,
           "owner": "C3KH2UYKoD1PtxX3nzaErA6zya9TXVtfKRjNKv9UW33m",
-          "agentWallet": "9ekwKFUJptrPB6WaizbKMsBcqynzZUAZdfVpPWqzY1Rd",
+          "wallet": "9ekwKFUJptrPB6WaizbKMsBcqynzZUAZdfVpPWqzY1Rd",
           "agentCardUri": "",
           "agentCardHash": "0000000000000000000000000000000000000000000000000000000000000000",
-          "status": "active",
+          "status": "Active",
           "registeredAt": 1790000000,
           "updatedAt": 1790086400
         },
@@ -741,24 +755,25 @@
             "agentRegistry": "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK",
             "owner": "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:C3KH2UYKoD1PtxX3nzaErA6zya9TXVtfKRjNKv9UW33m",
             "agentWallet": "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:9ekwKFUJptrPB6WaizbKMsBcqynzZUAZdfVpPWqzY1Rd",
+            "agentStatus": "active",
             "agentCard": "absent"
           }
         }
       },
       {
-        "name": "registry-deactivated",
-        "$comment": "status = deactivated is authoritative: the record is kept as a tombstone and the document carries no keys or services.",
+        "name": "deregistered",
+        "$comment": "status = Deregistered is final: the record is kept (never closed) and the document carries no keys or services. The card is not fetched.",
         "did": "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:4pudpBMWjSuXKogfSaue2H5SvoSdnvHRhH2FrQvDyTBW",
         "slot": 412345678,
         "record": {
-          "registrant": "uRBJTVBUYM4H5dQHSUWSU5VaxJK8ApMBAQdHm1fDCuM",
+          "creator": "uRBJTVBUYM4H5dQHSUWSU5VaxJK8ApMBAQdHm1fDCuM",
           "agentId": "retired-agent",
           "bump": 255,
           "owner": "uRBJTVBUYM4H5dQHSUWSU5VaxJK8ApMBAQdHm1fDCuM",
-          "agentWallet": "uRBJTVBUYM4H5dQHSUWSU5VaxJK8ApMBAQdHm1fDCuM",
+          "wallet": "uRBJTVBUYM4H5dQHSUWSU5VaxJK8ApMBAQdHm1fDCuM",
           "agentCardUri": "https://scribe.example/.well-known/aip-card.json",
           "agentCardHash": "7fe8d9018df3e9263925583853844f50d6445edd0e10907af7e3aed06664ba28",
-          "status": "deactivated",
+          "status": "Deregistered",
           "registeredAt": 1790000000,
           "updatedAt": 1790086400
         },
@@ -787,8 +802,100 @@
             "agentRegistry": "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK",
             "owner": "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:uRBJTVBUYM4H5dQHSUWSU5VaxJK8ApMBAQdHm1fDCuM",
             "agentWallet": "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:uRBJTVBUYM4H5dQHSUWSU5VaxJK8ApMBAQdHm1fDCuM",
+            "agentStatus": "deregistered",
             "deactivated": true,
-            "deactivation": "registry"
+            "deactivation": "deregistered"
+          }
+        }
+      },
+      {
+        "name": "inactive",
+        "$comment": "status = Inactive: the owner paused the agent on-chain (set_agent_status). Reversible; the document is unchanged and the metadata says the chain paused it. The card's own active: true does not override the chain.",
+        "did": "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:Dn7VdgkAdeeaXXkgVEbTfmooK22ehPP29i3CSmXoKbw4",
+        "slot": 412345678,
+        "record": {
+          "creator": "9JeqKarf1k7TDwf2U3PrjEasY9k8mk5GFd3VRizQ9aZN",
+          "agentId": "paused-agent",
+          "bump": 255,
+          "owner": "9JeqKarf1k7TDwf2U3PrjEasY9k8mk5GFd3VRizQ9aZN",
+          "wallet": "9JeqKarf1k7TDwf2U3PrjEasY9k8mk5GFd3VRizQ9aZN",
+          "agentCardUri": "https://ada.example/.well-known/aip-card.json",
+          "agentCardHash": "e9a80a52e96550de55f6273e397958560b0b35c6d51a723fa6289f786123c82c",
+          "status": "Inactive",
+          "registeredAt": 1790000000,
+          "updatedAt": 1790086400
+        },
+        "agentCardBody": "{\n  \"type\": \"https://eips.ethereum.org/EIPS/eip-8004#registration-v1\",\n  \"name\": \"Ada Research\",\n  \"description\": \"Research agent, migrated from did:aip v1.\",\n  \"services\": [\n    {\n      \"name\": \"A2A\",\n      \"endpoint\": \"https://ada.example/a2a\"\n    },\n    {\n      \"name\": \"Agent Card\",\n      \"endpoint\": \"https://ada.example/.well-known/agent-card.json\"\n    },\n    {\n      \"name\": \"DID\",\n      \"endpoint\": \"did:aip:7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU:ada-research-001\"\n    }\n  ]\n}\n",
+        "expected": {
+          "didDocument": {
+            "@context": [
+              "https://www.w3.org/ns/did/v1",
+              "https://w3id.org/security/suites/ed25519-2020/v1"
+            ],
+            "id": "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:Dn7VdgkAdeeaXXkgVEbTfmooK22ehPP29i3CSmXoKbw4",
+            "controller": "did:pkh:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:9JeqKarf1k7TDwf2U3PrjEasY9k8mk5GFd3VRizQ9aZN",
+            "verificationMethod": [
+              {
+                "id": "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:Dn7VdgkAdeeaXXkgVEbTfmooK22ehPP29i3CSmXoKbw4#owner",
+                "type": "Ed25519VerificationKey2020",
+                "controller": "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:Dn7VdgkAdeeaXXkgVEbTfmooK22ehPP29i3CSmXoKbw4",
+                "publicKeyMultibase": "z6Mknkusuq76MHbvLSVj9cMhaL8sMj1zBdKcwdxRFzxR4oLk"
+              },
+              {
+                "id": "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:Dn7VdgkAdeeaXXkgVEbTfmooK22ehPP29i3CSmXoKbw4#agent-wallet",
+                "type": "Ed25519VerificationKey2020",
+                "controller": "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:Dn7VdgkAdeeaXXkgVEbTfmooK22ehPP29i3CSmXoKbw4",
+                "publicKeyMultibase": "z6Mknkusuq76MHbvLSVj9cMhaL8sMj1zBdKcwdxRFzxR4oLk"
+              }
+            ],
+            "authentication": [
+              "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:Dn7VdgkAdeeaXXkgVEbTfmooK22ehPP29i3CSmXoKbw4#owner"
+            ],
+            "capabilityInvocation": [
+              "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:Dn7VdgkAdeeaXXkgVEbTfmooK22ehPP29i3CSmXoKbw4#owner"
+            ],
+            "assertionMethod": [
+              "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:Dn7VdgkAdeeaXXkgVEbTfmooK22ehPP29i3CSmXoKbw4#owner",
+              "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:Dn7VdgkAdeeaXXkgVEbTfmooK22ehPP29i3CSmXoKbw4#agent-wallet"
+            ],
+            "service": [
+              {
+                "id": "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:Dn7VdgkAdeeaXXkgVEbTfmooK22ehPP29i3CSmXoKbw4#agent-card",
+                "type": "AIPAgentCard",
+                "serviceEndpoint": "https://ada.example/.well-known/aip-card.json"
+              },
+              {
+                "id": "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:Dn7VdgkAdeeaXXkgVEbTfmooK22ehPP29i3CSmXoKbw4#a2a",
+                "type": "A2A",
+                "serviceEndpoint": "https://ada.example/a2a"
+              },
+              {
+                "id": "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:Dn7VdgkAdeeaXXkgVEbTfmooK22ehPP29i3CSmXoKbw4#agent-card-2",
+                "type": "Agent Card",
+                "serviceEndpoint": "https://ada.example/.well-known/agent-card.json"
+              },
+              {
+                "id": "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:Dn7VdgkAdeeaXXkgVEbTfmooK22ehPP29i3CSmXoKbw4#did",
+                "type": "DID",
+                "serviceEndpoint": "did:aip:7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU:ada-research-001"
+              }
+            ]
+          },
+          "didResolutionMetadata": {
+            "contentType": "application/did+ld+json"
+          },
+          "didDocumentMetadata": {
+            "versionId": "412345678",
+            "created": "2026-09-21T14:13:20Z",
+            "updated": "2026-09-22T14:13:20Z",
+            "agentRegistry": "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK",
+            "owner": "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:9JeqKarf1k7TDwf2U3PrjEasY9k8mk5GFd3VRizQ9aZN",
+            "agentWallet": "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:9JeqKarf1k7TDwf2U3PrjEasY9k8mk5GFd3VRizQ9aZN",
+            "agentStatus": "inactive",
+            "deactivated": true,
+            "deactivation": "inactive",
+            "agentCardUriScheme": "https",
+            "agentCard": "verified"
           }
         }
       },
@@ -798,14 +905,14 @@
         "did": "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:4VqS6uu2WPDR6EjpXDBKZxs9tjwc4WtksjXziWXcd6zk",
         "slot": 412345678,
         "record": {
-          "registrant": "uRBJTVBUYM4H5dQHSUWSU5VaxJK8ApMBAQdHm1fDCuM",
+          "creator": "uRBJTVBUYM4H5dQHSUWSU5VaxJK8ApMBAQdHm1fDCuM",
           "agentId": "scribe",
           "bump": 255,
           "owner": "uRBJTVBUYM4H5dQHSUWSU5VaxJK8ApMBAQdHm1fDCuM",
-          "agentWallet": "uRBJTVBUYM4H5dQHSUWSU5VaxJK8ApMBAQdHm1fDCuM",
+          "wallet": "uRBJTVBUYM4H5dQHSUWSU5VaxJK8ApMBAQdHm1fDCuM",
           "agentCardUri": "https://scribe.example/.well-known/aip-card.json",
           "agentCardHash": "1734d9573561b6c338473588c3d058b133ed807981326f7da275eac440928e04",
-          "status": "active",
+          "status": "Active",
           "registeredAt": 1790000000,
           "updatedAt": 1790086400
         },
@@ -865,6 +972,7 @@
             "agentRegistry": "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK",
             "owner": "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:uRBJTVBUYM4H5dQHSUWSU5VaxJK8ApMBAQdHm1fDCuM",
             "agentWallet": "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:uRBJTVBUYM4H5dQHSUWSU5VaxJK8ApMBAQdHm1fDCuM",
+            "agentStatus": "active",
             "agentCardUriScheme": "https",
             "agentCard": "verified",
             "deactivated": true,
@@ -874,18 +982,18 @@
       },
       {
         "name": "transferred-owner",
-        "$comment": "Ownership moved from the registrant (owner-a) to owner-b. The record address, and so the DID, still derive from the registrant; controller and #owner follow the current owner.",
+        "$comment": "Ownership moved from the creator (owner-a) to owner-b, and transfer reset the wallet to owner-b. The record address, and so the DID, still derive from the creator; controller and #owner follow the current owner.",
         "did": "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:AUZasaHCAj9619JwyVoXvLbDRy94f21kZcxQjg16uk5",
         "slot": 412345678,
         "record": {
-          "registrant": "uRBJTVBUYM4H5dQHSUWSU5VaxJK8ApMBAQdHm1fDCuM",
+          "creator": "uRBJTVBUYM4H5dQHSUWSU5VaxJK8ApMBAQdHm1fDCuM",
           "agentId": "transferred-agent",
           "bump": 255,
           "owner": "9JeqKarf1k7TDwf2U3PrjEasY9k8mk5GFd3VRizQ9aZN",
-          "agentWallet": "9JeqKarf1k7TDwf2U3PrjEasY9k8mk5GFd3VRizQ9aZN",
+          "wallet": "9JeqKarf1k7TDwf2U3PrjEasY9k8mk5GFd3VRizQ9aZN",
           "agentCardUri": "",
           "agentCardHash": "0000000000000000000000000000000000000000000000000000000000000000",
-          "status": "active",
+          "status": "Active",
           "registeredAt": 1790000000,
           "updatedAt": 1790086400
         },
@@ -934,6 +1042,7 @@
             "agentRegistry": "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK",
             "owner": "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:9JeqKarf1k7TDwf2U3PrjEasY9k8mk5GFd3VRizQ9aZN",
             "agentWallet": "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:9JeqKarf1k7TDwf2U3PrjEasY9k8mk5GFd3VRizQ9aZN",
+            "agentStatus": "active",
             "agentCard": "absent"
           }
         }
