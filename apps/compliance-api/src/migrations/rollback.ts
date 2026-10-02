@@ -45,6 +45,6 @@ async function rollbackLastMigration(): Promise<void> {
 }
 
 rollbackLastMigration().catch((error) => {
-  console.error('Rollback failed:', error);
+  logger.error('Rollback failed', { error: error instanceof Error ? error.message : String(error) });
   process.exit(1);
 });

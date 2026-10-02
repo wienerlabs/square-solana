@@ -49,7 +49,7 @@ async function pullPendingTransactions(
   cursorSignature: string | null,
 ): Promise<HeliusEnhancedTransaction[]> {
   const collected: HeliusEnhancedTransaction[] = [];
-  let until: string | null = cursorSignature;
+  const until: string | null = cursorSignature;
   let lastBatchTail: string | null = null;
   // Helius API: walks backwards in time when paginating with `before`. The
   // first call has no `before`, subsequent calls pass the oldest signature

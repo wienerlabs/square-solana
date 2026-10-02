@@ -27,16 +27,20 @@ interface MppPublicConfigResponse {
   readonly mppAuthorityPubkey: string | null;
 }
 
-router.get('/mpp/public-config', (_req, res) => {
-  let mppAuthorityPubkey: string | null = null;
+function resolveAuthorityPubkey(): string | null {
+  if (!config.mppAuthority.keypairBase58) return null;
   try {
-    mppAuthorityPubkey = config.mppAuthority.keypairBase58 ? getAuthorityPublicKeyBase58() : null;
+    return getAuthorityPublicKeyBase58();
   } catch (error) {
     logger.error('MPP authority keypair could not be decoded', {
       error: error instanceof Error ? error.message : String(error),
     });
-    mppAuthorityPubkey = null;
+    return null;
   }
+}
+
+router.get('/mpp/public-config', (_req, res) => {
+  const mppAuthorityPubkey = resolveAuthorityPubkey();
 
   const publishableKey = config.stripe.publishableKey;
   const isTestMode = publishableKey !== null && publishableKey.startsWith('pk_test_');

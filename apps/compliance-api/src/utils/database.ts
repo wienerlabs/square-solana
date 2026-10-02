@@ -14,7 +14,7 @@ const pool = new pg.Pool({
 });
 
 pool.on('error', (err) => {
-  console.error('Unexpected database pool error:', err.message);
+  logger.error('Unexpected database pool error', { error: err.message });
 });
 
 export async function query<T extends pg.QueryResultRow>(text: string, params?: unknown[]): Promise<pg.QueryResult<T>> {

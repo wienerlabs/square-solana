@@ -70,6 +70,6 @@ async function runMigrations(): Promise<void> {
 }
 
 runMigrations().catch((error) => {
-  console.error('Migration failed:', error);
+  logger.error('Migration failed', { error: error instanceof Error ? error.message : String(error) });
   process.exit(1);
 });
