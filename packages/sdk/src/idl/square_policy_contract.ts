@@ -1,0 +1,972 @@
+/**
+ * Program IDL in camelCase format in order to be used in JS/TS.
+ *
+ * Note that this is only a type helper and is not the actual IDL. The original
+ * IDL can be found at `target/idl/square_policy_contract.json`.
+ */
+export type SquarePolicyContract = {
+  "address": "FXD7ycSguBQw7o3DXqq4VUBHtdx5ZQpu9P2zb4KG4ZEU",
+  "metadata": {
+    "name": "squarePolicyContract",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Square policy arayüz sözleşmesi — gövdesiz Anchor stub'ı (BC-44)"
+  },
+  "instructions": [
+    {
+      "name": "deactivatePolicy",
+      "docs": [
+        "Deactivates a policy: no new jobs can reference it. Existing jobs settle against their snapshot."
+      ],
+      "discriminator": [
+        210,
+        232,
+        122,
+        110,
+        223,
+        75,
+        16,
+        26
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "docs": [
+            "`owner_key` while no multisig is bound, afterwards only `multisig_vault`."
+          ],
+          "signer": true
+        },
+        {
+          "name": "institution",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  105,
+                  110,
+                  115,
+                  116,
+                  105,
+                  116,
+                  117,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "institution.owner_key",
+                "account": "institution"
+              }
+            ]
+          },
+          "relations": [
+            "policy"
+          ]
+        },
+        {
+          "name": "policy",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  108,
+                  105,
+                  99,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "institution"
+              },
+              {
+                "kind": "account",
+                "path": "policy.policy_id",
+                "account": "policy"
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "initInstitution",
+      "docs": [
+        "Creates the institution account for `authority` (which becomes `owner_key`)."
+      ],
+      "discriminator": [
+        30,
+        36,
+        45,
+        134,
+        204,
+        23,
+        230,
+        212
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "docs": [
+            "Pays rent and fees; separate from the role signer (fee payer / sponsored transactions)."
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "authority",
+          "signer": true
+        },
+        {
+          "name": "institution",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  105,
+                  110,
+                  115,
+                  116,
+                  105,
+                  116,
+                  117,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "authority"
+              }
+            ]
+          }
+        },
+        {
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "name",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "setBuyerRoot",
+      "docs": [
+        "Flow step 5 (institution side): publishes the root of the salted approved-buyer list.",
+        "Leaf = sha256(buyer_pubkey || leaf_salt); escrow `buy_claim` checks a Merkle proof against the",
+        "current root. An all-zero root means \"no buyer restriction\"."
+      ],
+      "discriminator": [
+        95,
+        107,
+        132,
+        150,
+        16,
+        184,
+        42,
+        93
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "docs": [
+            "`owner_key` while no multisig is bound, afterwards only `multisig_vault`."
+          ],
+          "signer": true
+        },
+        {
+          "name": "institution",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  105,
+                  110,
+                  115,
+                  116,
+                  105,
+                  116,
+                  117,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "institution.owner_key",
+                "account": "institution"
+              }
+            ]
+          },
+          "relations": [
+            "policy"
+          ]
+        },
+        {
+          "name": "policy",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  108,
+                  105,
+                  99,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "institution"
+              },
+              {
+                "kind": "account",
+                "path": "policy.policy_id",
+                "account": "policy"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "buyerRoot",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "setInstitutionMultisig",
+      "docs": [
+        "Binds (or, signed by the current vault, rebinds) a Squads v4 multisig. Afterwards only its",
+        "vault PDA (`vault_index`) may sign as authority."
+      ],
+      "discriminator": [
+        211,
+        73,
+        228,
+        202,
+        198,
+        246,
+        75,
+        176
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "docs": [
+            "`owner_key` while no multisig is bound, afterwards only `multisig_vault`."
+          ],
+          "signer": true
+        },
+        {
+          "name": "institution",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  105,
+                  110,
+                  115,
+                  116,
+                  105,
+                  116,
+                  117,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "institution.owner_key",
+                "account": "institution"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "multisig",
+          "type": "pubkey"
+        },
+        {
+          "name": "vaultIndex",
+          "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "setPolicy",
+      "docs": [
+        "Flow step 1: commits a spending policy. Only the salted Poseidon commitment and the public",
+        "daily ceiling (settlement-mint atomic units) are stored."
+      ],
+      "discriminator": [
+        40,
+        133,
+        12,
+        157,
+        235,
+        202,
+        2,
+        132
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "authority",
+          "docs": [
+            "`owner_key` while no multisig is bound, afterwards only `multisig_vault`."
+          ],
+          "signer": true
+        },
+        {
+          "name": "institution",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  105,
+                  110,
+                  115,
+                  116,
+                  105,
+                  116,
+                  117,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "institution.owner_key",
+                "account": "institution"
+              }
+            ]
+          }
+        },
+        {
+          "name": "policy",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  108,
+                  105,
+                  99,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "institution"
+              },
+              {
+                "kind": "arg",
+                "path": "policyId"
+              }
+            ]
+          }
+        },
+        {
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "policyId",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "commitment",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "dailyCeiling",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "updatePolicy",
+      "docs": [
+        "Replaces the commitment and/or daily ceiling and increments `version`. Existing jobs keep the",
+        "snapshot taken at `create_job`."
+      ],
+      "discriminator": [
+        212,
+        245,
+        246,
+        7,
+        163,
+        151,
+        18,
+        57
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "docs": [
+            "`owner_key` while no multisig is bound, afterwards only `multisig_vault`."
+          ],
+          "signer": true
+        },
+        {
+          "name": "institution",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  105,
+                  110,
+                  115,
+                  116,
+                  105,
+                  116,
+                  117,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "institution.owner_key",
+                "account": "institution"
+              }
+            ]
+          },
+          "relations": [
+            "policy"
+          ]
+        },
+        {
+          "name": "policy",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  108,
+                  105,
+                  99,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "institution"
+              },
+              {
+                "kind": "account",
+                "path": "policy.policy_id",
+                "account": "policy"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "commitment",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "dailyCeiling",
+          "type": "u64"
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "institution",
+      "discriminator": [
+        178,
+        67,
+        44,
+        135,
+        26,
+        236,
+        199,
+        188
+      ]
+    },
+    {
+      "name": "policy",
+      "discriminator": [
+        222,
+        135,
+        7,
+        163,
+        235,
+        177,
+        33,
+        68
+      ]
+    }
+  ],
+  "events": [
+    {
+      "name": "buyerRootCommitted",
+      "discriminator": [
+        76,
+        227,
+        24,
+        84,
+        223,
+        218,
+        245,
+        95
+      ]
+    },
+    {
+      "name": "institutionCreated",
+      "discriminator": [
+        9,
+        54,
+        102,
+        126,
+        22,
+        74,
+        224,
+        64
+      ]
+    },
+    {
+      "name": "institutionMultisigSet",
+      "discriminator": [
+        112,
+        253,
+        86,
+        157,
+        105,
+        205,
+        67,
+        217
+      ]
+    },
+    {
+      "name": "policyCommitted",
+      "discriminator": [
+        205,
+        73,
+        112,
+        85,
+        148,
+        128,
+        67,
+        206
+      ]
+    },
+    {
+      "name": "policyDeactivated",
+      "discriminator": [
+        206,
+        178,
+        22,
+        255,
+        87,
+        227,
+        170,
+        231
+      ]
+    },
+    {
+      "name": "policyUpdated",
+      "discriminator": [
+        225,
+        112,
+        112,
+        67,
+        95,
+        236,
+        245,
+        161
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "unauthorized",
+      "msg": "Signer is not the institution's current authority"
+    },
+    {
+      "code": 6001,
+      "name": "nameTooLong",
+      "msg": "Institution name exceeds 64 bytes"
+    },
+    {
+      "code": 6002,
+      "name": "policyInactive",
+      "msg": "Policy is not active"
+    },
+    {
+      "code": 6003,
+      "name": "invalidDailyCeiling",
+      "msg": "Daily ceiling must be greater than zero"
+    },
+    {
+      "code": 6004,
+      "name": "invalidMultisigVault",
+      "msg": "Multisig vault does not match the Squads v4 derivation"
+    },
+    {
+      "code": 6005,
+      "name": "notImplemented",
+      "msg": "Interface contract stub: not implemented"
+    }
+  ],
+  "types": [
+    {
+      "name": "buyerRootCommitted",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "policy",
+            "type": "pubkey"
+          },
+          {
+            "name": "buyerRoot",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "institution",
+      "docs": [
+        "seeds = [\"institution\", owner_key]"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "ownerKey",
+            "docs": [
+              "The key the institution was created with; part of the PDA seeds, never changes."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "policyCount",
+            "type": "u32"
+          },
+          {
+            "name": "createdAt",
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "name",
+            "type": "string"
+          },
+          {
+            "name": "multisig",
+            "docs": [
+              "Squads v4 multisig bound with `set_institution_multisig`."
+            ],
+            "type": {
+              "option": "pubkey"
+            }
+          },
+          {
+            "name": "multisigVault",
+            "docs": [
+              "Squads vault PDA that is the sole authority once set (derived from `multisig` + vault index)."
+            ],
+            "type": {
+              "option": "pubkey"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "institutionCreated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "institution",
+            "type": "pubkey"
+          },
+          {
+            "name": "ownerKey",
+            "type": "pubkey"
+          },
+          {
+            "name": "name",
+            "type": "string"
+          }
+        ]
+      }
+    },
+    {
+      "name": "institutionMultisigSet",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "institution",
+            "type": "pubkey"
+          },
+          {
+            "name": "multisig",
+            "type": "pubkey"
+          },
+          {
+            "name": "multisigVault",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "policy",
+      "docs": [
+        "seeds = [\"policy\", institution, policy_id]"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "institution",
+            "type": "pubkey"
+          },
+          {
+            "name": "policyId",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "commitment",
+            "docs": [
+              "Salted Poseidon commitment of the policy (the policy itself stays off chain)."
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "dailyCeiling",
+            "docs": [
+              "Public daily spending ceiling in settlement-mint atomic units (USDC: 6 decimals)."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "buyerRoot",
+            "docs": [
+              "Root of the salted approved-buyer Merkle tree; all zeros = unrestricted."
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "version",
+            "type": "u32"
+          },
+          {
+            "name": "active",
+            "type": "bool"
+          },
+          {
+            "name": "createdAt",
+            "type": "i64"
+          },
+          {
+            "name": "updatedAt",
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "policyCommitted",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "policy",
+            "type": "pubkey"
+          },
+          {
+            "name": "institution",
+            "type": "pubkey"
+          },
+          {
+            "name": "policyId",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "commitment",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "dailyCeiling",
+            "type": "u64"
+          },
+          {
+            "name": "version",
+            "type": "u32"
+          }
+        ]
+      }
+    },
+    {
+      "name": "policyDeactivated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "policy",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "policyUpdated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "policy",
+            "type": "pubkey"
+          },
+          {
+            "name": "commitment",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "dailyCeiling",
+            "type": "u64"
+          },
+          {
+            "name": "version",
+            "type": "u32"
+          }
+        ]
+      }
+    }
+  ],
+  "constants": [
+    {
+      "name": "institutionSeed",
+      "type": "bytes",
+      "value": "[105, 110, 115, 116, 105, 116, 117, 116, 105, 111, 110]"
+    },
+    {
+      "name": "policySeed",
+      "type": "bytes",
+      "value": "[112, 111, 108, 105, 99, 121]"
+    }
+  ]
+};
