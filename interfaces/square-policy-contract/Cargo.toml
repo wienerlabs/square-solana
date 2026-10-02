@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "Square policy arayüz sözleşmesi — gövdesiz Anchor stub'ı (BC-44)"
 edition = "2021"
 rust-version = "1.84"
+license.workspace = true
 publish = false
 
 [lib]
