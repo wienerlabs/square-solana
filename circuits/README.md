@@ -4,7 +4,7 @@ Circom uyum devresi ve trusted setup belgeleri.
 
 | Dizin | Kaynak | Issue |
 |---|---|---|
-| `payment-compliance/` | `aperture/circuits/payment-prover` (geçmişiyle) | [BC-06] |
+| [`payment-compliance/`](payment-compliance/) | `aperture/circuits/payment-prover` (geçmişiyle) | [BC-06] ✓ |
 
 - Devre, release ispatına uyarlanır: payee / net tutar / mint / günlük sayaç / saat / job bağlama
   [BC-19].
