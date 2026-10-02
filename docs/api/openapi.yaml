@@ -1,0 +1,1269 @@
+openapi: 3.1.0
+info:
+  title: Square Solana API
+  version: 0.1.0
+  summary: Square HTTP API sözleşmesi (BE-35), uygulaması apps/api (BE-18).
+  description: |
+    Contract-first API sözleşmesi. Zincirdeki hesaplar, event'ler ve instruction argümanları
+    BC-44 IDL'lerinden üretilen `schemas/idl.json` şemalarıyla taşınır. Elle yazılan şemalar
+    `@squaresdk/solana-types` zod şemalarıyla birebir aynıdır (test: packages/types/test).
+
+    JSON kodlaması: adresler base58, u64 ondalık string, 32 baytlık değerler küçük harf hex,
+    zamanlar unix saniyesi, alan adları camelCase. Tüm `/v1` yanıtları `{ success, data, error, meta }`
+    zarfıyla döner. Ayrıntılar: docs/design/api-sdk-contract.md.
+  license:
+    name: MIT
+    identifier: MIT
+servers:
+  - url: http://localhost:3000
+    description: Yerel geliştirme (BE-18)
+tags:
+  - name: auth
+    description: Cüzdan Ed25519 oturumu ve API anahtarları.
+  - name: jobs
+    description: Job okuma uçları ve teslimat yükleme (adım 3–4, 6–8).
+  - name: policies
+    description: Kurum ve policy okuma uçları; policy içeriği asla API'ye gelmez (adım 1, 5).
+  - name: agents
+    description: Agent kayıtları, agent card barındırma ve A2A keşif yolu (adım 2).
+  - name: claims
+    description: Alacak piyasası okuma uçları (adım 5).
+  - name: disputes
+    description: Dispute okuma uçları.
+  - name: screening
+    description: Sanctions screening kayıtları (adım 3).
+  - name: events
+    description: İndexlenmiş zincir event'leri.
+  - name: keeper
+    description: Keeper günlüğü (finalize crank kararları).
+  - name: tx
+    description: 8 adımın imzasız tx hazırlığı.
+  - name: prover
+    description: Uzak prover (adım 7). Güven sınırı için ProveRequest açıklamasına bakın.
+  - name: health
+    description: Sağlık ve hazırlık kontrolleri.
+
+security: []
+
+paths:
+  /v1/auth/challenge:
+    post:
+      tags: [auth]
+      operationId: createAuthChallenge
+      summary: Cüzdan için imzalanacak oturum mesajı üretir.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AuthChallengeRequest' }
+      responses:
+        '200':
+          description: İmzalanacak mesaj.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessBase'
+                  - properties:
+                      data: { $ref: '#/components/schemas/AuthChallenge' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+
+  /v1/auth/session:
+    post:
+      tags: [auth]
+      operationId: createSession
+      summary: İmzalı mesajla oturum açar.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SessionRequest' }
+      responses:
+        '200':
+          description: Oturum.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessBase'
+                  - properties:
+                      data: { $ref: '#/components/schemas/Session' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+    delete:
+      tags: [auth]
+      operationId: deleteSession
+      summary: Oturumu kapatır.
+      security:
+        - session: []
+      responses:
+        '204':
+          description: Oturum kapatıldı.
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /v1/api-keys:
+    get:
+      tags: [auth]
+      operationId: listApiKeys
+      summary: Oturum sahibinin API anahtarlarını listeler.
+      security:
+        - session: []
+      responses:
+        '200':
+          description: API anahtarları.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessBase'
+                  - properties:
+                      data:
+                        type: array
+                        items: { $ref: '#/components/schemas/ApiKey' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    post:
+      tags: [auth]
+      operationId: createApiKey
+      summary: API anahtarı oluşturur; gizli değer yalnızca bu yanıtta döner.
+      security:
+        - session: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ApiKeyCreate' }
+      responses:
+        '201':
+          description: Oluşturulan anahtar.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessBase'
+                  - properties:
+                      data: { $ref: '#/components/schemas/ApiKeyCreated' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /v1/api-keys/{id}:
+    delete:
+      tags: [auth]
+      operationId: deleteApiKey
+      summary: API anahtarını iptal eder.
+      security:
+        - session: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, minLength: 1 }
+      responses:
+        '204':
+          description: İptal edildi.
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/jobs:
+    get:
+      tags: [jobs]
+      operationId: listJobs
+      summary: Job'ları filtreleyerek listeler.
+      parameters:
+        - name: status
+          in: query
+          schema: { $ref: './schemas/idl.json#/JobStatus' }
+        - name: institution
+          in: query
+          schema: { $ref: './schemas/idl.json#/Address' }
+        - name: agentRecord
+          in: query
+          schema: { $ref: './schemas/idl.json#/Address' }
+        - name: policy
+          in: query
+          schema: { $ref: './schemas/idl.json#/Address' }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Sayfalı job listesi.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessBase'
+                  - properties:
+                      data:
+                        type: array
+                        items: { $ref: '#/components/schemas/JobView' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  /v1/jobs/{job}:
+    get:
+      tags: [jobs]
+      operationId: getJob
+      summary: Tek job; payee, claim, ReleaseProof ve validation kaydıyla.
+      parameters:
+        - $ref: '#/components/parameters/JobPath'
+      responses:
+        '200':
+          description: Job görünümü.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessBase'
+                  - properties:
+                      data: { $ref: '#/components/schemas/JobView' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/jobs/{job}/deliveries:
+    post:
+      tags: [jobs]
+      operationId: uploadDelivery
+      summary: Teslimatı yükler; `submit_work` için workHash ve deliveryUri döner.
+      security:
+        - session: []
+        - apiKey: []
+      parameters:
+        - $ref: '#/components/parameters/JobPath'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  contentMediaType: application/octet-stream
+      responses:
+        '201':
+          description: Yükleme makbuzu.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessBase'
+                  - properties:
+                      data: { $ref: '#/components/schemas/DeliveryReceipt' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/institutions/{institution}:
+    get:
+      tags: [policies]
+      operationId: getInstitution
+      summary: Kurum hesabı (square_policy `Institution`).
+      parameters:
+        - name: institution
+          in: path
+          required: true
+          schema: { $ref: './schemas/idl.json#/Address' }
+      responses:
+        '200':
+          description: Kurum görünümü.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessBase'
+                  - properties:
+                      data: { $ref: '#/components/schemas/InstitutionView' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/policies:
+    get:
+      tags: [policies]
+      operationId: listPolicies
+      summary: Policy hesaplarını ve herkese açık meta verilerini listeler.
+      parameters:
+        - name: institution
+          in: query
+          schema: { $ref: './schemas/idl.json#/Address' }
+        - name: active
+          in: query
+          schema: { type: boolean }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Sayfalı policy listesi.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessBase'
+                  - properties:
+                      data:
+                        type: array
+                        items: { $ref: '#/components/schemas/PolicyView' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  /v1/policies/{policy}:
+    get:
+      tags: [policies]
+      operationId: getPolicy
+      summary: Tek policy.
+      parameters:
+        - $ref: '#/components/parameters/PolicyPath'
+      responses:
+        '200':
+          description: Policy görünümü.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessBase'
+                  - properties:
+                      data: { $ref: '#/components/schemas/PolicyView' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/policies/{policy}/meta:
+    put:
+      tags: [policies]
+      operationId: putPolicyMeta
+      summary: Policy'nin herkese açık meta verisini yazar (kurumun güncel yetkilisi).
+      security:
+        - session: []
+      parameters:
+        - $ref: '#/components/parameters/PolicyPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PolicyMeta' }
+      responses:
+        '200':
+          description: Güncel policy görünümü.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessBase'
+                  - properties:
+                      data: { $ref: '#/components/schemas/PolicyView' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/agents:
+    get:
+      tags: [agents]
+      operationId: listAgents
+      summary: Agent kayıtlarını listeler.
+      parameters:
+        - name: owner
+          in: query
+          schema: { $ref: './schemas/idl.json#/Address' }
+        - name: status
+          in: query
+          schema: { $ref: './schemas/idl.json#/AgentStatus' }
+        - name: skill
+          in: query
+          description: Agent card'daki beceri kimliği ya da etiketi.
+          schema: { type: string, minLength: 1, maxLength: 64 }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Sayfalı agent listesi.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessBase'
+                  - properties:
+                      data:
+                        type: array
+                        items: { $ref: '#/components/schemas/AgentView' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  /v1/agents/{agentRecord}:
+    get:
+      tags: [agents]
+      operationId: getAgent
+      summary: Tek agent; DID, doğrulanmış agent card ve itibar ile.
+      parameters:
+        - $ref: '#/components/parameters/AgentRecordPath'
+      responses:
+        '200':
+          description: Agent görünümü.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessBase'
+                  - properties:
+                      data: { $ref: '#/components/schemas/AgentView' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/agents/{agentRecord}/card:
+    put:
+      tags: [agents]
+      operationId: putAgentCard
+      summary: Agent card'ı barındırır; `update_agent` için URI ve SHA-256 döner (kayıt sahibi).
+      security:
+        - session: []
+        - apiKey: []
+      parameters:
+        - $ref: '#/components/parameters/AgentRecordPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AgentCard' }
+      responses:
+        '200':
+          description: Barındırılan kartın adresi ve hash'i.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessBase'
+                  - properties:
+                      data: { $ref: '#/components/schemas/AgentCardHosting' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /a/{agentRecord}/.well-known/agent-card.json:
+    get:
+      tags: [agents]
+      operationId: getWellKnownAgentCard
+      summary: A2A keşif yolu; barındırılan kartı zarfsız döner.
+      parameters:
+        - $ref: '#/components/parameters/AgentRecordPath'
+      responses:
+        '200':
+          description: Agent card.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AgentCard' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/claims:
+    get:
+      tags: [claims]
+      operationId: listClaims
+      summary: Alacak listelemelerini listeler.
+      parameters:
+        - name: status
+          in: query
+          schema: { $ref: './schemas/idl.json#/ClaimStatus' }
+        - name: seller
+          in: query
+          schema: { $ref: './schemas/idl.json#/Address' }
+        - name: buyer
+          in: query
+          schema: { $ref: './schemas/idl.json#/Address' }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Sayfalı listeleme.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessBase'
+                  - properties:
+                      data:
+                        type: array
+                        items: { $ref: '#/components/schemas/ClaimView' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  /v1/claims/{job}:
+    get:
+      tags: [claims]
+      operationId: getClaim
+      summary: Job'un alacak listelemesi.
+      parameters:
+        - $ref: '#/components/parameters/JobPath'
+      responses:
+        '200':
+          description: Listeleme görünümü.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessBase'
+                  - properties:
+                      data: { $ref: '#/components/schemas/ClaimView' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/disputes:
+    get:
+      tags: [disputes]
+      operationId: listDisputes
+      summary: Dispute'u olan job'ları listeler.
+      parameters:
+        - name: jobStatus
+          in: query
+          schema: { $ref: './schemas/idl.json#/JobStatus' }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Sayfalı dispute listesi.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessBase'
+                  - properties:
+                      data:
+                        type: array
+                        items: { $ref: '#/components/schemas/DisputeView' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  /v1/disputes/{job}:
+    get:
+      tags: [disputes]
+      operationId: getDispute
+      summary: Job'un dispute bilgisi.
+      parameters:
+        - $ref: '#/components/parameters/JobPath'
+      responses:
+        '200':
+          description: Dispute görünümü.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessBase'
+                  - properties:
+                      data: { $ref: '#/components/schemas/DisputeView' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/screening/{wallet}:
+    get:
+      tags: [screening]
+      operationId: getScreening
+      summary: Cüzdanın screening kaydı ve tazeliği.
+      parameters:
+        - name: wallet
+          in: path
+          required: true
+          schema: { $ref: './schemas/idl.json#/Address' }
+      responses:
+        '200':
+          description: Screening görünümü.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessBase'
+                  - properties:
+                      data: { $ref: '#/components/schemas/ScreeningView' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/events:
+    get:
+      tags: [events]
+      operationId: listEvents
+      summary: İndexlenmiş event'leri listeler.
+      parameters:
+        - name: job
+          in: query
+          schema: { $ref: './schemas/idl.json#/Address' }
+        - name: program
+          in: query
+          schema:
+            type: string
+            enum: [registry, policy, verifier, escrow]
+        - name: name
+          in: query
+          description: IDL event adı (ör. JobCreated).
+          schema: { type: string, minLength: 1, maxLength: 64 }
+        - name: fromSlot
+          in: query
+          schema: { type: integer, minimum: 0 }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Sayfalı event listesi.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessBase'
+                  - properties:
+                      data:
+                        type: array
+                        items: { $ref: '#/components/schemas/IndexedEvent' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  /v1/keeper/actions:
+    get:
+      tags: [keeper]
+      operationId: listKeeperActions
+      summary: Keeper günlüğü (gönderilen, bekletilen ve başarısız denemeler).
+      parameters:
+        - name: job
+          in: query
+          schema: { $ref: './schemas/idl.json#/Address' }
+        - name: outcome
+          in: query
+          schema: { $ref: '#/components/schemas/KeeperOutcome' }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Sayfalı günlük.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessBase'
+                  - properties:
+                      data:
+                        type: array
+                        items: { $ref: '#/components/schemas/KeeperAction' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  /v1/tx:
+    post:
+      tags: [tx]
+      operationId: prepareTx
+      summary: Bir instruction için imzasız v0 tx hazırlar (8 adımın tamamı).
+      description: |
+        `call` IDL'den üretilen `InstructionCall` birleşimidir. PDA'lar IDL'deki seed bilgisinden
+        sunucuda çözülür; `accounts` yalnızca imzacıları, dış hesapları ve token hesaplarını taşır.
+        Tx imzalanıp doğrudan RPC'ye gönderilir.
+      security:
+        - session: []
+        - apiKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TxRequest' }
+      responses:
+        '200':
+          description: İmzasız tx.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessBase'
+                  - properties:
+                      data: { $ref: '#/components/schemas/UnsignedTx' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '422': { $ref: '#/components/responses/SimulationFailed' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+
+  /v1/prove:
+    post:
+      tags: [prover]
+      operationId: prove
+      summary: payment-compliance devresi için Groth16 ispatı üretir.
+      security:
+        - apiKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ProveRequest' }
+      responses:
+        '200':
+          description: İspat ve public input'lar.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessBase'
+                  - properties:
+                      data: { $ref: '#/components/schemas/ProveResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+
+  /health:
+    get:
+      tags: [health]
+      operationId: getHealth
+      summary: Süreç sağlığı (zarfsız).
+      responses:
+        '200':
+          description: Sağlık durumu.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Health' }
+        '503':
+          description: Servis çalışmıyor.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Health' }
+
+  /ready:
+    get:
+      tags: [health]
+      operationId: getReady
+      summary: Bağımlılıklar (DB, RPC) hazır mı (zarfsız).
+      responses:
+        '200':
+          description: Hazır.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Health' }
+        '503':
+          description: Hazır değil.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Health' }
+
+components:
+  securitySchemes:
+    session:
+      type: http
+      scheme: bearer
+      description: '`POST /v1/auth/session` ile alınan oturum belirteci.'
+    apiKey:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: '`POST /v1/api-keys` ile oluşturulan anahtar.'
+
+  parameters:
+    Page:
+      name: page
+      in: query
+      schema: { type: integer, minimum: 1, default: 1 }
+    Limit:
+      name: limit
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
+    JobPath:
+      name: job
+      in: path
+      required: true
+      description: Job PDA adresi.
+      schema: { $ref: './schemas/idl.json#/Address' }
+    PolicyPath:
+      name: policy
+      in: path
+      required: true
+      description: Policy PDA adresi.
+      schema: { $ref: './schemas/idl.json#/Address' }
+    AgentRecordPath:
+      name: agentRecord
+      in: path
+      required: true
+      description: AgentRecord PDA adresi (did:aip v2 Solana tanımlayıcısının son parçası).
+      schema: { $ref: './schemas/idl.json#/Address' }
+
+  responses:
+    BadRequest:
+      description: Geçersiz istek.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    Unauthorized:
+      description: Kimlik doğrulama gerekli ya da geçersiz.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    Forbidden:
+      description: Yetki yok.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    NotFound:
+      description: Kaynak bulunamadı.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    RateLimited:
+      description: Hız sınırı aşıldı.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    SimulationFailed:
+      description: Tx simülasyonu başarısız; zincir hatası `programError` alanında.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    Unavailable:
+      description: Bağımlı servis kullanılamıyor.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+  schemas:
+    # ------------------------------------------------------------ zarf
+    ApiErrorCode:
+      type: string
+      enum:
+        - invalid_input
+        - unauthorized
+        - forbidden
+        - not_found
+        - conflict
+        - rate_limited
+        - program_error
+        - simulation_failed
+        - rpc_unavailable
+        - db_unavailable
+        - prover_unavailable
+        - not_implemented
+        - internal_error
+    ProgramErrorRef:
+      type: object
+      description: Kodlar her programda 6000'den başlar; (program, code) çifti tekildir.
+      required: [program, code, name]
+      additionalProperties: false
+      properties:
+        program: { type: string, enum: [registry, policy, verifier, escrow] }
+        code: { type: integer }
+        name: { type: string }
+    ApiError:
+      type: object
+      required: [code, message, programError, details]
+      additionalProperties: false
+      properties:
+        code: { $ref: '#/components/schemas/ApiErrorCode' }
+        message: { type: string }
+        programError:
+          oneOf:
+            - $ref: '#/components/schemas/ProgramErrorRef'
+            - type: 'null'
+        details:
+          oneOf:
+            - type: object
+              additionalProperties: true
+            - type: 'null'
+    ResponseMeta:
+      type: object
+      required: [requestId, page, limit, total]
+      additionalProperties: false
+      properties:
+        requestId: { type: string }
+        page: { type: [integer, 'null'], minimum: 1 }
+        limit: { type: [integer, 'null'], minimum: 1, maximum: 200 }
+        total: { type: [integer, 'null'], minimum: 0 }
+    SuccessBase:
+      type: object
+      required: [success, data, error, meta]
+      properties:
+        success: { type: boolean, const: true }
+        data: {}
+        error: { type: 'null' }
+        meta: { $ref: '#/components/schemas/ResponseMeta' }
+    ErrorResponse:
+      type: object
+      required: [success, data, error, meta]
+      additionalProperties: false
+      properties:
+        success: { type: boolean, const: false }
+        data: { type: 'null' }
+        error: { $ref: '#/components/schemas/ApiError' }
+        meta: { $ref: '#/components/schemas/ResponseMeta' }
+
+    # ------------------------------------------------------------ görünümler
+    JobView:
+      type: object
+      required: [address, account, payee, claim, releaseProof, validation, slot, indexedAt]
+      additionalProperties: false
+      properties:
+        address: { $ref: './schemas/idl.json#/Address' }
+        account: { $ref: './schemas/idl.json#/Job' }
+        payee:
+          $ref: './schemas/idl.json#/Address'
+          description: Satılmış alacakta alıcı, değilse agentWallet.
+        claim:
+          oneOf:
+            - $ref: './schemas/idl.json#/ClaimListing'
+            - type: 'null'
+        releaseProof:
+          oneOf:
+            - $ref: './schemas/idl.json#/ReleaseProof'
+            - type: 'null'
+        validation:
+          oneOf:
+            - $ref: './schemas/idl.json#/ValidationRecord'
+            - type: 'null'
+        slot: { type: integer, minimum: 0 }
+        indexedAt: { type: integer, format: int64 }
+    InstitutionView:
+      type: object
+      required: [address, account, slot, indexedAt]
+      additionalProperties: false
+      properties:
+        address: { $ref: './schemas/idl.json#/Address' }
+        account: { $ref: './schemas/idl.json#/Institution' }
+        slot: { type: integer, minimum: 0 }
+        indexedAt: { type: integer, format: int64 }
+    PolicyMeta:
+      type: object
+      description: Herkese açık meta veri; kuralların kendisi asla API'ye gelmez.
+      required: [name, description, labels, updatedAt]
+      additionalProperties: false
+      properties:
+        name: { type: string, minLength: 1, maxLength: 120 }
+        description: { type: [string, 'null'], maxLength: 2000 }
+        labels:
+          type: array
+          maxItems: 20
+          items: { type: string, minLength: 1, maxLength: 40 }
+        updatedAt: { type: integer, format: int64 }
+    PolicyView:
+      type: object
+      required: [address, account, meta, slot, indexedAt]
+      additionalProperties: false
+      properties:
+        address: { $ref: './schemas/idl.json#/Address' }
+        account: { $ref: './schemas/idl.json#/Policy' }
+        meta:
+          oneOf:
+            - $ref: '#/components/schemas/PolicyMeta'
+            - type: 'null'
+        slot: { type: integer, minimum: 0 }
+        indexedAt: { type: integer, format: int64 }
+    AgentView:
+      type: object
+      required: [address, account, did, card, cardVerified, reputation, slot, indexedAt]
+      additionalProperties: false
+      properties:
+        address: { $ref: './schemas/idl.json#/Address' }
+        account: { $ref: './schemas/idl.json#/AgentRecord' }
+        did: { type: string, pattern: '^did:[a-z0-9]+:[A-Za-z0-9._:%-]+$' }
+        card:
+          oneOf:
+            - $ref: '#/components/schemas/AgentCard'
+            - type: 'null'
+        cardVerified:
+          type: boolean
+          description: Kartın SHA-256'sı zincirdeki agentCardHash ile eşleşiyor mu.
+        reputation:
+          oneOf:
+            - $ref: './schemas/idl.json#/AgentReputation'
+            - type: 'null'
+        slot: { type: integer, minimum: 0 }
+        indexedAt: { type: integer, format: int64 }
+    ClaimView:
+      type: object
+      required: [address, job, account, slot, indexedAt]
+      additionalProperties: false
+      properties:
+        address: { $ref: './schemas/idl.json#/Address' }
+        job: { $ref: './schemas/idl.json#/Address' }
+        account: { $ref: './schemas/idl.json#/ClaimListing' }
+        slot: { type: integer, minimum: 0 }
+        indexedAt: { type: integer, format: int64 }
+    DisputeView:
+      type: object
+      required: [job, jobStatus, institution, agentRecord, dispute, slot, indexedAt]
+      additionalProperties: false
+      properties:
+        job: { $ref: './schemas/idl.json#/Address' }
+        jobStatus: { $ref: './schemas/idl.json#/JobStatus' }
+        institution: { $ref: './schemas/idl.json#/Address' }
+        agentRecord: { $ref: './schemas/idl.json#/Address' }
+        dispute: { $ref: './schemas/idl.json#/DisputeInfo' }
+        slot: { type: integer, minimum: 0 }
+        indexedAt: { type: integer, format: int64 }
+    ScreeningView:
+      type: object
+      required: [address, account, fresh, slot, indexedAt]
+      additionalProperties: false
+      properties:
+        address: { $ref: './schemas/idl.json#/Address' }
+        account: { $ref: './schemas/idl.json#/ScreeningRecord' }
+        fresh:
+          type: boolean
+          description: status == clear ve expiresAt > now.
+        slot: { type: integer, minimum: 0 }
+        indexedAt: { type: integer, format: int64 }
+
+    # ------------------------------------------------------------ agent card
+    AgentSkill:
+      type: object
+      required: [id, name, description, tags]
+      additionalProperties: false
+      properties:
+        id: { type: string, minLength: 1, maxLength: 64 }
+        name: { type: string, minLength: 1, maxLength: 120 }
+        description: { type: string, minLength: 1, maxLength: 2000 }
+        tags:
+          type: array
+          maxItems: 20
+          items: { type: string, minLength: 1, maxLength: 40 }
+        examples:
+          type: array
+          maxItems: 10
+          items: { type: string, maxLength: 500 }
+    AgentRegistration:
+      type: object
+      required: [agentRegistry, agentId]
+      additionalProperties: false
+      properties:
+        agentRegistry:
+          type: string
+          description: 'solana:{chain-ref}:{registry}'
+          pattern: '^solana:[1-9A-HJ-NP-Za-km-z]{32}:[1-9A-HJ-NP-Za-km-z]{32,44}$'
+        agentId: { $ref: './schemas/idl.json#/Address' }
+    AgentPricing:
+      type: object
+      required: [skillId, amount, mint]
+      additionalProperties: false
+      properties:
+        skillId: { type: string, minLength: 1, maxLength: 64 }
+        amount: { $ref: './schemas/idl.json#/U64' }
+        mint: { $ref: './schemas/idl.json#/Address' }
+    AgentCard:
+      type: object
+      description: A2A AgentCard çekirdeği + registrations + Square fiyatlandırması.
+      required: [name, description, url, version, capabilities, defaultInputModes, defaultOutputModes, skills, registrations]
+      additionalProperties: false
+      properties:
+        name: { type: string, minLength: 1, maxLength: 120 }
+        description: { type: string, minLength: 1, maxLength: 4000 }
+        url: { type: string, format: uri, pattern: '^https://' }
+        version: { type: string, minLength: 1, maxLength: 32 }
+        provider:
+          type: object
+          required: [organization, url]
+          additionalProperties: false
+          properties:
+            organization: { type: string, minLength: 1, maxLength: 120 }
+            url: { type: string, format: uri, pattern: '^https://' }
+        capabilities:
+          type: object
+          additionalProperties: false
+          properties:
+            streaming: { type: boolean, default: false }
+            pushNotifications: { type: boolean, default: false }
+        defaultInputModes:
+          type: array
+          minItems: 1
+          items: { type: string, minLength: 1 }
+        defaultOutputModes:
+          type: array
+          minItems: 1
+          items: { type: string, minLength: 1 }
+        skills:
+          type: array
+          minItems: 1
+          maxItems: 50
+          items: { $ref: '#/components/schemas/AgentSkill' }
+        registrations:
+          type: array
+          minItems: 1
+          items: { $ref: '#/components/schemas/AgentRegistration' }
+        pricing:
+          type: array
+          maxItems: 50
+          items: { $ref: '#/components/schemas/AgentPricing' }
+    AgentCardHosting:
+      type: object
+      required: [agentCardUri, agentCardHash]
+      additionalProperties: false
+      properties:
+        agentCardUri: { type: string, minLength: 1, maxLength: 200, description: update_agent argümanı }
+        agentCardHash: { $ref: './schemas/idl.json#/Hex32' }
+
+    # ------------------------------------------------------------ event'ler
+    IndexedEvent:
+      type: object
+      required: [signature, slot, blockTime, instructionIndex, eventIndex, payload]
+      additionalProperties: false
+      properties:
+        signature: { type: string, pattern: '^[1-9A-HJ-NP-Za-km-z]{64,88}$' }
+        slot: { type: integer, minimum: 0 }
+        blockTime: { type: [integer, 'null'], format: int64 }
+        instructionIndex: { type: integer, minimum: 0 }
+        eventIndex: { type: integer, minimum: 0 }
+        payload: { $ref: './schemas/idl.json#/ProgramEventPayload' }
+
+    # ------------------------------------------------------------ auth
+    AuthChallengeRequest:
+      type: object
+      required: [wallet]
+      additionalProperties: false
+      properties:
+        wallet: { $ref: './schemas/idl.json#/Address' }
+    AuthChallenge:
+      type: object
+      required: [nonce, message, expiresAt]
+      additionalProperties: false
+      properties:
+        nonce: { type: string, minLength: 16 }
+        message: { type: string, minLength: 1, description: Cüzdanın imzalayacağı tam metin. }
+        expiresAt: { type: integer, format: int64 }
+    SessionRequest:
+      type: object
+      required: [wallet, nonce, signature]
+      additionalProperties: false
+      properties:
+        wallet: { $ref: './schemas/idl.json#/Address' }
+        nonce: { type: string, minLength: 16 }
+        signature: { type: string, pattern: '^[1-9A-HJ-NP-Za-km-z]{64,88}$', description: 'Ed25519 imzası, base58.' }
+    Session:
+      type: object
+      required: [token, wallet, expiresAt]
+      additionalProperties: false
+      properties:
+        token: { type: string, minLength: 1 }
+        wallet: { $ref: './schemas/idl.json#/Address' }
+        expiresAt: { type: integer, format: int64 }
+    ApiKeyScope:
+      type: string
+      enum: [read, 'tx:prepare', 'deliveries:write', 'agents:write', prove]
+    ApiKey:
+      type: object
+      required: [id, label, prefix, scopes, createdAt, lastUsedAt]
+      additionalProperties: false
+      properties:
+        id: { type: string, minLength: 1 }
+        label: { type: string, minLength: 1, maxLength: 80 }
+        prefix: { type: string, minLength: 4, maxLength: 16 }
+        scopes:
+          type: array
+          minItems: 1
+          items: { $ref: '#/components/schemas/ApiKeyScope' }
+        createdAt: { type: integer, format: int64 }
+        lastUsedAt: { type: [integer, 'null'], format: int64 }
+    ApiKeyCreate:
+      type: object
+      required: [label, scopes]
+      additionalProperties: false
+      properties:
+        label: { type: string, minLength: 1, maxLength: 80 }
+        scopes:
+          type: array
+          minItems: 1
+          items: { $ref: '#/components/schemas/ApiKeyScope' }
+    ApiKeyCreated:
+      type: object
+      required: [apiKey, secret]
+      additionalProperties: false
+      properties:
+        apiKey: { $ref: '#/components/schemas/ApiKey' }
+        secret: { type: string, minLength: 32, description: Yalnızca bu yanıtta döner. }
+
+    # ------------------------------------------------------------ tx, teslimat, prover
+    TxRequest:
+      type: object
+      required: [call, accounts, feePayer, computeUnitPrice]
+      additionalProperties: false
+      properties:
+        call: { $ref: './schemas/idl.json#/InstructionCall' }
+        accounts:
+          type: object
+          description: Türetilemeyen hesaplar (imzacılar, dış hesaplar, token hesapları), IDL hesap adıyla.
+          additionalProperties: { $ref: './schemas/idl.json#/Address' }
+        feePayer: { $ref: './schemas/idl.json#/Address' }
+        computeUnitPrice:
+          oneOf:
+            - $ref: './schemas/idl.json#/U64'
+            - type: 'null'
+    UnsignedTx:
+      type: object
+      required: [transaction, blockhash, lastValidBlockHeight, feePayer, signers, addressLookupTables, computeUnitLimit, simulatedUnits]
+      additionalProperties: false
+      properties:
+        transaction: { type: string, contentEncoding: base64, description: İmzasız v0 VersionedTransaction. }
+        blockhash: { type: string, minLength: 32 }
+        lastValidBlockHeight: { type: integer, minimum: 0 }
+        feePayer: { $ref: './schemas/idl.json#/Address' }
+        signers:
+          type: array
+          minItems: 1
+          items: { $ref: './schemas/idl.json#/Address' }
+        addressLookupTables:
+          type: array
+          items: { $ref: './schemas/idl.json#/Address' }
+        computeUnitLimit: { type: integer, minimum: 0 }
+        simulatedUnits: { type: [integer, 'null'], minimum: 0 }
+    DeliveryReceipt:
+      type: object
+      required: [workHash, deliveryUri, contentType, size]
+      additionalProperties: false
+      properties:
+        workHash: { $ref: './schemas/idl.json#/Hex32' }
+        deliveryUri: { type: string, minLength: 1, maxLength: 128 }
+        contentType: { type: string, minLength: 1, maxLength: 120 }
+        size: { type: integer, minimum: 0 }
+    ProveRequest:
+      type: object
+      description: |
+        Güven sınırı: witness politikanın kendisini içerir; servisi işleten taraf politikayı görür.
+        Kurum kendi prover'ını çalıştırmalı ya da in-process proving kullanmalı.
+      required: [circuit, artifactVersion, witness]
+      additionalProperties: false
+      properties:
+        circuit: { type: string, const: payment-compliance }
+        artifactVersion: { $ref: './schemas/idl.json#/Hex32' }
+        witness:
+          type: object
+          additionalProperties:
+            oneOf:
+              - type: string
+              - type: array
+                items: { type: string }
+    ProveResponse:
+      type: object
+      required: [artifactVersion, proofA, proofB, proofC, publicInputs, provingMs]
+      additionalProperties: false
+      properties:
+        artifactVersion: { $ref: './schemas/idl.json#/Hex32' }
+        proofA: { type: string, pattern: '^[0-9a-f]{128}$' }
+        proofB: { type: string, pattern: '^[0-9a-f]{256}$' }
+        proofC: { type: string, pattern: '^[0-9a-f]{128}$' }
+        publicInputs:
+          type: array
+          minItems: 10
+          maxItems: 10
+          items: { $ref: './schemas/idl.json#/Hex32' }
+        provingMs: { type: integer, minimum: 0 }
+
+    # ------------------------------------------------------------ keeper, health
+    KeeperActionKind:
+      type: string
+      enum: [finalizePayment, executeResolution, lapseDispute]
+    KeeperOutcome:
+      type: string
+      enum: [submitted, confirmed, skipped, failed]
+    KeeperReason:
+      type: string
+      enum: [challengeOpen, proofRequired, staleProof, screeningPending, unprofitable, rpcError, programError]
+    KeeperAction:
+      type: object
+      required: [id, job, action, outcome, reason, signature, keeperFee, at, nextAttemptAt]
+      additionalProperties: false
+      properties:
+        id: { type: string, minLength: 1 }
+        job: { $ref: './schemas/idl.json#/Address' }
+        action: { $ref: '#/components/schemas/KeeperActionKind' }
+        outcome: { $ref: '#/components/schemas/KeeperOutcome' }
+        reason:
+          oneOf:
+            - $ref: '#/components/schemas/KeeperReason'
+            - type: 'null'
+        signature: { type: [string, 'null'], pattern: '^[1-9A-HJ-NP-Za-km-z]{64,88}$' }
+        keeperFee:
+          oneOf:
+            - $ref: './schemas/idl.json#/U64'
+            - type: 'null'
+        at: { type: integer, format: int64 }
+        nextAttemptAt: { type: [integer, 'null'], format: int64 }
+    Health:
+      type: object
+      required: [status, version, checks]
+      additionalProperties: false
+      properties:
+        status: { type: string, enum: [ok, degraded, down] }
+        version: { type: string, minLength: 1 }
+        checks:
+          type: object
+          additionalProperties: { type: string, enum: [ok, fail] }

@@ -1,0 +1,14 @@
+# OpenAPI lint yapılandırması (BE-35). `pnpm openapi:lint` ile çalışır.
+extends:
+  - recommended
+
+apis:
+  square:
+    root: docs/api/openapi.yaml
+
+rules:
+  # Sözleşme taslağında gerçek sunucu adresi yok (BE-18 / BE-20 ile gelir).
+  no-server-example.com: off
+  operation-4xx-response: error
+  operation-operationId: error
+  tag-description: error

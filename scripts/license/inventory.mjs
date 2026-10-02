@@ -184,7 +184,11 @@ function renderInventory(rows) {
   }
   const count = (eco) => rows.filter((r) => r.ecosystem === eco).length;
   const dist = {};
-  for (const r of rows) dist[r.license] = (dist[r.license] ?? 0) + 1;
+  // npm "(MIT OR Apache-2.0)" ile Cargo "MIT OR Apache-2.0" aynı ifadedir; özette birlikte sayılır.
+  for (const r of rows) {
+    const key = r.license.replace(/^\((.*)\)$/, "$1");
+    dist[key] = (dist[key] ?? 0) + 1;
+  }
   const distText = Object.entries(dist)
     .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
     .map(([license, n]) => `${n}× ${license}`)

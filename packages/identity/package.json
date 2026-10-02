@@ -1,0 +1,27 @@
+{
+  "name": "@squaresdk/solana-identity",
+  "version": "0.1.0",
+  "description": "did:aip çözümleyici (v2 Solana + v1), DID Document ve agent card doğrulama — BE-35 imzaları (gövdeler BE-09)",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "node --test \"test/*.test.mjs\""
+  },
+  "dependencies": {
+    "@solana/web3.js": "^1.99.0",
+    "@squaresdk/solana-sdk": "workspace:*",
+    "@squaresdk/solana-types": "workspace:*"
+  }
+}
