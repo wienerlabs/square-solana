@@ -1,0 +1,128 @@
+# Aperture Payment Prover (Circom)
+
+> **Square notu (BC-06).** Bu dizin `wienerlabs/aperture` `circuits/payment-prover`'dan geçmişiyle
+> taşındı ([`docs/provenance/BC-06.md`](../../docs/provenance/BC-06.md)). Aşağıdaki metin Aperture'ın
+> orijinal README'sidir; yalnızca `hello.circom`'un yolu güncellendi.
+>
+> - Prover artefaktları (`.r1cs`, `.wasm`, `.zkey`, `.ptau`, doğrulama anahtarı) repoya girmez
+>   (`.gitignore`). Geliştirme setup'ı ve artefakt pipeline'ı BC-20'de.
+> - `examples/hello.circom` iş anlamı taşımayan bir araç zinciri sağlamasıdır; üretim devresi
+>   `payment.circom`.
+> - Bağımlılıklar bu dizinde `npm ci` ile kurulur; dizin pnpm workspace'inin parçası değildir.
+> - Doğrulanan araç: circom 2.2.3. `payment.circom`: 2863 doğrusal olmayan + 4514 doğrusal kısıt,
+>   73 private girdi, 10 public çıktı.
+> - Devrenin release ispatına uyarlanması BC-19, kamusal phase-2 ceremony BC-38.
+
+This is the Circom + snarkjs rewrite of the payment-prover zero-knowledge
+circuit. It replaces the archived RISC Zero implementation under
+`_archive/risc0/` with a Groth16 pipeline that runs on commodity
+infrastructure and produces proofs verifiable on Solana via the
+`groth16-solana` crate.
+
+## Status
+
+- **Phase 1 (complete):** toolchain validated end-to-end with `hello.circom`
+  — compile, powers of tau, phase 2 setup, witness, prove, verify all
+  green.
+- **Phase 2 (complete):** `payment.circom` enforces all five policy rules
+  (per-tx limit, daily spend, token whitelist, blocked addresses,
+  endpoint category) with fixed-size arrays + mask signals for list
+  membership, Poseidon-based journal digest, and `is_compliant` output.
+  Tested against fixtures under `test-inputs/`.
+- **Phase 3 (complete):** Node.js `services/prover-service/` wraps snarkjs,
+  accepts the legacy request shape, and returns Groth16 bytes in the
+  layout `groth16-solana` expects. Proof latency ~640 ms on CPU.
+- **Phase 4 (complete):** `programs/verifier/src/groth16_vk.rs` contains
+  the real VK extracted from `payment_vk.json`. `verify_payment_proof_v2`
+  takes (proof_a, proof_b, proof_c, public_inputs[2]) and performs real
+  on-chain Groth16 verification via alt_bn128 syscalls. Dashboard helper
+  `buildVerifyPaymentProofV2Ix` wires clients to the new instruction.
+- **Phase 5:** production trusted-setup ceremony (Hermez ptau drop-in),
+  devnet deploy, end-to-end test with real wallet + real proof, and
+  migrate existing v1 call sites in PaymentsTab / AIPAgentsTab / docs.
+
+## Prerequisites
+
+```bash
+# Circom compiler (Rust build from source)
+git clone https://github.com/iden3/circom.git /tmp/circom-src
+cd /tmp/circom-src && cargo install --path circom
+
+# snarkjs CLI
+npm install -g snarkjs
+```
+
+## Hello-world pipeline
+
+The `examples/hello.circom` file proves knowledge of two field elements that sum to
+a public value — a sanity check, not part of the production flow.
+
+```bash
+cd circuits/payment-prover
+mkdir -p build
+circom examples/hello.circom --r1cs --wasm --sym -o build
+cd build
+
+# One-time ceremony (local, not production)
+snarkjs powersoftau new bn128 10 pot_0.ptau -v
+snarkjs powersoftau contribute pot_0.ptau pot_1.ptau --name="dev" -v -e="any-entropy"
+snarkjs powersoftau prepare phase2 pot_1.ptau pot_final.ptau -v
+snarkjs groth16 setup hello.r1cs pot_final.ptau hello_0.zkey
+snarkjs zkey contribute hello_0.zkey hello_final.zkey --name="dev" -e="any-entropy"
+snarkjs zkey export verificationkey hello_final.zkey hello_vk.json
+
+# Prove and verify
+echo '{"a":3,"b":5,"sum":8}' > input.json
+node hello_js/generate_witness.js hello_js/hello.wasm input.json witness.wtns
+snarkjs groth16 prove hello_final.zkey witness.wtns proof.json public.json
+snarkjs groth16 verify hello_vk.json public.json proof.json
+# Expected: [INFO] snarkJS: OK!
+```
+
+All intermediate artifacts live under `build/` and are gitignored.
+
+## Payment circuit end-to-end
+
+After installing `circomlib` via `npm install`, run:
+
+```bash
+cd circuits/payment-prover
+mkdir -p build
+circom payment.circom --r1cs --wasm --sym -l node_modules -o build
+cd build
+
+# Ceremony sized for payment.circom's ~2300 constraints
+snarkjs powersoftau new bn128 14 pot14_0.ptau -v
+snarkjs powersoftau contribute pot14_0.ptau pot14_1.ptau --name="dev" -v -e="any"
+snarkjs powersoftau prepare phase2 pot14_1.ptau pot14_final.ptau -v
+snarkjs groth16 setup payment.r1cs pot14_final.ptau payment_0.zkey
+snarkjs zkey contribute payment_0.zkey payment_final.zkey --name="dev" -e="any"
+snarkjs zkey export verificationkey payment_final.zkey payment_vk.json
+
+# Prove with a sample compliant input
+cp ../test-inputs/ok_compliant.json input.json
+node payment_js/generate_witness.js payment_js/payment.wasm input.json witness.wtns
+snarkjs groth16 prove payment_final.zkey witness.wtns proof.json public.json
+snarkjs groth16 verify payment_vk.json public.json proof.json
+# Expected: [INFO] snarkJS: OK!
+# public.json: ["1", "<journal_digest>"]
+```
+
+Non-compliant fixtures (`bad_amount_exceeds_per_tx.json`,
+`bad_token_not_whitelisted.json`) exercise the rules and should yield
+`is_compliant = 0` while the proof still verifies — the circuit proves
+the check was performed, not that the outcome is positive.
+
+## Production trusted setup
+
+The hello-world ceremony is local and discard-only. The real
+`payment.circom` will use a reusable Powers of Tau generated by a public
+ceremony (Hermez/Polygon ceremony's `ptau` files are the standard
+drop-in).
+
+## References
+
+- Circom language docs: https://docs.circom.io
+- snarkjs: https://github.com/iden3/snarkjs
+- groth16-solana: https://github.com/Lightprotocol/groth16-solana
+- Light Protocol (reference Solana deployment): https://github.com/Lightprotocol
