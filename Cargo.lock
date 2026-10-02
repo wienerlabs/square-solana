@@ -3189,7 +3189,6 @@ dependencies = [
  "anchor-lang",
  "groth16-solana",
  "policy-registry",
- "sha2 0.10.9",
 ]
 
 [[package]]
