@@ -2,7 +2,7 @@
   "name": "@squaresdk/solana-sdk",
   "version": "0.1.0",
   "description": "Square Solana SDK: 4 program için typed client, PDA'lar, tx builder'lar, event decoder, API client — BE-35 imzaları (gövdeler BE-08)",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "private": true,
   "type": "module",
   "exports": {

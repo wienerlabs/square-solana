@@ -2,7 +2,7 @@
   "name": "@squaresdk/solana-identity",
   "version": "0.1.0",
   "description": "did:aip çözümleyici (v2 Solana + v1), DID Document ve agent card doğrulama — BE-35 imzaları (gövdeler BE-09)",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "private": true,
   "type": "module",
   "exports": {
