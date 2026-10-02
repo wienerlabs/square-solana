@@ -3,6 +3,9 @@ resolution = true
 skip-lint = false
 
 [programs.localnet]
+# Kaynak programların declare_id! değerleri; yeni Square program ID'leri BC-09'da.
+policy_registry = "FXD7ycSguBQw7o3DXqq4VUBHtdx5ZQpu9P2zb4KG4ZEU"
+verifier = "AzKirEv7h5PstLNYNqLj7fCXU9EFA6nSnuoed3QkmUfU"
 
 [registry]
 url = "https://api.apr.dev"
