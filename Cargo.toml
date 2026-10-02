@@ -1,0 +1,14 @@
+[workspace]
+resolver = "2"
+# programs/* ilk program PR'ı (BC-05) ile eklenir: Cargo, hiçbir klasörle eşleşmeyen glob'da hata verir.
+members = ["crates/*"]
+
+[profile.release]
+overflow-checks = true
+lto = "fat"
+codegen-units = 1
+
+[profile.release.build-override]
+opt-level = 3
+incremental = false
+codegen-units = 1

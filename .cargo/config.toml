@@ -1,0 +1,5 @@
+# Solana platform-tools (v1.48) rustc 1.84 ile gelir. Host cargo'nun bağımlılıkları
+# platform-tools'un derleyemeyeceği (edition2024 isteyen) sürümlere çözmesini önlemek için
+# her crate `rust-version` bildirir ve resolver bu sınırı aşan sürümlerde geri düşer.
+[resolver]
+incompatible-rust-versions = "fallback"
