@@ -1,6 +1,8 @@
 [workspace]
 resolver = "2"
-members = ["programs/*", "crates/*"]
+members = ["programs/*", "interfaces/*", "crates/*"]
+# interfaces/ kendi Anchor.toml'u ile ayrı bir Anchor workspace'i; onun çıktı klasörü crate değildir.
+exclude = ["interfaces/target"]
 
 [profile.release]
 overflow-checks = true
