@@ -21,7 +21,7 @@ eksik bağları zincir üzerinde kurar:
 |---|---|---|
 | Escrow, challenge penceresi, arbitration, alacak piyasası | [Covenant](https://github.com/wienerlabs/covenant) | `square_escrow` |
 | Politika commitment'ı, Groth16 uyum ispatı | [Aperture](https://github.com/wienerlabs/aperture) | `square_policy`, `square_verifier`, `circuits/` |
-| Agent kimliği, `did:aip`, A2A | [AIP](https://github.com/wienerlabs/aip-beta) | `square_registry`, `@squaresdk/solana-identity` |
+| Agent kimliği, `did:aip`, A2A | [AIP](https://github.com/dr-wilson-empty/aip-beta) | `square_registry`, `@squaresdk/solana-identity` |
 
 Ürün kapsamı Arc üzerindeki Square'den referans alınır; kod oradan taşınmaz. Programlar
 **geçmişleriyle** taşınır (`git subtree` ya da `git filter-repo`) ve **yeni program ID'leriyle**
@@ -73,6 +73,7 @@ prover, screener), `@squaresdk/solana-*` paketleri ve Next.js web uygulaması.
 | Dizin | İçerik |
 |---|---|
 | [`programs/`](programs/) | Anchor programları: escrow, policy, verifier, registry |
+| `interfaces/`, `idl/` | Programların arayüz sözleşmesi: gövdesiz stub'lar ve IDL'leri ([`docs/design/program-interface.md`](docs/design/program-interface.md)) |
 | [`crates/`](crates/) | Paylaşılan Rust crate'leri (`square-common`) |
 | [`circuits/`](circuits/) | Circom uyum devresi ve trusted setup belgeleri |
 | [`packages/`](packages/) | TS paketleri (`@squaresdk/solana-*`) |

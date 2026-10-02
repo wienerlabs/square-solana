@@ -7,7 +7,7 @@ Proje belgeleri. Mevcut olanlar bağlantılı; diğerleri ilgili issue ile eklen
 | [`analysis/`](analysis/) | Birleştirme analizi; [§12](analysis/square-solana-analysis.md#12-kararlar) kesin kararlar | — |
 | `decisions/` | ADR'ler: §12 kararlarının kalıcı kaydı | [BE-06] |
 | `did-aip/` | `did:aip` v2 Solana (CAIP-2) profil spesifikasyonu ve test vektörleri | [BC-14] |
-| `design/` | program arayüz sözleşmesi (`program-interface.md`), normatif event şeması (`events.md`) | [BC-44], [BC-16] |
+| [`design/`](design/) | [program arayüz sözleşmesi](design/program-interface.md), normatif event şeması (`events.md`) | [BC-44], [BC-16] |
 | [`provenance/`](provenance/) | taşınan dizinlerin kaynak repo, commit ve yöntem kayıtları (issue başına bir dosya) | [BC-04], [BC-05], [BC-06], [BC-07], [BE-02] |
 | `THIRD_PARTY_LICENSES.md` | üçüncü taraf lisans envanteri | [BC-02] |
 | `legal/relicensing/` | Covenant LGPL kodu için yazılı yeniden lisanslama onayları | [BC-03] |
