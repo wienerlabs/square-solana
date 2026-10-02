@@ -1,13 +1,17 @@
 /**
- * Built-in Claude Haiku handler for quick capability setup.
+ * Built-in Anthropic handler for quick capability setup.
  *
  * Usage:
- *   import { haiku } from '@aip/agent-sdk';
+ *   import { haiku } from '@squaresdk/solana-agent-sdk';
  *
  *   agent.capability('text.summarize', {
  *     description: 'Summarize Text',
- *     price: '0.10',
- *     handler: haiku('You are a summarization specialist. Summarize concisely.'),
+ *     price: { amount: '0.10', token: 'USDC', network: 'solana' },
+ *     handler: haiku(
+ *       'You are a summarization specialist. Summarize concisely.',
+ *       process.env.ANTHROPIC_MODEL,
+ *       1024,
+ *     ),
  *   });
  */
 import Anthropic from "@anthropic-ai/sdk";
@@ -24,24 +28,32 @@ function getClient(): Anthropic {
 }
 
 /**
- * Create a capability handler powered by Claude Haiku.
+ * Create a capability handler powered by an Anthropic model.
  * @param systemPrompt — Instructions for the model
- * @param model — Model ID (default: claude-haiku-4-5-20251001)
+ * @param model — Anthropic model ID; chosen by the caller, there is no default
+ * @param maxTokens — Upper bound on the response length
  */
 export function haiku(
   systemPrompt: string,
-  model: string = "claude-haiku-4-5-20251001"
+  model: string,
+  maxTokens: number
 ): (input: string) => Promise<string> {
+  if (!model) throw new Error("haiku: model is required");
+  if (!Number.isInteger(maxTokens) || maxTokens <= 0) {
+    throw new Error("haiku: maxTokens must be a positive integer");
+  }
   return async (input: string): Promise<string> => {
     const client = getClient();
     const response = await client.messages.create({
       model,
-      max_tokens: 1024,
+      max_tokens: maxTokens,
       system: systemPrompt,
       messages: [{ role: "user", content: input }],
     });
-    const block = response.content[0];
-    if (block.type === "text") return block.text;
-    return "No text response from model.";
+    const text = response.content.flatMap((block) => (block.type === "text" ? [block.text] : []));
+    if (text.length === 0) {
+      throw new Error(`haiku: model ${model} returned no text content (stop_reason=${response.stop_reason})`);
+    }
+    return text.join("");
   };
 }

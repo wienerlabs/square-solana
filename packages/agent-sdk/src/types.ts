@@ -1,17 +1,19 @@
 /** Agent type classification */
 export type AgentType = "LLM" | "Task" | "Execution";
 
-/** Capability pricing */
+/** Capability pricing; every field is explicit. */
 export interface Pricing {
   amount: string;
-  token?: string;   // default: "USDC"
-  network?: string;  // default: "solana"
+  /** Payment token (symbol or mint) the caller pays in. */
+  token: string;
+  /** Network the payment settles on. */
+  network: string;
 }
 
 /** Capability definition */
 export interface CapabilityConfig {
   description: string;
-  price: string | Pricing;
+  price: Pricing;
   handler: (input: string) => Promise<string>;
 }
 
@@ -37,6 +39,11 @@ export interface AgentOptions {
   /** HTTP port to listen on */
   port: number;
   /**
+   * Externally reachable base URL of this agent (scheme + host [+ path]).
+   * The Agent Card advertises `${publicUrl}/a2a` as the A2A endpoint.
+   */
+  publicUrl: string;
+  /**
    * Solana wallet address (base58 Ed25519 public key) for receiving
    * payments AND for deriving the canonical did:aip identifier.
    * REQUIRED as of @aip/agent-sdk 0.2.0 — the previous `did:aip:sdk:*`
@@ -49,9 +56,9 @@ export interface AgentOptions {
    */
   agentId?: string;
   /** Agent type */
-  type?: AgentType;
-  /** Semantic version */
-  version?: string;
+  type: AgentType;
+  /** Semantic version reported in the Agent Card */
+  version: string;
   /**
    * Explicit DID override (advanced use only). When set, must be a
    * canonical did:aip identifier matching the §3.2 ABNF. Most callers
@@ -59,4 +66,12 @@ export interface AgentOptions {
    * walletAddress + agentId.
    */
   did?: string;
+  /** Receives lifecycle and task events; nothing is printed when omitted. */
+  logger?: AgentLogger;
+}
+
+/** Minimal logger the agent reports to. */
+export interface AgentLogger {
+  info(message: string): void;
+  error(message: string): void;
 }

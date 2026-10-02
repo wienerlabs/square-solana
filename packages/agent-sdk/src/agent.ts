@@ -1,22 +1,26 @@
 /**
- * @aip/agent-sdk — Agent builder with fluent API.
+ * @squaresdk/solana-agent-sdk — Agent builder with fluent API.
  *
  * Usage:
  *   const agent = createAgent({
  *     name: 'My Bot',
- *     port: 4001,
- *     walletAddress: 'YourSolanaWalletAddressBase58…',
+ *     port: Number(process.env.PORT),
+ *     publicUrl: process.env.AGENT_PUBLIC_URL,
+ *     type: 'Task',
+ *     version: '1.2.0',
+ *     walletAddress: process.env.AGENT_WALLET,
  *   });
  *   agent.capability('text.summarize', {
  *     description: 'Summarize Text',
- *     price: '0.10',
- *     handler: async (input) => `Summary: ${input}`,
+ *     price: { amount: '0.10', token: 'USDC', network: 'solana' },
+ *     handler: async (input) => summarize(input),
  *   });
  *   agent.start();
  */
+import { randomUUID } from "node:crypto";
 import express from "express";
 import type { Express } from "express";
-import type { AgentOptions, AgentCard, AgentType, CapabilityConfig, Pricing } from "./types";
+import type { AgentOptions, AgentCard, CapabilityConfig, Pricing } from "./types";
 
 interface InternalTask {
   id: string;
@@ -33,10 +37,6 @@ function jsonRpcError(id: string | number | null, code: number, message: string)
   return { jsonrpc: "2.0", error: { code, message }, id };
 }
 
-function normalizePricing(price: string | Pricing): { amount: string; token: string; network: string } {
-  if (typeof price === "string") return { amount: price, token: "USDC", network: "solana" };
-  return { amount: price.amount, token: price.token ?? "USDC", network: price.network ?? "solana" };
-}
 
 /** Solana base58 pubkey: 32–44 chars from the Bitcoin alphabet (no 0OIl). */
 const SOLANA_PUBKEY_RE = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
@@ -68,6 +68,17 @@ export function createAgent(options: AgentOptions): Agent {
     );
   }
 
+  let publicUrl: URL;
+  try {
+    publicUrl = new URL(options.publicUrl);
+  } catch (err) {
+    throw new Error(
+      `createAgent: publicUrl must be an absolute URL. Got: ${JSON.stringify(options.publicUrl)}.`,
+      { cause: err },
+    );
+  }
+  const a2aEndpoint = `${publicUrl.toString().replace(/\/+$/, "")}/a2a`;
+
   const agentId = options.agentId ?? sanitizeAgentId(options.name);
   if (!AGENT_ID_RE.test(agentId)) {
     throw new Error(
@@ -81,16 +92,14 @@ export function createAgent(options: AgentOptions): Agent {
   app.use(express.json());
 
   const tasks = new Map<string, InternalTask>();
-  const capabilities = new Map<string, { config: CapabilityConfig; pricing: { amount: string; token: string; network: string } }>();
+  const capabilities = new Map<string, { config: CapabilityConfig; pricing: Pricing }>();
 
-  const agentType: AgentType = options.type ?? "Task";
-  const version = options.version ?? "1.0.0";
   const walletAddress = options.walletAddress;
   const did = options.did ?? `did:aip:${walletAddress}:${agentId}`;
 
   /** Register a capability with its handler */
   function capability(id: string, config: CapabilityConfig) {
-    const pricing = normalizePricing(config.price);
+    const pricing: Pricing = { ...config.price };
     capabilities.set(id, { config, pricing });
     return api; // fluent chaining
   }
@@ -100,9 +109,9 @@ export function createAgent(options: AgentOptions): Agent {
     return {
       did,
       name: options.name,
-      version,
-      endpoint: `http://localhost:${options.port}/a2a`,
-      type: agentType,
+      version: options.version,
+      endpoint: a2aEndpoint,
+      type: options.type,
       walletAddress,
       capabilities: Array.from(capabilities.entries()).map(([id, { config, pricing }]) => ({
         id,
@@ -136,7 +145,7 @@ export function createAgent(options: AgentOptions): Agent {
         return res.json(jsonRpcError(id, -32602, `Unsupported capability: ${capId}`));
       }
 
-      const agentTaskId = taskId || `atask_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+      const agentTaskId = taskId || `atask_${randomUUID()}`;
       tasks.set(agentTaskId, { id: agentTaskId, status: "WORKING" });
 
       res.json(jsonRpcOk(id, { taskId: agentTaskId, status: "WORKING" }));
@@ -145,11 +154,11 @@ export function createAgent(options: AgentOptions): Agent {
       try {
         const artifact = await cap.config.handler(input);
         tasks.set(agentTaskId, { id: agentTaskId, status: "COMPLETED", artifact });
-        console.log(`  [${options.name}] Task ${agentTaskId} completed`);
+        options.logger?.info(`[${options.name}] Task ${agentTaskId} completed`);
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         tasks.set(agentTaskId, { id: agentTaskId, status: "FAILED", error: message });
-        console.error(`  [${options.name}] Task ${agentTaskId} failed:`, message);
+        options.logger?.error(`[${options.name}] Task ${agentTaskId} failed: ${message}`);
       }
       return;
     }
@@ -176,11 +185,10 @@ export function createAgent(options: AgentOptions): Agent {
   function start() {
     const card = getCard();
     app.listen(options.port, () => {
-      console.log(`[${options.name}] listening on http://localhost:${options.port}`);
-      console.log(`  DID:        ${did}`);
-      console.log(`  Agent Card: http://localhost:${options.port}/.well-known/agent.json`);
-      console.log(`  A2A:        http://localhost:${options.port}/a2a`);
-      console.log(`  Capabilities: ${Array.from(capabilities.keys()).join(", ")}`);
+      options.logger?.info(
+        `[${options.name}] listening on port ${options.port}; DID ${did}; A2A ${a2aEndpoint}; ` +
+          `capabilities: ${Array.from(capabilities.keys()).join(", ")}`,
+      );
     });
     return card;
   }

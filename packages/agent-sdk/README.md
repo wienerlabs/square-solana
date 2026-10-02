@@ -1,4 +1,9 @@
-# @aipagents/agent-sdk
+# @squaresdk/solana-agent-sdk
+
+> Migrated with history from [`dr-wilson-empty/aip-beta`](https://github.com/dr-wilson-empty/aip-beta)
+> `packages/agent-sdk` (BE-02, see `docs/provenance/BE-02.md`). Adaptation to Square
+> (did:aip v2, Square jobs and settlement) happens in BE-19. The marketplace, escrow and
+> payment sections below describe the AIP backend, which is not part of Square.
 
 Build AIP compatible AI agents in minutes. The SDK gives you the
 smallest possible runtime that satisfies the Agent Internet Protocol
@@ -14,53 +19,47 @@ backend.
 
 ## Install
 
+Built inside the Square monorepo (not published to npm yet):
+
 ```bash
-npm install @aipagents/agent-sdk
+pnpm install
+pnpm --filter @squaresdk/solana-agent-sdk build
 ```
 
-Requires Node 18 or later.
+Requires Node 24 or later.
 
 ## Quick start
 
 ```ts
-import { createAgent, haiku } from "@aipagents/agent-sdk";
+import { createAgent, haiku } from "@squaresdk/solana-agent-sdk";
 
 const agent = createAgent({
   name: "Summary Bot",
-  port: 4001,
+  port: Number(process.env.PORT),
+  publicUrl: process.env.AGENT_PUBLIC_URL, // e.g. the URL your host routes to this process
   type: "Task",
-  walletAddress: "YOUR_SOLANA_WALLET",
+  version: "1.2.0",
+  walletAddress: process.env.AGENT_WALLET,
 });
 
 agent.capability("text.summarize", {
   description: "Summarize Text",
-  price: "0.10",
+  price: { amount: "0.10", token: "USDC", network: "solana" },
   handler: haiku(
     "You are a summarisation specialist. Keep summaries under 200 words.",
-  ),
-});
-
-agent.capability("text.classify", {
-  description: "Classify Text",
-  price: "0.05",
-  handler: haiku(
-    "Classify into: GOVERNANCE, DEFI, TECHNICAL, GENERAL. Return JSON.",
+    process.env.ANTHROPIC_MODEL,
+    1024,
   ),
 });
 
 agent.start();
 ```
 
-The agent now serves the A2A protocol on port 4001. Verify with:
+The agent now serves the A2A protocol on `PORT` and advertises
+`${AGENT_PUBLIC_URL}/a2a` in its Agent Card. Verify with:
 
 ```bash
-curl http://localhost:4001/.well-known/agent.json
-```
-
-To register it on the AIP marketplace:
-
-```bash
-aip register --url http://localhost:4001 --on-chain
+curl "$AGENT_PUBLIC_URL/.well-known/agent.json"
 ```
 
 ## Custom handlers
@@ -70,7 +69,7 @@ You do not have to use Claude Haiku. Any async function works:
 ```ts
 agent.capability("data.retrieve", {
   description: "Fetch On Chain Data",
-  price: "0.25",
+  price: { amount: "0.25", token: "USDC", network: "solana" },
   handler: async (input) => {
     const data = await myCustomApiCall(input);
     return JSON.stringify({ type: "json", data });
@@ -86,20 +85,26 @@ artifact (also a string). For structured outputs see the
 
 ### `createAgent(options)`
 
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `name` | `string` | required | Agent display name shown in marketplace listings. |
-| `port` | `number` | required | HTTP port the agent listens on. |
-| `type` | `"LLM" \| "Task" \| "Execution"` | `"Task"` | Agent category. Marketplace filters use this. |
-| `version` | `string` | `"1.0.0"` | Semantic version reported in the Agent Card. |
-| `walletAddress` | `string` | `""` | Solana wallet that receives USDC payouts after task settlement. |
+All options except `agentId`, `did` and `logger` are required; none has a default.
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `name` | `string` | Agent display name. |
+| `port` | `number` | HTTP port the agent listens on. |
+| `publicUrl` | `string` | Externally reachable base URL; the Agent Card advertises `${publicUrl}/a2a`. |
+| `type` | `"LLM" \| "Task" \| "Execution"` | Agent category. |
+| `version` | `string` | Semantic version reported in the Agent Card. |
+| `walletAddress` | `string` | Base58 Solana wallet that receives payouts and anchors the DID. |
+| `agentId` | `string` | Optional DID slug (`[a-z0-9_-]{1,32}`); derived from `name` when omitted. |
+| `did` | `string` | Optional explicit DID override. |
+| `logger` | `{ info, error }` | Optional; receives lifecycle and task events. Nothing is printed without it. |
 
 ### `.capability(id, config)`
 
 | Field | Type | Description |
 |-------|------|-------------|
 | `description` | `string` | Human readable label rendered in the marketplace and in CLI output. |
-| `price` | `string \| Pricing` | USDC price as a string, for example `"0.10"`. |
+| `price` | `Pricing` | `{ amount, token, network }`, all required. |
 | `handler` | `(input: string) => Promise<string>` | Processing function. Return a string or a serialised artifact (see below). |
 
 Each capability you declare becomes a distinct, separately priced
@@ -111,12 +116,12 @@ request, so a caller cannot underpay for a premium capability.
 Starts the HTTP server. Returns the Agent Card object that will be
 served at `/.well-known/agent.json`.
 
-### `haiku(systemPrompt, model?)`
+### `haiku(systemPrompt, model, maxTokens)`
 
-Convenience factory that returns a handler powered by Claude Haiku.
-Requires `ANTHROPIC_API_KEY` in the environment. The optional `model`
-argument lets you target a specific Anthropic model id; the default
-is the current Haiku release.
+Convenience factory that returns a handler powered by an Anthropic model.
+Requires `ANTHROPIC_API_KEY` in the environment. `model` (Anthropic model
+id) and `maxTokens` are required. The handler throws when the model
+returns no text content.
 
 ## HTTP endpoints
 
@@ -180,11 +185,11 @@ You can call the agent directly while developing, bypassing payment
 entirely:
 
 ```bash
-curl -X POST http://localhost:4001/a2a \
+curl -X POST "$AGENT_PUBLIC_URL/a2a" \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","id":1,"method":"task/create","params":{"capability":"text.summarize","input":"Hello"}}'
 
-curl -X POST http://localhost:4001/a2a \
+curl -X POST "$AGENT_PUBLIC_URL/a2a" \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","id":2,"method":"task/status","params":{"taskId":"<id-from-create>"}}'
 ```
@@ -195,11 +200,11 @@ backend takes over payment orchestration.
 
 ## Source and license
 
-Built and published from the
+Originally built in the
 [`dr-wilson-empty/aip-beta`](https://github.com/dr-wilson-empty/aip-beta)
 monorepo alongside the CLI, backend, and DID resolver.
 
-ISC License.
+MIT License; the original notice is kept in [`LICENSE`](LICENSE).
 
 ## Links
 
