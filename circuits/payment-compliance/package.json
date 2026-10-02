@@ -1,10 +1,14 @@
 {
   "name": "payment-prover",
   "version": "1.0.0",
-  "description": "This is the Circom + snarkjs rewrite of the payment-prover zero-knowledge circuit. It replaces the archived RISC Zero implementation under `_archive/risc0/` with a Groth16 pipeline that runs on commodity infrastructure and produces proofs verifiable on Solana via the `groth16-solana` crate.",
-  "main": "index.js",
+  "private": true,
+  "description": "Square release-proof circuit (BC-19): Circom/Groth16 proof that an escrow release fits the institution policy. See docs/design/release-circuit.md.",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build": "node scripts/build.mjs",
+    "fetch-ptau": "node scripts/fetch-ptau.mjs",
+    "inputs": "node scripts/generate_test_inputs.mjs",
+    "inputs:check": "node scripts/generate_test_inputs.mjs --check",
+    "test": "node --test \"test/*.test.mjs\""
   },
   "keywords": [],
   "author": "",
@@ -14,7 +18,9 @@
     "circomlib": "^2.0.5"
   },
   "devDependencies": {
+    "@noble/curves": "2.4.0",
     "bs58": "^6.0.0",
-    "circomlibjs": "^0.1.7"
+    "circomlibjs": "^0.1.7",
+    "snarkjs": "0.7.6"
   }
 }

@@ -1,0 +1,22 @@
+{
+  "description": "Settles in the native SOL mint, which is not on the whitelist.",
+  "refusal_code": "4",
+  "refused_rules": [
+    "MINT_NOT_ALLOWED"
+  ],
+  "public_signals": {
+    "refusal_code": "4",
+    "policy_commitment": "17040439076184967394581195263985121356537750946887965865812216376066378039915",
+    "daily_ceiling": "1000000000",
+    "payee_high": "39603846859677690964152807649152072222",
+    "payee_low": "127117542171637602946942707218743329092",
+    "net_amount": "25000000",
+    "mint_high": "8782939367155159336158223281524621365",
+    "mint_low": "290790566801258635813148551384743804929",
+    "daily_spent_before": "200000000",
+    "current_unix_timestamp": "1790000000",
+    "job_high": "49796695054203276470969200263641897190",
+    "job_low": "13782664408477402011771783189819232979",
+    "stripe_receipt_hash": "0"
+  }
+}

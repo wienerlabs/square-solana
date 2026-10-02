@@ -1,259 +1,339 @@
 pragma circom 2.0.0;
 
+include "circomlib/circuits/bitify.circom";
 include "circomlib/circuits/comparators.circom";
 include "circomlib/circuits/poseidon.circom";
+include "./lib/timestamp.circom";
 
-// PaymentCompliance proves that an AI-agent payment satisfies all six rules
-// of its operator's policy AND binds the proof to a specific transfer.
+// ReleaseCompliance proves what a Square escrow release owes its institution's
+// policy: whether the release fits every rule of the committed mandate, and
+// exactly which rules it breaks when it does not. The proof is bound to one
+// release — one job, one payee, one net amount, one mint, one day's counter and
+// one moment — so the verifier (BC-21) can store it as that job's ReleaseProof
+// and the escrow (BC-24) can act on it without trusting whoever built it.
 //
-// Compared to the v1 circuit (private payment fields, only is_compliant +
-// journal_digest exposed) this version exposes the transfer parameters
-// (recipient, amount, mint, timestamp) and the policy commitment as PUBLIC
-// outputs so the on-chain verifier can:
+// The normative description, including what the verifier must check against
+// each signal, is docs/design/release-circuit.md. This header is the summary.
 //
-//   1. cross-check the proof's recipient_high/low against the actual transfer
-//      instruction's destination ATA (Adım 5),
-//   2. cross-check token_mint_high/low against the transfer's mint,
-//   3. cross-check amount_lamports against the transfer's amount,
-//   4. cross-check daily_spent_before against the on-chain OperatorState PDA
-//      (Adım 3 + Adım 6),
-//   5. cross-check current_unix_timestamp against Solana's Clock sysvar,
-//   6. cross-check policy_data_hash against PolicyAccount.policy_data_hash
-//      written by the policy-registry program (Adım 2).
+// ORIGIN
 //
-// Anything still private:
-//   - The policy ceiling values (max_per_tx, max_daily) — operators reveal
-//     only that the payment fit, not what their cap was.
-//   - The whitelist / blocked / category lists — auditors learn membership
-//     was checked but not what the lists contained.
-//   - The payment category — auditors do not learn what kind of service
-//     the agent paid for.
+// Imported from Aperture's payment-prover (BC-06, docs/provenance/BC-06.md) and
+// adapted under BC-19. The soundness fixes Arc (wienerlabs/square at dc0157f)
+// made to the same circuit are carried over, because every one of them applies
+// here unchanged:
 //
-// Hash algorithms:
-//   - Inside-circuit: Poseidon (cheap, BN254-native).
-//   - Backend services/policy-service/src/utils/merkle.ts MUST produce the
-//     same Poseidon commitments byte-for-byte (Adım 4a).
-template PaymentCompliance(MAX_WHITELIST, MAX_BLOCKED, MAX_CATEGORIES) {
+//   1. The timestamp decomposition was under-constrained, so a prover could
+//      choose the weekday. lib/timestamp.circom is the sound version.
+//   2. The list mask arrays are gone. The commitment covered the list values
+//      but not the masks, so zeroing blocked_addresses_mask switched rule 4 off
+//      with a byte-identical commitment. Padding is zero and every lookup key is
+//      constrained non-zero, so a padding slot can never match.
+//   3. Every comparator operand is range-checked. circomlib's comparators bound
+//      the difference of their operands, never the operands themselves.
+//   4. The policy commitment is salted per field (square#45), so publishing
+//      one value, or guessing an easy one, does not open the others.
+//
+// What BC-19 adds on top: the payee instead of the transfer recipient, the net
+// amount, the job binding, the public daily ceiling as a rule of its own, and a
+// refusal code in place of the is_compliant bit.
+//
+// PUBLIC SIGNALS, IN ORDER (13)
+//
+// A Solana address is 32 bytes and does not fit in one BN254 element, so it is
+// carried as two 128-bit halves: high = bytes 0..15, low = bytes 16..31, each
+// read big-endian. Each half is range-checked to 128 bits here, so a pair is
+// always the canonical split of exactly one address.
+//
+//   [0]  refusal_code            0 when the release complies; otherwise one bit
+//                                per broken rule (table below)
+//   [1]  policy_commitment       salted Poseidon commitment to the whole policy
+//   [2]  daily_ceiling           the policy's public daily ceiling (BC-17)
+//   [3]  payee_high              address the release pays: the agent wallet, or
+//   [4]  payee_low               the claim buyer when the receivable was sold
+//   [5]  net_amount              what the payee receives, settlement-mint units
+//   [6]  mint_high               settlement mint
+//   [7]  mint_low
+//   [8]  daily_spent_before      the institution's OperatorState counter
+//   [9]  current_unix_timestamp  seconds; the verifier bounds it to Clock
+//   [10] job_high                the escrow Job account this release belongs to
+//   [11] job_low
+//   [12] stripe_receipt_hash     Poseidon receipt commitment, 0 when unused
+//
+// REFUSAL CODE BITS
+//
+//   bit  value  rule broken
+//   0    1      per-transaction ceiling: net_amount > max_per_tx
+//   1    2      private daily ceiling: daily_spent_before + net_amount > max_daily
+//   2    4      mint not on the token whitelist
+//   3    8      payee on the blocked list
+//   4    16     payment category not allowed
+//   5    32     outside the policy's time window
+//   6    64     public daily ceiling: daily_spent_before + net_amount > daily_ceiling
+//
+// A refusing proof is a valid proof. It is the institution's mandate deciding
+// against this release, and it carries every rule that decided so.
+//
+// WHAT STAYS PRIVATE
+//
+//   - The two private ceilings (max_per_tx, max_daily).
+//   - The whitelist, blocked list and category list.
+//   - The payment category and the time window.
+//   - The eight salts, and the operator and policy identifiers.
+//
+// Rule 5 binds nobody: payment_category is neither a public signal nor bound to
+// anything on chain, so a prover can make rule 5 pass or fail at will. See
+// docs/design/release-circuit.md before treating a category refusal as final.
+template ReleaseCompliance(MAX_WHITELIST, MAX_BLOCKED, MAX_CATEGORIES) {
     // ============================================================ Policy (private)
-    signal input max_per_tx_lamports;
-    signal input max_daily_lamports;
+    signal input max_per_tx;
+    signal input max_daily;
 
-    // Lists are pre-hashed (each entry is a single BN254 field element) by
-    // the prover-service before being fed in. Slot 0..count-1 carries real
-    // entries; the rest are 0-padded and the parallel mask marks active slots.
+    // List entries are field elements produced by the caller:
+    //   token_whitelist[i]   = Poseidon(mint_high, mint_low) of an allowed mint
+    //   blocked_addresses[i] = Poseidon(high, low) of a blocked wallet
+    //   allowed_categories[i], payment_category = Poseidon(high, low) of the
+    //   category string's UTF-8 bytes zero-padded to 32
+    // Slots 0..count-1 carry real entries and the rest are zero.
     signal input token_whitelist[MAX_WHITELIST];
-    signal input token_whitelist_mask[MAX_WHITELIST];
     signal input blocked_addresses[MAX_BLOCKED];
-    signal input blocked_addresses_mask[MAX_BLOCKED];
     signal input allowed_categories[MAX_CATEGORIES];
-    signal input allowed_categories_mask[MAX_CATEGORIES];
-
-    // Service-layer fields the policy_data_hash commits to but that never
-    // leak through any public output.
     signal input payment_category;
+
+    // Fields the commitment covers that never leak through a public signal.
     signal input operator_id_field;
     signal input policy_id_field;
 
-    // Time restriction config. time_active=0 means "no time gate"; in that
-    // case the rest of the time fields are free witnesses ignored by the
-    // hash and the rule.
+    // One salt per committed field. Unconstrained on purpose: their only job is
+    // entropy, and what pins them is the commitment itself, which the verifier
+    // compares with the job's policy snapshot.
+    signal input policy_salts[8];
+
+    // Time restriction. time_active = 0 means no time gate. The three fields
+    // below are range-checked whatever time_active is, so send 0 for all three
+    // when there is no window.
     signal input time_active;
     signal input time_days_bitmask;
     signal input time_start_hour_utc;
     signal input time_end_hour_utc;
 
-    // ============================================================ Payment (public)
-    // These signals are wired straight to public outputs at the bottom so the
-    // on-chain verifier can read them out of the proof. The prover MUST set
-    // them to the same values the actual Solana transfer uses; otherwise
-    // rules 3/4 still pass against the wrong target and the verifier will
-    // reject in Adım 5 because they no longer match the transfer instruction.
-    signal input recipient_high_in;
-    signal input recipient_low_in;
-    signal input amount_lamports_in;
-    signal input token_mint_high_in;
-    signal input token_mint_low_in;
+    // ============================================================ Release (public)
+    // Mirrored to the public outputs below. The verifier fills every one of
+    // them from accounts it reads, except net_amount, the timestamp and the
+    // receipt hash, so a proof built for any other release fails the pairing.
+    signal input daily_ceiling_in;
+    signal input payee_high_in;
+    signal input payee_low_in;
+    signal input net_amount_in;
+    signal input mint_high_in;
+    signal input mint_low_in;
     signal input daily_spent_before_in;
     signal input current_unix_timestamp_in;
+    signal input job_high_in;
+    signal input job_low_in;
 
-    // Stripe (MPP B-flow) receipt commitment. Zero when the proof is for a
-    // pure Solana payment (no Stripe involved); a non-zero Poseidon hash
-    // when the operator paid via Stripe and is claiming the matching
-    // PaymentIntent. The on-chain verifier (Adım 8c) ed25519-checks this
-    // value against the compliance-api's MPP authority signature; the
-    // circuit itself does not constrain it cryptographically beyond
-    // mirroring it to a public output, because Stripe is the trust root.
+    // Stripe receipt commitment (MPP path, BC-37). Zero on the escrow release
+    // path. Mirrored and not constrained further: Stripe is the trust root on
+    // that path and the verifier checks the attestation signature.
     signal input stripe_receipt_hash_in;
 
     // ============================================================ Public outputs
-    signal output is_compliant;
-    signal output policy_data_hash;
-    signal output recipient_high;
-    signal output recipient_low;
-    signal output amount_lamports;
-    signal output token_mint_high;
-    signal output token_mint_low;
+    signal output refusal_code;
+    signal output policy_commitment;
+    signal output daily_ceiling;
+    signal output payee_high;
+    signal output payee_low;
+    signal output net_amount;
+    signal output mint_high;
+    signal output mint_low;
     signal output daily_spent_before;
     signal output current_unix_timestamp;
+    signal output job_high;
+    signal output job_low;
     signal output stripe_receipt_hash;
 
-    // Mirror inputs to outputs. With Groth16 over BN254 this just reuses the
-    // signal — no extra constraint cost beyond the equality.
-    recipient_high <== recipient_high_in;
-    recipient_low <== recipient_low_in;
-    amount_lamports <== amount_lamports_in;
-    token_mint_high <== token_mint_high_in;
-    token_mint_low <== token_mint_low_in;
+    daily_ceiling <== daily_ceiling_in;
+    payee_high <== payee_high_in;
+    payee_low <== payee_low_in;
+    net_amount <== net_amount_in;
+    mint_high <== mint_high_in;
+    mint_low <== mint_low_in;
     daily_spent_before <== daily_spent_before_in;
     current_unix_timestamp <== current_unix_timestamp_in;
+    job_high <== job_high_in;
+    job_low <== job_low_in;
     stripe_receipt_hash <== stripe_receipt_hash_in;
 
-    // ============================================================ Hashed payment fields
-    // payment_token = Poseidon([token_mint_high, token_mint_low]) — same
-    // shape services/prover-service/src/hash.js uses for hashSolanaAddress,
-    // so a whitelist entry produced from the same pubkey collides exactly.
-    component token_hasher = Poseidon(2);
-    token_hasher.inputs[0] <== token_mint_high;
-    token_hasher.inputs[1] <== token_mint_low;
-    signal payment_token;
-    payment_token <== token_hasher.out;
+    // ============================================================ Amount bounds
+    // Every operand of the three amount comparators is a u64 on chain, and is
+    // constrained to be one here: a comparator bounds the difference of its
+    // operands, so an unbounded operand near the modulus would make it answer
+    // about a different value than the one it appears to compare.
+    component net_amount_bits = Num2Bits(64);
+    net_amount_bits.in <== net_amount;
 
-    component recipient_hasher = Poseidon(2);
-    recipient_hasher.inputs[0] <== recipient_high;
-    recipient_hasher.inputs[1] <== recipient_low;
-    signal payment_recipient;
-    payment_recipient <== recipient_hasher.out;
+    component daily_spent_bits = Num2Bits(64);
+    daily_spent_bits.in <== daily_spent_before;
+
+    component daily_ceiling_bits = Num2Bits(64);
+    daily_ceiling_bits.in <== daily_ceiling;
+
+    component max_per_tx_bits = Num2Bits(64);
+    max_per_tx_bits.in <== max_per_tx;
+
+    component max_daily_bits = Num2Bits(64);
+    max_daily_bits.in <== max_daily;
+
+    // ============================================================ Address halves
+    // Each half under 2^128, so (high, low) is the canonical split of one
+    // 32-byte address and no other pair names the same key.
+    component payee_high_bits = Num2Bits(128);
+    payee_high_bits.in <== payee_high;
+    component payee_low_bits = Num2Bits(128);
+    payee_low_bits.in <== payee_low;
+    component mint_high_bits = Num2Bits(128);
+    mint_high_bits.in <== mint_high;
+    component mint_low_bits = Num2Bits(128);
+    mint_low_bits.in <== mint_low;
+    component job_high_bits = Num2Bits(128);
+    job_high_bits.in <== job_high;
+    component job_low_bits = Num2Bits(128);
+    job_low_bits.in <== job_low;
+
+    // ============================================================ Lookup keys
+    // The list entries are Poseidon images of addresses, so the keys looked up
+    // are too. All three keys are constrained non-zero, because zero is what
+    // padding slots hold: that is what lets the mask arrays go.
+    component payee_hasher = Poseidon(2);
+    payee_hasher.inputs[0] <== payee_high;
+    payee_hasher.inputs[1] <== payee_low;
+    signal payee_key;
+    payee_key <== payee_hasher.out;
+
+    component mint_hasher = Poseidon(2);
+    mint_hasher.inputs[0] <== mint_high;
+    mint_hasher.inputs[1] <== mint_low;
+    signal mint_key;
+    mint_key <== mint_hasher.out;
+
+    component payee_key_is_zero = IsZero();
+    payee_key_is_zero.in <== payee_key;
+    payee_key_is_zero.out === 0;
+
+    component mint_key_is_zero = IsZero();
+    mint_key_is_zero.in <== mint_key;
+    mint_key_is_zero.out === 0;
+
+    component category_is_zero = IsZero();
+    category_is_zero.in <== payment_category;
+    category_is_zero.out === 0;
+
+    // ============================================================ Window bounds
+    // hour is constrained to 0..23 by UtcDayHourChecked; these put the policy's
+    // own bounds in range so the comparison cannot be steered by a field
+    // element near the modulus.
+    component start_hour_bits = Num2Bits(5);
+    start_hour_bits.in <== time_start_hour_utc;
+
+    component end_hour_bits = Num2Bits(5);
+    end_hour_bits.in <== time_end_hour_utc;
+
+    // time_active gates rule 6 through `1 - time_active + time_active * x`,
+    // which only behaves like a switch for a boolean.
+    time_active * (time_active - 1) === 0;
 
     // ============================================================ Rule 1
-    // amount_lamports <= max_per_tx_lamports
+    // net_amount <= max_per_tx
     component rule1 = LessEqThan(64);
-    rule1.in[0] <== amount_lamports;
-    rule1.in[1] <== max_per_tx_lamports;
+    rule1.in[0] <== net_amount;
+    rule1.in[1] <== max_per_tx;
     signal rule1_ok;
     rule1_ok <== rule1.out;
 
     // ============================================================ Rule 2
-    // daily_spent_before + amount_lamports <= max_daily_lamports
+    // daily_spent_before + net_amount <= max_daily (private ceiling)
     signal projected_daily;
-    projected_daily <== daily_spent_before + amount_lamports;
+    projected_daily <== daily_spent_before + net_amount;
     component rule2 = LessEqThan(65);
     rule2.in[0] <== projected_daily;
-    rule2.in[1] <== max_daily_lamports;
+    rule2.in[1] <== max_daily;
     signal rule2_ok;
     rule2_ok <== rule2.out;
 
     // ============================================================ Rule 3
-    // payment_token matches at least one active whitelist entry.
+    // mint_key matches a whitelist entry.
     component whitelist_eq[MAX_WHITELIST];
-    signal whitelist_hit[MAX_WHITELIST];
     signal whitelist_or[MAX_WHITELIST];
     for (var i = 0; i < MAX_WHITELIST; i++) {
         whitelist_eq[i] = IsEqual();
-        whitelist_eq[i].in[0] <== payment_token;
+        whitelist_eq[i].in[0] <== mint_key;
         whitelist_eq[i].in[1] <== token_whitelist[i];
-        whitelist_hit[i] <== whitelist_eq[i].out * token_whitelist_mask[i];
     }
-    whitelist_or[0] <== whitelist_hit[0];
+    whitelist_or[0] <== whitelist_eq[0].out;
     for (var i = 1; i < MAX_WHITELIST; i++) {
         whitelist_or[i] <==
-            whitelist_or[i - 1] + whitelist_hit[i]
-            - whitelist_or[i - 1] * whitelist_hit[i];
+            whitelist_or[i - 1] + whitelist_eq[i].out
+            - whitelist_or[i - 1] * whitelist_eq[i].out;
     }
     signal rule3_ok;
     rule3_ok <== whitelist_or[MAX_WHITELIST - 1];
 
     // ============================================================ Rule 4
-    // payment_recipient is NOT in the blocked list.
+    // payee_key is NOT in the blocked list.
     component blocked_eq[MAX_BLOCKED];
-    signal blocked_hit[MAX_BLOCKED];
     signal blocked_or[MAX_BLOCKED];
     for (var i = 0; i < MAX_BLOCKED; i++) {
         blocked_eq[i] = IsEqual();
-        blocked_eq[i].in[0] <== payment_recipient;
+        blocked_eq[i].in[0] <== payee_key;
         blocked_eq[i].in[1] <== blocked_addresses[i];
-        blocked_hit[i] <== blocked_eq[i].out * blocked_addresses_mask[i];
     }
-    blocked_or[0] <== blocked_hit[0];
+    blocked_or[0] <== blocked_eq[0].out;
     for (var i = 1; i < MAX_BLOCKED; i++) {
         blocked_or[i] <==
-            blocked_or[i - 1] + blocked_hit[i]
-            - blocked_or[i - 1] * blocked_hit[i];
+            blocked_or[i - 1] + blocked_eq[i].out
+            - blocked_or[i - 1] * blocked_eq[i].out;
     }
     signal rule4_ok;
     rule4_ok <== 1 - blocked_or[MAX_BLOCKED - 1];
 
     // ============================================================ Rule 5
-    // payment_category matches an active allowed_categories entry.
+    // payment_category matches an allowed_categories entry.
     component category_eq[MAX_CATEGORIES];
-    signal category_hit[MAX_CATEGORIES];
     signal category_or[MAX_CATEGORIES];
     for (var i = 0; i < MAX_CATEGORIES; i++) {
         category_eq[i] = IsEqual();
         category_eq[i].in[0] <== payment_category;
         category_eq[i].in[1] <== allowed_categories[i];
-        category_hit[i] <== category_eq[i].out * allowed_categories_mask[i];
     }
-    category_or[0] <== category_hit[0];
+    category_or[0] <== category_eq[0].out;
     for (var i = 1; i < MAX_CATEGORIES; i++) {
         category_or[i] <==
-            category_or[i - 1] + category_hit[i]
-            - category_or[i - 1] * category_hit[i];
+            category_or[i - 1] + category_eq[i].out
+            - category_or[i - 1] * category_eq[i].out;
     }
     signal rule5_ok;
     rule5_ok <== category_or[MAX_CATEGORIES - 1];
 
-    // ============================================================ Rule 6 (NEW)
-    // current_unix_timestamp falls inside the policy's allowed window when
-    // a window is configured. When time_active == 0 this rule is a free pass.
-    //
-    // Step 1: derive day_index and sec_in_day from the timestamp via a
-    // witnessed division pattern, with both parts range-checked so the
-    // prover cannot cheat by witnessing arbitrary values.
-    signal day_index;
-    signal sec_in_day;
-    day_index <-- current_unix_timestamp \ 86400;
-    sec_in_day <-- current_unix_timestamp - day_index * 86400;
-    day_index * 86400 + sec_in_day === current_unix_timestamp;
+    // ============================================================ Rule 6
+    // current_unix_timestamp falls inside the policy's window when one is
+    // configured; a free pass when time_active == 0. The decomposition is
+    // witnessed here and constrained in UtcDayHourChecked.
+    component clock = UtcDayHourChecked(40);
+    clock.timestamp <== current_unix_timestamp;
+    clock.day_index <-- current_unix_timestamp \ 86400;
+    clock.sec_in_day <-- current_unix_timestamp % 86400;
+    clock.hour <-- (current_unix_timestamp % 86400) \ 3600;
+    clock.sec_in_hour <-- (current_unix_timestamp % 86400) % 3600;
+    clock.weeks <-- ((current_unix_timestamp \ 86400) + 3) \ 7;
+    clock.day_of_week <-- ((current_unix_timestamp \ 86400) + 3) % 7;
 
-    component lt_sec_in_day = LessThan(20);
-    lt_sec_in_day.in[0] <== sec_in_day;
-    lt_sec_in_day.in[1] <== 86400;
-    lt_sec_in_day.out === 1;
-
-    // Step 2: hour = floor(sec_in_day / 3600), 0..23
     signal hour;
-    signal sec_in_hour;
-    hour <-- sec_in_day \ 3600;
-    sec_in_hour <-- sec_in_day - hour * 3600;
-    hour * 3600 + sec_in_hour === sec_in_day;
-
-    component lt_sec_in_hour = LessThan(15);
-    lt_sec_in_hour.in[0] <== sec_in_hour;
-    lt_sec_in_hour.in[1] <== 3600;
-    lt_sec_in_hour.out === 1;
-
-    component lt_hour = LessThan(5);
-    lt_hour.in[0] <== hour;
-    lt_hour.in[1] <== 24;
-    lt_hour.out === 1;
-
-    // Step 3: day_of_week = (day_index + 4) mod 7
-    // 1970-01-01 was a Thursday; with Mon=0, Thu=3, so the offset is +3, but
-    // ISO weekday constants used by the dashboard map Mon=0..Sun=6, and
-    // 1970-01-01 -> Thursday -> 3, hence the +3 shift here.
     signal day_of_week;
-    signal weeks;
-    weeks <-- (day_index + 3) \ 7;
-    day_of_week <-- (day_index + 3) - weeks * 7;
-    weeks * 7 + day_of_week === day_index + 3;
+    hour <== clock.hour_out;
+    day_of_week <== clock.day_of_week_out;
 
-    component lt_dow = LessThan(4);
-    lt_dow.in[0] <== day_of_week;
-    lt_dow.in[1] <== 7;
-    lt_dow.out === 1;
-
-    // Step 4: decompose days_bitmask into 7 bit signals so we can index
-    // it by day_of_week.
+    // Decompose days_bitmask (bit 0 = Monday) into 7 bits so it can be indexed
+    // by day_of_week. The accumulator equality forces the unique decomposition
+    // and the mask under 128.
     signal day_bits[7];
     signal day_bits_acc[8];
     day_bits_acc[0] <== 0;
@@ -264,7 +344,8 @@ template PaymentCompliance(MAX_WHITELIST, MAX_BLOCKED, MAX_CATEGORIES) {
     }
     day_bits_acc[7] === time_days_bitmask;
 
-    // Step 5: select day_bits[day_of_week] using IsEqual + sum.
+    // Select day_bits[day_of_week]; day_of_week is 0..6, so exactly one term
+    // can be non-zero.
     component dow_eq[7];
     signal day_active_terms[7];
     signal day_active_acc[8];
@@ -279,9 +360,9 @@ template PaymentCompliance(MAX_WHITELIST, MAX_BLOCKED, MAX_CATEGORIES) {
     signal day_active;
     day_active <== day_active_acc[7];
 
-    // Step 6: hour_in_window = (hour >= start) AND (hour <= end). MVP
-    // assumes start <= end; midnight-spanning windows (e.g. 22-06) will be
-    // handled in a future revision once the dashboard models them.
+    // hour_in_window = (hour >= start) AND (hour <= end). Assumes start <= end:
+    // a window that runs past midnight is not modelled, and under one no hour
+    // is inside the window. Policy tooling must refuse start > end.
     component hour_ge_start = GreaterEqThan(8);
     hour_ge_start.in[0] <== hour;
     hour_ge_start.in[1] <== time_start_hour_utc;
@@ -293,41 +374,55 @@ template PaymentCompliance(MAX_WHITELIST, MAX_BLOCKED, MAX_CATEGORIES) {
     signal hour_in_window;
     hour_in_window <== hour_ge_start.out * hour_le_end.out;
 
-    // Step 7: combine. When time_active == 0 the rule is a free pass.
-    // rule6_ok = (1 - time_active) + time_active * (day_active * hour_in_window)
     signal time_compliant_when_active;
     time_compliant_when_active <== day_active * hour_in_window;
     signal rule6_ok;
     rule6_ok <== 1 - time_active + time_active * time_compliant_when_active;
 
-    // ============================================================ Combine all rules
-    signal and_12;
-    signal and_123;
-    signal and_1234;
-    signal and_12345;
-    and_12 <== rule1_ok * rule2_ok;
-    and_123 <== and_12 * rule3_ok;
-    and_1234 <== and_123 * rule4_ok;
-    and_12345 <== and_1234 * rule5_ok;
-    is_compliant <== and_12345 * rule6_ok;
+    // ============================================================ Rule 7
+    // daily_spent_before + net_amount <= daily_ceiling (public ceiling, BC-17).
+    // The chain can check this one itself; it is in the circuit so the proof's
+    // verdict never disagrees with that check, and a release the public ceiling
+    // stops is a refusal with its own reason rather than a proof that verifies
+    // and a release that cannot happen.
+    component rule7 = LessEqThan(65);
+    rule7.in[0] <== projected_daily;
+    rule7.in[1] <== daily_ceiling;
+    signal rule7_ok;
+    rule7_ok <== rule7.out;
 
-    // ============================================================ policy_data_hash
-    // MUST stay byte-for-byte identical to
-    // services/policy-service/src/utils/merkle.ts::computePolicyDataHash.
+    // ============================================================ Refusal code
+    // Every rule_ok above is boolean, so this is the unique bitmask of broken
+    // rules and 0 exactly when all seven pass.
+    refusal_code <==
+          (1 - rule1_ok)
+        + (1 - rule2_ok) * 2
+        + (1 - rule3_ok) * 4
+        + (1 - rule4_ok) * 8
+        + (1 - rule5_ok) * 16
+        + (1 - rule6_ok) * 32
+        + (1 - rule7_ok) * 64;
+
+    // ============================================================ Policy commitment
+    // Must stay byte-identical to the policy tooling's commitment.
     //
-    // Backend layout:
-    //   poseidon([
-    //     max_daily,
-    //     max_per_tx,
-    //     operator_field,
-    //     policy_id_field,
-    //     poseidon(categories_padded_to_8),
-    //     poseidon(blocked_padded_to_10),
-    //     poseidon(tokens_padded_to_10),
-    //     time_field
-    //   ])
-    // where time_field is 0 when no restriction is configured, otherwise
-    // poseidon([1, days_bitmask, start_hour, end_hour]).
+    //   value[0] = max_daily
+    //   value[1] = max_per_tx
+    //   value[2] = operator_id_field
+    //   value[3] = policy_id_field
+    //   value[4] = Poseidon(allowed_categories)  padded to MAX_CATEGORIES
+    //   value[5] = Poseidon(blocked_addresses)   padded to MAX_BLOCKED
+    //   value[6] = Poseidon(token_whitelist)     padded to MAX_WHITELIST
+    //   value[7] = time_field: 0 with no window, otherwise
+    //              Poseidon(1, days_bitmask, start_hour, end_hour)
+    //
+    //   leaf[i]    = Poseidon(3)(i, policy_salts[i], value[i])
+    //   commitment = Poseidon(8)(leaf[0] .. leaf[7])
+    //
+    // The index inside each leaf keeps a leaf from being replayed in another
+    // position, and a leaf (Poseidon(3)) cannot pass for the root (Poseidon(8)).
+    // Disclosing (i, value[i], salt[i]) and the seven sibling leaves opens one
+    // field without opening the others.
     component cat_list_hash = Poseidon(MAX_CATEGORIES);
     for (var i = 0; i < MAX_CATEGORIES; i++) {
         cat_list_hash.inputs[i] <== allowed_categories[i];
@@ -343,9 +438,7 @@ template PaymentCompliance(MAX_WHITELIST, MAX_BLOCKED, MAX_CATEGORIES) {
         tokens_list_hash.inputs[i] <== token_whitelist[i];
     }
 
-    // Compute Poseidon over the time fields unconditionally; mux to 0 when
-    // time_active == 0 so the result lines up with the backend's "0 sentinel
-    // for empty restrictions" rule.
+    // Computed unconditionally and muxed to 0 when the restriction is off.
     component time_when_active = Poseidon(4);
     time_when_active.inputs[0] <== time_active;
     time_when_active.inputs[1] <== time_days_bitmask;
@@ -354,21 +447,30 @@ template PaymentCompliance(MAX_WHITELIST, MAX_BLOCKED, MAX_CATEGORIES) {
     signal time_field;
     time_field <== time_active * time_when_active.out;
 
+    signal policy_values[8];
+    policy_values[0] <== max_daily;
+    policy_values[1] <== max_per_tx;
+    policy_values[2] <== operator_id_field;
+    policy_values[3] <== policy_id_field;
+    policy_values[4] <== cat_list_hash.out;
+    policy_values[5] <== blocked_list_hash.out;
+    policy_values[6] <== tokens_list_hash.out;
+    policy_values[7] <== time_field;
+
+    component policy_leaf[8];
     component policy_hasher = Poseidon(8);
-    policy_hasher.inputs[0] <== max_daily_lamports;
-    policy_hasher.inputs[1] <== max_per_tx_lamports;
-    policy_hasher.inputs[2] <== operator_id_field;
-    policy_hasher.inputs[3] <== policy_id_field;
-    policy_hasher.inputs[4] <== cat_list_hash.out;
-    policy_hasher.inputs[5] <== blocked_list_hash.out;
-    policy_hasher.inputs[6] <== tokens_list_hash.out;
-    policy_hasher.inputs[7] <== time_field;
-    policy_data_hash <== policy_hasher.out;
+    for (var i = 0; i < 8; i++) {
+        policy_leaf[i] = Poseidon(3);
+        policy_leaf[i].inputs[0] <== i;
+        policy_leaf[i].inputs[1] <== policy_salts[i];
+        policy_leaf[i].inputs[2] <== policy_values[i];
+        policy_hasher.inputs[i] <== policy_leaf[i].out;
+    }
+    policy_commitment <== policy_hasher.out;
 }
 
-// MAX_WHITELIST = 10, MAX_BLOCKED = 10, MAX_CATEGORIES = 8 — must match
-// the constants in services/policy-service/src/utils/merkle.ts and
-// services/prover-service/src/prover.js. Changing any of these is a
-// breaking circuit change that requires re-running the trusted setup and
-// updating the on-chain verifying key.
-component main = PaymentCompliance(10, 10, 8);
+// MAX_WHITELIST = 10, MAX_BLOCKED = 10, MAX_CATEGORIES = 8. These, the public
+// signal order and the refusal bits are frozen by the trusted setup (BC-20,
+// BC-38): changing any of them needs a new proving key and a new verifying key
+// in square_verifier.
+component main = ReleaseCompliance(10, 10, 8);
