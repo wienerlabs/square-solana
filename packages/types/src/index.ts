@@ -8,7 +8,6 @@ export * from './policy-document.js';
 export * from './a2a.js';
 export * from './events.js';
 export * from './operations.js';
-export * from './not-implemented.js';
 
 /** BE-35 API / SDK sözleşme sürümü (docs/design/api-sdk-contract.md değişiklik kaydı). */
-export const API_CONTRACT_VERSION = '0.1.0';
+export const API_CONTRACT_VERSION = '0.1.1';

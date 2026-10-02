@@ -1,6 +1,6 @@
 # Release ispatı devresi
 
-**Durum:** BC-19 (#27) · **Devre:** [`circuits/payment-compliance/payment.circom`](../../circuits/payment-compliance/payment.circom) · **Bağlı sözleşme:** BC-44 v0.1.0 ([program-interface.md](program-interface.md))
+**Durum:** BC-19 (#27) · **Devre:** [`circuits/payment-compliance/payment.circom`](../../circuits/payment-compliance/payment.circom) · **Bağlı sözleşme:** BC-44 v0.1.1 ([program-interface.md](program-interface.md), [`idl/`](../../idl/))
 
 Bu belge, kurumun escrow release'i için ürettiği Groth16 ispatının neyi kanıtladığını ve verifier'ın (BC-21) her public sinyali neye bağlaması gerektiğini tanımlar. Sinyal sırası, ret bitleri ve commitment yapısı trusted setup ile donar (BC-20, BC-38). Bunlardan birini değiştirmek yeni bir proving key ve `square_verifier`'da yeni bir verifying key gerektirir.
 
@@ -127,16 +127,16 @@ Her iki yolda da:
 - **Malleability:** Groth16 ispatı kodlamasına bağlı değildir. Aynı sinyaller için yeniden rastgeleleştirilmiş bir kopya da doğrulanır (Arc `compliance-gate.md`). Burada zararsızdır: `ReleaseProof` job başına bir PDA'dır, sinyaller job'u içerir ve ispatı yalnızca kurumun yetkilisi bağlayabilir. Tüketilmiş bir ispatı işaretlemek gerekirse işaret ispatın baytlarına değil sinyallere konmalıdır.
 - **CU:** 10 yerine 13 public input, ispat hazırlamada üç ek G1 çarpımı demektir. Ölçüm BC-21'in kabul kriteri.
 
-### Sözleşmeye etkisi (BC-44 v0.2.0 için)
+### Sözleşmeye etkisi (bir sonraki sözleşme sürümü için)
 
-| Yüzey | v0.1.0 | Bu devreyle |
+| Yüzey (`idl/square_verifier_contract.json`) | v0.1.1 | Bu devreyle |
 |---|---|---|
-| `PUBLIC_INPUTS` | 10 ("BC-19'da kesinleşir") | 13 |
+| `public_inputs` uzunluğu | 10 | 13 |
 | `set_compliance_proof` argümanları | `proof_a/b/c`, `public_inputs: [[u8; 32]; 10]` | A: `proof_a/b/c`, `refusal_code: u16`, `net_amount: u64`, `proof_timestamp: i64` · B: 13 sinyal + sıkıştırılmış noktalar |
 | `ReleaseProof.refusal_code` | "devreyle BC-19'da tanımlanır" | §3'teki bit maskesi |
 | `verify_mpp_payment_proof` | 10 sinyal | aynı 13 sinyal; `stripe_receipt_hash` ≠ 0 |
 
-Sözleşme Muhammed'de (BC-44, BC-21); bu tablo öneridir.
+Sözleşme (`idl/*.json`) Muhammed'de (BC-44, BC-21); bu tablo öneridir, bu PR IDL'e dokunmuyor.
 
 ## 7. Gizlilik
 

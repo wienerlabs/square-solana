@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Square Solana API
-  version: 0.1.0
+  version: 0.1.1
   summary: Square HTTP API sözleşmesi (BE-35), uygulaması apps/api (BE-18).
   description: |
     Contract-first API sözleşmesi. Zincirdeki hesaplar, event'ler ve instruction argümanları
@@ -14,9 +14,6 @@ info:
   license:
     name: MIT
     identifier: MIT
-servers:
-  - url: http://localhost:3000
-    description: Yerel geliştirme (BE-18)
 tags:
   - name: auth
     description: Cüzdan Ed25519 oturumu ve API anahtarları.
@@ -815,7 +812,6 @@ components:
         - rpc_unavailable
         - db_unavailable
         - prover_unavailable
-        - not_implemented
         - internal_error
     ProgramErrorRef:
       type: object

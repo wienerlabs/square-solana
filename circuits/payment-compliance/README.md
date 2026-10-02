@@ -35,7 +35,6 @@ npm run inputs                         # test-inputs/'u yeniden üretir (--check
 | `scripts/fetch-ptau.mjs` | Sabitlenmiş PPoT dosyasını indirir ve hash'ini doğrular |
 | `scripts/build.mjs` | `payment.circom` ve iki zaman damgası test devresini derler, kısıt sayısını yazar |
 | `test/` | `node:test` testleri ve `test/circuits/` altındaki zaman damgası test devreleri |
-| `examples/hello.circom` | İş anlamı olmayan araç zinciri sağlaması (BC-06) |
 
 ## Anahtarlar
 
