@@ -1,0 +1,12 @@
+build/
+node_modules/
+*.ptau
+*.zkey
+*.wtns
+# Square (BC-06): derleme çıktıları build/ dışına yazılsa da repoya girmez.
+*.r1cs
+*.sym
+*.wasm
+*_js/
+*_cpp/
+*_vk.json
