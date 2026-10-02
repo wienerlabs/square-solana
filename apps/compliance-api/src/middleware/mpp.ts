@@ -61,10 +61,7 @@ async function getStripe(): Promise<StripeType> {
   return stripeInstance;
 }
 
-function createChallengeId(
-  data: Record<string, unknown>,
-  secretKey: string,
-): string {
+function createChallengeId(data: Record<string, unknown>, secretKey: string): string {
   const hmac = crypto.createHmac('sha256', secretKey);
   hmac.update(JSON.stringify(data));
   return hmac.digest('hex');
@@ -75,19 +72,9 @@ function createChallengeId(
  * If x-mpp-credential header is present, verifies the Stripe payment.
  * If not, creates a Stripe PaymentIntent and returns 402 with challenge.
  */
-export function requireMPPPayment(
-  amountCents: number,
-  currency: string,
-  description: string,
-) {
-  return async (
-    req: Request,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> => {
-    const credentialHeader = req.headers['x-mpp-credential'] as
-      | string
-      | undefined;
+export function requireMPPPayment(amountCents: number, currency: string, description: string) {
+  return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    const credentialHeader = req.headers['x-mpp-credential'] as string | undefined;
 
     if (!credentialHeader) {
       try {
@@ -98,8 +85,7 @@ export function requireMPPPayment(
         // The agent then confirms with off_session=true against the saved
         // payment_method; without the customer link Stripe rejects the
         // off_session confirm with "PaymentIntent has no Customer".
-        const operatorIdHint =
-          (req.query.operator_id as string | undefined) ?? undefined;
+        const operatorIdHint = (req.query.operator_id as string | undefined) ?? undefined;
         let savedCustomer: string | null = null;
         if (operatorIdHint) {
           const creds = await getOperatorStripeCredentials(operatorIdHint);
@@ -132,10 +118,7 @@ export function requireMPPPayment(
           expires: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
         };
 
-        const challengeId = createChallengeId(
-          challengeData,
-          config.mpp.secretKey,
-        );
+        const challengeId = createChallengeId(challengeData, config.mpp.secretKey);
 
         const challenge: MPPChallenge = {
           id: challengeId,
@@ -148,13 +131,8 @@ export function requireMPPPayment(
 
         challengeCache.set(challengeId, challenge);
 
-        const challengeBase64 = Buffer.from(JSON.stringify(challenge)).toString(
-          'base64',
-        );
-        res.setHeader(
-          'WWW-Authenticate',
-          `MPP realm="${config.mpp.realm}", challenge="${challengeBase64}"`,
-        );
+        const challengeBase64 = Buffer.from(JSON.stringify(challenge)).toString('base64');
+        res.setHeader('WWW-Authenticate', `MPP realm="${config.mpp.realm}", challenge="${challengeBase64}"`);
 
         logger.info('MPP challenge issued', {
           challengeId,
@@ -169,49 +147,36 @@ export function requireMPPPayment(
           mppChallenge: challenge,
         });
       } catch (err) {
-        const message =
-          err instanceof Error
-            ? err.message
-            : 'Failed to create payment challenge';
+        const message = err instanceof Error ? err.message : 'Failed to create payment challenge';
         logger.error('MPP challenge creation failed', { error: message });
-        res
-          .status(500)
-          .json({ success: false, error: message, data: null });
+        res.status(500).json({ success: false, error: message, data: null });
       }
       return;
     }
 
     try {
-      const credential: MPPCredential = JSON.parse(
-        Buffer.from(credentialHeader, 'base64').toString('utf-8'),
-      );
+      const credential: MPPCredential = JSON.parse(Buffer.from(credentialHeader, 'base64').toString('utf-8'));
 
       if (!credential.challengeId || !credential.paymentIntentId) {
         res.status(400).json({
           success: false,
-          error:
-            'Invalid MPP credential: missing challengeId or paymentIntentId',
+          error: 'Invalid MPP credential: missing challengeId or paymentIntentId',
           data: null,
         });
         return;
       }
 
-      const cachedChallenge = challengeCache.get<MPPChallenge>(
-        credential.challengeId,
-      );
+      const cachedChallenge = challengeCache.get<MPPChallenge>(credential.challengeId);
       if (!cachedChallenge) {
         res.status(402).json({
           success: false,
-          error:
-            'Challenge expired or not found. Please retry to get a new challenge.',
+          error: 'Challenge expired or not found. Please retry to get a new challenge.',
           data: null,
         });
         return;
       }
 
-      if (
-        cachedChallenge.stripe.paymentIntentId !== credential.paymentIntentId
-      ) {
+      if (cachedChallenge.stripe.paymentIntentId !== credential.paymentIntentId) {
         res.status(402).json({
           success: false,
           error: 'PaymentIntent does not match challenge',
@@ -257,9 +222,7 @@ export function requireMPPPayment(
 
       (req as Request & { mppReceipt: MPPReceipt }).mppReceipt = receipt;
 
-      const receiptBase64 = Buffer.from(JSON.stringify(receipt)).toString(
-        'base64',
-      );
+      const receiptBase64 = Buffer.from(JSON.stringify(receipt)).toString('base64');
       res.setHeader('Payment-Receipt', receiptBase64);
 
       challengeCache.del(credential.challengeId);
@@ -272,8 +235,7 @@ export function requireMPPPayment(
 
       next();
     } catch (err) {
-      const message =
-        err instanceof Error ? err.message : 'MPP verification failed';
+      const message = err instanceof Error ? err.message : 'MPP verification failed';
       logger.error('MPP verification error', { error: message });
       res.status(402).json({
         success: false,

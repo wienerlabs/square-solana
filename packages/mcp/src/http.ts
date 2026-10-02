@@ -5,7 +5,7 @@
  * The agent can read the entire market with zero credentials.
  */
 
-import type { CovenantMcpConfig } from "./config.js";
+import type { CovenantMcpConfig } from './config.js';
 
 export class CovenantHttpError extends Error {
   constructor(
@@ -14,21 +14,18 @@ export class CovenantHttpError extends Error {
     public readonly body: string,
   ) {
     super(message);
-    this.name = "CovenantHttpError";
+    this.name = 'CovenantHttpError';
   }
 }
 
 export class CovenantHttp {
   constructor(private readonly config: CovenantMcpConfig) {}
 
-  async get<T = unknown>(
-    path: string,
-    query?: Record<string, string | number | undefined>,
-  ): Promise<T> {
+  async get<T = unknown>(path: string, query?: Record<string, string | number | undefined>): Promise<T> {
     const url = new URL(path, this.config.baseUrl);
     if (query) {
       for (const [key, value] of Object.entries(query)) {
-        if (value !== undefined && value !== "") {
+        if (value !== undefined && value !== '') {
           url.searchParams.set(key, String(value));
         }
       }
@@ -39,28 +36,20 @@ export class CovenantHttp {
 
     try {
       const res = await fetch(url.toString(), {
-        method: "GET",
-        headers: { accept: "application/json" },
+        method: 'GET',
+        headers: { accept: 'application/json' },
         signal: controller.signal,
       });
 
       const text = await res.text();
       if (!res.ok) {
-        throw new CovenantHttpError(
-          `GET ${url.pathname} failed with ${res.status}`,
-          res.status,
-          text.slice(0, 500),
-        );
+        throw new CovenantHttpError(`GET ${url.pathname} failed with ${res.status}`, res.status, text.slice(0, 500));
       }
 
       try {
         return JSON.parse(text) as T;
       } catch {
-        throw new CovenantHttpError(
-          `GET ${url.pathname} returned non-JSON response`,
-          res.status,
-          text.slice(0, 500),
-        );
+        throw new CovenantHttpError(`GET ${url.pathname} returned non-JSON response`, res.status, text.slice(0, 500));
       }
     } finally {
       clearTimeout(timeout);

@@ -4,11 +4,7 @@ export function computeProofHash(data: string): string {
   return createHash('sha256').update(data).digest('hex');
 }
 
-export function computeBatchHash(
-  proofHashes: readonly string[],
-  periodStart: Date,
-  periodEnd: Date
-): string {
+export function computeBatchHash(proofHashes: readonly string[], periodStart: Date, periodEnd: Date): string {
   const sorted = [...proofHashes].sort();
   const concatenated = sorted.join(':');
   // Include the period bounds so two attestations covering the same proof set

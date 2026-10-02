@@ -8,16 +8,12 @@ interface Migration {
   down: (client: import('pg').PoolClient) => Promise<void>;
 }
 
-const migrations: Migration[] = [
-  { name: '001_create_compliance_tables', ...migration001 },
-];
+const migrations: Migration[] = [{ name: '001_create_compliance_tables', ...migration001 }];
 
 async function rollbackLastMigration(): Promise<void> {
   const client = await getClient();
   try {
-    const result = await client.query<{ name: string }>(
-      'SELECT name FROM migrations ORDER BY id DESC LIMIT 1'
-    );
+    const result = await client.query<{ name: string }>('SELECT name FROM migrations ORDER BY id DESC LIMIT 1');
 
     if (result.rows.length === 0) {
       logger.info('No migrations to rollback');

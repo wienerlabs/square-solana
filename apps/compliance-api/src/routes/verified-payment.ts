@@ -1,9 +1,6 @@
 import { Router } from 'express';
 import type { ApiResponse } from '../types/api.js';
-import {
-  getVerifiedPaymentIntent,
-  upsertVerifiedPaymentIntent,
-} from '../models/verified-payment-intent.js';
+import { getVerifiedPaymentIntent, upsertVerifiedPaymentIntent } from '../models/verified-payment-intent.js';
 import {
   computeStripeReceiptHash,
   getAuthorityPublicKeyBase58,
@@ -39,12 +36,12 @@ let stripeInstance: StripeInstance | null = null;
 async function getStripe(): Promise<StripeInstance> {
   if (!stripeInstance) {
     const StripeMod = (await import('stripe')).default;
-    stripeInstance = new (StripeMod as unknown as new (
-      key: string,
-      opts: Record<string, unknown>,
-    ) => StripeInstance)(config.stripe.secretKey, {
-      apiVersion: config.stripe.apiVersion,
-    });
+    stripeInstance = new (StripeMod as unknown as new (key: string, opts: Record<string, unknown>) => StripeInstance)(
+      config.stripe.secretKey,
+      {
+        apiVersion: config.stripe.apiVersion,
+      },
+    );
   }
   return stripeInstance;
 }
@@ -141,8 +138,7 @@ router.post('/verified-payment/sync/:id', async (req, res, next) => {
     if (!config.mppAuthority.keypairBase58) {
       res.status(503).json({
         success: false,
-        error:
-          'MPP_AUTHORITY_KEYPAIR_BASE58 is not configured; cannot sign the canonical receipt.',
+        error: 'MPP_AUTHORITY_KEYPAIR_BASE58 is not configured; cannot sign the canonical receipt.',
         data: null,
       });
       return;
@@ -153,8 +149,7 @@ router.post('/verified-payment/sync/:id', async (req, res, next) => {
     try {
       pi = await stripe.paymentIntents.retrieve(id);
     } catch (err) {
-      const message =
-        err instanceof Error ? err.message : 'Stripe paymentIntents.retrieve failed';
+      const message = err instanceof Error ? err.message : 'Stripe paymentIntents.retrieve failed';
       logger.warn('Stripe PI retrieve failed during sync', {
         pi_id: id,
         error: message,
@@ -184,8 +179,7 @@ router.post('/verified-payment/sync/:id', async (req, res, next) => {
       return;
     }
 
-    const customer =
-      typeof pi.customer === 'string' ? pi.customer : pi.customer?.id ?? '';
+    const customer = typeof pi.customer === 'string' ? pi.customer : (pi.customer?.id ?? '');
 
     // Mirror the webhook's paid_at logic: prefer the latest_charge.created so
     // the on-chain receipt timestamp matches when the funds actually settled,

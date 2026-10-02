@@ -30,9 +30,7 @@ interface MppPublicConfigResponse {
 router.get('/mpp/public-config', (_req, res) => {
   let mppAuthorityPubkey: string | null = null;
   try {
-    mppAuthorityPubkey = config.mppAuthority.keypairBase58
-      ? getAuthorityPublicKeyBase58()
-      : null;
+    mppAuthorityPubkey = config.mppAuthority.keypairBase58 ? getAuthorityPublicKeyBase58() : null;
   } catch (error) {
     logger.error('MPP authority keypair could not be decoded', {
       error: error instanceof Error ? error.message : String(error),

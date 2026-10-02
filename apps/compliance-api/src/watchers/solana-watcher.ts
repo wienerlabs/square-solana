@@ -7,11 +7,7 @@ import {
 } from '../utils/helius.js';
 import { query } from '../utils/database.js';
 import { insertUnattestedPayment } from '../models/unattested-payment.js';
-import {
-  getWatcherCursor,
-  upsertWatcherCursor,
-  listKnownOperatorIds,
-} from '../models/watcher-cursor.js';
+import { getWatcherCursor, upsertWatcherCursor, listKnownOperatorIds } from '../models/watcher-cursor.js';
 
 /**
  * Solana watcher: pulls every parsed token transfer that left an operator
@@ -102,10 +98,7 @@ function extractOutgoing(
   return matches;
 }
 
-async function hasMatchingProof(
-  operatorId: string,
-  signature: string,
-): Promise<boolean> {
+async function hasMatchingProof(operatorId: string, signature: string): Promise<boolean> {
   const result = await query<{ count: string }>(
     `SELECT COUNT(*)::text AS count
        FROM proof_records
@@ -115,9 +108,7 @@ async function hasMatchingProof(
   return parseInt(result.rows[0]?.count ?? '0', 10) > 0;
 }
 
-export async function reconcileOperatorWallet(
-  operatorId: string,
-): Promise<ReconcileSummary> {
+export async function reconcileOperatorWallet(operatorId: string): Promise<ReconcileSummary> {
   const summary: ReconcileSummary = {
     operator_id: operatorId,
     transactions_scanned: 0,
@@ -167,9 +158,7 @@ export async function reconcileOperatorWallet(
       }
       const blockTime = tx.timestamp ? new Date(tx.timestamp * 1000) : null;
       const decimals = transfer.tokenStandard === 'NonFungible' ? 0 : 6;
-      const amountRaw = BigInt(
-        Math.round((transfer.tokenAmount ?? 0) * 10 ** decimals),
-      );
+      const amountRaw = BigInt(Math.round((transfer.tokenAmount ?? 0) * 10 ** decimals));
       const { inserted } = await insertUnattestedPayment({
         operator_id: operatorId,
         source: 'solana',
@@ -249,9 +238,7 @@ export function startSolanaWatcher(): void {
   if (watcherTimer) return;
   const helius = config.helius;
   if (!helius) {
-    logger.warn(
-      'Solana unattested-payment watcher not started: HELIUS_API_KEY is not set',
-    );
+    logger.warn('Solana unattested-payment watcher not started: HELIUS_API_KEY is not set');
     return;
   }
   const interval = config.watcher.intervalMs;
@@ -268,10 +255,7 @@ export function startSolanaWatcher(): void {
       if (result.summaries.some((s) => s.unattested_inserted > 0)) {
         logger.warn('Watcher tick recorded new unattested payments', {
           operators_scanned: result.operators_scanned,
-          new_unattested: result.summaries.reduce(
-            (acc, s) => acc + s.unattested_inserted,
-            0,
-          ),
+          new_unattested: result.summaries.reduce((acc, s) => acc + s.unattested_inserted, 0),
         });
       }
     } catch (err) {

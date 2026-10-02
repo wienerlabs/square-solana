@@ -25,10 +25,7 @@ export interface X402PaymentProof {
  * If x-402-payment header is present, verifies the payment on-chain.
  * If not, returns 402 with payment requirements.
  */
-export function requireX402Payment(
-  priceBaseUnits: number,
-  description: string
-) {
+export function requireX402Payment(priceBaseUnits: number, description: string) {
   return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     const paymentHeader = req.headers['x-402-payment'] as string | undefined;
 
@@ -56,9 +53,7 @@ export function requireX402Payment(
 
     // Payment header present -- verify on-chain
     try {
-      const proof: X402PaymentProof = JSON.parse(
-        Buffer.from(paymentHeader, 'base64').toString('utf-8')
-      );
+      const proof: X402PaymentProof = JSON.parse(Buffer.from(paymentHeader, 'base64').toString('utf-8'));
 
       if (!proof.txSignature || !proof.payer) {
         res.status(400).json({

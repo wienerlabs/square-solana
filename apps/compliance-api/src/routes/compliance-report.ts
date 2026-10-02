@@ -75,23 +75,14 @@ router.get(
       const payment = (req as Request & { x402Payment: X402PaymentProof }).x402Payment;
 
       // Fetch proof records
-      const { records: proofs, total: totalProofs } = await getProofRecordsByOperator(
-        operatorId,
-        1,
-        100
-      );
+      const { records: proofs, total: totalProofs } = await getProofRecordsByOperator(operatorId, 1, 100);
 
       const compliantProofs = proofs.filter((p) => p.is_compliant).length;
       const nonCompliantProofs = totalProofs - compliantProofs;
-      const complianceRate =
-        totalProofs > 0 ? ((compliantProofs / totalProofs) * 100).toFixed(1) : '0.0';
+      const complianceRate = totalProofs > 0 ? ((compliantProofs / totalProofs) * 100).toFixed(1) : '0.0';
 
       // Fetch attestations
-      const { attestations, total: totalAttestations } = await getAttestationsByOperator(
-        operatorId,
-        1,
-        100
-      );
+      const { attestations, total: totalAttestations } = await getAttestationsByOperator(operatorId, 1, 100);
 
       let totalVolumeMin = 0;
       let totalVolumeMax = 0;
@@ -150,7 +141,7 @@ router.get(
     } catch (error) {
       next(error);
     }
-  }
+  },
 );
 
 export default router;

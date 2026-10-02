@@ -7,19 +7,14 @@ export class AppError extends Error {
   constructor(
     public readonly statusCode: number,
     message: string,
-    public readonly details?: string[]
+    public readonly details?: string[],
   ) {
     super(message);
     this.name = 'AppError';
   }
 }
 
-export function errorHandler(
-  err: Error,
-  _req: Request,
-  res: Response,
-  _next: NextFunction
-): void {
+export function errorHandler(err: Error, _req: Request, res: Response, _next: NextFunction): void {
   if (err instanceof AppError) {
     const response: ApiError = {
       success: false,

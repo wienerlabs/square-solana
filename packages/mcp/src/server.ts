@@ -19,11 +19,11 @@
  * Transport: stdio. Configure in your MCP client (see README).
  */
 
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { loadConfig } from "./config.js";
-import { packageInfo } from "./package-info.js";
-import { registerDiscoveryTools } from "./tools/discover.js";
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { loadConfig } from './config.js';
+import { packageInfo } from './package-info.js';
+import { registerDiscoveryTools } from './tools/discover.js';
 
 async function main(): Promise<void> {
   const config = loadConfig();
@@ -48,7 +48,7 @@ async function main(): Promise<void> {
 
 main().catch((err) => {
   process.stderr.write(
-    `${packageInfo.name} fatal: ${err instanceof Error ? err.stack ?? err.message : String(err)}\n`,
+    `${packageInfo.name} fatal: ${err instanceof Error ? (err.stack ?? err.message) : String(err)}\n`,
   );
   process.exit(1);
 });

@@ -46,7 +46,7 @@ export async function createBatchAttestation(
   operatorId: string,
   periodStart: Date,
   periodEnd: Date,
-  proofRecords: readonly ProofRecord[]
+  proofRecords: readonly ProofRecord[],
 ): Promise<Attestation> {
   return transaction(async (client) => {
     const id = uuidv4();
@@ -85,7 +85,7 @@ export async function createBatchAttestation(
         sanctionsIntersections,
         proofHashes,
         batchHash,
-      ]
+      ],
     );
 
     logger.info('Batch attestation created', {
@@ -100,29 +100,26 @@ export async function createBatchAttestation(
 }
 
 export async function getAttestationById(id: string): Promise<Attestation | null> {
-  const result = await query<AttestationRow>(
-    'SELECT * FROM attestations WHERE id = $1',
-    [id]
-  );
+  const result = await query<AttestationRow>('SELECT * FROM attestations WHERE id = $1', [id]);
   return result.rows.length > 0 ? rowToAttestation(result.rows[0]) : null;
 }
 
 export async function getAttestationsByOperator(
   operatorId: string,
   page: number,
-  limit: number
+  limit: number,
 ): Promise<{ attestations: Attestation[]; total: number }> {
   const offset = (page - 1) * limit;
 
   const countResult = await query<{ count: string }>(
     'SELECT COUNT(*) as count FROM attestations WHERE operator_id = $1',
-    [operatorId]
+    [operatorId],
   );
 
   const result = await query<AttestationRow>(
     `SELECT * FROM attestations WHERE operator_id = $1
      ORDER BY period_end DESC LIMIT $2 OFFSET $3`,
-    [operatorId, limit, offset]
+    [operatorId, limit, offset],
   );
 
   return {
@@ -131,14 +128,11 @@ export async function getAttestationsByOperator(
   };
 }
 
-export async function updateTxSignature(
-  id: string,
-  txSignature: string
-): Promise<Attestation | null> {
+export async function updateTxSignature(id: string, txSignature: string): Promise<Attestation | null> {
   const result = await query<AttestationRow>(
     `UPDATE attestations SET tx_signature = $1, updated_at = NOW()
      WHERE id = $2 RETURNING *`,
-    [txSignature, id]
+    [txSignature, id],
   );
   if (result.rows.length === 0) return null;
 

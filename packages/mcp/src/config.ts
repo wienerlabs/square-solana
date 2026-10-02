@@ -23,11 +23,11 @@ function requireEnv(name: string): string {
 }
 
 export function loadConfig(): CovenantMcpConfig {
-  const rawUrl = requireEnv("COVENANT_API_URL");
+  const rawUrl = requireEnv('COVENANT_API_URL');
   // Throws on anything that is not an absolute URL.
-  const baseUrl = new URL(rawUrl).toString().replace(/\/+$/, "");
+  const baseUrl = new URL(rawUrl).toString().replace(/\/+$/, '');
 
-  const rawTimeout = requireEnv("COVENANT_TIMEOUT_MS");
+  const rawTimeout = requireEnv('COVENANT_TIMEOUT_MS');
   const timeoutMs = Number(rawTimeout);
   if (!Number.isInteger(timeoutMs) || timeoutMs <= 0) {
     throw new Error(`COVENANT_TIMEOUT_MS must be a positive integer, got ${rawTimeout}`);
@@ -35,7 +35,7 @@ export function loadConfig(): CovenantMcpConfig {
 
   return {
     baseUrl,
-    network: requireEnv("COVENANT_NETWORK"),
+    network: requireEnv('COVENANT_NETWORK'),
     timeoutMs,
   };
 }

@@ -31,21 +31,13 @@ interface StripePaymentIntentMinimal {
 
 interface StripeInstance {
   readonly webhooks: {
-    constructEvent(
-      payload: Buffer | string,
-      signatureHeader: string,
-      secret: string,
-    ): StripeEvent;
+    constructEvent(payload: Buffer | string, signatureHeader: string, secret: string): StripeEvent;
   };
 }
 
 import { config } from '../config.js';
 import { logger } from '../utils/logger.js';
-import {
-  computeStripeReceiptHash,
-  signReceiptHash,
-  type CanonicalStripeReceipt,
-} from '../utils/stripe-receipt.js';
+import { computeStripeReceiptHash, signReceiptHash, type CanonicalStripeReceipt } from '../utils/stripe-receipt.js';
 import { upsertVerifiedPaymentIntent } from '../models/verified-payment-intent.js';
 
 const router = Router();
@@ -54,10 +46,10 @@ let stripeInstance: StripeInstance | null = null;
 async function getStripe(): Promise<StripeInstance> {
   if (!stripeInstance) {
     const StripeMod = (await import('stripe')).default;
-    stripeInstance = new (StripeMod as unknown as new (
-      key: string,
-      opts: Record<string, unknown>,
-    ) => StripeInstance)(config.stripe.secretKey, { apiVersion: config.stripe.apiVersion });
+    stripeInstance = new (StripeMod as unknown as new (key: string, opts: Record<string, unknown>) => StripeInstance)(
+      config.stripe.secretKey,
+      { apiVersion: config.stripe.apiVersion },
+    );
   }
   return stripeInstance;
 }
@@ -111,11 +103,7 @@ router.post(
     let event: StripeEvent;
     try {
       const stripe = await getStripe();
-      event = stripe.webhooks.constructEvent(
-        req.body as Buffer,
-        sigHeader,
-        config.stripe.webhookSecret,
-      );
+      event = stripe.webhooks.constructEvent(req.body as Buffer, sigHeader, config.stripe.webhookSecret);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'signature verify failed';
       logger.warn('Stripe webhook signature verification failed', { error: message });
@@ -154,8 +142,7 @@ router.post(
       return;
     }
 
-    const customer =
-      typeof pi.customer === 'string' ? pi.customer : pi.customer?.id ?? '';
+    const customer = typeof pi.customer === 'string' ? pi.customer : (pi.customer?.id ?? '');
     const paidAtUnix = (() => {
       const charge = pi.latest_charge ?? null;
       if (charge && typeof charge !== 'string' && charge.created) {

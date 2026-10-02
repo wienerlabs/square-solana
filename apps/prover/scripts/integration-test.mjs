@@ -66,11 +66,7 @@ async function callProve(payload) {
 
 function assertBufferLen(base64, expected, name) {
   const buf = Buffer.from(base64, 'base64');
-  assert.equal(
-    buf.length,
-    expected,
-    `${name}: expected ${expected} bytes, got ${buf.length}`,
-  );
+  assert.equal(buf.length, expected, `${name}: expected ${expected} bytes, got ${buf.length}`);
   return buf;
 }
 
@@ -78,11 +74,7 @@ function assertIsCompliantEncoding(base64Value, expectedBool, name) {
   const buf = assertBufferLen(base64Value, 32, name);
   const expected = Buffer.alloc(32);
   if (expectedBool) expected[31] = 1;
-  assert.deepEqual(
-    buf,
-    expected,
-    `${name}: non-canonical encoding for is_compliant=${expectedBool}`,
-  );
+  assert.deepEqual(buf, expected, `${name}: non-canonical encoding for is_compliant=${expectedBool}`);
 }
 
 async function run() {
@@ -94,11 +86,7 @@ async function run() {
   assertBufferLen(ok.groth16.proof_a, 64, 'proof_a');
   assertBufferLen(ok.groth16.proof_b, 128, 'proof_b');
   assertBufferLen(ok.groth16.proof_c, 64, 'proof_c');
-  assert.equal(
-    ok.groth16.public_inputs.length,
-    ok.raw_public.length,
-    'public_inputs count must match raw_public',
-  );
+  assert.equal(ok.groth16.public_inputs.length, ok.raw_public.length, 'public_inputs count must match raw_public');
   assertIsCompliantEncoding(ok.groth16.public_inputs[0], true, 'public_inputs[0]');
   ok.groth16.public_inputs.forEach((value, i) => {
     const bytes = assertBufferLen(value, 32, `public_inputs[${i}]`);

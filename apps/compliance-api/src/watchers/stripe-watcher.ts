@@ -61,9 +61,7 @@ async function loadStripeCandidates(): Promise<CandidateRow[]> {
  * those are flagged with operator_id="unknown" so the dashboard still
  * surfaces them under a special bucket.
  */
-async function resolveOperatorByCustomer(
-  customerId: string | null,
-): Promise<string> {
+async function resolveOperatorByCustomer(customerId: string | null): Promise<string> {
   if (!customerId) return 'unknown';
   const result = await query<{ operator_id: string }>(
     `SELECT operator_id FROM operator_stripe_credentials WHERE stripe_customer_id = $1`,

@@ -22,14 +22,16 @@ function paramAsString(value: string | string[]): string {
   return Array.isArray(value) ? value[0] : value;
 }
 
-const BatchAttestationInputSchema = z.object({
-  operator_id: z.string().min(1).max(64),
-  period_start: z.coerce.date(),
-  period_end: z.coerce.date(),
-}).refine(
-  (data) => data.period_end > data.period_start,
-  { message: 'period_end must be after period_start', path: ['period_end'] }
-);
+const BatchAttestationInputSchema = z
+  .object({
+    operator_id: z.string().min(1).max(64),
+    period_start: z.coerce.date(),
+    period_end: z.coerce.date(),
+  })
+  .refine((data) => data.period_end > data.period_start, {
+    message: 'period_end must be after period_start',
+    path: ['period_end'],
+  });
 
 /**
  * @swagger
@@ -53,22 +55,13 @@ router.post('/batch', validateBody(BatchAttestationInputSchema), async (req, res
   try {
     const { operator_id, period_start, period_end } = req.body;
 
-    const proofRecords = await getProofRecordsByOperatorAndPeriod(
-      operator_id,
-      period_start,
-      period_end
-    );
+    const proofRecords = await getProofRecordsByOperatorAndPeriod(operator_id, period_start, period_end);
 
     if (proofRecords.length === 0) {
       throw new AppError(400, 'No proof records found for the specified operator and period');
     }
 
-    const attestation = await createBatchAttestation(
-      operator_id,
-      period_start,
-      period_end,
-      proofRecords
-    );
+    const attestation = await createBatchAttestation(operator_id, period_start, period_end, proofRecords);
 
     const output = formatBatchOutput(attestation);
 
@@ -164,11 +157,7 @@ router.get('/operator/:operatorId', async (req, res, next) => {
     const page = Math.max(1, parseInt(req.query.page as string, 10) || 1);
     const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string, 10) || 20));
 
-    const { attestations, total } = await getAttestationsByOperator(
-      operatorId,
-      page,
-      limit
-    );
+    const { attestations, total } = await getAttestationsByOperator(operatorId, page, limit);
 
     const response: PaginatedResponse<Attestation> = {
       success: true,

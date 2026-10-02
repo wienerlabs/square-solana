@@ -21,17 +21,13 @@ import path from 'node:path';
 
 const [vkPath, constName, nrInputsConst] = process.argv.slice(2);
 if (!vkPath || !constName || !nrInputsConst) {
-  console.error(
-    'Usage: node extract-vk-rust.mjs <vk.json> <VK_CONST_NAME> <NR_INPUTS_CONST_NAME>',
-  );
+  console.error('Usage: node extract-vk-rust.mjs <vk.json> <VK_CONST_NAME> <NR_INPUTS_CONST_NAME>');
   process.exit(2);
 }
 
 const vk = JSON.parse(fs.readFileSync(vkPath, 'utf8'));
 
-const BN254_P = BigInt(
-  '21888242871839275222246405745257275088696311157297823662689037894645226208583',
-);
+const BN254_P = BigInt('21888242871839275222246405745257275088696311157297823662689037894645226208583');
 
 function toFieldBytes(decimalString) {
   const n = BigInt(decimalString);
@@ -54,12 +50,7 @@ function encodeG2(point) {
   // snarkjs: [[x0, x1], [y0, y1], [z0, z1]]
   // groth16-solana expects the Fp2 components in reversed order.
   const [x, y] = point;
-  return [
-    ...toFieldBytes(x[1]),
-    ...toFieldBytes(x[0]),
-    ...toFieldBytes(y[1]),
-    ...toFieldBytes(y[0]),
-  ];
+  return [...toFieldBytes(x[1]), ...toFieldBytes(x[0]), ...toFieldBytes(y[1]), ...toFieldBytes(y[0])];
 }
 
 function formatByteArray(bytes, name, indent = '    ') {
@@ -107,23 +98,17 @@ const icBytes = vk.IC.map(encodeG1);
 
 const nPublic = Number(vk.nPublic);
 if (icBytes.length !== nPublic + 1) {
-  throw new Error(
-    `IC length (${icBytes.length}) does not match nPublic+1 (${nPublic + 1})`,
-  );
+  throw new Error(`IC length (${icBytes.length}) does not match nPublic+1 (${nPublic + 1})`);
 }
 
-console.log(
-  `// Generated from ${path.relative(process.cwd(), vkPath)} — do not edit by hand.`,
-);
+console.log(`// Generated from ${path.relative(process.cwd(), vkPath)} — do not edit by hand.`);
 console.log(`// Regenerate with: node services/prover-service/scripts/extract-vk-rust.mjs`);
 console.log('');
 console.log(`pub const ${nrInputsConst}: usize = ${nPublic};`);
 console.log('');
 console.log(formatIcArray(icBytes, ''));
 console.log('');
-console.log(
-  `pub const ${constName}: Groth16Verifyingkey = Groth16Verifyingkey {`,
-);
+console.log(`pub const ${constName}: Groth16Verifyingkey = Groth16Verifyingkey {`);
 console.log(`    nr_pubinputs: ${nPublic},`);
 console.log(formatByteArray(alphaBytes, 'vk_alpha_g1'));
 console.log(formatByteArray(betaBytes, 'vk_beta_g2'));

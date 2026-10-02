@@ -1,9 +1,7 @@
 // BN254 base field prime p (matches the scalar field used by alt_bn128 on
 // Solana). Required for negating the Y coordinate of proof_a per the
 // groth16-solana verifier convention.
-const BN254_P = BigInt(
-  '21888242871839275222246405745257275088696311157297823662689037894645226208583',
-);
+const BN254_P = BigInt('21888242871839275222246405745257275088696311157297823662689037894645226208583');
 
 // Serialize a decimal string into a 32-byte big-endian Buffer.
 function toFieldBytes(decimalString) {
@@ -53,10 +51,7 @@ function encodeProofB(pi_b) {
 
 // snarkjs emits proof_c as [x, y, 1]. groth16-solana expects 64 bytes = x || y.
 function encodeProofC(pi_c) {
-  return Buffer.concat([
-    toFieldBytes(pi_c[0]),
-    toFieldBytes(pi_c[1]),
-  ]);
+  return Buffer.concat([toFieldBytes(pi_c[0]), toFieldBytes(pi_c[1])]);
 }
 
 // Convert each public input (decimal string) to a 32-byte big-endian buffer,

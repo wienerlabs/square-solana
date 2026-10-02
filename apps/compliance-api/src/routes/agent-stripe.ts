@@ -16,10 +16,10 @@ let stripeInstance: StripeType | null = null;
 async function getStripe(): Promise<StripeType> {
   if (!stripeInstance) {
     const Stripe = (await import('stripe')).default;
-    stripeInstance = new (Stripe as unknown as new (
-      key: string,
-      opts: Record<string, unknown>,
-    ) => StripeType)(config.stripe.secretKey, { apiVersion: config.stripe.apiVersion });
+    stripeInstance = new (Stripe as unknown as new (key: string, opts: Record<string, unknown>) => StripeType)(
+      config.stripe.secretKey,
+      { apiVersion: config.stripe.apiVersion },
+    );
   }
   return stripeInstance;
 }

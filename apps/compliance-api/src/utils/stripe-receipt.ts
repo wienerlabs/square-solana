@@ -76,10 +76,7 @@ function splitBytes32(buf: Buffer): [bigint, bigint] {
   return [high, low];
 }
 
-async function hashStringField(
-  poseidon: Poseidon,
-  s: string,
-): Promise<bigint> {
+async function hashStringField(poseidon: Poseidon, s: string): Promise<bigint> {
   const [high, low] = splitBytes32(utf8PadTo32(s));
   return BigInt(poseidon.F.toString(poseidon([high, low])));
 }
@@ -102,9 +99,7 @@ async function hashStringField(
  *     paid_at_unix,
  *   ])
  */
-export async function computeStripeReceiptHash(
-  receipt: CanonicalStripeReceipt,
-): Promise<string> {
+export async function computeStripeReceiptHash(receipt: CanonicalStripeReceipt): Promise<string> {
   const poseidon = await getPoseidon();
   const stripeIdField = await hashStringField(poseidon, receipt.stripe_payment_intent_id);
   const currencyField = await hashStringField(poseidon, receipt.currency);

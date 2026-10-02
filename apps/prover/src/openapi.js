@@ -18,7 +18,7 @@ export const openapiSpec = {
         summary: 'Liveness probe',
         tags: ['Meta'],
         responses: {
-          '200': {
+          200: {
             description: 'Service is up',
             content: {
               'application/json': {
@@ -42,7 +42,7 @@ export const openapiSpec = {
           },
         },
         responses: {
-          '200': {
+          200: {
             description: 'Proof generated',
             content: {
               'application/json': {
@@ -50,7 +50,7 @@ export const openapiSpec = {
               },
             },
           },
-          '500': {
+          500: {
             description: 'Prover error',
             content: {
               'application/json': {

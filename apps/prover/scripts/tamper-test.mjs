@@ -18,12 +18,7 @@ function requireBaseUrl() {
 }
 
 const BASE_URL = requireBaseUrl();
-const VK_PATH = path.resolve(
-  __dirname,
-  '..',
-  'artifacts',
-  'payment_vk.json',
-);
+const VK_PATH = path.resolve(__dirname, '..', 'artifacts', 'payment_vk.json');
 
 const COMPLIANT_INPUT = {
   max_daily_spend_lamports: 100000000,
@@ -76,9 +71,7 @@ async function main() {
     process.exit(1);
   }
 
-  console.log(
-    '\nTampering with proof: flip a single field-element bit in pi_a[0]...',
-  );
+  console.log('\nTampering with proof: flip a single field-element bit in pi_a[0]...');
   const tamperedProof = JSON.parse(JSON.stringify(validProof));
   tamperedProof.pi_a[0] = stringBigIntAdd(tamperedProof.pi_a[0], '1');
 
@@ -89,9 +82,7 @@ async function main() {
     process.exit(2);
   }
 
-  console.log(
-    '\nTampering with public inputs: flip is_compliant from 1 to 0...',
-  );
+  console.log('\nTampering with public inputs: flip is_compliant from 1 to 0...');
   const tamperedPublic = [...validPublic];
   tamperedPublic[0] = '0';
 
@@ -102,9 +93,7 @@ async function main() {
     process.exit(3);
   }
 
-  console.log(
-    '\nAll checks passed. The proof is cryptographically bound to both the',
-  );
+  console.log('\nAll checks passed. The proof is cryptographically bound to both the');
   console.log('proof bytes AND the public inputs — a fake prover could not do this.');
   // snarkjs keeps its curve worker threads alive; exit explicitly.
   process.exit(0);

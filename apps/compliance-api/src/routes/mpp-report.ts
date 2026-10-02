@@ -1,10 +1,7 @@
 import { Router } from 'express';
 import type { Request } from 'express';
 import type { ApiResponse } from '../types/api.js';
-import {
-  requireMPPPayment,
-  type MPPReceipt,
-} from '../middleware/mpp.js';
+import { requireMPPPayment, type MPPReceipt } from '../middleware/mpp.js';
 import { getProofRecordsByOperator } from '../models/proof-record.js';
 import { getAttestationsByOperator } from '../models/attestation.js';
 import { config } from '../config.js';
@@ -64,11 +61,7 @@ interface MPPComplianceReport {
  */
 router.get(
   '/mpp-report',
-  requireMPPPayment(
-    config.mpp.reportPriceCents,
-    config.mpp.reportCurrency,
-    'Aperture Compliance Report',
-  ),
+  requireMPPPayment(config.mpp.reportPriceCents, config.mpp.reportCurrency, 'Aperture Compliance Report'),
   async (req, res, next) => {
     try {
       const operatorId = req.query.operator_id as string;
@@ -81,21 +74,15 @@ router.get(
         return;
       }
 
-      const receipt = (req as Request & { mppReceipt: MPPReceipt })
-        .mppReceipt;
+      const receipt = (req as Request & { mppReceipt: MPPReceipt }).mppReceipt;
 
-      const { records: proofs, total: totalProofs } =
-        await getProofRecordsByOperator(operatorId, 1, 100);
+      const { records: proofs, total: totalProofs } = await getProofRecordsByOperator(operatorId, 1, 100);
 
       const compliantProofs = proofs.filter((p) => p.is_compliant).length;
       const nonCompliantProofs = totalProofs - compliantProofs;
-      const complianceRate =
-        totalProofs > 0
-          ? ((compliantProofs / totalProofs) * 100).toFixed(1)
-          : '0.0';
+      const complianceRate = totalProofs > 0 ? ((compliantProofs / totalProofs) * 100).toFixed(1) : '0.0';
 
-      const { attestations, total: totalAttestations } =
-        await getAttestationsByOperator(operatorId, 1, 100);
+      const { attestations, total: totalAttestations } = await getAttestationsByOperator(operatorId, 1, 100);
 
       let totalVolumeMin = 0;
       let totalVolumeMax = 0;
@@ -129,10 +116,7 @@ router.get(
           is_compliant: p.is_compliant,
           amount_range_min: p.amount_range_min,
           amount_range_max: p.amount_range_max,
-          verified_at:
-            p.verified_at instanceof Date
-              ? p.verified_at.toISOString()
-              : String(p.verified_at),
+          verified_at: p.verified_at instanceof Date ? p.verified_at.toISOString() : String(p.verified_at),
         })),
         payment: {
           protocol: 'mpp',

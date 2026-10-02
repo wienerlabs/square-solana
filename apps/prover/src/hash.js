@@ -26,9 +26,7 @@ export function splitBytes(buffer) {
 export function decodeAddress32(base58String) {
   const raw = Buffer.from(bs58.decode(base58String));
   if (raw.length !== 32) {
-    throw new Error(
-      `Address must decode to 32 bytes, got ${raw.length}: ${base58String}`,
-    );
+    throw new Error(`Address must decode to 32 bytes, got ${raw.length}: ${base58String}`);
   }
   return raw;
 }
@@ -81,9 +79,7 @@ export async function hashUuid(uuidString) {
 // slots, 0 for padding).
 async function padList(values, maxLength, hasher) {
   if (values.length > maxLength) {
-    throw new Error(
-      `List of size ${values.length} exceeds circuit max of ${maxLength}`,
-    );
+    throw new Error(`List of size ${values.length} exceeds circuit max of ${maxLength}`);
   }
   const hashed = [];
   const mask = [];

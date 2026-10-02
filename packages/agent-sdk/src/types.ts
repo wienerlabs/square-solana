@@ -1,5 +1,5 @@
 /** Agent type classification */
-export type AgentType = "LLM" | "Task" | "Execution";
+export type AgentType = 'LLM' | 'Task' | 'Execution';
 
 /** Capability pricing; every field is explicit. */
 export interface Pricing {

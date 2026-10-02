@@ -53,7 +53,7 @@ export async function createProofRecord(input: ProofRecordInput): Promise<ProofR
       input.token_mint,
       input.is_compliant,
       input.verified_at,
-    ]
+    ],
   );
 
   logger.info('Proof record created', {
@@ -67,38 +67,35 @@ export async function createProofRecord(input: ProofRecordInput): Promise<ProofR
 export async function getProofRecordsByOperatorAndPeriod(
   operatorId: string,
   periodStart: Date,
-  periodEnd: Date
+  periodEnd: Date,
 ): Promise<ProofRecord[]> {
   const result = await query<ProofRecordRow>(
     `SELECT * FROM proof_records
      WHERE operator_id = $1 AND verified_at >= $2 AND verified_at < $3
      ORDER BY verified_at ASC`,
-    [operatorId, periodStart, periodEnd]
+    [operatorId, periodStart, periodEnd],
   );
   return result.rows.map(rowToProofRecord);
 }
 
 export async function getProofRecordById(id: string): Promise<ProofRecord | null> {
-  const result = await query<ProofRecordRow>(
-    'SELECT * FROM proof_records WHERE id = $1',
-    [id]
-  );
+  const result = await query<ProofRecordRow>('SELECT * FROM proof_records WHERE id = $1', [id]);
   return result.rows.length > 0 ? rowToProofRecord(result.rows[0]) : null;
 }
 
 export async function getProofRecordsByOperator(
   operatorId: string,
   page: number,
-  limit: number
+  limit: number,
 ): Promise<{ records: ProofRecord[]; total: number }> {
   const offset = (page - 1) * limit;
   const countResult = await query<{ count: string }>(
     'SELECT COUNT(*) as count FROM proof_records WHERE operator_id = $1',
-    [operatorId]
+    [operatorId],
   );
   const result = await query<ProofRecordRow>(
     'SELECT * FROM proof_records WHERE operator_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3',
-    [operatorId, limit, offset]
+    [operatorId, limit, offset],
   );
   return {
     records: result.rows.map(rowToProofRecord),
@@ -106,23 +103,17 @@ export async function getProofRecordsByOperator(
   };
 }
 
-export async function updateProofTxSignature(
-  id: string,
-  txSignature: string
-): Promise<ProofRecord | null> {
-  const result = await query<ProofRecordRow>(
-    'UPDATE proof_records SET tx_signature = $1 WHERE id = $2 RETURNING *',
-    [txSignature, id]
-  );
+export async function updateProofTxSignature(id: string, txSignature: string): Promise<ProofRecord | null> {
+  const result = await query<ProofRecordRow>('UPDATE proof_records SET tx_signature = $1 WHERE id = $2 RETURNING *', [
+    txSignature,
+    id,
+  ]);
   if (result.rows.length === 0) return null;
   logger.info('Proof tx_signature updated', { proof_id: id, tx_signature: txSignature });
   return rowToProofRecord(result.rows[0]);
 }
 
 export async function getProofRecordByPaymentId(paymentId: string): Promise<ProofRecord | null> {
-  const result = await query<ProofRecordRow>(
-    'SELECT * FROM proof_records WHERE payment_id = $1',
-    [paymentId]
-  );
+  const result = await query<ProofRecordRow>('SELECT * FROM proof_records WHERE payment_id = $1', [paymentId]);
   return result.rows.length > 0 ? rowToProofRecord(result.rows[0]) : null;
 }

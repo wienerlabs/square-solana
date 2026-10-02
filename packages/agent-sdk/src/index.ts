@@ -27,14 +27,7 @@
  * ```
  */
 
-export { createAgent } from "./agent";
-export type { Agent } from "./agent";
-export { haiku } from "./haiku";
-export type {
-  AgentOptions,
-  AgentCard,
-  AgentLogger,
-  AgentType,
-  CapabilityConfig,
-  Pricing,
-} from "./types";
+export { createAgent } from './agent';
+export type { Agent } from './agent';
+export { haiku } from './haiku';
+export type { AgentOptions, AgentCard, AgentLogger, AgentType, CapabilityConfig, Pricing } from './types';

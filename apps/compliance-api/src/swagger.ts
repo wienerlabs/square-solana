@@ -7,7 +7,8 @@ const options: swaggerJsdoc.Options = {
     info: {
       title: 'Aperture Compliance API',
       version: packageInfo.version,
-      description: 'Batch attestation service for Aperture ZK compliance layer. Aggregates proof records into operator attestations.',
+      description:
+        'Batch attestation service for Aperture ZK compliance layer. Aggregates proof records into operator attestations.',
       contact: {
         name: 'Aperture Team',
       },
@@ -18,8 +19,15 @@ const options: swaggerJsdoc.Options = {
         ProofRecordInput: {
           type: 'object',
           required: [
-            'operator_id', 'policy_id', 'payment_id', 'proof_hash',
-            'amount_range_min', 'amount_range_max', 'token_mint', 'is_compliant', 'verified_at',
+            'operator_id',
+            'policy_id',
+            'payment_id',
+            'proof_hash',
+            'amount_range_min',
+            'amount_range_max',
+            'token_mint',
+            'is_compliant',
+            'verified_at',
           ],
           properties: {
             operator_id: { type: 'string', format: 'uuid' },

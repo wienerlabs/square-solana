@@ -81,9 +81,7 @@ export async function fetchEnhancedTransactions(
   const res = await fetch(url);
   if (!res.ok) {
     const body = await res.text().catch(() => '');
-    throw new Error(
-      `Helius enhanced-transactions HTTP ${res.status} for ${address}: ${body.slice(0, 240)}`,
-    );
+    throw new Error(`Helius enhanced-transactions HTTP ${res.status} for ${address}: ${body.slice(0, 240)}`);
   }
   const json = (await res.json()) as unknown;
   if (!Array.isArray(json)) {

@@ -22,19 +22,15 @@ import { swaggerSpec } from './swagger.js';
 const app = express();
 
 app.use(helmet());
-app.use(cors({
-  origin: [...config.corsOrigins],
-  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: [
-    'Content-Type',
-    'Authorization',
-    'x-402-payment',
-    'x-mpp-credential',
-    'x-aperture-proof-record',
-  ],
-  exposedHeaders: ['WWW-Authenticate', 'Payment-Receipt'],
-  credentials: true,
-}));
+app.use(
+  cors({
+    origin: [...config.corsOrigins],
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'x-402-payment', 'x-mpp-credential', 'x-aperture-proof-record'],
+    exposedHeaders: ['WWW-Authenticate', 'Payment-Receipt'],
+    credentials: true,
+  }),
+);
 // Stripe webhook MUST mount before express.json — Stripe-Signature is HMAC'd
 // over the unparsed request body, and the json parser would consume it.
 app.use('/api/v1/mpp', stripeWebhookRouter);

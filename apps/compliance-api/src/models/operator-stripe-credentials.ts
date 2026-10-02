@@ -33,13 +33,8 @@ function rowToView(r: Row): OperatorStripeCredentials {
   };
 }
 
-export async function getOperatorStripeCredentials(
-  operatorId: string,
-): Promise<OperatorStripeCredentials | null> {
-  const result = await query<Row>(
-    'SELECT * FROM operator_stripe_credentials WHERE operator_id = $1',
-    [operatorId],
-  );
+export async function getOperatorStripeCredentials(operatorId: string): Promise<OperatorStripeCredentials | null> {
+  const result = await query<Row>('SELECT * FROM operator_stripe_credentials WHERE operator_id = $1', [operatorId]);
   if (result.rows.length === 0) return null;
   return rowToView(result.rows[0]);
 }
@@ -70,13 +65,7 @@ export async function upsertOperatorStripeCredentials(input: {
        card_last4 = EXCLUDED.card_last4,
        updated_at = NOW()
      RETURNING *`,
-    [
-      input.operator_id,
-      input.stripe_customer_id,
-      input.stripe_payment_method_id,
-      input.card_brand,
-      input.card_last4,
-    ],
+    [input.operator_id, input.stripe_customer_id, input.stripe_payment_method_id, input.card_brand, input.card_last4],
   );
   logger.info('OperatorStripeCredentials persisted', {
     operator_id: input.operator_id,
@@ -86,12 +75,7 @@ export async function upsertOperatorStripeCredentials(input: {
   return rowToView(result.rows[0]);
 }
 
-export async function deleteOperatorStripeCredentials(
-  operatorId: string,
-): Promise<boolean> {
-  const result = await query(
-    'DELETE FROM operator_stripe_credentials WHERE operator_id = $1',
-    [operatorId],
-  );
+export async function deleteOperatorStripeCredentials(operatorId: string): Promise<boolean> {
+  const result = await query('DELETE FROM operator_stripe_credentials WHERE operator_id = $1', [operatorId]);
   return (result.rowCount ?? 0) > 0;
 }

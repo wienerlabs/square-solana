@@ -136,9 +136,7 @@ export interface ListUnattestedResult {
   readonly total: number;
 }
 
-export async function listUnattestedPayments(
-  filter: ListUnattestedFilter,
-): Promise<ListUnattestedResult> {
+export async function listUnattestedPayments(filter: ListUnattestedFilter): Promise<ListUnattestedResult> {
   const page = Math.max(1, filter.page ?? 1);
   const limit = Math.min(100, Math.max(1, filter.limit ?? 50));
   const offset = (page - 1) * limit;
@@ -175,13 +173,8 @@ export async function listUnattestedPayments(
   return { records: dataResult.rows.map(rowToView), total };
 }
 
-export async function getUnattestedPayment(
-  id: string,
-): Promise<UnattestedPayment | null> {
-  const result = await query<Row>(
-    'SELECT * FROM unattested_payments WHERE id = $1',
-    [id],
-  );
+export async function getUnattestedPayment(id: string): Promise<UnattestedPayment | null> {
+  const result = await query<Row>('SELECT * FROM unattested_payments WHERE id = $1', [id]);
   return result.rows.length === 0 ? null : rowToView(result.rows[0]);
 }
 
@@ -192,9 +185,7 @@ export interface ResolveUnattestedInput {
   readonly note: string | null;
 }
 
-export async function resolveUnattestedPayment(
-  input: ResolveUnattestedInput,
-): Promise<UnattestedPayment | null> {
+export async function resolveUnattestedPayment(input: ResolveUnattestedInput): Promise<UnattestedPayment | null> {
   const result = await query<Row>(
     `UPDATE unattested_payments
        SET status = $2,
@@ -221,9 +212,7 @@ export interface UnattestedSummary {
   readonly total: number;
 }
 
-export async function summarizeUnattestedByOperator(
-  operatorId: string,
-): Promise<UnattestedSummary> {
+export async function summarizeUnattestedByOperator(operatorId: string): Promise<UnattestedSummary> {
   const result = await query<{ status: UnattestedStatus; count: string }>(
     `SELECT status, COUNT(*)::text AS count
        FROM unattested_payments

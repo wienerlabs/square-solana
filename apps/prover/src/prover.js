@@ -64,18 +64,9 @@ function validateRequest(req) {
 export async function generateProof(request) {
   validateRequest(request);
 
-  const tokens = await padAddressList(
-    request.token_whitelist ?? [],
-    MAX_WHITELIST,
-  );
-  const blocked = await padAddressList(
-    request.blocked_addresses ?? [],
-    MAX_BLOCKED,
-  );
-  const categories = await padCategoryList(
-    request.allowed_endpoint_categories ?? [],
-    MAX_CATEGORIES,
-  );
+  const tokens = await padAddressList(request.token_whitelist ?? [], MAX_WHITELIST);
+  const blocked = await padAddressList(request.blocked_addresses ?? [], MAX_BLOCKED);
+  const categories = await padCategoryList(request.allowed_endpoint_categories ?? [], MAX_CATEGORIES);
 
   // Time restriction. Default = inactive (no time gate). The circuit MUX
   // forces hash(time) == 0 when time_active == 0, so the off-chain backend's
@@ -133,11 +124,7 @@ export async function generateProof(request) {
     stripe_receipt_hash_in: String(request.stripe_receipt_hash ?? '0'),
   };
 
-  const { proof, publicSignals } = await snarkjs.groth16.fullProve(
-    circuitInput,
-    WASM_PATH,
-    ZKEY_PATH,
-  );
+  const { proof, publicSignals } = await snarkjs.groth16.fullProve(circuitInput, WASM_PATH, ZKEY_PATH);
 
   // publicSignals layout (matches payment.circom output order):
   //   [0] is_compliant
@@ -152,7 +139,7 @@ export async function generateProof(request) {
   if (publicSignals.length !== 10) {
     throw new Error(
       `Circuit produced ${publicSignals.length} public signals, expected 10 — ` +
-      `circuit and prover-service are out of sync.`
+        `circuit and prover-service are out of sync.`,
     );
   }
   const [
@@ -170,9 +157,7 @@ export async function generateProof(request) {
 
   const encoded = encodeForGroth16Solana(proof, publicSignals);
 
-  const policyDataHashHex = BigInt(policyDataHashStr)
-    .toString(16)
-    .padStart(64, '0');
+  const policyDataHashHex = BigInt(policyDataHashStr).toString(16).padStart(64, '0');
 
   return {
     is_compliant: isCompliantStr === '1',

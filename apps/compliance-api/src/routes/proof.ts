@@ -14,20 +14,22 @@ import {
 
 const router = Router();
 
-const ProofRecordInputSchema = z.object({
-  operator_id: z.string().min(1).max(64),
-  policy_id: z.string().min(1).max(64),
-  payment_id: z.string().min(1),
-  proof_hash: z.string().length(64),
-  amount_range_min: z.number().nonnegative().finite(),
-  amount_range_max: z.number().nonnegative().finite(),
-  token_mint: z.string().min(1),
-  is_compliant: z.boolean(),
-  verified_at: z.coerce.date(),
-}).refine(
-  (data) => data.amount_range_max >= data.amount_range_min,
-  { message: 'amount_range_max must be >= amount_range_min', path: ['amount_range_max'] }
-);
+const ProofRecordInputSchema = z
+  .object({
+    operator_id: z.string().min(1).max(64),
+    policy_id: z.string().min(1).max(64),
+    payment_id: z.string().min(1),
+    proof_hash: z.string().length(64),
+    amount_range_min: z.number().nonnegative().finite(),
+    amount_range_max: z.number().nonnegative().finite(),
+    token_mint: z.string().min(1),
+    is_compliant: z.boolean(),
+    verified_at: z.coerce.date(),
+  })
+  .refine((data) => data.amount_range_max >= data.amount_range_min, {
+    message: 'amount_range_max must be >= amount_range_min',
+    path: ['amount_range_max'],
+  });
 
 const UUIDSchema = z.string().uuid();
 

@@ -93,9 +93,7 @@ const EnvSchema = z
 function loadEnv(): z.infer<typeof EnvSchema> {
   const parsed = EnvSchema.safeParse(process.env);
   if (!parsed.success) {
-    const problems = parsed.error.issues
-      .map((issue) => `  ${issue.path.join('.')}: ${issue.message}`)
-      .join('\n');
+    const problems = parsed.error.issues.map((issue) => `  ${issue.path.join('.')}: ${issue.message}`).join('\n');
     throw new Error(`Invalid compliance-api environment:\n${problems}`);
   }
   return parsed.data;

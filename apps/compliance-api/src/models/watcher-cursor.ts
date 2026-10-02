@@ -28,14 +28,11 @@ function rowToView(r: Row): WatcherCursor {
   };
 }
 
-export async function getWatcherCursor(
-  operatorId: string,
-  source: WatcherSource,
-): Promise<WatcherCursor | null> {
-  const result = await query<Row>(
-    `SELECT * FROM watcher_cursors WHERE operator_id = $1 AND source = $2`,
-    [operatorId, source],
-  );
+export async function getWatcherCursor(operatorId: string, source: WatcherSource): Promise<WatcherCursor | null> {
+  const result = await query<Row>(`SELECT * FROM watcher_cursors WHERE operator_id = $1 AND source = $2`, [
+    operatorId,
+    source,
+  ]);
   return result.rows.length === 0 ? null : rowToView(result.rows[0]);
 }
 
@@ -46,9 +43,7 @@ export interface UpsertWatcherCursorInput {
   readonly lastBlockTime: Date | null;
 }
 
-export async function upsertWatcherCursor(
-  input: UpsertWatcherCursorInput,
-): Promise<WatcherCursor> {
+export async function upsertWatcherCursor(input: UpsertWatcherCursorInput): Promise<WatcherCursor> {
   const result = await query<Row>(
     `INSERT INTO watcher_cursors (operator_id, source, last_signature, last_block_time, updated_at)
      VALUES ($1, $2, $3, $4, NOW())

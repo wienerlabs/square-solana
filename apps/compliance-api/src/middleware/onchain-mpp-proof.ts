@@ -39,10 +39,10 @@ function getConnection(): Connection {
 // + 32 journal_digest + 8 timestamp + 1 verified + 1 consumed
 // + 32 recipient + 32 token_mint + 8 amount_lamports + 1 bump
 const OFF_OPERATOR = 8;
-const OFF_VERIFIED = 8 + 32 + 32 + 32 + 32 + 32 + 8;            // 176
-const OFF_CONSUMED = OFF_VERIFIED + 1;                          // 177
-const OFF_RECIPIENT = OFF_CONSUMED + 1;                         // 178
-const OFF_AMOUNT = OFF_RECIPIENT + 32 + 32;                     // 242
+const OFF_VERIFIED = 8 + 32 + 32 + 32 + 32 + 32 + 8; // 176
+const OFF_CONSUMED = OFF_VERIFIED + 1; // 177
+const OFF_RECIPIENT = OFF_CONSUMED + 1; // 178
+const OFF_AMOUNT = OFF_RECIPIENT + 32 + 32; // 242
 
 export interface OnchainMppProofView {
   readonly proofRecordPubkey: string;
@@ -53,11 +53,7 @@ export interface OnchainMppProofView {
 }
 
 export function requireOnchainMppProof() {
-  return async (
-    req: Request,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> => {
+  return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     const proofRecordHeader = req.header('x-aperture-proof-record');
     if (!proofRecordHeader) {
       res.status(402).json({
@@ -82,10 +78,7 @@ export function requireOnchainMppProof() {
     }
 
     try {
-      const accountInfo = await getConnection().getAccountInfo(
-        proofRecordPubkey,
-        'confirmed',
-      );
+      const accountInfo = await getConnection().getAccountInfo(proofRecordPubkey, 'confirmed');
       if (!accountInfo) {
         res.status(402).json({
           success: false,

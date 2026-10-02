@@ -14,10 +14,7 @@ const router = Router();
 
 function pagination(req: Request): { page: number; limit: number } {
   const page = Math.max(1, parseInt((req.query.page as string) ?? '1', 10) || 1);
-  const limit = Math.min(
-    100,
-    Math.max(1, parseInt((req.query.limit as string) ?? '50', 10) || 50),
-  );
+  const limit = Math.min(100, Math.max(1, parseInt((req.query.limit as string) ?? '50', 10) || 50));
   return { page, limit };
 }
 
@@ -39,8 +36,7 @@ function parseSource(raw: unknown): UnattestedSource | undefined {
 router.get('/', async (req: Request, res: Response, next) => {
   try {
     const { page, limit } = pagination(req);
-    const operatorId =
-      typeof req.query.operator_id === 'string' ? req.query.operator_id : undefined;
+    const operatorId = typeof req.query.operator_id === 'string' ? req.query.operator_id : undefined;
     const status = parseStatus(req.query.status);
     const source = parseSource(req.query.source);
     const result = await listUnattestedPayments({

@@ -81,13 +81,10 @@ export async function upsertVerifiedPaymentIntent(
   return rowToView(result.rows[0]);
 }
 
-export async function getVerifiedPaymentIntent(
-  paymentIntentId: string,
-): Promise<VerifiedPaymentIntent | null> {
-  const result = await query<Row>(
-    `SELECT * FROM verified_payment_intents WHERE stripe_payment_intent_id = $1`,
-    [paymentIntentId],
-  );
+export async function getVerifiedPaymentIntent(paymentIntentId: string): Promise<VerifiedPaymentIntent | null> {
+  const result = await query<Row>(`SELECT * FROM verified_payment_intents WHERE stripe_payment_intent_id = $1`, [
+    paymentIntentId,
+  ]);
   if (result.rows.length === 0) return null;
   return rowToView(result.rows[0]);
 }

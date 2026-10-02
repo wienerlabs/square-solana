@@ -17,10 +17,7 @@ pool.on('error', (err) => {
   console.error('Unexpected database pool error:', err.message);
 });
 
-export async function query<T extends pg.QueryResultRow>(
-  text: string,
-  params?: unknown[]
-): Promise<pg.QueryResult<T>> {
+export async function query<T extends pg.QueryResultRow>(text: string, params?: unknown[]): Promise<pg.QueryResult<T>> {
   const start = Date.now();
   const result = await pool.query<T>(text, params);
   const duration = Date.now() - start;
@@ -32,9 +29,7 @@ export async function getClient(): Promise<pg.PoolClient> {
   return pool.connect();
 }
 
-export async function transaction<T>(
-  fn: (client: pg.PoolClient) => Promise<T>
-): Promise<T> {
+export async function transaction<T>(fn: (client: pg.PoolClient) => Promise<T>): Promise<T> {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
