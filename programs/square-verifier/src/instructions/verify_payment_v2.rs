@@ -142,6 +142,12 @@ pub fn handler(
     proof_c: [u8; 64],
     public_inputs: [[u8; 32]; PAYMENT_NR_INPUTS],
 ) -> Result<()> {
+    // BC-11: fails closed; see `TRANSFER_HOOK_PATHS_ENABLED`.
+    require!(
+        super::TRANSFER_HOOK_PATHS_ENABLED,
+        VerifierV2Error::TransferHookPathRemoved
+    );
+
     // 1. Cryptographic Groth16 verification via alt_bn128 syscalls.
     let mut verifier = Groth16Verifier::<PAYMENT_NR_INPUTS>::new(
         &proof_a,
@@ -328,4 +334,6 @@ pub enum VerifierV2Error {
     PendingProofAlreadySet,
     #[msg("Proof carries a Stripe receipt hash; this Solana-flow instruction does not accept MPP proofs")]
     StripeReceiptUnexpected,
+    #[msg("Transfer-hook payment path was removed (BC-11); use set_compliance_proof (BC-21)")]
+    TransferHookPathRemoved,
 }

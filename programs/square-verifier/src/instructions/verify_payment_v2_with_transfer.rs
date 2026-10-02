@@ -208,6 +208,12 @@ pub fn handler<'info>(
     public_inputs: [[u8; 32]; PAYMENT_NR_INPUTS],
     transfer_amount: u64,
 ) -> Result<()> {
+    // BC-11: fails closed; see `TRANSFER_HOOK_PATHS_ENABLED`.
+    require!(
+        super::TRANSFER_HOOK_PATHS_ENABLED,
+        VerifyWithTransferError::TransferHookPathRemoved
+    );
+
     // ---- 0. Account program-owner pinning ------------------------------
     // Accept either SPL Token (Token-1) or SPL Token-2022. The token_program
     // account passed by the caller decides which CPI we issue, and the
@@ -498,4 +504,6 @@ pub enum VerifyWithTransferError {
     TokenAccountTooShort,
     #[msg("Mint account data is shorter than the SPL Token-2022 layout requires")]
     MintDataTooShort,
+    #[msg("Transfer-hook payment path was removed (BC-11); use set_compliance_proof (BC-21)")]
+    TransferHookPathRemoved,
 }

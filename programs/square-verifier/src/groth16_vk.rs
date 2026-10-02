@@ -134,20 +134,3 @@ pub const APERTURE_PAYMENT_VK: Groth16Verifyingkey = Groth16Verifyingkey {
     ],
     vk_ic: &APERTURE_PAYMENT_VK_IC,
 };
-
-// Placeholder VK for the batch-aggregator circuit. The Circom version of
-// the batch aggregator does not exist yet; the corresponding v2 instruction
-// remains in the program for shape-compatibility but will fail-closed
-// against this zeroed VK until the circuit ships.
-pub const BATCH_NR_INPUTS: usize = 2;
-
-const APERTURE_BATCH_VK_IC: [[u8; 64]; 3] = [[0u8; 64]; 3];
-
-pub const APERTURE_BATCH_VK: Groth16Verifyingkey = Groth16Verifyingkey {
-    nr_pubinputs: BATCH_NR_INPUTS,
-    vk_alpha_g1: [0u8; 64],
-    vk_beta_g2: [0u8; 128],
-    vk_gamme_g2: [0u8; 128],
-    vk_delta_g2: [0u8; 128],
-    vk_ic: &APERTURE_BATCH_VK_IC,
-};
