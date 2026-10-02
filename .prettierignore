@@ -1,0 +1,15 @@
+# Üretilen dosyalar, derleme çıktıları ve taşınan kaynaklar biçimlendirilmez.
+node_modules
+dist
+target
+.turbo
+pnpm-lock.yaml
+packages/types/src/generated
+packages/sdk/src/idl
+docs/api/schemas
+idl
+programs
+circuits
+interfaces
+*.md
+docs/did-aip

@@ -1,6 +1,6 @@
 // Elle yazılan zod şemaları ile docs/api/openapi.yaml bileşenlerinin birebir aynı olduğunu denetler.
 // IDL kaynaklı şemalar üreteçle (gen:check) denetlenir; bu test el yazımı yüzeyi kapsar.
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { parse } from 'yaml';
@@ -75,7 +75,10 @@ test('IDL şemaları: her hesap, event ve instruction için OpenAPI şeması var
   for (const program of Object.values(t.IDL_PROGRAMS)) {
     for (const name of [...program.accounts, ...program.events]) assert.ok(idlSchemas[name], name);
     for (const ix of program.instructions) {
-      const pascal = ix.split('_').map((w) => w[0].toUpperCase() + w.slice(1)).join('');
+      const pascal = ix
+        .split('_')
+        .map((w) => w[0].toUpperCase() + w.slice(1))
+        .join('');
       assert.ok(idlSchemas[`${pascal}Args`], `${pascal}Args`);
     }
   }

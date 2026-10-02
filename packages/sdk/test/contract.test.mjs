@@ -1,4 +1,4 @@
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { parse } from 'yaml';
@@ -6,7 +6,9 @@ import * as sdk from '../dist/index.js';
 
 const spec = parse(readFileSync(new URL('../../../docs/api/openapi.yaml', import.meta.url), 'utf8'));
 const operationIds = Object.values(spec.paths).flatMap((item) =>
-  Object.values(item).filter((op) => op && typeof op === 'object' && 'operationId' in op).map((op) => op.operationId),
+  Object.values(item)
+    .filter((op) => op && typeof op === 'object' && 'operationId' in op)
+    .map((op) => op.operationId),
 );
 
 test('SquareApi metotları OpenAPI operationId listesiyle aynı', () => {
@@ -15,7 +17,9 @@ test('SquareApi metotları OpenAPI operationId listesiyle aynı', () => {
 
 test('SQUARE_IDLS, idl/ dosyalarıyla aynı', () => {
   for (const program of ['registry', 'policy', 'verifier', 'escrow']) {
-    const idl = JSON.parse(readFileSync(new URL(`../../../idl/square_${program}_contract.json`, import.meta.url), 'utf8'));
+    const idl = JSON.parse(
+      readFileSync(new URL(`../../../idl/square_${program}_contract.json`, import.meta.url), 'utf8'),
+    );
     assert.equal(sdk.SQUARE_IDLS[program].address, idl.address);
     assert.equal(sdk.SQUARE_IDLS[program].metadata.name, idl.metadata.name);
     assert.equal(sdk.SQUARE_IDLS[program].instructions.length, idl.instructions.length);

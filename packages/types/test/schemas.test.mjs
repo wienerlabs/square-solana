@@ -1,4 +1,4 @@
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import * as t from '../dist/index.js';
 
@@ -43,8 +43,15 @@ test('InstructionCall: IDL argümanlarıyla doğrulanır', () => {
 test('envelopeSchema: başarı ve hata kolları', () => {
   const env = t.envelopeSchema(t.HealthSchema);
   const meta = { requestId: 'r1', page: null, limit: null, total: null };
-  assert.ok(env.safeParse({ success: true, data: { status: 'ok', version: '0.1.0', checks: {} }, error: null, meta }).success);
-  const error = { code: 'program_error', message: 'x', programError: { program: 'escrow', code: 6000, name: 'InvalidStatus' }, details: null };
+  assert.ok(
+    env.safeParse({ success: true, data: { status: 'ok', version: '0.1.0', checks: {} }, error: null, meta }).success,
+  );
+  const error = {
+    code: 'program_error',
+    message: 'x',
+    programError: { program: 'escrow', code: 6000, name: 'InvalidStatus' },
+    details: null,
+  };
   assert.ok(env.safeParse({ success: false, data: null, error, meta }).success);
   assert.ok(!env.safeParse({ success: true, data: null, error, meta }).success);
 });
