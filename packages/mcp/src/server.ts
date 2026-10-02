@@ -22,14 +22,15 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { loadConfig } from "./config.js";
+import { packageInfo } from "./package-info.js";
 import { registerDiscoveryTools } from "./tools/discover.js";
 
 async function main(): Promise<void> {
   const config = loadConfig();
 
   const server = new McpServer({
-    name: "covenant-mcp",
-    version: "0.1.0",
+    name: packageInfo.name,
+    version: packageInfo.version,
   });
 
   // v0.1: read-only discovery tools (no wallet required).
@@ -41,13 +42,13 @@ async function main(): Promise<void> {
   // stderr is safe to log to under stdio transport; stdout is the
   // JSON-RPC channel and must not be polluted.
   process.stderr.write(
-    `covenant-mcp v0.1.0 connected. network=${config.network} api=${config.baseUrl}\n`,
+    `${packageInfo.name} v${packageInfo.version} connected. network=${config.network} api=${config.baseUrl}\n`,
   );
 }
 
 main().catch((err) => {
   process.stderr.write(
-    `covenant-mcp fatal: ${err instanceof Error ? err.stack ?? err.message : String(err)}\n`,
+    `${packageInfo.name} fatal: ${err instanceof Error ? err.stack ?? err.message : String(err)}\n`,
   );
   process.exit(1);
 });

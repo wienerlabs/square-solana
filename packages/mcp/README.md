@@ -26,11 +26,12 @@ Every tool description teaches the model the settlement semantics (per-job PDA e
 
 ## Install
 
-```bash
-npm install -g covenant-mcp
-```
+Built inside the Square monorepo (not published to npm yet; see BE-28):
 
-Or run without installing via npx (used in the config below).
+```bash
+pnpm install
+pnpm --filter @squaresdk/solana-mcp build
+```
 
 ## Use with Claude Desktop
 
@@ -43,11 +44,12 @@ Add this to your Claude Desktop MCP config:
 {
   "mcpServers": {
     "covenant": {
-      "command": "npx",
-      "args": ["-y", "covenant-mcp"],
+      "command": "node",
+      "args": ["<repo>/packages/mcp/dist/server.js"],
       "env": {
-        "COVENANT_API_URL": "https://www.covenant.run",
-        "COVENANT_NETWORK": "devnet"
+        "COVENANT_API_URL": "<API base URL>",
+        "COVENANT_NETWORK": "<cluster label>",
+        "COVENANT_TIMEOUT_MS": "<ms>"
       }
     }
   }
@@ -64,7 +66,9 @@ Restart Claude Desktop. You will see a tool icon; ask Claude things like:
 ## Use with Claude Code
 
 ```bash
-claude mcp add covenant -- npx -y covenant-mcp
+claude mcp add covenant \
+  -e COVENANT_API_URL=<API base URL> -e COVENANT_NETWORK=<cluster label> -e COVENANT_TIMEOUT_MS=<ms> \
+  -- node <repo>/packages/mcp/dist/server.js
 ```
 
 ## Use with Cursor
@@ -75,8 +79,13 @@ Add to `.cursor/mcp.json` in your project, or the global Cursor MCP settings:
 {
   "mcpServers": {
     "covenant": {
-      "command": "npx",
-      "args": ["-y", "covenant-mcp"]
+      "command": "node",
+      "args": ["<repo>/packages/mcp/dist/server.js"],
+      "env": {
+        "COVENANT_API_URL": "<API base URL>",
+        "COVENANT_NETWORK": "<cluster label>",
+        "COVENANT_TIMEOUT_MS": "<ms>"
+      }
     }
   }
 }
@@ -84,20 +93,21 @@ Add to `.cursor/mcp.json` in your project, or the global Cursor MCP settings:
 
 ## Configuration
 
-| Env var | Default | Purpose |
-|---|---|---|
-| `COVENANT_API_URL` | `https://www.covenant.run` | Base URL of the Covenant API. Point at a local dev server or a future mainnet endpoint with no code change. |
-| `COVENANT_NETWORK` | `devnet` | Network label surfaced back to the agent. |
-| `COVENANT_TIMEOUT_MS` | `15000` | Per-request timeout. |
+All three variables are required; the server exits with an error when one is missing.
+
+| Env var | Purpose |
+|---|---|
+| `COVENANT_API_URL` | Base URL of the Covenant API. |
+| `COVENANT_NETWORK` | Network label surfaced back to the agent. |
+| `COVENANT_TIMEOUT_MS` | Per-request timeout. |
 
 ## Local development
 
 ```bash
-git clone https://github.com/wienerlabs/covenant.git
-cd covenant/mcp
-npm install
-npm run build
-node dist/server.js   # speaks MCP over stdio
+pnpm install
+pnpm --filter @squaresdk/solana-mcp build
+COVENANT_API_URL=<API base URL> COVENANT_NETWORK=<cluster label> COVENANT_TIMEOUT_MS=<ms> \
+  node packages/mcp/dist/server.js   # speaks MCP over stdio
 ```
 
 Quick stdio smoke test:
@@ -107,7 +117,8 @@ printf '%s\n' \
   '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"smoke","version":"0"}}}' \
   '{"jsonrpc":"2.0","method":"notifications/initialized"}' \
   '{"jsonrpc":"2.0","id":2,"method":"tools/list"}' \
-  | node dist/server.js
+  | COVENANT_API_URL=<API base URL> COVENANT_NETWORK=<cluster label> COVENANT_TIMEOUT_MS=<ms> \
+    node packages/mcp/dist/server.js
 ```
 
 ## License
