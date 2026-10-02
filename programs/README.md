@@ -17,8 +17,8 @@ Square'in Anchor programları. Tek Anchor workspace'inde derlenir; programlar bi
   instruction'ları geçmişle birlikte geldi ve [BC-11] ile kaldırıldı.
 - Tek Anchor sürümü [BC-08], yeni program ID'leri ve 2-of-3 Squads upgrade authority [BC-09].
 - Dış arayüz sözleşmesi (instruction / account / PDA / event) [BC-44] ile önce sabitlenir:
-  [`docs/design/program-interface.md`](../docs/design/program-interface.md). Gövdesiz stub'lar taşınan
-  programlarla çakışmasın diye bu dizinin dışında, `interfaces/` altında; IDL'leri `idl/` altında durur.
+  [`docs/design/program-interface.md`](../docs/design/program-interface.md). Sözleşmenin tek kaynağı
+  [`idl/`](../idl/) altındaki IDL'lerdir.
 - Paylaşılan seed'ler, roller, hata kodları ve event tipleri [`crates/square-common`](../crates/).
 
 [BC-04]: https://github.com/wienerlabs/square-solana/issues/4
