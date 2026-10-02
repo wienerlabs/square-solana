@@ -59,11 +59,6 @@ export const config = {
     secretKey: requireEnv('MPP_SECRET_KEY'),
     realm: optionalEnv('MPP_REALM', 'aperture-compliance'),
   },
-  light: {
-    rpcUrl: optionalEnv('LIGHT_RPC_URL', ''),
-    compressedMint: optionalEnv('COMPRESSED_ATTESTATION_MINT', ''),
-    payerPrivateKey: optionalEnv('LIGHT_PAYER_PRIVATE_KEY', ''),
-  },
   /// Helius credentials power the unattested-payment watcher. Without an
   /// API key the watcher logs a one-time warning and stays idle so the
   /// rest of the compliance-api keeps working; an explicit failure mode

@@ -10,7 +10,6 @@ import attestationRouter from './routes/attestation.js';
 import complianceReportRouter from './routes/compliance-report.js';
 import mppReportRouter from './routes/mpp-report.js';
 import healthRouter from './routes/health.js';
-import compressedAttestationRouter from './routes/compressed-attestation.js';
 import stripeWebhookRouter from './routes/stripe-webhook.js';
 import mppProtectedServiceRouter from './routes/mpp-protected-service.js';
 import mppPublicConfigRouter from './routes/mpp-public-config.js';
@@ -62,7 +61,6 @@ app.use('/api/v1/compliance', mppProtectedServiceRouter);
 app.use('/api/v1/compliance', mppPublicConfigRouter);
 app.use('/api/v1', agentStripeRouter);
 app.use('/api/v1/compliance', verifiedPaymentRouter);
-app.use('/api/v1/compliance', compressedAttestationRouter);
 app.use('/api/v1/unattested-payments', unattestedPaymentsRouter);
 
 app.use(errorHandler);
