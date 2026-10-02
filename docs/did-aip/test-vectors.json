@@ -1,0 +1,1050 @@
+{
+  "$comment": [
+    "Machine-readable form of Appendix A of method-spec-v2-solana.md.",
+    "Everything except v1.records is synthetic and needs no network: keys are Ed25519 public keys derived from SHA-256(\"did:aip solana profile test vector / <label>\") as private seeds, record addresses come from `solana find-program-derived-address`, card hashes are SHA-256 over the exact UTF-8 bytes of agentCardBody.",
+    "registry is a test program id, not a deployed program. Vectors for the deployed square_registry are added when it has an id (BC-09).",
+    "v1.records is a snapshot of Solana devnet, not a fixture: v1 records are mutable and may be closed. A test that asserts them must read the chain."
+  ],
+  "specVersion": "2.0-solana",
+  "chains": {
+    "mainnet": {
+      "caip2": "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp",
+      "chainRef": "5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp"
+    },
+    "devnet": {
+      "caip2": "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1",
+      "chainRef": "EtWTRABZaYq6iMfeYKouRu166VU2xqa1"
+    },
+    "testnet": {
+      "caip2": "solana:4uhcVJyU9pJkvQyS88uRDiswHXSCkY3z",
+      "chainRef": "4uhcVJyU9pJkvQyS88uRDiswHXSCkY3z"
+    }
+  },
+  "registry": "4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK",
+  "keys": [
+    {
+      "label": "owner-a",
+      "address": "uRBJTVBUYM4H5dQHSUWSU5VaxJK8ApMBAQdHm1fDCuM",
+      "hex": "0d6d8a2eaec93cac00e797a7a3b32ed1b9032dee78b9f96a7ef4100f7fdc8fa8",
+      "onCurve": true,
+      "publicKeyMultibase": "z6MkfMgDthjcp5qXPaU6y1SMHZdVQXaAY44hsBKZ82yg8Rgj",
+      "didKey": "did:key:z6MkfMgDthjcp5qXPaU6y1SMHZdVQXaAY44hsBKZ82yg8Rgj"
+    },
+    {
+      "label": "owner-b",
+      "address": "9JeqKarf1k7TDwf2U3PrjEasY9k8mk5GFd3VRizQ9aZN",
+      "hex": "7b6325aede1800fda0ba2712c0b148da827531af926c83e47aeec290b4822389",
+      "onCurve": true,
+      "publicKeyMultibase": "z6Mknkusuq76MHbvLSVj9cMhaL8sMj1zBdKcwdxRFzxR4oLk",
+      "didKey": "did:key:z6Mknkusuq76MHbvLSVj9cMhaL8sMj1zBdKcwdxRFzxR4oLk"
+    },
+    {
+      "label": "wallet-c",
+      "address": "9ekwKFUJptrPB6WaizbKMsBcqynzZUAZdfVpPWqzY1Rd",
+      "hex": "8089aa1a06f8777413acbdbaa9f291ce93dde097c78afd9d8fc82857997b223c",
+      "onCurve": true,
+      "publicKeyMultibase": "z6Mko71yuVikASLrHbMHQZZACxjcfZ4qyMQvKgQkDnp1TED1",
+      "didKey": "did:key:z6Mko71yuVikASLrHbMHQZZACxjcfZ4qyMQvKgQkDnp1TED1"
+    },
+    {
+      "label": "vault-b (PDA of wallet program, seeds [\"vault\", owner-b])",
+      "address": "HLEdiAAXJFxLWs46LgVoXJW2RCxD7WTUiM3Km8CHD394",
+      "hex": "f2a870e4c827d1825c2cd70c00036cb9cf94809735f87aaebd25a0adff07fc9b",
+      "onCurve": false
+    },
+    {
+      "label": "vault-institution (PDA of wallet program, seeds [\"vault\", \"institution\"])",
+      "address": "C3KH2UYKoD1PtxX3nzaErA6zya9TXVtfKRjNKv9UW33m",
+      "hex": "a4086204dfa364b62f975648f8aea2f0598a7fa8bc80004e64eb0f984e82f060",
+      "onCurve": false
+    }
+  ],
+  "didKeyDecoding": {
+    "$comment": "A did:key decoder must strip the multibase prefix \"z\" before base58-decoding, then check and drop the 0xed01 multicodec prefix. Decoding \"z6Mk…\" whole and dropping two bytes (covenant app/lib/aip/did.ts resolveDID, did.slice(8)) returns naiveWrongResult instead of publicKey.",
+    "didKey": "did:key:z6MkfMgDthjcp5qXPaU6y1SMHZdVQXaAY44hsBKZ82yg8Rgj",
+    "publicKey": "uRBJTVBUYM4H5dQHSUWSU5VaxJK8ApMBAQdHm1fDCuM",
+    "naiveWrongResult": "24Sosyc4HTsUWSBK3GWyZKHc1qJ1hQSe3BbxDTLGvrm9cdu"
+  },
+  "derivation": {
+    "$comment": "agentRecord = find_program_address([\"agent\", registrant, agent_id], registry). The DID uses the record address, never the slug.",
+    "cases": [
+      {
+        "chainRef": "EtWTRABZaYq6iMfeYKouRu166VU2xqa1",
+        "registry": "4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK",
+        "registrant": "uRBJTVBUYM4H5dQHSUWSU5VaxJK8ApMBAQdHm1fDCuM",
+        "agentId": "scribe",
+        "agentRecord": "4VqS6uu2WPDR6EjpXDBKZxs9tjwc4WtksjXziWXcd6zk",
+        "bump": 255,
+        "did": "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:4VqS6uu2WPDR6EjpXDBKZxs9tjwc4WtksjXziWXcd6zk"
+      },
+      {
+        "chainRef": "5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp",
+        "registry": "4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK",
+        "registrant": "uRBJTVBUYM4H5dQHSUWSU5VaxJK8ApMBAQdHm1fDCuM",
+        "agentId": "scribe",
+        "agentRecord": "4VqS6uu2WPDR6EjpXDBKZxs9tjwc4WtksjXziWXcd6zk",
+        "bump": 255,
+        "did": "did:aip:solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:4VqS6uu2WPDR6EjpXDBKZxs9tjwc4WtksjXziWXcd6zk"
+      },
+      {
+        "chainRef": "EtWTRABZaYq6iMfeYKouRu166VU2xqa1",
+        "registry": "4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK",
+        "registrant": "9JeqKarf1k7TDwf2U3PrjEasY9k8mk5GFd3VRizQ9aZN",
+        "agentId": "ada-research-001",
+        "agentRecord": "DMKXywzzYsD1ZXunrZQWpXddvnWyNMPDftZKSWxKq8EP",
+        "bump": 254,
+        "did": "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:DMKXywzzYsD1ZXunrZQWpXddvnWyNMPDftZKSWxKq8EP"
+      },
+      {
+        "chainRef": "EtWTRABZaYq6iMfeYKouRu166VU2xqa1",
+        "registry": "4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK",
+        "registrant": "C3KH2UYKoD1PtxX3nzaErA6zya9TXVtfKRjNKv9UW33m",
+        "agentId": "treasury-agent",
+        "agentRecord": "ZbBgQ6ZxwQLFMFw159YwAppe8cgM3gfdtARdJnG6eoF",
+        "bump": 255,
+        "did": "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:ZbBgQ6ZxwQLFMFw159YwAppe8cgM3gfdtARdJnG6eoF"
+      },
+      {
+        "chainRef": "EtWTRABZaYq6iMfeYKouRu166VU2xqa1",
+        "registry": "4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK",
+        "registrant": "uRBJTVBUYM4H5dQHSUWSU5VaxJK8ApMBAQdHm1fDCuM",
+        "agentId": "retired-agent",
+        "agentRecord": "4pudpBMWjSuXKogfSaue2H5SvoSdnvHRhH2FrQvDyTBW",
+        "bump": 255,
+        "did": "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:4pudpBMWjSuXKogfSaue2H5SvoSdnvHRhH2FrQvDyTBW"
+      },
+      {
+        "chainRef": "EtWTRABZaYq6iMfeYKouRu166VU2xqa1",
+        "registry": "4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK",
+        "registrant": "uRBJTVBUYM4H5dQHSUWSU5VaxJK8ApMBAQdHm1fDCuM",
+        "agentId": "transferred-agent",
+        "agentRecord": "AUZasaHCAj9619JwyVoXvLbDRy94f21kZcxQjg16uk5",
+        "bump": 255,
+        "did": "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:AUZasaHCAj9619JwyVoXvLbDRy94f21kZcxQjg16uk5"
+      },
+      {
+        "chainRef": "EtWTRABZaYq6iMfeYKouRu166VU2xqa1",
+        "registry": "4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK",
+        "registrant": "9JeqKarf1k7TDwf2U3PrjEasY9k8mk5GFd3VRizQ9aZN",
+        "agentId": "a-32-character-agent-slug-000001",
+        "agentRecord": "FkYUGZCAK7L96yHEiG6VxMZmrQvobvCavDBRk4FQBLpG",
+        "bump": 254,
+        "did": "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:FkYUGZCAK7L96yHEiG6VxMZmrQvobvCavDBRk4FQBLpG"
+      }
+    ]
+  },
+  "parse": {
+    "valid": [
+      {
+        "did": "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:4VqS6uu2WPDR6EjpXDBKZxs9tjwc4WtksjXziWXcd6zk",
+        "version": 2,
+        "namespace": "solana",
+        "chainRef": "EtWTRABZaYq6iMfeYKouRu166VU2xqa1",
+        "registry": "4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK",
+        "agentRecord": "4VqS6uu2WPDR6EjpXDBKZxs9tjwc4WtksjXziWXcd6zk",
+        "agentRegistry": "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK",
+        "$comment": "Devnet."
+      },
+      {
+        "did": "did:aip:solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:4VqS6uu2WPDR6EjpXDBKZxs9tjwc4WtksjXziWXcd6zk",
+        "version": 2,
+        "namespace": "solana",
+        "chainRef": "5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp",
+        "registry": "4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK",
+        "agentRecord": "4VqS6uu2WPDR6EjpXDBKZxs9tjwc4WtksjXziWXcd6zk",
+        "agentRegistry": "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK",
+        "$comment": "Mainnet. The same program id and seeds give the same record address on every cluster; only chain-ref tells the two apart, so this is a different DID from the devnet one."
+      },
+      {
+        "did": "did:aip:solana:4uhcVJyU9pJkvQyS88uRDiswHXSCkY3z:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:4VqS6uu2WPDR6EjpXDBKZxs9tjwc4WtksjXziWXcd6zk",
+        "version": 2,
+        "namespace": "solana",
+        "chainRef": "4uhcVJyU9pJkvQyS88uRDiswHXSCkY3z",
+        "registry": "4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK",
+        "agentRecord": "4VqS6uu2WPDR6EjpXDBKZxs9tjwc4WtksjXziWXcd6zk",
+        "agentRegistry": "solana:4uhcVJyU9pJkvQyS88uRDiswHXSCkY3z:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK",
+        "$comment": "Well-formed. Whether it resolves depends on the resolver having a testnet endpoint; without one the result is unsupportedChain, not invalidDid."
+      },
+      {
+        "did": "did:aip:eip155:5042002:0x8004a818bfb912233c491871b3d84c89a494bd9e:2",
+        "version": 2,
+        "namespace": "eip155",
+        "$comment": "Four segments, namespace eip155: parsed and resolved per method-spec-v2 §3.2, not by this profile."
+      },
+      {
+        "did": "did:aip:7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU:ada-research-001",
+        "version": 1,
+        "ownerPubkey": "7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU",
+        "agentId": "ada-research-001",
+        "$comment": "Two segments: v1 (method-spec-v2 §9.1). The example DID of the v1 specification."
+      },
+      {
+        "did": "did:aip:GgpgQDxRnuucbim3n7UPMkXQ8ExEZ1TAH9yLQedSkPpv:cue",
+        "version": 1,
+        "ownerPubkey": "GgpgQDxRnuucbim3n7UPMkXQ8ExEZ1TAH9yLQedSkPpv",
+        "agentId": "cue",
+        "$comment": "Two segments: v1. A live devnet record, see v1.records."
+      }
+    ],
+    "rejected": [
+      {
+        "did": "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:4VqS6uu2WPDR6EjpXDBKZxs9tjwc4WtksjXziWXcd6zk",
+        "error": "invalidDid",
+        "reason": "chain-ref is 31 characters; a CAIP-2 Solana reference is exactly 32"
+      },
+      {
+        "did": "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1w:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:4VqS6uu2WPDR6EjpXDBKZxs9tjwc4WtksjXziWXcd6zk",
+        "error": "invalidDid",
+        "reason": "chain-ref is 33 characters; a CAIP-2 Solana reference is exactly 32"
+      },
+      {
+        "did": "did:aip:solana:devnet:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:4VqS6uu2WPDR6EjpXDBKZxs9tjwc4WtksjXziWXcd6zk",
+        "error": "invalidDid",
+        "reason": "chain-ref is a cluster name, not a CAIP-2 reference"
+      },
+      {
+        "did": "did:aip:solana:EtWTR0BZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:4VqS6uu2WPDR6EjpXDBKZxs9tjwc4WtksjXziWXcd6zk",
+        "error": "invalidDid",
+        "reason": "chain-ref contains '0', which is outside the base58 alphabet"
+      },
+      {
+        "did": "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:0x8004a818bfb912233c491871b3d84c89a494bd9e:4VqS6uu2WPDR6EjpXDBKZxs9tjwc4WtksjXziWXcd6zk",
+        "error": "invalidDid",
+        "reason": "registry is an EVM address, not a base58 program id"
+      },
+      {
+        "did": "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4uQeVj5tqViQh7yWWGStvkEG1Zmhx6uasJtWCJziofL:4VqS6uu2WPDR6EjpXDBKZxs9tjwc4WtksjXziWXcd6zk",
+        "error": "invalidDid",
+        "reason": "registry has a valid length (43) but decodes to 31 bytes"
+      },
+      {
+        "did": "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:1ZbBgQ6ZxwQLFMFw159YwAppe8cgM3gfdtARdJnG6eoF",
+        "error": "invalidDid",
+        "reason": "agent-record decodes to 33 bytes: a leading '1' is a leading zero byte, so this is not the canonical encoding of a 32-byte address"
+      },
+      {
+        "did": "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK",
+        "error": "invalidDid",
+        "reason": "three segments"
+      },
+      {
+        "did": "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:uRBJTVBUYM4H5dQHSUWSU5VaxJK8ApMBAQdHm1fDCuM:scribe",
+        "error": "invalidDid",
+        "reason": "five segments: the owner-scoped slug is not the agent identifier; the record address is"
+      },
+      {
+        "did": "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:",
+        "error": "invalidDid",
+        "reason": "empty agent-record segment"
+      },
+      {
+        "did": "did:aip:Solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:4VqS6uu2WPDR6EjpXDBKZxs9tjwc4WtksjXziWXcd6zk",
+        "error": "invalidDid",
+        "reason": "namespace is case-sensitive and must be lowercase \"solana\""
+      },
+      {
+        "did": "did:aip:7imsPo1o:audit-agent",
+        "error": "invalidDid",
+        "reason": "legacy AIP short form (8-character owner prefix): not a v1 DID, see §9.4"
+      },
+      {
+        "did": "did:aip:platform:orchestrator",
+        "error": "invalidDid",
+        "reason": "AIP platform-internal identifier, never anchored on-chain; 'l' is outside the base58 alphabet"
+      },
+      {
+        "did": "did:aip:hosted:my-agent",
+        "error": "invalidDid",
+        "reason": "AIP hosted-agent identifier, never anchored on-chain; owner segment is not a 32-byte key"
+      },
+      {
+        "did": "did:aip:4uQeVj5tqViQh7yWWGStvkEG1Zmhx6uasJtWCJziofL:scribe",
+        "error": "invalidDid",
+        "reason": "v1 owner segment has a valid length but decodes to 31 bytes"
+      },
+      {
+        "did": "did:aip:uRBJTVBUYM4H5dQHSUWSU5VaxJK8ApMBAQdHm1fDCuM:has.dot",
+        "error": "invalidDid",
+        "reason": "v1 agent-id contains '.'"
+      },
+      {
+        "did": "did:aip:uRBJTVBUYM4H5dQHSUWSU5VaxJK8ApMBAQdHm1fDCuM:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "error": "invalidDid",
+        "reason": "v1 agent-id is 33 characters"
+      },
+      {
+        "did": "did:key:z6MkfMgDthjcp5qXPaU6y1SMHZdVQXaAY44hsBKZ82yg8Rgj",
+        "error": "invalidDid",
+        "reason": "not a did:aip identifier; a multi-method resolver dispatches did:key to its own method"
+      }
+    ],
+    "agentRegistry": [
+      {
+        "agentRegistry": "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK",
+        "agentId": "4VqS6uu2WPDR6EjpXDBKZxs9tjwc4WtksjXziWXcd6zk",
+        "did": "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:4VqS6uu2WPDR6EjpXDBKZxs9tjwc4WtksjXziWXcd6zk"
+      }
+    ]
+  },
+  "documents": {
+    "$comment": "Inline resolution cases at a fixed slot. record is the logical AgentRecord view of §4.1; agentCardBody is what the card URI serves (null: unreachable).",
+    "cases": [
+      {
+        "name": "active-verified-card",
+        "$comment": "Owner and agent wallet are the same on-curve key: both verification methods are present (method-spec-v2 §4.6 applies). The card hash matches, so card services are emitted; the DID self-reference is dropped.",
+        "did": "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:4VqS6uu2WPDR6EjpXDBKZxs9tjwc4WtksjXziWXcd6zk",
+        "slot": 412345678,
+        "record": {
+          "registrant": "uRBJTVBUYM4H5dQHSUWSU5VaxJK8ApMBAQdHm1fDCuM",
+          "agentId": "scribe",
+          "bump": 255,
+          "owner": "uRBJTVBUYM4H5dQHSUWSU5VaxJK8ApMBAQdHm1fDCuM",
+          "agentWallet": "uRBJTVBUYM4H5dQHSUWSU5VaxJK8ApMBAQdHm1fDCuM",
+          "agentCardUri": "https://scribe.example/.well-known/aip-card.json",
+          "agentCardHash": "7fe8d9018df3e9263925583853844f50d6445edd0e10907af7e3aed06664ba28",
+          "status": "active",
+          "registeredAt": 1790000000,
+          "updatedAt": 1790086400
+        },
+        "agentCardBody": "{\n  \"type\": \"https://eips.ethereum.org/EIPS/eip-8004#registration-v1\",\n  \"name\": \"Scribe\",\n  \"description\": \"Drafts and summarises documents.\",\n  \"services\": [\n    {\n      \"name\": \"A2A\",\n      \"endpoint\": \"https://scribe.example/a2a\",\n      \"version\": \"0.3.0\"\n    },\n    {\n      \"name\": \"MCP\",\n      \"endpoint\": \"https://scribe.example/mcp\"\n    },\n    {\n      \"name\": \"DID\",\n      \"endpoint\": \"did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:4VqS6uu2WPDR6EjpXDBKZxs9tjwc4WtksjXziWXcd6zk\"\n    }\n  ],\n  \"x402Support\": true,\n  \"active\": true\n}\n",
+        "expected": {
+          "didDocument": {
+            "@context": [
+              "https://www.w3.org/ns/did/v1",
+              "https://w3id.org/security/suites/ed25519-2020/v1"
+            ],
+            "id": "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:4VqS6uu2WPDR6EjpXDBKZxs9tjwc4WtksjXziWXcd6zk",
+            "controller": "did:pkh:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:uRBJTVBUYM4H5dQHSUWSU5VaxJK8ApMBAQdHm1fDCuM",
+            "verificationMethod": [
+              {
+                "id": "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:4VqS6uu2WPDR6EjpXDBKZxs9tjwc4WtksjXziWXcd6zk#owner",
+                "type": "Ed25519VerificationKey2020",
+                "controller": "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:4VqS6uu2WPDR6EjpXDBKZxs9tjwc4WtksjXziWXcd6zk",
+                "publicKeyMultibase": "z6MkfMgDthjcp5qXPaU6y1SMHZdVQXaAY44hsBKZ82yg8Rgj"
+              },
+              {
+                "id": "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:4VqS6uu2WPDR6EjpXDBKZxs9tjwc4WtksjXziWXcd6zk#agent-wallet",
+                "type": "Ed25519VerificationKey2020",
+                "controller": "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:4VqS6uu2WPDR6EjpXDBKZxs9tjwc4WtksjXziWXcd6zk",
+                "publicKeyMultibase": "z6MkfMgDthjcp5qXPaU6y1SMHZdVQXaAY44hsBKZ82yg8Rgj"
+              }
+            ],
+            "authentication": [
+              "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:4VqS6uu2WPDR6EjpXDBKZxs9tjwc4WtksjXziWXcd6zk#owner"
+            ],
+            "capabilityInvocation": [
+              "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:4VqS6uu2WPDR6EjpXDBKZxs9tjwc4WtksjXziWXcd6zk#owner"
+            ],
+            "assertionMethod": [
+              "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:4VqS6uu2WPDR6EjpXDBKZxs9tjwc4WtksjXziWXcd6zk#owner",
+              "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:4VqS6uu2WPDR6EjpXDBKZxs9tjwc4WtksjXziWXcd6zk#agent-wallet"
+            ],
+            "service": [
+              {
+                "id": "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:4VqS6uu2WPDR6EjpXDBKZxs9tjwc4WtksjXziWXcd6zk#agent-card",
+                "type": "AIPAgentCard",
+                "serviceEndpoint": "https://scribe.example/.well-known/aip-card.json"
+              },
+              {
+                "id": "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:4VqS6uu2WPDR6EjpXDBKZxs9tjwc4WtksjXziWXcd6zk#a2a",
+                "type": "A2A",
+                "serviceEndpoint": "https://scribe.example/a2a"
+              },
+              {
+                "id": "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:4VqS6uu2WPDR6EjpXDBKZxs9tjwc4WtksjXziWXcd6zk#mcp",
+                "type": "MCP",
+                "serviceEndpoint": "https://scribe.example/mcp"
+              }
+            ]
+          },
+          "didResolutionMetadata": {
+            "contentType": "application/did+ld+json"
+          },
+          "didDocumentMetadata": {
+            "versionId": "412345678",
+            "created": "2026-09-21T14:13:20Z",
+            "updated": "2026-09-22T14:13:20Z",
+            "agentRegistry": "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK",
+            "owner": "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:uRBJTVBUYM4H5dQHSUWSU5VaxJK8ApMBAQdHm1fDCuM",
+            "agentWallet": "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:uRBJTVBUYM4H5dQHSUWSU5VaxJK8ApMBAQdHm1fDCuM",
+            "agentCardUriScheme": "https",
+            "agentCard": "verified"
+          }
+        }
+      },
+      {
+        "name": "off-curve-wallet-and-slug-collision",
+        "$comment": "The agent wallet is a program-derived address (standing in for a smart-account vault): it has no private key, so it is not a verification method; it stays visible in didDocumentMetadata.agentWallet. A card service named \"Agent Card\" slugs to the reserved #agent-card and becomes #agent-card-2. The DID entry naming the v1 predecessor is not a self-reference and is kept.",
+        "did": "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:DMKXywzzYsD1ZXunrZQWpXddvnWyNMPDftZKSWxKq8EP",
+        "slot": 412345678,
+        "record": {
+          "registrant": "9JeqKarf1k7TDwf2U3PrjEasY9k8mk5GFd3VRizQ9aZN",
+          "agentId": "ada-research-001",
+          "bump": 254,
+          "owner": "9JeqKarf1k7TDwf2U3PrjEasY9k8mk5GFd3VRizQ9aZN",
+          "agentWallet": "HLEdiAAXJFxLWs46LgVoXJW2RCxD7WTUiM3Km8CHD394",
+          "agentCardUri": "ipfs://bafkreihjvafff2lfkdpfl5rhhy4xswcwbmftlrwvdjzd7jrit54gci6ifq",
+          "agentCardHash": "e9a80a52e96550de55f6273e397958560b0b35c6d51a723fa6289f786123c82c",
+          "status": "active",
+          "registeredAt": 1790000000,
+          "updatedAt": 1790086400
+        },
+        "agentCardBody": "{\n  \"type\": \"https://eips.ethereum.org/EIPS/eip-8004#registration-v1\",\n  \"name\": \"Ada Research\",\n  \"description\": \"Research agent, migrated from did:aip v1.\",\n  \"services\": [\n    {\n      \"name\": \"A2A\",\n      \"endpoint\": \"https://ada.example/a2a\"\n    },\n    {\n      \"name\": \"Agent Card\",\n      \"endpoint\": \"https://ada.example/.well-known/agent-card.json\"\n    },\n    {\n      \"name\": \"DID\",\n      \"endpoint\": \"did:aip:7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU:ada-research-001\"\n    }\n  ]\n}\n",
+        "expected": {
+          "didDocument": {
+            "@context": [
+              "https://www.w3.org/ns/did/v1",
+              "https://w3id.org/security/suites/ed25519-2020/v1"
+            ],
+            "id": "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:DMKXywzzYsD1ZXunrZQWpXddvnWyNMPDftZKSWxKq8EP",
+            "controller": "did:pkh:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:9JeqKarf1k7TDwf2U3PrjEasY9k8mk5GFd3VRizQ9aZN",
+            "verificationMethod": [
+              {
+                "id": "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:DMKXywzzYsD1ZXunrZQWpXddvnWyNMPDftZKSWxKq8EP#owner",
+                "type": "Ed25519VerificationKey2020",
+                "controller": "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:DMKXywzzYsD1ZXunrZQWpXddvnWyNMPDftZKSWxKq8EP",
+                "publicKeyMultibase": "z6Mknkusuq76MHbvLSVj9cMhaL8sMj1zBdKcwdxRFzxR4oLk"
+              }
+            ],
+            "authentication": [
+              "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:DMKXywzzYsD1ZXunrZQWpXddvnWyNMPDftZKSWxKq8EP#owner"
+            ],
+            "capabilityInvocation": [
+              "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:DMKXywzzYsD1ZXunrZQWpXddvnWyNMPDftZKSWxKq8EP#owner"
+            ],
+            "assertionMethod": [
+              "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:DMKXywzzYsD1ZXunrZQWpXddvnWyNMPDftZKSWxKq8EP#owner"
+            ],
+            "service": [
+              {
+                "id": "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:DMKXywzzYsD1ZXunrZQWpXddvnWyNMPDftZKSWxKq8EP#agent-card",
+                "type": "AIPAgentCard",
+                "serviceEndpoint": "ipfs://bafkreihjvafff2lfkdpfl5rhhy4xswcwbmftlrwvdjzd7jrit54gci6ifq"
+              },
+              {
+                "id": "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:DMKXywzzYsD1ZXunrZQWpXddvnWyNMPDftZKSWxKq8EP#a2a",
+                "type": "A2A",
+                "serviceEndpoint": "https://ada.example/a2a"
+              },
+              {
+                "id": "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:DMKXywzzYsD1ZXunrZQWpXddvnWyNMPDftZKSWxKq8EP#agent-card-2",
+                "type": "Agent Card",
+                "serviceEndpoint": "https://ada.example/.well-known/agent-card.json"
+              },
+              {
+                "id": "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:DMKXywzzYsD1ZXunrZQWpXddvnWyNMPDftZKSWxKq8EP#did",
+                "type": "DID",
+                "serviceEndpoint": "did:aip:7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU:ada-research-001"
+              }
+            ]
+          },
+          "didResolutionMetadata": {
+            "contentType": "application/did+ld+json"
+          },
+          "didDocumentMetadata": {
+            "versionId": "412345678",
+            "created": "2026-09-21T14:13:20Z",
+            "updated": "2026-09-22T14:13:20Z",
+            "agentRegistry": "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK",
+            "owner": "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:9JeqKarf1k7TDwf2U3PrjEasY9k8mk5GFd3VRizQ9aZN",
+            "agentWallet": "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:HLEdiAAXJFxLWs46LgVoXJW2RCxD7WTUiM3Km8CHD394",
+            "agentCardUriScheme": "ipfs",
+            "agentCard": "verified"
+          }
+        }
+      },
+      {
+        "name": "card-hash-mismatch",
+        "$comment": "The served card differs from the one whose hash is on-chain. Nothing from the card is used; #agent-card stays because the URI itself is on-chain state.",
+        "did": "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:4VqS6uu2WPDR6EjpXDBKZxs9tjwc4WtksjXziWXcd6zk",
+        "slot": 412345678,
+        "record": {
+          "registrant": "uRBJTVBUYM4H5dQHSUWSU5VaxJK8ApMBAQdHm1fDCuM",
+          "agentId": "scribe",
+          "bump": 255,
+          "owner": "uRBJTVBUYM4H5dQHSUWSU5VaxJK8ApMBAQdHm1fDCuM",
+          "agentWallet": "uRBJTVBUYM4H5dQHSUWSU5VaxJK8ApMBAQdHm1fDCuM",
+          "agentCardUri": "https://scribe.example/.well-known/aip-card.json",
+          "agentCardHash": "7fe8d9018df3e9263925583853844f50d6445edd0e10907af7e3aed06664ba28",
+          "status": "active",
+          "registeredAt": 1790000000,
+          "updatedAt": 1790086400
+        },
+        "agentCardBody": "{\n  \"type\": \"https://eips.ethereum.org/EIPS/eip-8004#registration-v1\",\n  \"name\": \"Scribe\",\n  \"description\": \"Drafts, summarises and signs documents.\",\n  \"services\": [\n    {\n      \"name\": \"A2A\",\n      \"endpoint\": \"https://scribe.example/a2a\",\n      \"version\": \"0.3.0\"\n    },\n    {\n      \"name\": \"MCP\",\n      \"endpoint\": \"https://scribe.example/mcp\"\n    },\n    {\n      \"name\": \"DID\",\n      \"endpoint\": \"did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:4VqS6uu2WPDR6EjpXDBKZxs9tjwc4WtksjXziWXcd6zk\"\n    }\n  ],\n  \"x402Support\": true,\n  \"active\": true\n}\n",
+        "expected": {
+          "didDocument": {
+            "@context": [
+              "https://www.w3.org/ns/did/v1",
+              "https://w3id.org/security/suites/ed25519-2020/v1"
+            ],
+            "id": "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:4VqS6uu2WPDR6EjpXDBKZxs9tjwc4WtksjXziWXcd6zk",
+            "controller": "did:pkh:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:uRBJTVBUYM4H5dQHSUWSU5VaxJK8ApMBAQdHm1fDCuM",
+            "verificationMethod": [
+              {
+                "id": "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:4VqS6uu2WPDR6EjpXDBKZxs9tjwc4WtksjXziWXcd6zk#owner",
+                "type": "Ed25519VerificationKey2020",
+                "controller": "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:4VqS6uu2WPDR6EjpXDBKZxs9tjwc4WtksjXziWXcd6zk",
+                "publicKeyMultibase": "z6MkfMgDthjcp5qXPaU6y1SMHZdVQXaAY44hsBKZ82yg8Rgj"
+              },
+              {
+                "id": "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:4VqS6uu2WPDR6EjpXDBKZxs9tjwc4WtksjXziWXcd6zk#agent-wallet",
+                "type": "Ed25519VerificationKey2020",
+                "controller": "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:4VqS6uu2WPDR6EjpXDBKZxs9tjwc4WtksjXziWXcd6zk",
+                "publicKeyMultibase": "z6MkfMgDthjcp5qXPaU6y1SMHZdVQXaAY44hsBKZ82yg8Rgj"
+              }
+            ],
+            "authentication": [
+              "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:4VqS6uu2WPDR6EjpXDBKZxs9tjwc4WtksjXziWXcd6zk#owner"
+            ],
+            "capabilityInvocation": [
+              "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:4VqS6uu2WPDR6EjpXDBKZxs9tjwc4WtksjXziWXcd6zk#owner"
+            ],
+            "assertionMethod": [
+              "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:4VqS6uu2WPDR6EjpXDBKZxs9tjwc4WtksjXziWXcd6zk#owner",
+              "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:4VqS6uu2WPDR6EjpXDBKZxs9tjwc4WtksjXziWXcd6zk#agent-wallet"
+            ],
+            "service": [
+              {
+                "id": "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:4VqS6uu2WPDR6EjpXDBKZxs9tjwc4WtksjXziWXcd6zk#agent-card",
+                "type": "AIPAgentCard",
+                "serviceEndpoint": "https://scribe.example/.well-known/aip-card.json"
+              }
+            ]
+          },
+          "didResolutionMetadata": {
+            "contentType": "application/did+ld+json",
+            "warnings": [
+              {
+                "code": "agentCardHashMismatch",
+                "message": "SHA-256 of https://scribe.example/.well-known/aip-card.json does not match agent_card_hash"
+              }
+            ]
+          },
+          "didDocumentMetadata": {
+            "versionId": "412345678",
+            "created": "2026-09-21T14:13:20Z",
+            "updated": "2026-09-22T14:13:20Z",
+            "agentRegistry": "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK",
+            "owner": "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:uRBJTVBUYM4H5dQHSUWSU5VaxJK8ApMBAQdHm1fDCuM",
+            "agentWallet": "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:uRBJTVBUYM4H5dQHSUWSU5VaxJK8ApMBAQdHm1fDCuM",
+            "agentCardUriScheme": "https",
+            "agentCard": "unverified"
+          }
+        }
+      },
+      {
+        "name": "card-unreachable",
+        "$comment": "agentCardBody null means the URI could not be dereferenced. A warning, not an error.",
+        "did": "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:4VqS6uu2WPDR6EjpXDBKZxs9tjwc4WtksjXziWXcd6zk",
+        "slot": 412345678,
+        "record": {
+          "registrant": "uRBJTVBUYM4H5dQHSUWSU5VaxJK8ApMBAQdHm1fDCuM",
+          "agentId": "scribe",
+          "bump": 255,
+          "owner": "uRBJTVBUYM4H5dQHSUWSU5VaxJK8ApMBAQdHm1fDCuM",
+          "agentWallet": "uRBJTVBUYM4H5dQHSUWSU5VaxJK8ApMBAQdHm1fDCuM",
+          "agentCardUri": "https://scribe.example/.well-known/aip-card.json",
+          "agentCardHash": "7fe8d9018df3e9263925583853844f50d6445edd0e10907af7e3aed06664ba28",
+          "status": "active",
+          "registeredAt": 1790000000,
+          "updatedAt": 1790086400
+        },
+        "agentCardBody": null,
+        "expected": {
+          "didDocument": {
+            "@context": [
+              "https://www.w3.org/ns/did/v1",
+              "https://w3id.org/security/suites/ed25519-2020/v1"
+            ],
+            "id": "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:4VqS6uu2WPDR6EjpXDBKZxs9tjwc4WtksjXziWXcd6zk",
+            "controller": "did:pkh:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:uRBJTVBUYM4H5dQHSUWSU5VaxJK8ApMBAQdHm1fDCuM",
+            "verificationMethod": [
+              {
+                "id": "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:4VqS6uu2WPDR6EjpXDBKZxs9tjwc4WtksjXziWXcd6zk#owner",
+                "type": "Ed25519VerificationKey2020",
+                "controller": "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:4VqS6uu2WPDR6EjpXDBKZxs9tjwc4WtksjXziWXcd6zk",
+                "publicKeyMultibase": "z6MkfMgDthjcp5qXPaU6y1SMHZdVQXaAY44hsBKZ82yg8Rgj"
+              },
+              {
+                "id": "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:4VqS6uu2WPDR6EjpXDBKZxs9tjwc4WtksjXziWXcd6zk#agent-wallet",
+                "type": "Ed25519VerificationKey2020",
+                "controller": "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:4VqS6uu2WPDR6EjpXDBKZxs9tjwc4WtksjXziWXcd6zk",
+                "publicKeyMultibase": "z6MkfMgDthjcp5qXPaU6y1SMHZdVQXaAY44hsBKZ82yg8Rgj"
+              }
+            ],
+            "authentication": [
+              "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:4VqS6uu2WPDR6EjpXDBKZxs9tjwc4WtksjXziWXcd6zk#owner"
+            ],
+            "capabilityInvocation": [
+              "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:4VqS6uu2WPDR6EjpXDBKZxs9tjwc4WtksjXziWXcd6zk#owner"
+            ],
+            "assertionMethod": [
+              "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:4VqS6uu2WPDR6EjpXDBKZxs9tjwc4WtksjXziWXcd6zk#owner",
+              "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:4VqS6uu2WPDR6EjpXDBKZxs9tjwc4WtksjXziWXcd6zk#agent-wallet"
+            ],
+            "service": [
+              {
+                "id": "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:4VqS6uu2WPDR6EjpXDBKZxs9tjwc4WtksjXziWXcd6zk#agent-card",
+                "type": "AIPAgentCard",
+                "serviceEndpoint": "https://scribe.example/.well-known/aip-card.json"
+              }
+            ]
+          },
+          "didResolutionMetadata": {
+            "contentType": "application/did+ld+json",
+            "warnings": [
+              {
+                "code": "agentCardUnreachable",
+                "message": "https://scribe.example/.well-known/aip-card.json could not be dereferenced"
+              }
+            ]
+          },
+          "didDocumentMetadata": {
+            "versionId": "412345678",
+            "created": "2026-09-21T14:13:20Z",
+            "updated": "2026-09-22T14:13:20Z",
+            "agentRegistry": "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK",
+            "owner": "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:uRBJTVBUYM4H5dQHSUWSU5VaxJK8ApMBAQdHm1fDCuM",
+            "agentWallet": "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:uRBJTVBUYM4H5dQHSUWSU5VaxJK8ApMBAQdHm1fDCuM",
+            "agentCardUriScheme": "https",
+            "agentCard": "unavailable"
+          }
+        }
+      },
+      {
+        "name": "card-invalid",
+        "$comment": "The served bytes match agent_card_hash, so the owner committed to them, but they are not a valid agent card (§5.5). Nothing from the card is used.",
+        "did": "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:4VqS6uu2WPDR6EjpXDBKZxs9tjwc4WtksjXziWXcd6zk",
+        "slot": 412345678,
+        "record": {
+          "registrant": "uRBJTVBUYM4H5dQHSUWSU5VaxJK8ApMBAQdHm1fDCuM",
+          "agentId": "scribe",
+          "bump": 255,
+          "owner": "uRBJTVBUYM4H5dQHSUWSU5VaxJK8ApMBAQdHm1fDCuM",
+          "agentWallet": "uRBJTVBUYM4H5dQHSUWSU5VaxJK8ApMBAQdHm1fDCuM",
+          "agentCardUri": "https://scribe.example/.well-known/aip-card.json",
+          "agentCardHash": "ab5eb4ef20d198fb3dc5f16a557ad4691f718ca3ee01c9352356e838de03a0a1",
+          "status": "active",
+          "registeredAt": 1790000000,
+          "updatedAt": 1790086400
+        },
+        "agentCardBody": "{\"services\": \"https://scribe.example/a2a\"}\n",
+        "expected": {
+          "didDocument": {
+            "@context": [
+              "https://www.w3.org/ns/did/v1",
+              "https://w3id.org/security/suites/ed25519-2020/v1"
+            ],
+            "id": "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:4VqS6uu2WPDR6EjpXDBKZxs9tjwc4WtksjXziWXcd6zk",
+            "controller": "did:pkh:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:uRBJTVBUYM4H5dQHSUWSU5VaxJK8ApMBAQdHm1fDCuM",
+            "verificationMethod": [
+              {
+                "id": "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:4VqS6uu2WPDR6EjpXDBKZxs9tjwc4WtksjXziWXcd6zk#owner",
+                "type": "Ed25519VerificationKey2020",
+                "controller": "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:4VqS6uu2WPDR6EjpXDBKZxs9tjwc4WtksjXziWXcd6zk",
+                "publicKeyMultibase": "z6MkfMgDthjcp5qXPaU6y1SMHZdVQXaAY44hsBKZ82yg8Rgj"
+              },
+              {
+                "id": "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:4VqS6uu2WPDR6EjpXDBKZxs9tjwc4WtksjXziWXcd6zk#agent-wallet",
+                "type": "Ed25519VerificationKey2020",
+                "controller": "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:4VqS6uu2WPDR6EjpXDBKZxs9tjwc4WtksjXziWXcd6zk",
+                "publicKeyMultibase": "z6MkfMgDthjcp5qXPaU6y1SMHZdVQXaAY44hsBKZ82yg8Rgj"
+              }
+            ],
+            "authentication": [
+              "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:4VqS6uu2WPDR6EjpXDBKZxs9tjwc4WtksjXziWXcd6zk#owner"
+            ],
+            "capabilityInvocation": [
+              "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:4VqS6uu2WPDR6EjpXDBKZxs9tjwc4WtksjXziWXcd6zk#owner"
+            ],
+            "assertionMethod": [
+              "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:4VqS6uu2WPDR6EjpXDBKZxs9tjwc4WtksjXziWXcd6zk#owner",
+              "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:4VqS6uu2WPDR6EjpXDBKZxs9tjwc4WtksjXziWXcd6zk#agent-wallet"
+            ],
+            "service": [
+              {
+                "id": "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:4VqS6uu2WPDR6EjpXDBKZxs9tjwc4WtksjXziWXcd6zk#agent-card",
+                "type": "AIPAgentCard",
+                "serviceEndpoint": "https://scribe.example/.well-known/aip-card.json"
+              }
+            ]
+          },
+          "didResolutionMetadata": {
+            "contentType": "application/did+ld+json",
+            "warnings": [
+              {
+                "code": "agentCardInvalid",
+                "message": "https://scribe.example/.well-known/aip-card.json matches agent_card_hash but is not a valid agent card"
+              }
+            ]
+          },
+          "didDocumentMetadata": {
+            "versionId": "412345678",
+            "created": "2026-09-21T14:13:20Z",
+            "updated": "2026-09-22T14:13:20Z",
+            "agentRegistry": "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK",
+            "owner": "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:uRBJTVBUYM4H5dQHSUWSU5VaxJK8ApMBAQdHm1fDCuM",
+            "agentWallet": "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:uRBJTVBUYM4H5dQHSUWSU5VaxJK8ApMBAQdHm1fDCuM",
+            "agentCardUriScheme": "https",
+            "agentCard": "invalid"
+          }
+        }
+      },
+      {
+        "name": "off-curve-owner-no-card",
+        "$comment": "The registrant and owner is a program-derived address (an institution's smart-account vault): no #owner verification method, so authentication and capabilityInvocation are empty; control is exercised on-chain through the owning program. The agent wallet is an ordinary key. No card.",
+        "did": "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:ZbBgQ6ZxwQLFMFw159YwAppe8cgM3gfdtARdJnG6eoF",
+        "slot": 412345678,
+        "record": {
+          "registrant": "C3KH2UYKoD1PtxX3nzaErA6zya9TXVtfKRjNKv9UW33m",
+          "agentId": "treasury-agent",
+          "bump": 255,
+          "owner": "C3KH2UYKoD1PtxX3nzaErA6zya9TXVtfKRjNKv9UW33m",
+          "agentWallet": "9ekwKFUJptrPB6WaizbKMsBcqynzZUAZdfVpPWqzY1Rd",
+          "agentCardUri": "",
+          "agentCardHash": "0000000000000000000000000000000000000000000000000000000000000000",
+          "status": "active",
+          "registeredAt": 1790000000,
+          "updatedAt": 1790086400
+        },
+        "agentCardBody": null,
+        "expected": {
+          "didDocument": {
+            "@context": [
+              "https://www.w3.org/ns/did/v1",
+              "https://w3id.org/security/suites/ed25519-2020/v1"
+            ],
+            "id": "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:ZbBgQ6ZxwQLFMFw159YwAppe8cgM3gfdtARdJnG6eoF",
+            "controller": "did:pkh:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:C3KH2UYKoD1PtxX3nzaErA6zya9TXVtfKRjNKv9UW33m",
+            "verificationMethod": [
+              {
+                "id": "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:ZbBgQ6ZxwQLFMFw159YwAppe8cgM3gfdtARdJnG6eoF#agent-wallet",
+                "type": "Ed25519VerificationKey2020",
+                "controller": "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:ZbBgQ6ZxwQLFMFw159YwAppe8cgM3gfdtARdJnG6eoF",
+                "publicKeyMultibase": "z6Mko71yuVikASLrHbMHQZZACxjcfZ4qyMQvKgQkDnp1TED1"
+              }
+            ],
+            "authentication": [],
+            "capabilityInvocation": [],
+            "assertionMethod": [
+              "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:ZbBgQ6ZxwQLFMFw159YwAppe8cgM3gfdtARdJnG6eoF#agent-wallet"
+            ],
+            "service": []
+          },
+          "didResolutionMetadata": {
+            "contentType": "application/did+ld+json"
+          },
+          "didDocumentMetadata": {
+            "versionId": "412345678",
+            "created": "2026-09-21T14:13:20Z",
+            "updated": "2026-09-22T14:13:20Z",
+            "agentRegistry": "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK",
+            "owner": "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:C3KH2UYKoD1PtxX3nzaErA6zya9TXVtfKRjNKv9UW33m",
+            "agentWallet": "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:9ekwKFUJptrPB6WaizbKMsBcqynzZUAZdfVpPWqzY1Rd",
+            "agentCard": "absent"
+          }
+        }
+      },
+      {
+        "name": "registry-deactivated",
+        "$comment": "status = deactivated is authoritative: the record is kept as a tombstone and the document carries no keys or services.",
+        "did": "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:4pudpBMWjSuXKogfSaue2H5SvoSdnvHRhH2FrQvDyTBW",
+        "slot": 412345678,
+        "record": {
+          "registrant": "uRBJTVBUYM4H5dQHSUWSU5VaxJK8ApMBAQdHm1fDCuM",
+          "agentId": "retired-agent",
+          "bump": 255,
+          "owner": "uRBJTVBUYM4H5dQHSUWSU5VaxJK8ApMBAQdHm1fDCuM",
+          "agentWallet": "uRBJTVBUYM4H5dQHSUWSU5VaxJK8ApMBAQdHm1fDCuM",
+          "agentCardUri": "https://scribe.example/.well-known/aip-card.json",
+          "agentCardHash": "7fe8d9018df3e9263925583853844f50d6445edd0e10907af7e3aed06664ba28",
+          "status": "deactivated",
+          "registeredAt": 1790000000,
+          "updatedAt": 1790086400
+        },
+        "agentCardBody": null,
+        "expected": {
+          "didDocument": {
+            "@context": [
+              "https://www.w3.org/ns/did/v1",
+              "https://w3id.org/security/suites/ed25519-2020/v1"
+            ],
+            "id": "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:4pudpBMWjSuXKogfSaue2H5SvoSdnvHRhH2FrQvDyTBW",
+            "controller": "did:pkh:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:uRBJTVBUYM4H5dQHSUWSU5VaxJK8ApMBAQdHm1fDCuM",
+            "verificationMethod": [],
+            "authentication": [],
+            "capabilityInvocation": [],
+            "assertionMethod": [],
+            "service": []
+          },
+          "didResolutionMetadata": {
+            "contentType": "application/did+ld+json"
+          },
+          "didDocumentMetadata": {
+            "versionId": "412345678",
+            "created": "2026-09-21T14:13:20Z",
+            "updated": "2026-09-22T14:13:20Z",
+            "agentRegistry": "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK",
+            "owner": "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:uRBJTVBUYM4H5dQHSUWSU5VaxJK8ApMBAQdHm1fDCuM",
+            "agentWallet": "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:uRBJTVBUYM4H5dQHSUWSU5VaxJK8ApMBAQdHm1fDCuM",
+            "deactivated": true,
+            "deactivation": "registry"
+          }
+        }
+      },
+      {
+        "name": "card-declares-inactive",
+        "$comment": "The card sets active: false. That is a claim by the owner, reversible by editing a file: the document is unchanged and the metadata says who deactivated.",
+        "did": "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:4VqS6uu2WPDR6EjpXDBKZxs9tjwc4WtksjXziWXcd6zk",
+        "slot": 412345678,
+        "record": {
+          "registrant": "uRBJTVBUYM4H5dQHSUWSU5VaxJK8ApMBAQdHm1fDCuM",
+          "agentId": "scribe",
+          "bump": 255,
+          "owner": "uRBJTVBUYM4H5dQHSUWSU5VaxJK8ApMBAQdHm1fDCuM",
+          "agentWallet": "uRBJTVBUYM4H5dQHSUWSU5VaxJK8ApMBAQdHm1fDCuM",
+          "agentCardUri": "https://scribe.example/.well-known/aip-card.json",
+          "agentCardHash": "1734d9573561b6c338473588c3d058b133ed807981326f7da275eac440928e04",
+          "status": "active",
+          "registeredAt": 1790000000,
+          "updatedAt": 1790086400
+        },
+        "agentCardBody": "{\n  \"type\": \"https://eips.ethereum.org/EIPS/eip-8004#registration-v1\",\n  \"name\": \"Scribe\",\n  \"description\": \"Paused.\",\n  \"services\": [\n    {\n      \"name\": \"A2A\",\n      \"endpoint\": \"https://scribe.example/a2a\"\n    }\n  ],\n  \"active\": false\n}\n",
+        "expected": {
+          "didDocument": {
+            "@context": [
+              "https://www.w3.org/ns/did/v1",
+              "https://w3id.org/security/suites/ed25519-2020/v1"
+            ],
+            "id": "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:4VqS6uu2WPDR6EjpXDBKZxs9tjwc4WtksjXziWXcd6zk",
+            "controller": "did:pkh:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:uRBJTVBUYM4H5dQHSUWSU5VaxJK8ApMBAQdHm1fDCuM",
+            "verificationMethod": [
+              {
+                "id": "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:4VqS6uu2WPDR6EjpXDBKZxs9tjwc4WtksjXziWXcd6zk#owner",
+                "type": "Ed25519VerificationKey2020",
+                "controller": "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:4VqS6uu2WPDR6EjpXDBKZxs9tjwc4WtksjXziWXcd6zk",
+                "publicKeyMultibase": "z6MkfMgDthjcp5qXPaU6y1SMHZdVQXaAY44hsBKZ82yg8Rgj"
+              },
+              {
+                "id": "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:4VqS6uu2WPDR6EjpXDBKZxs9tjwc4WtksjXziWXcd6zk#agent-wallet",
+                "type": "Ed25519VerificationKey2020",
+                "controller": "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:4VqS6uu2WPDR6EjpXDBKZxs9tjwc4WtksjXziWXcd6zk",
+                "publicKeyMultibase": "z6MkfMgDthjcp5qXPaU6y1SMHZdVQXaAY44hsBKZ82yg8Rgj"
+              }
+            ],
+            "authentication": [
+              "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:4VqS6uu2WPDR6EjpXDBKZxs9tjwc4WtksjXziWXcd6zk#owner"
+            ],
+            "capabilityInvocation": [
+              "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:4VqS6uu2WPDR6EjpXDBKZxs9tjwc4WtksjXziWXcd6zk#owner"
+            ],
+            "assertionMethod": [
+              "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:4VqS6uu2WPDR6EjpXDBKZxs9tjwc4WtksjXziWXcd6zk#owner",
+              "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:4VqS6uu2WPDR6EjpXDBKZxs9tjwc4WtksjXziWXcd6zk#agent-wallet"
+            ],
+            "service": [
+              {
+                "id": "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:4VqS6uu2WPDR6EjpXDBKZxs9tjwc4WtksjXziWXcd6zk#agent-card",
+                "type": "AIPAgentCard",
+                "serviceEndpoint": "https://scribe.example/.well-known/aip-card.json"
+              },
+              {
+                "id": "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:4VqS6uu2WPDR6EjpXDBKZxs9tjwc4WtksjXziWXcd6zk#a2a",
+                "type": "A2A",
+                "serviceEndpoint": "https://scribe.example/a2a"
+              }
+            ]
+          },
+          "didResolutionMetadata": {
+            "contentType": "application/did+ld+json"
+          },
+          "didDocumentMetadata": {
+            "versionId": "412345678",
+            "created": "2026-09-21T14:13:20Z",
+            "updated": "2026-09-22T14:13:20Z",
+            "agentRegistry": "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK",
+            "owner": "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:uRBJTVBUYM4H5dQHSUWSU5VaxJK8ApMBAQdHm1fDCuM",
+            "agentWallet": "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:uRBJTVBUYM4H5dQHSUWSU5VaxJK8ApMBAQdHm1fDCuM",
+            "agentCardUriScheme": "https",
+            "agentCard": "verified",
+            "deactivated": true,
+            "deactivation": "agentCard"
+          }
+        }
+      },
+      {
+        "name": "transferred-owner",
+        "$comment": "Ownership moved from the registrant (owner-a) to owner-b. The record address, and so the DID, still derive from the registrant; controller and #owner follow the current owner.",
+        "did": "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:AUZasaHCAj9619JwyVoXvLbDRy94f21kZcxQjg16uk5",
+        "slot": 412345678,
+        "record": {
+          "registrant": "uRBJTVBUYM4H5dQHSUWSU5VaxJK8ApMBAQdHm1fDCuM",
+          "agentId": "transferred-agent",
+          "bump": 255,
+          "owner": "9JeqKarf1k7TDwf2U3PrjEasY9k8mk5GFd3VRizQ9aZN",
+          "agentWallet": "9JeqKarf1k7TDwf2U3PrjEasY9k8mk5GFd3VRizQ9aZN",
+          "agentCardUri": "",
+          "agentCardHash": "0000000000000000000000000000000000000000000000000000000000000000",
+          "status": "active",
+          "registeredAt": 1790000000,
+          "updatedAt": 1790086400
+        },
+        "agentCardBody": null,
+        "expected": {
+          "didDocument": {
+            "@context": [
+              "https://www.w3.org/ns/did/v1",
+              "https://w3id.org/security/suites/ed25519-2020/v1"
+            ],
+            "id": "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:AUZasaHCAj9619JwyVoXvLbDRy94f21kZcxQjg16uk5",
+            "controller": "did:pkh:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:9JeqKarf1k7TDwf2U3PrjEasY9k8mk5GFd3VRizQ9aZN",
+            "verificationMethod": [
+              {
+                "id": "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:AUZasaHCAj9619JwyVoXvLbDRy94f21kZcxQjg16uk5#owner",
+                "type": "Ed25519VerificationKey2020",
+                "controller": "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:AUZasaHCAj9619JwyVoXvLbDRy94f21kZcxQjg16uk5",
+                "publicKeyMultibase": "z6Mknkusuq76MHbvLSVj9cMhaL8sMj1zBdKcwdxRFzxR4oLk"
+              },
+              {
+                "id": "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:AUZasaHCAj9619JwyVoXvLbDRy94f21kZcxQjg16uk5#agent-wallet",
+                "type": "Ed25519VerificationKey2020",
+                "controller": "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:AUZasaHCAj9619JwyVoXvLbDRy94f21kZcxQjg16uk5",
+                "publicKeyMultibase": "z6Mknkusuq76MHbvLSVj9cMhaL8sMj1zBdKcwdxRFzxR4oLk"
+              }
+            ],
+            "authentication": [
+              "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:AUZasaHCAj9619JwyVoXvLbDRy94f21kZcxQjg16uk5#owner"
+            ],
+            "capabilityInvocation": [
+              "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:AUZasaHCAj9619JwyVoXvLbDRy94f21kZcxQjg16uk5#owner"
+            ],
+            "assertionMethod": [
+              "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:AUZasaHCAj9619JwyVoXvLbDRy94f21kZcxQjg16uk5#owner",
+              "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK:AUZasaHCAj9619JwyVoXvLbDRy94f21kZcxQjg16uk5#agent-wallet"
+            ],
+            "service": []
+          },
+          "didResolutionMetadata": {
+            "contentType": "application/did+ld+json"
+          },
+          "didDocumentMetadata": {
+            "versionId": "412345678",
+            "created": "2026-09-21T14:13:20Z",
+            "updated": "2026-09-22T14:13:20Z",
+            "agentRegistry": "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:4sAy8cfTmn581JQLCzqHpQDhkKNutvTBamvX8UqqGKCK",
+            "owner": "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:9JeqKarf1k7TDwf2U3PrjEasY9k8mk5GFd3VRizQ9aZN",
+            "agentWallet": "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:9JeqKarf1k7TDwf2U3PrjEasY9k8mk5GFd3VRizQ9aZN",
+            "agentCard": "absent"
+          }
+        }
+      }
+    ]
+  },
+  "v1": {
+    "$comment": "did:aip v1 on Solana devnet, program CgchXu2dRV3r9E1YjRhp4kbeLLtv1Xz61yoerJzp1Vbc. The live account layout is dr-wilson-empty/aip-beta c427872 (1366 bytes), not the wienerlabs/aip-beta 9655c15 copy (1048 bytes).",
+    "program": "CgchXu2dRV3r9E1YjRhp4kbeLLtv1Xz61yoerJzp1Vbc",
+    "network": "solana:devnet",
+    "specExample": {
+      "$comment": "Appendix A.1 of the v1 specification names this derivation but gives no value.",
+      "owner": "7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU",
+      "agentId": "ada-research-001",
+      "pda": "4jRi9vpwATU5e7y2YRmyuT6xbzBEnidxqTeeBfpPkpnc",
+      "bump": 255
+    },
+    "snapshotSlot": 506742046,
+    "records": [
+      {
+        "did": "did:aip:GgpgQDxRnuucbim3n7UPMkXQ8ExEZ1TAH9yLQedSkPpv:cue",
+        "pda": "UPffxxeBDxB6rZ9652vY9qAeEzT9tuXjSE71jYDtxof",
+        "bump": 254,
+        "owner": "GgpgQDxRnuucbim3n7UPMkXQ8ExEZ1TAH9yLQedSkPpv",
+        "agentId": "cue",
+        "walletAddress": "GgpgQDxRnuucbim3n7UPMkXQ8ExEZ1TAH9yLQedSkPpv",
+        "endpoint": "https://app.aipagents.xyz/api/hosted-agent?agentId=cue",
+        "storedDid": "did:aip:GgpgQDxRnuucbim3n7UPMkXQ8ExEZ1TAH9yLQedSkPpv:cue",
+        "expectedDocument": {
+          "@context": [
+            "https://www.w3.org/ns/did/v1",
+            "https://w3id.org/security/suites/ed25519-2020/v1",
+            "https://aip.network/ns/agent/v1"
+          ],
+          "id": "did:aip:GgpgQDxRnuucbim3n7UPMkXQ8ExEZ1TAH9yLQedSkPpv:cue",
+          "controller": "did:aip:GgpgQDxRnuucbim3n7UPMkXQ8ExEZ1TAH9yLQedSkPpv:cue",
+          "verificationMethod": [
+            {
+              "id": "did:aip:GgpgQDxRnuucbim3n7UPMkXQ8ExEZ1TAH9yLQedSkPpv:cue#key-1",
+              "type": "Ed25519VerificationKey2020",
+              "controller": "did:aip:GgpgQDxRnuucbim3n7UPMkXQ8ExEZ1TAH9yLQedSkPpv:cue",
+              "publicKeyMultibase": "z6Mkv95izUCs8TQ5iDbkTgSECr5PwpE5xthWyAtGEvbTfccJ"
+            }
+          ],
+          "authentication": [
+            "did:aip:GgpgQDxRnuucbim3n7UPMkXQ8ExEZ1TAH9yLQedSkPpv:cue#key-1"
+          ],
+          "assertionMethod": [
+            "did:aip:GgpgQDxRnuucbim3n7UPMkXQ8ExEZ1TAH9yLQedSkPpv:cue#key-1"
+          ],
+          "service": [
+            {
+              "id": "did:aip:GgpgQDxRnuucbim3n7UPMkXQ8ExEZ1TAH9yLQedSkPpv:cue#agent-endpoint",
+              "type": "AIPAgentEndpoint",
+              "serviceEndpoint": "https://app.aipagents.xyz/api/hosted-agent?agentId=cue"
+            }
+          ]
+        },
+        "expectedMetadata": {
+          "network": "solana:devnet",
+          "pda": "UPffxxeBDxB6rZ9652vY9qAeEzT9tuXjSE71jYDtxof",
+          "bump": 254,
+          "deprecated": true
+        }
+      },
+      {
+        "did": "did:aip:7imsPo1owz6arqjqHpHvEfNgTepXnm9vtjmHQoVWmABX:audit-agent",
+        "pda": "Bxqhm87GiuucZWTfrzBB5daWu5aQz8awBpxcb2uf1mh",
+        "bump": 255,
+        "owner": "7imsPo1owz6arqjqHpHvEfNgTepXnm9vtjmHQoVWmABX",
+        "agentId": "audit-agent",
+        "walletAddress": "7imsPo1owz6arqjqHpHvEfNgTepXnm9vtjmHQoVWmABX",
+        "endpoint": "https://app.aipagents.xyz/api/hosted-agent?agentId=audit-agent",
+        "storedDid": "did:aip:7imsPo1owz6arqjqHpHvEfNgTepXnm9vtjmHQoVWmABX:audit-agent",
+        "expectedDocument": {
+          "@context": [
+            "https://www.w3.org/ns/did/v1",
+            "https://w3id.org/security/suites/ed25519-2020/v1",
+            "https://aip.network/ns/agent/v1"
+          ],
+          "id": "did:aip:7imsPo1owz6arqjqHpHvEfNgTepXnm9vtjmHQoVWmABX:audit-agent",
+          "controller": "did:aip:7imsPo1owz6arqjqHpHvEfNgTepXnm9vtjmHQoVWmABX:audit-agent",
+          "verificationMethod": [
+            {
+              "id": "did:aip:7imsPo1owz6arqjqHpHvEfNgTepXnm9vtjmHQoVWmABX:audit-agent#key-1",
+              "type": "Ed25519VerificationKey2020",
+              "controller": "did:aip:7imsPo1owz6arqjqHpHvEfNgTepXnm9vtjmHQoVWmABX:audit-agent",
+              "publicKeyMultibase": "z6MkmB2uz3GFHXb3yLaXyPFm5kvgHE6PCeQHakgDF5TXgNxu"
+            }
+          ],
+          "authentication": [
+            "did:aip:7imsPo1owz6arqjqHpHvEfNgTepXnm9vtjmHQoVWmABX:audit-agent#key-1"
+          ],
+          "assertionMethod": [
+            "did:aip:7imsPo1owz6arqjqHpHvEfNgTepXnm9vtjmHQoVWmABX:audit-agent#key-1"
+          ],
+          "service": [
+            {
+              "id": "did:aip:7imsPo1owz6arqjqHpHvEfNgTepXnm9vtjmHQoVWmABX:audit-agent#agent-endpoint",
+              "type": "AIPAgentEndpoint",
+              "serviceEndpoint": "https://app.aipagents.xyz/api/hosted-agent?agentId=audit-agent"
+            }
+          ]
+        },
+        "expectedMetadata": {
+          "network": "solana:devnet",
+          "pda": "Bxqhm87GiuucZWTfrzBB5daWu5aQz8awBpxcb2uf1mh",
+          "bump": 255,
+          "deprecated": true
+        }
+      }
+    ]
+  }
+}
