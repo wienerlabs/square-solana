@@ -7,7 +7,8 @@ Proje belgeleri. Mevcut olanlar bağlantılı; diğerleri ilgili issue ile eklen
 | [`analysis/`](analysis/) | Birleştirme analizi; [§12](analysis/square-solana-analysis.md#12-kararlar) kesin kararlar | — |
 | `decisions/` | ADR'ler: §12 kararlarının kalıcı kaydı | [BE-06] |
 | `did-aip/` | `did:aip` v2 Solana (CAIP-2) profil spesifikasyonu ve test vektörleri | [BC-14] |
-| [`design/`](design/) | [program arayüz sözleşmesi](design/program-interface.md), normatif event şeması (`events.md`) | [BC-44], [BC-16] |
+| [`design/`](design/) | [program arayüz sözleşmesi](design/program-interface.md), [API ve SDK sözleşmesi](design/api-sdk-contract.md), normatif event şeması (`events.md`) | [BC-44], [BE-35], [BC-16] |
+| [`api/`](api/) | [OpenAPI 3.1 spec](api/openapi.yaml) (28 operasyon); [`schemas/idl.json`](api/schemas/idl.json) IDL'den üretilen JSON Schema'lar, elle düzenlenmez | [BE-35] |
 | [`provenance/`](provenance/) | taşınan dizinlerin kaynak repo, commit ve yöntem kayıtları (issue başına bir dosya) | [BC-04], [BC-05], [BC-06], [BC-07], [BE-02] |
 | `THIRD_PARTY_LICENSES.md` | üçüncü taraf lisans envanteri | [BC-02] |
 | `legal/relicensing/` | Covenant LGPL kodu için yazılı yeniden lisanslama onayları | [BC-03] |
@@ -27,3 +28,4 @@ Proje belgeleri. Mevcut olanlar bağlantılı; diğerleri ilgili issue ile eklen
 [BC-44]: https://github.com/wienerlabs/square-solana/issues/101
 [BE-02]: https://github.com/wienerlabs/square-solana/issues/16
 [BE-06]: https://github.com/wienerlabs/square-solana/issues/20
+[BE-35]: https://github.com/wienerlabs/square-solana/issues/102
