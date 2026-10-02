@@ -1,0 +1,39 @@
+# packages/
+
+TypeScript paketleri (pnpm workspace). Dizin adı kısa ad, npm adı **`@squaresdk/solana-<ad>`**
+([§12.4](../docs/analysis/square-solana-analysis.md#124-varsay%C4%B1lanlar)); `square` ve
+`@square/*` adları kullanılmaz. Adlandırma, ortak yapılandırma ve sürümleme [BE-01] ile kurulur.
+
+| Dizin | npm adı | İçerik | Issue |
+|---|---|---|---|
+| `config/` | `@squaresdk/solana-config` | tsconfig, eslint, prettier ortak ayarları | [BE-01] |
+| `types/` | `@squaresdk/solana-types` | ortak zod şemaları | [BE-07] |
+| `sdk/` | `@squaresdk/solana-sdk` | 4 program için IDL'den typed client, PDA'lar, event decoder, tx builder'lar | [BE-08] |
+| `identity/` | `@squaresdk/solana-identity` | `did:aip` resolver (v2 Solana + v1), agent card | [BE-09] |
+| `policy/` | `@squaresdk/solana-policy` | kurum tarafı: politika, commitment, alıcı listesi, ispat | [BE-10] |
+| `observability/` | `@squaresdk/solana-observability` | logger, metrikler, health, alarm | [BE-12] |
+| `hardening/` | `@squaresdk/solana-hardening` | SSRF, idempotency, rate limit, RPC failover, imzalı eylemler | [BE-13] |
+| `a2a/` | `@squaresdk/solana-a2a` | JSON-RPC 2.0 görev protokolü, görev ↔ job durum eşlemesi | [BE-17] |
+| `agent-sdk/` | `@squaresdk/solana-agent-sdk` | agent yazma kiti | [BE-19] |
+| `x402/` | `@squaresdk/solana-x402` | x402 v2 gateway (resmi `@x402/*` üzerine) | [BE-24] |
+| `mcp/` | `@squaresdk/solana-mcp` | Square MCP sunucusu + agent MCP istemcisi | [BE-28] |
+| `hosted/` | `@squaresdk/solana-hosted` | konfigürasyondan çalışan kurum agent'ı | [BE-29] |
+| `cli/` | `@squaresdk/solana-cli` | komut satırı aracı | [BE-30] |
+
+Kaynak projelerden taşınan paketler (`covenant/sdk`, `covenant/mcp`, `aperture/shared/types`,
+`aip-beta/packages/agent-sdk`) geçmişleriyle gelir [BE-02].
+
+[BE-01]: https://github.com/wienerlabs/square-solana/issues/15
+[BE-02]: https://github.com/wienerlabs/square-solana/issues/16
+[BE-07]: https://github.com/wienerlabs/square-solana/issues/39
+[BE-08]: https://github.com/wienerlabs/square-solana/issues/40
+[BE-09]: https://github.com/wienerlabs/square-solana/issues/41
+[BE-10]: https://github.com/wienerlabs/square-solana/issues/42
+[BE-12]: https://github.com/wienerlabs/square-solana/issues/45
+[BE-13]: https://github.com/wienerlabs/square-solana/issues/46
+[BE-17]: https://github.com/wienerlabs/square-solana/issues/50
+[BE-19]: https://github.com/wienerlabs/square-solana/issues/52
+[BE-24]: https://github.com/wienerlabs/square-solana/issues/79
+[BE-28]: https://github.com/wienerlabs/square-solana/issues/87
+[BE-29]: https://github.com/wienerlabs/square-solana/issues/88
+[BE-30]: https://github.com/wienerlabs/square-solana/issues/89

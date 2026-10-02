@@ -1,0 +1,23 @@
+# https://editorconfig.org
+# Varsayılan: UTF-8, LF, sonda tek satır sonu, 2 boşluk girinti (TS/JS/JSON/YAML/TOML/Markdown).
+# Rust ve Circom 4 boşluk (rustfmt varsayılanı ve aperture devre kodunun mevcut düzeni).
+
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 2
+
+[*.{rs,circom}]
+indent_size = 4
+
+# Markdown'da satır sonundaki iki boşluk zorunlu satır kırılımıdır; silinmemeli.
+[*.md]
+trim_trailing_whitespace = false
+
+[Makefile]
+indent_style = tab
