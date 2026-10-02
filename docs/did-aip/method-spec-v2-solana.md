@@ -373,7 +373,8 @@ resolve(did):
   2. Validate per §3.2. On failure → error "invalidDid".
   3. Select an RPC endpoint for chain-ref. None configured → error "unsupportedChain".
      Before using it, getGenesisHash MUST start with chain-ref; re-check after any failover.
-  4. If the resolver keeps a registry allowlist and registry is not on it → error "registryNotAllowed".
+  4. If registry is the v1 program (§9.2), or the resolver keeps a registry allowlist and registry
+     is not on it → error "registryNotAllowed".
   5. getAccountInfo(agent-record) at commitment "confirmed" or stronger.
      The RPC call fails → error "networkError".
      No account → error "notFound".
@@ -518,11 +519,13 @@ Facts a v1 implementation needs and the v1 specification does not give:
   Wiener Labs' control. What a v1 DID resolves to can change with a program upgrade nobody here
   approves (v1 §7.6).
 - `CgchXu2dRV3r9E1YjRhp4kbeLLtv1Xz61yoerJzp1Vbc` is the v1 program, not a Registry of this profile,
-  and a resolver MUST NOT accept it as the `registry` segment of a `solana` DID. The BC-44 interface
-  stubs declare this id until BC-09 assigns Square program ids, so a client that took the registry
-  address from today's IDL would build DIDs naming the v1 program. Both programs call their account
-  `AgentRecord` and so share its Anchor discriminator: step 6 of §6.1 cannot tell them apart, and only
-  the allowlist (§10.1) does.
+  and a resolver MUST NOT accept it as the `registry` segment of a `solana` DID: step 4 of §6.1
+  rejects it with `registryNotAllowed`, whether or not the resolver keeps an allowlist. The BC-44
+  interface stubs, and the v1 code imported into `programs/square-registry` (BC-07), declare this id
+  until BC-09 assigns Square program ids, so a client that took the registry address from today's
+  IDL would build DIDs naming the v1 program. Both programs call their account `AgentRecord` and so
+  share its Anchor discriminator: step 6 of §6.1 cannot tell them apart, so the check is by program
+  id, before any network call.
 
 ### 9.3 `did:key`
 
@@ -651,7 +654,7 @@ not require service types to be registered.
 | BC-15 `square_registry` | Implements §4.2: no DID field, `["agent", creator, agent_id]` seeds, `Deregistered` instead of close, card URI and hash written together, wallet reset on transfer |
 | BC-44 program interface | v0.1.0 already matches §3.4, §4.1 and §7: same seeds and field names, no DID field, no close, `Inactive` / `Deregistered`, card URI and hash. Not stated there yet: the wallet reset on transfer (§4.2.5). Its stubs declare the v1 program id until BC-09 (§9.2) |
 | BC-16 events | Registry events carry the record address; the DID is derived, not emitted |
-| BE-09 `@squaresdk/solana-identity` | Implements §6 and §9 and consumes `test-vectors.json`; the v1 path decodes the c427872 layout (§9.2) |
+| BE-09 `@squaresdk/solana-identity` | Implements §6 and §9 and consumes `test-vectors.json`; the v1 path decodes the c427872 layout, and the v1 program id is rejected as a registry (§6.1 step 4, §9.2) |
 | BC-07 registry import | Source: `dr-wilson-empty/aip-beta`. Its registry at c427872 is the code deployed as v1 (§9.2) |
 | W3C registry | [w3c/did-extensions#750][w3c-750], still open, changes the method's `verifiableDataRegistry` from Solana to ERC-8004. With this profile both apply, and the entry should say so |
 
@@ -694,7 +697,7 @@ bytes of `agentCardBody`. The `registry` is a test program id, not a deployed pr
 | `parse.valid` | Solana-profile, v2 (`eip155`) and v1 DIDs with their parsed parts |
 | `parse.rejected` | 18 identifiers rejected as `invalidDid`, each with the rule it breaks (§3.2, §9.3, §9.4) |
 | `parse.agentRegistry` | The `(agentRegistry, agentId)` ⇄ DID mapping of §3.5 |
-| `documents` | Ten resolution cases with an inline record and card: verified card, off-curve wallet and service-id collision, hash mismatch, unreachable card, invalid card, off-curve owner without a card, `Deregistered`, `Inactive`, card `active: false`, transferred owner |
+| `documents` | Eleven resolution cases. Ten have an inline record and card: verified card, off-curve wallet and service-id collision, hash mismatch, unreachable card, invalid card, off-curve owner without a card, `Deregistered`, `Inactive`, card `active: false`, transferred owner. The eleventh names the v1 program as registry and expects `registryNotAllowed` before any read (§9.2) |
 | `v1` | The derivation the v1 specification's Appendix A.1 names without a value, and two live devnet records (a snapshot at slot 506742046, not fixtures) with their v1 DID Documents |
 
 [v1]: https://github.com/dr-wilson-empty/aip-beta/blob/5689708a8f9eefba5ca57724adf0478e762b3ee3/standards/did-aip-method-spec.md

@@ -296,7 +296,7 @@
     ]
   },
   "documents": {
-    "$comment": "Inline resolution cases at a fixed slot. record is the logical AgentRecord view of §4.1, with the field names of the BC-44 contract (status: Active | Inactive | Deregistered); agentCardBody is what the card URI serves (null: unreachable).",
+    "$comment": "Inline resolution cases at a fixed slot. record is the logical AgentRecord view of §4.1, with the field names of the BC-44 contract (status: Active | Inactive | Deregistered); agentCardBody is what the card URI serves (null: unreachable). In a case whose expected result is an error, slot, record and agentCardBody are null: the resolver fails before reading anything.",
     "cases": [
       {
         "name": "active-verified-card",
@@ -1045,6 +1045,21 @@
             "agentStatus": "active",
             "agentCard": "absent"
           }
+        }
+      },
+      {
+        "name": "v1-program-as-registry",
+        "$comment": "The registry segment is the v1 program, as a client would build the DID from today's BC-44 IDL (§9.2). The resolver rejects it at step 4 of §6.1, whether or not it keeps an allowlist and before any network call; slot, record and agentCardBody are null because nothing is read. Both programs' accounts are named AgentRecord and share the Anchor discriminator, so the owner and discriminator check of step 6 would not catch it.",
+        "did": "did:aip:solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:CgchXu2dRV3r9E1YjRhp4kbeLLtv1Xz61yoerJzp1Vbc:34jS95y4ekgbXAPzpSVnuDopfLdHsYNm9e2A3Fq5oEvT",
+        "slot": null,
+        "record": null,
+        "agentCardBody": null,
+        "expected": {
+          "didDocument": null,
+          "didResolutionMetadata": {
+            "error": "registryNotAllowed"
+          },
+          "didDocumentMetadata": {}
         }
       }
     ]
