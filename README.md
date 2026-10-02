@@ -99,11 +99,21 @@ Yapının gerekçesi: [§9](docs/analysis/square-solana-analysis.md#9-%C3%B6neri
 pnpm install
 pnpm build
 cargo build
-cargo clippy --workspace -- -D warnings
-cargo fmt --all --check
+cargo clippy --workspace
 cargo test --workspace
+mkdir -p target/deploy   # temiz klonda ilk anchor build'den önce şart, aşağıya bakın
 anchor build
 ```
+
+- **Temiz klonda `anchor build`:** Anchor 0.31, `target/deploy` yokken yapılan ilk derlemede
+  programlar için yeni anahtar çifti üretir ve `declare_id!` değerleriyle `Anchor.toml`'u bu
+  rastgele ID'lerle değiştirir. Önce `mkdir -p target/deploy` çalıştırın; derlemeden sonra
+  `git status` bu dosyalarda değişiklik göstermemeli.
+- **Katı kontroller BC-13 ile gelir:** `cargo clippy --workspace -- -D warnings` ve
+  `cargo fmt --all --check` bugün main'de kırmızı. Uyarılar ve biçim farkları taşınan programlardan
+  (`square-policy`, `square-verifier`, `square-registry`) geliyor. Bu kurallar BC-13 ile CI'a
+  girene kadar yukarıdaki komutlar geçerli; yeni yazdığınız kodu yine de katı kurallara göre
+  temiz tutun.
 
 Editör ayarları [`.editorconfig`](.editorconfig) ile paylaşılır.
 
