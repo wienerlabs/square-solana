@@ -6,9 +6,18 @@
     "build": "turbo run build",
     "test": "turbo run test",
     "lint": "turbo run lint",
-    "typecheck": "turbo run typecheck"
+    "typecheck": "turbo run typecheck",
+    "openapi:lint": "redocly lint",
+    "openapi:docs": "redocly build-docs square -o dist/api/index.html",
+    "contract:check": "interfaces/build-idl.sh --check && pnpm --filter @squaresdk/solana-types gen:check"
   },
   "devDependencies": {
-    "turbo": "^2.11.7"
+    "@redocly/cli": "^2.57.0",
+    "@types/node": "^24.0.0",
+    "turbo": "^2.11.7",
+    "typescript": "~5.9.3"
+  },
+  "engines": {
+    "node": ">=24"
   }
 }
