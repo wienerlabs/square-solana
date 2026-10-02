@@ -61,7 +61,13 @@ function render(program) {
 
 const files = PROGRAMS.flatMap(render);
 if (process.argv.includes('--check')) {
-  const read = (p) => { try { return readFileSync(p, 'utf8'); } catch { return null; } };
+  const read = (p) => {
+    try {
+      return readFileSync(p, 'utf8');
+    } catch {
+      return null;
+    }
+  };
   const stale = files.filter(([p, text]) => read(p) !== text).map(([p]) => p.replace(`${root}/`, ''));
   if (stale.length) {
     for (const p of stale) console.error(`güncel değil: ${p} (pnpm --filter @squaresdk/solana-sdk gen)`);

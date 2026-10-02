@@ -47,7 +47,9 @@ export interface SquareApi {
   createApiKey(body: ApiKeyCreate): Promise<ApiEnvelope<ApiKeyCreated>>;
   deleteApiKey(id: string): Promise<void>;
 
-  listJobs(query?: PageParams & { status?: JobStatus; institution?: Address; agentRecord?: Address; policy?: Address }): Promise<ApiEnvelope<JobView[]>>;
+  listJobs(
+    query?: PageParams & { status?: JobStatus; institution?: Address; agentRecord?: Address; policy?: Address },
+  ): Promise<ApiEnvelope<JobView[]>>;
   getJob(job: Address): Promise<ApiEnvelope<JobView>>;
   uploadDelivery(job: Address, file: Blob): Promise<ApiEnvelope<DeliveryReceipt>>;
 
@@ -56,18 +58,26 @@ export interface SquareApi {
   getPolicy(policy: Address): Promise<ApiEnvelope<PolicyView>>;
   putPolicyMeta(policy: Address, meta: PolicyMeta): Promise<ApiEnvelope<PolicyView>>;
 
-  listAgents(query?: PageParams & { owner?: Address; status?: AgentStatus; skill?: string }): Promise<ApiEnvelope<AgentView[]>>;
+  listAgents(
+    query?: PageParams & { owner?: Address; status?: AgentStatus; skill?: string },
+  ): Promise<ApiEnvelope<AgentView[]>>;
   getAgent(agentRecord: Address): Promise<ApiEnvelope<AgentView>>;
   putAgentCard(agentRecord: Address, card: AgentCard): Promise<ApiEnvelope<AgentCardHosting>>;
   getWellKnownAgentCard(agentRecord: Address): Promise<AgentCard>;
 
-  listClaims(query?: PageParams & { status?: ClaimStatus; seller?: Address; buyer?: Address }): Promise<ApiEnvelope<ClaimView[]>>;
+  listClaims(
+    query?: PageParams & { status?: ClaimStatus; seller?: Address; buyer?: Address },
+  ): Promise<ApiEnvelope<ClaimView[]>>;
   getClaim(job: Address): Promise<ApiEnvelope<ClaimView>>;
   listDisputes(query?: PageParams & { jobStatus?: JobStatus }): Promise<ApiEnvelope<DisputeView[]>>;
   getDispute(job: Address): Promise<ApiEnvelope<DisputeView>>;
   getScreening(wallet: Address): Promise<ApiEnvelope<ScreeningView>>;
-  listEvents(query?: PageParams & { job?: Address; program?: SquareProgram; name?: string; fromSlot?: number }): Promise<ApiEnvelope<IndexedEvent[]>>;
-  listKeeperActions(query?: PageParams & { job?: Address; outcome?: KeeperAction['outcome'] }): Promise<ApiEnvelope<KeeperAction[]>>;
+  listEvents(
+    query?: PageParams & { job?: Address; program?: SquareProgram; name?: string; fromSlot?: number },
+  ): Promise<ApiEnvelope<IndexedEvent[]>>;
+  listKeeperActions(
+    query?: PageParams & { job?: Address; outcome?: KeeperAction['outcome'] },
+  ): Promise<ApiEnvelope<KeeperAction[]>>;
 
   prepareTx(body: TxRequest): Promise<ApiEnvelope<UnsignedTx>>;
   prove(body: ProveRequest): Promise<ApiEnvelope<ProveResponse>>;

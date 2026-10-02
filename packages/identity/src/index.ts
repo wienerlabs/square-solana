@@ -35,7 +35,10 @@ export interface DidDocument {
 export interface DidResolutionResult {
   didDocument: DidDocument | null;
   didDocumentMetadata: { created?: string; updated?: string; deactivated?: boolean };
-  didResolutionMetadata: { contentType?: 'application/did+ld+json'; error?: 'invalidDid' | 'notFound' | 'methodNotSupported' };
+  didResolutionMetadata: {
+    contentType?: 'application/did+ld+json';
+    error?: 'invalidDid' | 'notFound' | 'methodNotSupported';
+  };
 }
 
 export interface ResolverOptions {
@@ -52,11 +55,18 @@ export interface SquareIdentity {
   /** v2 Solana DID'i üretir. */
   formatDidAip(input: { chainRef: string; registry: PublicKey; agentRecord: PublicKey }): string;
   /** Zincirdeki `AgentRecord` ve (varsa) agent card'dan DID Document üretir. */
-  buildDidDocument(record: AgentRecordAccount, card: AgentCard | null, context: { did: string; chainRef: string }): DidDocument;
+  buildDidDocument(
+    record: AgentRecordAccount,
+    card: AgentCard | null,
+    context: { did: string; chainRef: string },
+  ): DidDocument;
   /** DID'i çözer (v2 Solana + v1). */
   resolveDid(did: string, options: ResolverOptions): Promise<DidResolutionResult>;
   /** Kartı indirir; SSRF korumalı (yalnızca https), boyut sınırlı. Ham baytlar hash doğrulaması içindir. */
-  fetchAgentCard(uri: string, options?: { fetch?: typeof fetch; maxBytes?: number }): Promise<{ card: AgentCard; bytes: Uint8Array }>;
+  fetchAgentCard(
+    uri: string,
+    options?: { fetch?: typeof fetch; maxBytes?: number },
+  ): Promise<{ card: AgentCard; bytes: Uint8Array }>;
   /** SHA-256(bytes) == zincirdeki `agentCardHash`. */
   verifyAgentCardHash(bytes: Uint8Array, expectedHash: Uint8Array): boolean;
 }

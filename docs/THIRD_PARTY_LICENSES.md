@@ -25,16 +25,24 @@ pnpm license:write
 | `anchor-lang` | cargo | Apache-2.0 | runtime | `aip-registry`, `policy-registry`, `verifier` | ✓ |
 | `groth16-solana` | cargo | MIT | runtime | `verifier` | ✓ |
 | `sha2` | cargo | MIT OR Apache-2.0 | runtime | `policy-registry` | ✓ |
+| `@changesets/cli` | npm | MIT | dev | `@squaresdk/solana-monorepo` | ✓ |
 | `@coral-xyz/anchor` | npm | (MIT OR Apache-2.0) | runtime | `@squaresdk/solana-sdk` | ✓ |
+| `@eslint/js` | npm | MIT | runtime | `@squaresdk/solana-config` | ✓ |
 | `@redocly/cli` | npm | MIT | dev | `@squaresdk/solana-monorepo` | ✓ |
 | `@solana/web3.js` | npm | MIT | runtime | `@squaresdk/solana-identity`, `@squaresdk/solana-policy`, `@squaresdk/solana-sdk` | ✓ |
 | `@types/node` | npm | MIT | dev | `@squaresdk/solana-monorepo` | ✓ |
+| `eslint` | npm | MIT | dev | `@squaresdk/solana-monorepo` | ✓ |
+| `eslint-config-prettier` | npm | MIT | runtime | `@squaresdk/solana-config` | ✓ |
+| `globals` | npm | MIT | runtime | `@squaresdk/solana-config` | ✓ |
+| `prettier` | npm | MIT | dev | `@squaresdk/solana-monorepo` | ✓ |
 | `turbo` | npm | MIT | dev | `@squaresdk/solana-monorepo` | ✓ |
 | `typescript` | npm | Apache-2.0 | dev | `@squaresdk/solana-monorepo` | ✓ |
+| `typescript-eslint` | npm | MIT | runtime | `@squaresdk/solana-config` | ✓ |
+| `vitest` | npm | MIT | dev | `@squaresdk/solana-sdk`, `@squaresdk/solana-types` | ✓ |
 | `yaml` | npm | ISC | dev | `@squaresdk/solana-sdk`, `@squaresdk/solana-types` | ✓ |
 | `zod` | npm | MIT | runtime | `@squaresdk/solana-types` | ✓ |
 
-**Özet:** 8 npm, 3 Cargo doğrudan bağımlılık; lisans dağılımı: 6× MIT, 2× Apache-2.0, 2× MIT OR Apache-2.0, 1× ISC.
+**Özet:** 16 npm, 3 Cargo doğrudan bağımlılık; lisans dağılımı: 14× MIT, 2× Apache-2.0, 2× MIT OR Apache-2.0, 1× ISC.
 <!-- license-inventory:end -->
 
 Kaynak projelerin (Aperture, AIP, Covenant) kendi lisansları ve telif bildirimleri

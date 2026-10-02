@@ -11,8 +11,12 @@ type Expect<T extends true> = T;
 // create_job(spec_hash: [u8; 32], amount: u64, deadline: i64, challenge_period: u64)
 export type CreateJobArgs = Expect<Same<IxArgs<SquareEscrowContract, 'createJob'>, [number[], BN, BN, BN]>>;
 // register_agent(agent_id: String, agent_card_uri: String, agent_card_hash: [u8; 32], wallet: Pubkey)
-export type RegisterAgentArgs = Expect<Same<IxArgs<SquareRegistryContract, 'registerAgent'>, [string, string, number[], PublicKey]>>;
+export type RegisterAgentArgs = Expect<
+  Same<IxArgs<SquareRegistryContract, 'registerAgent'>, [string, string, number[], PublicKey]>
+>;
 // Hesap adları IDL'den gelir (camelCase); payer ve institution create_job'da imzacı.
-export type CreateJobAccountKeys = Expect<Equal<'payer' extends keyof IxAccounts<SquareEscrowContract, 'createJob'> ? true : false, true>>;
+export type CreateJobAccountKeys = Expect<
+  Equal<'payer' extends keyof IxAccounts<SquareEscrowContract, 'createJob'> ? true : false, true>
+>;
 // Zincir hesap tipi IDL düzeniyle: Job.agentWallet bir PublicKey.
 export type JobAgentWallet = Expect<Equal<JobAccount['agentWallet'], PublicKey>>;

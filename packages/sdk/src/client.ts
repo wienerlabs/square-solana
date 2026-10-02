@@ -60,7 +60,10 @@ export interface SquareFlow {
     options: BuildOptions,
   ): Promise<BuiltTx & { job: PublicKey; specHash: Uint8Array }>;
   /** Adım 3b: fonlama (iki tarafın screening kaydı okunur). */
-  fundJob(params: { institution: PublicKey; job: PublicKey; institutionTokenAccount: PublicKey }, options: BuildOptions): Promise<BuiltTx>;
+  fundJob(
+    params: { institution: PublicKey; job: PublicKey; institutionTokenAccount: PublicKey },
+    options: BuildOptions,
+  ): Promise<BuiltTx>;
   /** Adım 4: kabul. */
   acceptJob(params: { agent: PublicKey; job: PublicKey }, options: BuildOptions): Promise<BuiltTx>;
   /** Adım 4: teslim. */
@@ -84,14 +87,29 @@ export interface SquareFlow {
   ): Promise<BuiltTx>;
   cancelClaim(params: { seller: PublicKey; job: PublicKey }, options: BuildOptions): Promise<BuiltTx>;
   /** Adım 6 + 8: permissionless finalize (keeper). ReleaseProof yoksa `ProofRequired` ile döner. */
-  finalizePayment(params: { keeper: PublicKey; job: PublicKey; keeperTokenAccount: PublicKey }, options: BuildOptions): Promise<BuiltTx>;
-  raiseDispute(
-    params: { institution: PublicKey; job: PublicKey; reasonHash: Uint8Array; bond: bigint; institutionTokenAccount: PublicKey },
+  finalizePayment(
+    params: { keeper: PublicKey; job: PublicKey; keeperTokenAccount: PublicKey },
     options: BuildOptions,
   ): Promise<BuiltTx>;
-  resolveDispute(params: { arbitrator: PublicKey; job: PublicKey; resolution: DisputeResolution }, options: BuildOptions): Promise<BuiltTx>;
+  raiseDispute(
+    params: {
+      institution: PublicKey;
+      job: PublicKey;
+      reasonHash: Uint8Array;
+      bond: bigint;
+      institutionTokenAccount: PublicKey;
+    },
+    options: BuildOptions,
+  ): Promise<BuiltTx>;
+  resolveDispute(
+    params: { arbitrator: PublicKey; job: PublicKey; resolution: DisputeResolution },
+    options: BuildOptions,
+  ): Promise<BuiltTx>;
   executeResolution(params: { caller: PublicKey; job: PublicKey }, options: BuildOptions): Promise<BuiltTx>;
-  cancelJob(params: { institution: PublicKey; job: PublicKey; institutionTokenAccount: PublicKey }, options: BuildOptions): Promise<BuiltTx>;
+  cancelJob(
+    params: { institution: PublicKey; job: PublicKey; institutionTokenAccount: PublicKey },
+    options: BuildOptions,
+  ): Promise<BuiltTx>;
 }
 
 export interface SquareClient {
