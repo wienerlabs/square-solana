@@ -98,6 +98,9 @@ Yapının gerekçesi: [§9](docs/analysis/square-solana-analysis.md#9-%C3%B6neri
 ```bash
 pnpm install
 pnpm build
+pnpm lint          # ESLint + Prettier (@squaresdk/solana-config)
+pnpm check:names   # paket adları @squaresdk/solana- (ADR 0001)
+pnpm test          # vitest
 cargo build
 cargo clippy --workspace
 cargo test --workspace

@@ -17,7 +17,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "node --test \"test/*.test.mjs\"",
+    "test": "vitest run",
     "gen": "node scripts/gen-idl-types.mjs",
     "gen:check": "node scripts/gen-idl-types.mjs --check"
   },
@@ -27,6 +27,8 @@
     "@squaresdk/solana-types": "workspace:*"
   },
   "devDependencies": {
+    "@squaresdk/solana-config": "workspace:*",
+    "vitest": "^5.0.3",
     "yaml": "^2.9.1"
   }
 }

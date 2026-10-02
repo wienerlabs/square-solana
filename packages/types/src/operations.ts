@@ -41,7 +41,10 @@ export const ApiKeySchema = z.object({
 });
 export type ApiKey = z.infer<typeof ApiKeySchema>;
 
-export const ApiKeyCreateSchema = z.object({ label: z.string().min(1).max(80), scopes: z.array(ApiKeyScopeSchema).min(1) });
+export const ApiKeyCreateSchema = z.object({
+  label: z.string().min(1).max(80),
+  scopes: z.array(ApiKeyScopeSchema).min(1),
+});
 export type ApiKeyCreate = z.infer<typeof ApiKeyCreateSchema>;
 
 export const ApiKeyCreatedSchema = z.object({ apiKey: ApiKeySchema, secret: z.string().min(32) });

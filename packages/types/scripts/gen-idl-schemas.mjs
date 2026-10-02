@@ -21,8 +21,12 @@ const OAS_OUT = resolve(root, 'docs/api/schemas/idl.json');
 const camel = (s) => s.replace(/_([a-z0-9])/g, (_, c) => c.toUpperCase());
 const lowerFirst = (s) => s.charAt(0).toLowerCase() + s.slice(1);
 const INT_RANGES = {
-  u8: [0, 255], u16: [0, 65535], u32: [0, 4294967295],
-  i8: [-128, 127], i16: [-32768, 32767], i32: [-2147483648, 2147483647],
+  u8: [0, 255],
+  u16: [0, 65535],
+  u32: [0, 4294967295],
+  i8: [-128, 127],
+  i16: [-32768, 32767],
+  i32: [-2147483648, 2147483647],
 };
 
 function loadIdls() {
@@ -156,14 +160,18 @@ function oasDef(def) {
     };
   }
   const hasData = ty.variants.some((v) => v.fields?.length);
-  if (!hasData) return { type: 'string', ...(description && { description }), enum: ty.variants.map((v) => lowerFirst(v.name)) };
+  if (!hasData)
+    return { type: 'string', ...(description && { description }), enum: ty.variants.map((v) => lowerFirst(v.name)) };
   const mapping = {};
   const oneOf = ty.variants.map((v) => {
     const kind = lowerFirst(v.name);
     const properties = { kind: { type: 'string', const: kind } };
     for (const f of v.fields ?? []) properties[camel(f.name)] = oasOf(f.type);
     mapping[kind] = `#/${def.name}${v.name}`;
-    return { name: `${def.name}${v.name}`, schema: { type: 'object', required: Object.keys(properties), additionalProperties: false, properties } };
+    return {
+      name: `${def.name}${v.name}`,
+      schema: { type: 'object', required: Object.keys(properties), additionalProperties: false, properties },
+    };
   });
   return {
     __variants: oneOf,
@@ -222,7 +230,9 @@ function generate() {
   const arms = [];
   for (const { program, idl } of idls) {
     for (const e of idl.events ?? []) {
-      arms.push(`  z.object({ program: z.literal('${program}'), name: z.literal('${e.name}'), data: ${e.name}Schema }),`);
+      arms.push(
+        `  z.object({ program: z.literal('${program}'), name: z.literal('${e.name}'), data: ${e.name}Schema }),`,
+      );
     }
   }
   ts.push('/** Zincirden çözülen event: program + event adı + payload (indexer ve API bu biçimi kullanır). */');
@@ -230,7 +240,11 @@ function generate() {
   ts.push('export type ProgramEventPayload = z.infer<typeof ProgramEventPayloadSchema>;');
   ts.push('');
   // Instruction argümanları + tx hazırlama isteği (API `POST /v1/tx`, SDK tx builder'ları).
-  const pascal = (snake) => snake.split('_').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join('');
+  const pascal = (snake) =>
+    snake
+      .split('_')
+      .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+      .join('');
   const ixArms = [];
   const seenIx = new Map();
   for (const { program, idl } of idls) {
@@ -243,7 +257,9 @@ function generate() {
       ts.push(`export const ${name}Schema = z.object({${fields ? `\n${fields}\n` : ''}});`);
       ts.push(`export type ${name} = z.infer<typeof ${name}Schema>;`);
       ts.push('');
-      ixArms.push(`  z.object({ program: z.literal('${program}'), instruction: z.literal('${camel(ix.name)}'), args: ${name}Schema }),`);
+      ixArms.push(
+        `  z.object({ program: z.literal('${program}'), instruction: z.literal('${camel(ix.name)}'), args: ${name}Schema }),`,
+      );
     }
   }
   ts.push('/** Program + instruction + IDL kodlamasıyla argümanlar. */');
@@ -252,14 +268,24 @@ function generate() {
   ts.push('');
   const body = ts.join('\n');
   const used = ['Address', 'Base64', 'Hex32', 'I128', 'I64', 'U64', 'hexBytes'].filter((id) =>
-    new RegExp(`\\b${id}\\b`).test(body.split('__PRIMITIVES_IMPORT__')[1]));
+    new RegExp(`\\b${id}\\b`).test(body.split('__PRIMITIVES_IMPORT__')[1]),
+  );
   const tsText = body.replace('__PRIMITIVES_IMPORT__', `import { ${used.join(', ')} } from '../primitives.js';`);
 
   // --- OpenAPI (JSON Schema 2020-12 / OAS 3.1)
   const oas = {
-    $comment: 'BU DOSYA ÜRETİLİR — elle değiştirmeyin. Kaynak: idl/*.json (BC-44). pnpm --filter @squaresdk/solana-types gen',
-    Address: { type: 'string', description: 'Base58 Solana adresi (32 bayt)', pattern: '^[1-9A-HJ-NP-Za-km-z]{32,44}$' },
-    U64: { type: 'string', description: 'u64, ondalık string (JS number hassasiyetini aşmamak için)', pattern: '^(0|[1-9][0-9]{0,19})$' },
+    $comment:
+      'BU DOSYA ÜRETİLİR — elle değiştirmeyin. Kaynak: idl/*.json (BC-44). pnpm --filter @squaresdk/solana-types gen',
+    Address: {
+      type: 'string',
+      description: 'Base58 Solana adresi (32 bayt)',
+      pattern: '^[1-9A-HJ-NP-Za-km-z]{32,44}$',
+    },
+    U64: {
+      type: 'string',
+      description: 'u64, ondalık string (JS number hassasiyetini aşmamak için)',
+      pattern: '^(0|[1-9][0-9]{0,19})$',
+    },
     I128: { type: 'string', description: 'i128, ondalık string', pattern: '^-?(0|[1-9][0-9]{0,38})$' },
     Hex32: { type: 'string', description: '32 bayt, küçük harf hex', pattern: '^[0-9a-f]{64}$' },
   };
@@ -292,7 +318,11 @@ function generate() {
     }
   }
   oas.ProgramEventPayload = { oneOf: eventOneOf, discriminator: { propertyName: 'name', mapping: eventMapping } };
-  const pascalCase = (snake) => snake.split('_').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join('');
+  const pascalCase = (snake) =>
+    snake
+      .split('_')
+      .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+      .join('');
   const callMapping = {};
   const callOneOf = [];
   for (const { program, idl } of idls) {
@@ -324,10 +354,22 @@ function generate() {
 
 const { tsText, oasText } = generate();
 if (process.argv.includes('--check')) {
-  const read = (p) => { try { return readFileSync(p, 'utf8'); } catch { return null; } };
-  const stale = [[TS_OUT, tsText], [OAS_OUT, oasText]].filter(([p, text]) => read(p) !== text).map(([p]) => p);
+  const read = (p) => {
+    try {
+      return readFileSync(p, 'utf8');
+    } catch {
+      return null;
+    }
+  };
+  const stale = [
+    [TS_OUT, tsText],
+    [OAS_OUT, oasText],
+  ]
+    .filter(([p, text]) => read(p) !== text)
+    .map(([p]) => p);
   if (stale.length) {
-    for (const p of stale) console.error(`güncel değil: ${p.replace(`${root}/`, '')} (pnpm --filter @squaresdk/solana-types gen)`);
+    for (const p of stale)
+      console.error(`güncel değil: ${p.replace(`${root}/`, '')} (pnpm --filter @squaresdk/solana-types gen)`);
     process.exit(1);
   }
   console.log('IDL şemaları güncel.');

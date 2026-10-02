@@ -1019,7 +1019,8 @@ components:
     AgentCard:
       type: object
       description: A2A AgentCard çekirdeği + registrations + Square fiyatlandırması.
-      required: [name, description, url, version, capabilities, defaultInputModes, defaultOutputModes, skills, registrations]
+      required:
+        [name, description, url, version, capabilities, defaultInputModes, defaultOutputModes, skills, registrations]
       additionalProperties: false
       properties:
         name: { type: string, minLength: 1, maxLength: 120 }
@@ -1165,7 +1166,17 @@ components:
             - type: 'null'
     UnsignedTx:
       type: object
-      required: [transaction, blockhash, lastValidBlockHeight, feePayer, signers, addressLookupTables, computeUnitLimit, simulatedUnits]
+      required:
+        [
+          transaction,
+          blockhash,
+          lastValidBlockHeight,
+          feePayer,
+          signers,
+          addressLookupTables,
+          computeUnitLimit,
+          simulatedUnits,
+        ]
       additionalProperties: false
       properties:
         transaction: { type: string, contentEncoding: base64, description: İmzasız v0 VersionedTransaction. }

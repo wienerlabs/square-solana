@@ -14,25 +14,25 @@
 
 /** İncelemesiz kabul edilen SPDX kimlikleri: izin verici, Apache-2.0 ile dağıtılabilir. */
 export const PERMISSIVE = new Set([
-  "0BSD",
-  "Apache-2.0",
-  "BlueOak-1.0.0",
-  "BSD-2-Clause",
-  "BSD-3-Clause",
-  "BSL-1.0",
-  "CC0-1.0",
-  "ISC",
-  "MIT",
-  "MIT-0",
-  "Python-2.0",
-  "Unicode-3.0",
-  "Unicode-DFS-2016",
-  "Unlicense",
-  "Zlib",
+  '0BSD',
+  'Apache-2.0',
+  'BlueOak-1.0.0',
+  'BSD-2-Clause',
+  'BSD-3-Clause',
+  'BSL-1.0',
+  'CC0-1.0',
+  'ISC',
+  'MIT',
+  'MIT-0',
+  'Python-2.0',
+  'Unicode-3.0',
+  'Unicode-DFS-2016',
+  'Unlicense',
+  'Zlib',
 ]);
 
 /** Yalnızca ek izin veren, lisansın koşullarını sıkılaştırmayan istisnalar. */
-export const PERMISSIVE_EXCEPTIONS = new Set(["LLVM-exception"]);
+export const PERMISSIVE_EXCEPTIONS = new Set(['LLVM-exception']);
 
 /**
  * İzin verici olmayan ama elle değerlendirilmiş bağımlılıklar. Anahtar "npm:<ad>" ya da
@@ -43,7 +43,7 @@ export const PERMISSIVE_EXCEPTIONS = new Set(["LLVM-exception"]);
  */
 export const ASSESSED = {};
 
-const OPERATORS = new Set(["AND", "OR", "WITH"]);
+const OPERATORS = new Set(['AND', 'OR', 'WITH']);
 
 function canonicalId(id) {
   const lower = id.toLowerCase();
@@ -57,13 +57,13 @@ function canonicalId(id) {
  * Diğer her şey olduğu gibi döner; ayrıştırılamayanlar (ör. "SEE LICENSE IN ...") parse'ta düşer.
  */
 export function normalizeLicense(raw) {
-  const s = String(raw ?? "").trim();
-  if (/^[A-Za-z0-9.+-]+(\/[A-Za-z0-9.+-]+)+$/.test(s)) return s.split("/").join(" OR ");
+  const s = String(raw ?? '').trim();
+  if (/^[A-Za-z0-9.+-]+(\/[A-Za-z0-9.+-]+)+$/.test(s)) return s.split('/').join(' OR ');
   return s;
 }
 
 function tokenize(expr) {
-  const tokens = expr.replace(/\(/g, " ( ").replace(/\)/g, " ) ").trim().split(/\s+/);
+  const tokens = expr.replace(/\(/g, ' ( ').replace(/\)/g, ' ) ').trim().split(/\s+/);
   return tokens.filter(Boolean).map((t) => (OPERATORS.has(t.toUpperCase()) ? t.toUpperCase() : t));
 }
 
@@ -73,29 +73,29 @@ function tokenize(expr) {
  * Geçersiz ifadede Error fırlatır.
  */
 export function parseSpdx(expr) {
-  const tokens = tokenize(String(expr ?? ""));
-  if (tokens.length === 0) throw new Error("boş lisans ifadesi");
+  const tokens = tokenize(String(expr ?? ''));
+  if (tokens.length === 0) throw new Error('boş lisans ifadesi');
   let i = 0;
   const peek = () => tokens[i];
   const next = () => tokens[i++];
 
-  const isId = (t) => t !== undefined && t !== "(" && t !== ")" && !OPERATORS.has(t);
+  const isId = (t) => t !== undefined && t !== '(' && t !== ')' && !OPERATORS.has(t);
 
   function atom() {
     const t = next();
-    if (t === "(") {
+    if (t === '(') {
       const node = orExpr();
-      if (next() !== ")") throw new Error(`kapanmayan parantez: "${expr}"`);
+      if (next() !== ')') throw new Error(`kapanmayan parantez: "${expr}"`);
       return node;
     }
-    if (!isId(t)) throw new Error(`lisans kimliği bekleniyordu, "${t ?? "son"}" geldi: "${expr}"`);
+    if (!isId(t)) throw new Error(`lisans kimliği bekleniyordu, "${t ?? 'son'}" geldi: "${expr}"`);
     if (!/^[A-Za-z0-9.+:-]+$/.test(t)) throw new Error(`geçersiz lisans kimliği "${t}"`);
     return { id: canonicalId(t) };
   }
 
   function withExpr() {
     const node = atom();
-    if (peek() === "WITH") {
+    if (peek() === 'WITH') {
       next();
       const exc = next();
       if (!isId(exc)) throw new Error(`WITH'ten sonra istisna kimliği bekleniyordu: "${expr}"`);
@@ -107,20 +107,20 @@ export function parseSpdx(expr) {
 
   function andExpr() {
     const args = [withExpr()];
-    while (peek() === "AND") {
+    while (peek() === 'AND') {
       next();
       args.push(withExpr());
     }
-    return args.length === 1 ? args[0] : { op: "and", args };
+    return args.length === 1 ? args[0] : { op: 'and', args };
   }
 
   function orExpr() {
     const args = [andExpr()];
-    while (peek() === "OR") {
+    while (peek() === 'OR') {
       next();
       args.push(andExpr());
     }
-    return args.length === 1 ? args[0] : { op: "or", args };
+    return args.length === 1 ? args[0] : { op: 'or', args };
   }
 
   const ast = orExpr();
@@ -130,8 +130,8 @@ export function parseSpdx(expr) {
 
 /** Ayrıştırılmış ifade izin verici mi? AND: hepsi, OR: en az biri, WITH: istisna da izinli olmalı. */
 export function isPermissiveAst(node) {
-  if (node.op === "and") return node.args.every(isPermissiveAst);
-  if (node.op === "or") return node.args.some(isPermissiveAst);
+  if (node.op === 'and') return node.args.every(isPermissiveAst);
+  if (node.op === 'or') return node.args.some(isPermissiveAst);
   if (!PERMISSIVE.has(node.id)) return false;
   return node.exception === undefined || PERMISSIVE_EXCEPTIONS.has(node.exception);
 }
@@ -155,8 +155,8 @@ export function isPermissive(license) {
  * @returns {{status: LicenseStatus, note?: string}}
  */
 export function classify(ecosystem, name, license, assessed = ASSESSED) {
-  if (isPermissive(license)) return { status: "ok" };
+  if (isPermissive(license)) return { status: 'ok' };
   const a = assessed[`${ecosystem}:${name}`];
-  if (a) return { status: a.status === "cleared" ? "ok" : "review", note: a.note };
-  return { status: "fail" };
+  if (a) return { status: a.status === 'cleared' ? 'ok' : 'review', note: a.note };
+  return { status: 'fail' };
 }

@@ -22,5 +22,8 @@
     "@solana/web3.js": "^1.99.0",
     "@squaresdk/solana-sdk": "workspace:*",
     "@squaresdk/solana-types": "workspace:*"
+  },
+  "devDependencies": {
+    "@squaresdk/solana-config": "workspace:*"
   }
 }

@@ -1,22 +1,31 @@
 {
   "name": "@squaresdk/solana-monorepo",
   "private": true,
+  "type": "module",
   "license": "Apache-2.0",
   "packageManager": "pnpm@10.34.6",
   "scripts": {
     "build": "turbo run build",
     "test": "turbo run test",
-    "lint": "turbo run lint",
+    "lint": "eslint . && prettier --check .",
     "typecheck": "turbo run typecheck",
     "openapi:lint": "redocly lint",
     "openapi:docs": "redocly build-docs square -o dist/api/index.html",
     "contract:check": "pnpm --filter @squaresdk/solana-types gen:check && pnpm --filter @squaresdk/solana-sdk gen:check",
     "license:check": "node scripts/license/inventory.mjs --check",
-    "license:write": "node scripts/license/inventory.mjs --write"
+    "license:write": "node scripts/license/inventory.mjs --write",
+    "format": "prettier --write .",
+    "check:names": "node scripts/check-package-names.mjs",
+    "changeset": "changeset",
+    "version-packages": "changeset version"
   },
   "devDependencies": {
+    "@changesets/cli": "^3.0.3",
     "@redocly/cli": "^2.57.0",
+    "@squaresdk/solana-config": "workspace:*",
     "@types/node": "^24.0.0",
+    "eslint": "^10.12.0",
+    "prettier": "^3.9.9",
     "turbo": "^2.11.7",
     "typescript": "~5.9.3"
   },

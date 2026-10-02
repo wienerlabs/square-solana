@@ -21,8 +21,7 @@ export const I128 = z.string().regex(/^-?(0|[1-9][0-9]{0,38})$/, 'ondalık i128 
 export const I64 = z.number().int().refine(Number.isSafeInteger, 'güvenli tamsayı aralığı dışında');
 
 /** `n` bayt, küçük harf hex. */
-export const hexBytes = (n: number) =>
-  z.string().regex(new RegExp(`^[0-9a-f]{${n * 2}}$`), `${n} bayt hex bekleniyor`);
+export const hexBytes = (n: number) => z.string().regex(new RegExp(`^[0-9a-f]{${n * 2}}$`), `${n} bayt hex bekleniyor`);
 
 /** 32 bayt hash / commitment, küçük harf hex. */
 export const Hex32 = hexBytes(32);

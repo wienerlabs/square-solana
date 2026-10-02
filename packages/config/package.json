@@ -1,0 +1,24 @@
+{
+  "name": "@squaresdk/solana-config",
+  "version": "0.1.0",
+  "description": "Square TS paketleri ve uygulamaları için ortak tsconfig, ESLint ve Prettier ayarları (BE-01)",
+  "license": "Apache-2.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./tsconfig.base.json": "./tsconfig.base.json",
+    "./eslint": "./eslint.config.js",
+    "./prettier": "./prettier.config.js"
+  },
+  "files": [
+    "tsconfig.base.json",
+    "eslint.config.js",
+    "prettier.config.js"
+  ],
+  "dependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint-config-prettier": "^10.1.8",
+    "globals": "^17.13.0",
+    "typescript-eslint": "^8.71.0"
+  }
+}
