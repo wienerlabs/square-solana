@@ -1,0 +1,4654 @@
+{
+  "$comment": "BU DOSYA ÜRETİLİR — elle değiştirmeyin. Kaynak: idl/*.json (BC-44). pnpm --filter @squaresdk/solana-types gen",
+  "Address": {
+    "type": "string",
+    "description": "Base58 Solana adresi (32 bayt)",
+    "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,44}$"
+  },
+  "U64": {
+    "type": "string",
+    "description": "u64, ondalık string (JS number hassasiyetini aşmamak için)",
+    "pattern": "^(0|[1-9][0-9]{0,19})$"
+  },
+  "I128": {
+    "type": "string",
+    "description": "i128, ondalık string",
+    "pattern": "^-?(0|[1-9][0-9]{0,38})$"
+  },
+  "Hex32": {
+    "type": "string",
+    "description": "32 bayt, küçük harf hex",
+    "pattern": "^[0-9a-f]{64}$"
+  },
+  "AgentDeregistered": {
+    "type": "object",
+    "required": [
+      "agentRecord"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "agentRecord": {
+        "$ref": "#/Address"
+      }
+    }
+  },
+  "AgentOwnershipTransferred": {
+    "type": "object",
+    "required": [
+      "agentRecord",
+      "previousOwner",
+      "newOwner"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "agentRecord": {
+        "$ref": "#/Address"
+      },
+      "previousOwner": {
+        "$ref": "#/Address"
+      },
+      "newOwner": {
+        "$ref": "#/Address"
+      }
+    }
+  },
+  "AgentStatus": {
+    "type": "string",
+    "enum": [
+      "active",
+      "inactive",
+      "deregistered"
+    ]
+  },
+  "AgentRecord": {
+    "type": "object",
+    "description": "seeds = [\"agent\", creator, agent_id]",
+    "required": [
+      "creator",
+      "owner",
+      "wallet",
+      "agentCardHash",
+      "status",
+      "registeredAt",
+      "updatedAt",
+      "bump",
+      "agentId",
+      "agentCardUri"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "creator": {
+        "$ref": "#/Address",
+        "description": "Original registrant; part of the PDA seeds, never changes."
+      },
+      "owner": {
+        "$ref": "#/Address",
+        "description": "Current owner; can change via `transfer_agent_ownership`."
+      },
+      "wallet": {
+        "$ref": "#/Address",
+        "description": "Agent wallet: signs escrow `accept_job` / `submit_work` / `list_claim` and is the default payee."
+      },
+      "agentCardHash": {
+        "$ref": "#/Hex32",
+        "description": "SHA-256 of the agent card JSON served at `agent_card_uri`."
+      },
+      "status": {
+        "$ref": "#/AgentStatus"
+      },
+      "registeredAt": {
+        "type": "integer",
+        "format": "int64"
+      },
+      "updatedAt": {
+        "type": "integer",
+        "format": "int64"
+      },
+      "bump": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 255
+      },
+      "agentId": {
+        "type": "string"
+      },
+      "agentCardUri": {
+        "type": "string"
+      }
+    }
+  },
+  "AgentRegistered": {
+    "type": "object",
+    "required": [
+      "agentRecord",
+      "creator",
+      "owner",
+      "agentId",
+      "wallet",
+      "agentCardHash"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "agentRecord": {
+        "$ref": "#/Address"
+      },
+      "creator": {
+        "$ref": "#/Address"
+      },
+      "owner": {
+        "$ref": "#/Address"
+      },
+      "agentId": {
+        "type": "string"
+      },
+      "wallet": {
+        "$ref": "#/Address"
+      },
+      "agentCardHash": {
+        "$ref": "#/Hex32"
+      }
+    }
+  },
+  "AgentReputation": {
+    "type": "object",
+    "description": "seeds = [\"reputation\", agent_record] — bound to the registry agent, not to a wallet (BC-26).",
+    "required": [
+      "agentRecord",
+      "jobsCompleted",
+      "jobsFailed",
+      "jobsDisputed",
+      "totalEarned",
+      "firstJobAt",
+      "lastJobAt",
+      "bump"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "agentRecord": {
+        "$ref": "#/Address"
+      },
+      "jobsCompleted": {
+        "$ref": "#/U64"
+      },
+      "jobsFailed": {
+        "$ref": "#/U64"
+      },
+      "jobsDisputed": {
+        "$ref": "#/U64"
+      },
+      "totalEarned": {
+        "$ref": "#/U64"
+      },
+      "firstJobAt": {
+        "type": "integer",
+        "format": "int64"
+      },
+      "lastJobAt": {
+        "type": "integer",
+        "format": "int64"
+      },
+      "bump": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 255
+      }
+    }
+  },
+  "AgentStatusChanged": {
+    "type": "object",
+    "required": [
+      "agentRecord",
+      "status"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "agentRecord": {
+        "$ref": "#/Address"
+      },
+      "status": {
+        "$ref": "#/AgentStatus"
+      }
+    }
+  },
+  "AgentUpdated": {
+    "type": "object",
+    "required": [
+      "agentRecord",
+      "wallet",
+      "agentCardHash"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "agentRecord": {
+        "$ref": "#/Address"
+      },
+      "wallet": {
+        "$ref": "#/Address"
+      },
+      "agentCardHash": {
+        "$ref": "#/Hex32"
+      }
+    }
+  },
+  "ArbitratorsUpdated": {
+    "type": "object",
+    "required": [
+      "arbitrators",
+      "threshold",
+      "arbitratorSetVersion"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "arbitrators": {
+        "type": "array",
+        "items": {
+          "$ref": "#/Address"
+        }
+      },
+      "threshold": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 255
+      },
+      "arbitratorSetVersion": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 4294967295
+      }
+    }
+  },
+  "BuyerRootCommitted": {
+    "type": "object",
+    "required": [
+      "policy",
+      "buyerRoot"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "policy": {
+        "$ref": "#/Address"
+      },
+      "buyerRoot": {
+        "$ref": "#/Hex32"
+      }
+    }
+  },
+  "ClaimBought": {
+    "type": "object",
+    "required": [
+      "job",
+      "buyer",
+      "price"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "job": {
+        "$ref": "#/Address"
+      },
+      "buyer": {
+        "$ref": "#/Address"
+      },
+      "price": {
+        "$ref": "#/U64"
+      }
+    }
+  },
+  "ClaimCancelled": {
+    "type": "object",
+    "required": [
+      "job"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "job": {
+        "$ref": "#/Address"
+      }
+    }
+  },
+  "ClaimListed": {
+    "type": "object",
+    "required": [
+      "job",
+      "seller",
+      "price",
+      "faceValue"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "job": {
+        "$ref": "#/Address"
+      },
+      "seller": {
+        "$ref": "#/Address"
+      },
+      "price": {
+        "$ref": "#/U64"
+      },
+      "faceValue": {
+        "$ref": "#/U64"
+      }
+    }
+  },
+  "ClaimStatus": {
+    "type": "string",
+    "description": "`cancel_claim` closes the listing, so there is no Cancelled state.",
+    "enum": [
+      "listed",
+      "bought",
+      "settled",
+      "defaulted"
+    ]
+  },
+  "ClaimListing": {
+    "type": "object",
+    "description": "seeds = [\"claim\", job]",
+    "required": [
+      "job",
+      "seller",
+      "buyer",
+      "rentPayer",
+      "price",
+      "faceValue",
+      "listedAt",
+      "boughtAt",
+      "status",
+      "bump"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "job": {
+        "$ref": "#/Address"
+      },
+      "seller": {
+        "$ref": "#/Address",
+        "description": "`job.agent_wallet` at listing time."
+      },
+      "buyer": {
+        "$ref": "#/Address",
+        "description": "`Pubkey::default()` until bought."
+      },
+      "rentPayer": {
+        "$ref": "#/Address",
+        "description": "Paid the listing rent; receives it back on `cancel_claim`."
+      },
+      "price": {
+        "$ref": "#/U64"
+      },
+      "faceValue": {
+        "$ref": "#/U64",
+        "description": "`job.amount` at listing time (informational)."
+      },
+      "listedAt": {
+        "type": "integer",
+        "format": "int64"
+      },
+      "boughtAt": {
+        "type": "integer",
+        "format": "int64"
+      },
+      "status": {
+        "$ref": "#/ClaimStatus"
+      },
+      "bump": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 255
+      }
+    }
+  },
+  "ReleaseVerdict": {
+    "type": "string",
+    "enum": [
+      "compliant",
+      "refused"
+    ]
+  },
+  "ComplianceProofSet": {
+    "type": "object",
+    "required": [
+      "job",
+      "policy",
+      "verdict",
+      "refusalCode",
+      "payee",
+      "netAmount",
+      "mint",
+      "dailySpentBefore"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "job": {
+        "$ref": "#/Address"
+      },
+      "policy": {
+        "$ref": "#/Address"
+      },
+      "verdict": {
+        "$ref": "#/ReleaseVerdict"
+      },
+      "refusalCode": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 65535
+      },
+      "payee": {
+        "$ref": "#/Address"
+      },
+      "netAmount": {
+        "$ref": "#/U64"
+      },
+      "mint": {
+        "$ref": "#/Address"
+      },
+      "dailySpentBefore": {
+        "$ref": "#/U64"
+      }
+    }
+  },
+  "DisputeResolutionPending": {
+    "type": "object",
+    "required": [
+      "kind"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "kind": {
+        "type": "string",
+        "const": "pending"
+      }
+    }
+  },
+  "DisputeResolutionFavorAgent": {
+    "type": "object",
+    "required": [
+      "kind"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "kind": {
+        "type": "string",
+        "const": "favorAgent"
+      }
+    }
+  },
+  "DisputeResolutionFavorInstitution": {
+    "type": "object",
+    "required": [
+      "kind"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "kind": {
+        "type": "string",
+        "const": "favorInstitution"
+      }
+    }
+  },
+  "DisputeResolutionSplit": {
+    "type": "object",
+    "required": [
+      "kind",
+      "agentAmount"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "kind": {
+        "type": "string",
+        "const": "split"
+      },
+      "agentAmount": {
+        "$ref": "#/U64"
+      }
+    }
+  },
+  "DisputeResolution": {
+    "oneOf": [
+      {
+        "$ref": "#/DisputeResolutionPending"
+      },
+      {
+        "$ref": "#/DisputeResolutionFavorAgent"
+      },
+      {
+        "$ref": "#/DisputeResolutionFavorInstitution"
+      },
+      {
+        "$ref": "#/DisputeResolutionSplit"
+      }
+    ],
+    "discriminator": {
+      "propertyName": "kind",
+      "mapping": {
+        "pending": "#/DisputeResolutionPending",
+        "favorAgent": "#/DisputeResolutionFavorAgent",
+        "favorInstitution": "#/DisputeResolutionFavorInstitution",
+        "split": "#/DisputeResolutionSplit"
+      }
+    }
+  },
+  "DisputeDecided": {
+    "type": "object",
+    "required": [
+      "job",
+      "resolution"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "job": {
+        "$ref": "#/Address"
+      },
+      "resolution": {
+        "$ref": "#/DisputeResolution"
+      }
+    }
+  },
+  "DisputeInfo": {
+    "type": "object",
+    "description": "Inline dispute state; `raised_at == 0` means no dispute. One dispute per job.",
+    "required": [
+      "challenger",
+      "bond",
+      "reasonHash",
+      "raisedAt",
+      "deadline",
+      "decidedAt",
+      "closedAt",
+      "lapsed",
+      "approvalMask",
+      "approvalCount",
+      "arbitratorSetVersion",
+      "resolution"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "challenger": {
+        "$ref": "#/Address",
+        "description": "Institution (`raise_dispute`) or agent wallet (`escalate_missing_proof`, DRAFT)."
+      },
+      "bond": {
+        "$ref": "#/U64",
+        "description": "0 for an escalation without bond."
+      },
+      "reasonHash": {
+        "$ref": "#/Hex32"
+      },
+      "raisedAt": {
+        "type": "integer",
+        "format": "int64"
+      },
+      "deadline": {
+        "type": "integer",
+        "format": "int64",
+        "description": "DRAFT (M5): `raised_at + dispute_timeout_secs`; `lapse_dispute` allowed after it."
+      },
+      "decidedAt": {
+        "type": "integer",
+        "format": "int64",
+        "description": "When the threshold was reached."
+      },
+      "closedAt": {
+        "type": "integer",
+        "format": "int64",
+        "description": "When `execute_resolution` or `lapse_dispute` closed the dispute."
+      },
+      "lapsed": {
+        "type": "boolean"
+      },
+      "approvalMask": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 255,
+        "description": "Bit i = `config.arbitrators[i]` voted for `resolution`."
+      },
+      "approvalCount": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 255
+      },
+      "arbitratorSetVersion": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 4294967295,
+        "description": "`config.arbitrator_set_version` when the dispute was raised."
+      },
+      "resolution": {
+        "$ref": "#/DisputeResolution"
+      }
+    }
+  },
+  "DisputeLapsed": {
+    "type": "object",
+    "description": "DRAFT (M5).",
+    "required": [
+      "job",
+      "bondRefunded"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "job": {
+        "$ref": "#/Address"
+      },
+      "bondRefunded": {
+        "$ref": "#/U64"
+      }
+    }
+  },
+  "DisputeRaised": {
+    "type": "object",
+    "required": [
+      "job",
+      "challenger",
+      "bond",
+      "reasonHash",
+      "deadline"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "job": {
+        "$ref": "#/Address"
+      },
+      "challenger": {
+        "$ref": "#/Address"
+      },
+      "bond": {
+        "$ref": "#/U64"
+      },
+      "reasonHash": {
+        "$ref": "#/Hex32"
+      },
+      "deadline": {
+        "type": "integer",
+        "format": "int64"
+      }
+    }
+  },
+  "DisputeResolved": {
+    "type": "object",
+    "required": [
+      "job",
+      "resolution",
+      "agentSideAmount",
+      "institutionRefund",
+      "bondToAgentSide",
+      "bondReturned"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "job": {
+        "$ref": "#/Address"
+      },
+      "resolution": {
+        "$ref": "#/DisputeResolution"
+      },
+      "agentSideAmount": {
+        "$ref": "#/U64"
+      },
+      "institutionRefund": {
+        "$ref": "#/U64"
+      },
+      "bondToAgentSide": {
+        "$ref": "#/U64"
+      },
+      "bondReturned": {
+        "$ref": "#/U64"
+      }
+    }
+  },
+  "DisputeVote": {
+    "type": "object",
+    "required": [
+      "job",
+      "arbitrator",
+      "resolution",
+      "approvalCount"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "job": {
+        "$ref": "#/Address"
+      },
+      "arbitrator": {
+        "$ref": "#/Address"
+      },
+      "resolution": {
+        "$ref": "#/DisputeResolution"
+      },
+      "approvalCount": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 255
+      }
+    }
+  },
+  "EscrowParams": {
+    "type": "object",
+    "required": [
+      "minChallengePeriod",
+      "maxChallengePeriod",
+      "minBondBps",
+      "minBondAbsolute",
+      "keeperFeeBps",
+      "proofTimeoutSecs",
+      "disputeTimeoutSecs",
+      "travelRuleThreshold"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "minChallengePeriod": {
+        "$ref": "#/U64"
+      },
+      "maxChallengePeriod": {
+        "$ref": "#/U64"
+      },
+      "minBondBps": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 65535
+      },
+      "minBondAbsolute": {
+        "$ref": "#/U64"
+      },
+      "keeperFeeBps": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 65535,
+        "description": "Share of the escrowed amount paid to the `finalize_payment` caller (BC-23)."
+      },
+      "proofTimeoutSecs": {
+        "type": "integer",
+        "format": "int64",
+        "description": "DRAFT (M5, BC-24): `escalate_missing_proof` allowed after `challenge_end + proof_timeout_secs`."
+      },
+      "disputeTimeoutSecs": {
+        "type": "integer",
+        "format": "int64",
+        "description": "DRAFT (M5, BC-33): `dispute.deadline = raised_at + dispute_timeout_secs`."
+      },
+      "travelRuleThreshold": {
+        "$ref": "#/U64",
+        "description": "DRAFT (M5, BC-34): jobs at or above this amount need a Travel Rule commitment; 0 = disabled."
+      }
+    }
+  },
+  "EscrowConfig": {
+    "type": "object",
+    "description": "Singleton. seeds = [\"config\"]",
+    "required": [
+      "admin",
+      "settlementMint",
+      "registryProgram",
+      "policyProgram",
+      "verifierProgram",
+      "arbitrators",
+      "arbitratorCount",
+      "threshold",
+      "arbitratorSetVersion",
+      "params",
+      "bump"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "admin": {
+        "$ref": "#/Address"
+      },
+      "settlementMint": {
+        "$ref": "#/Address",
+        "description": "The only mint jobs can use (USDC). Policy ceilings and the daily counter are in its units."
+      },
+      "registryProgram": {
+        "$ref": "#/Address",
+        "description": "Owner of `AgentRecord` / `ScreeningRecord` accounts read by escrow."
+      },
+      "policyProgram": {
+        "$ref": "#/Address",
+        "description": "Owner of `Institution` / `Policy` accounts read by escrow."
+      },
+      "verifierProgram": {
+        "$ref": "#/Address",
+        "description": "Owner of `ReleaseProof`; target of the `record_release` CPI."
+      },
+      "arbitrators": {
+        "type": "array",
+        "items": {
+          "$ref": "#/Address"
+        },
+        "minItems": 7,
+        "maxItems": 7
+      },
+      "arbitratorCount": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 255,
+        "description": "Active slots `arbitrators[..arbitrator_count]` (N)."
+      },
+      "threshold": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 255,
+        "description": "Approvals required (M), 2 <= M <= N."
+      },
+      "arbitratorSetVersion": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 4294967295,
+        "description": "Bumped on every `update_arbitrators`; disputes snapshot it."
+      },
+      "params": {
+        "$ref": "#/EscrowParams"
+      },
+      "bump": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 255
+      }
+    }
+  },
+  "EscrowConfigUpdated": {
+    "type": "object",
+    "required": [
+      "admin",
+      "settlementMint",
+      "params"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "admin": {
+        "$ref": "#/Address"
+      },
+      "settlementMint": {
+        "$ref": "#/Address"
+      },
+      "params": {
+        "$ref": "#/EscrowParams"
+      }
+    }
+  },
+  "Finalized": {
+    "type": "object",
+    "required": [
+      "job",
+      "keeper",
+      "keeperFee"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "job": {
+        "$ref": "#/Address"
+      },
+      "keeper": {
+        "$ref": "#/Address"
+      },
+      "keeperFee": {
+        "$ref": "#/U64"
+      }
+    }
+  },
+  "Institution": {
+    "type": "object",
+    "description": "seeds = [\"institution\", owner_key]",
+    "required": [
+      "ownerKey",
+      "policyCount",
+      "createdAt",
+      "bump",
+      "name",
+      "multisig",
+      "multisigVault"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "ownerKey": {
+        "$ref": "#/Address",
+        "description": "The key the institution was created with; part of the PDA seeds, never changes."
+      },
+      "policyCount": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 4294967295
+      },
+      "createdAt": {
+        "type": "integer",
+        "format": "int64"
+      },
+      "bump": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 255
+      },
+      "name": {
+        "type": "string"
+      },
+      "multisig": {
+        "oneOf": [
+          {
+            "$ref": "#/Address"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "description": "Squads v4 multisig bound with `set_institution_multisig`."
+      },
+      "multisigVault": {
+        "oneOf": [
+          {
+            "$ref": "#/Address"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "description": "Squads vault PDA that is the sole authority once set (derived from `multisig` + vault index)."
+      }
+    }
+  },
+  "InstitutionCreated": {
+    "type": "object",
+    "required": [
+      "institution",
+      "ownerKey",
+      "name"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "institution": {
+        "$ref": "#/Address"
+      },
+      "ownerKey": {
+        "$ref": "#/Address"
+      },
+      "name": {
+        "type": "string"
+      }
+    }
+  },
+  "InstitutionMultisigSet": {
+    "type": "object",
+    "required": [
+      "institution",
+      "multisig",
+      "multisigVault"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "institution": {
+        "$ref": "#/Address"
+      },
+      "multisig": {
+        "$ref": "#/Address"
+      },
+      "multisigVault": {
+        "$ref": "#/Address"
+      }
+    }
+  },
+  "JobStatus": {
+    "type": "string",
+    "enum": [
+      "open",
+      "funded",
+      "accepted",
+      "delivered",
+      "disputed",
+      "resolved",
+      "released",
+      "refunded",
+      "cancelled"
+    ]
+  },
+  "Job": {
+    "type": "object",
+    "description": "seeds = [\"job\", institution, spec_hash]; vault = [\"escrow_token\", job], bond vault = [\"bond\", job] (token authority of both = job).",
+    "required": [
+      "institution",
+      "agentRecord",
+      "agentWallet",
+      "mint",
+      "rentPayer",
+      "amount",
+      "specHash",
+      "status",
+      "createdAt",
+      "fundedAt",
+      "deadline",
+      "challengePeriod",
+      "challengeEnd",
+      "deliveredAt",
+      "settledAt",
+      "workHash",
+      "travelRuleCommitment",
+      "policyCommitment",
+      "policyDailyCeiling",
+      "policyVersion",
+      "bump",
+      "vaultBump",
+      "bondBump",
+      "policy",
+      "dispute",
+      "deliveryUri"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "institution": {
+        "$ref": "#/Address",
+        "description": "Institution wallet or Squads vault that created/funds the job; refund target."
+      },
+      "agentRecord": {
+        "$ref": "#/Address",
+        "description": "square_registry `AgentRecord` the job is bound to; reputation is written against it."
+      },
+      "agentWallet": {
+        "$ref": "#/Address",
+        "description": "`AgentRecord.wallet` at creation (or at the last `sync_agent_wallet`); signs accept/submit/list and is the payee unless the receivable was sold."
+      },
+      "mint": {
+        "$ref": "#/Address"
+      },
+      "rentPayer": {
+        "$ref": "#/Address",
+        "description": "Paid the rent of the job and its vaults; receives it back when they close."
+      },
+      "amount": {
+        "$ref": "#/U64"
+      },
+      "specHash": {
+        "$ref": "#/Hex32",
+        "description": "SHA-256 of the off-chain job spec JSON (A2A task mapping, BE side)."
+      },
+      "status": {
+        "$ref": "#/JobStatus"
+      },
+      "createdAt": {
+        "type": "integer",
+        "format": "int64"
+      },
+      "fundedAt": {
+        "type": "integer",
+        "format": "int64"
+      },
+      "deadline": {
+        "type": "integer",
+        "format": "int64",
+        "description": "Deadline for delivery."
+      },
+      "challengePeriod": {
+        "$ref": "#/U64"
+      },
+      "challengeEnd": {
+        "type": "integer",
+        "format": "int64",
+        "description": "Set in `submit_work`; finalize allowed after it."
+      },
+      "deliveredAt": {
+        "type": "integer",
+        "format": "int64"
+      },
+      "settledAt": {
+        "type": "integer",
+        "format": "int64"
+      },
+      "workHash": {
+        "$ref": "#/Hex32"
+      },
+      "travelRuleCommitment": {
+        "$ref": "#/Hex32",
+        "description": "DRAFT (M5): salted Travel Rule commitment; all zeros = none."
+      },
+      "policyCommitment": {
+        "$ref": "#/Hex32",
+        "description": "Policy snapshot taken at `create_job` (zeros when `policy` is None). The release proof is checked against it, so later policy updates or deactivation cannot change this job's rules."
+      },
+      "policyDailyCeiling": {
+        "$ref": "#/U64"
+      },
+      "policyVersion": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 4294967295
+      },
+      "bump": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 255
+      },
+      "vaultBump": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 255
+      },
+      "bondBump": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 255,
+        "description": "Set by `raise_dispute`; 0 while no bond vault exists."
+      },
+      "policy": {
+        "oneOf": [
+          {
+            "$ref": "#/Address"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "description": "square_policy `Policy`; `Some` = proof-gated release."
+      },
+      "dispute": {
+        "$ref": "#/DisputeInfo"
+      },
+      "deliveryUri": {
+        "type": "string"
+      }
+    }
+  },
+  "JobAccepted": {
+    "type": "object",
+    "required": [
+      "job",
+      "agentRecord",
+      "agentWallet"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "job": {
+        "$ref": "#/Address"
+      },
+      "agentRecord": {
+        "$ref": "#/Address"
+      },
+      "agentWallet": {
+        "$ref": "#/Address"
+      }
+    }
+  },
+  "JobAgentWalletSynced": {
+    "type": "object",
+    "required": [
+      "job",
+      "agentWallet"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "job": {
+        "$ref": "#/Address"
+      },
+      "agentWallet": {
+        "$ref": "#/Address"
+      }
+    }
+  },
+  "JobCancelled": {
+    "type": "object",
+    "required": [
+      "job",
+      "refundedAmount"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "job": {
+        "$ref": "#/Address"
+      },
+      "refundedAmount": {
+        "$ref": "#/U64"
+      }
+    }
+  },
+  "JobCreated": {
+    "type": "object",
+    "required": [
+      "job",
+      "institution",
+      "agentRecord",
+      "agentWallet",
+      "policy",
+      "policyVersion",
+      "mint",
+      "amount",
+      "specHash",
+      "deadline",
+      "challengePeriod"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "job": {
+        "$ref": "#/Address"
+      },
+      "institution": {
+        "$ref": "#/Address"
+      },
+      "agentRecord": {
+        "$ref": "#/Address"
+      },
+      "agentWallet": {
+        "$ref": "#/Address"
+      },
+      "policy": {
+        "oneOf": [
+          {
+            "$ref": "#/Address"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "policyVersion": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 4294967295
+      },
+      "mint": {
+        "$ref": "#/Address"
+      },
+      "amount": {
+        "$ref": "#/U64"
+      },
+      "specHash": {
+        "$ref": "#/Hex32"
+      },
+      "deadline": {
+        "type": "integer",
+        "format": "int64"
+      },
+      "challengePeriod": {
+        "$ref": "#/U64"
+      }
+    }
+  },
+  "JobFunded": {
+    "type": "object",
+    "required": [
+      "job",
+      "amount"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "job": {
+        "$ref": "#/Address"
+      },
+      "amount": {
+        "$ref": "#/U64"
+      }
+    }
+  },
+  "LinkedPrograms": {
+    "type": "object",
+    "required": [
+      "registryProgram",
+      "policyProgram",
+      "verifierProgram"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "registryProgram": {
+        "$ref": "#/Address"
+      },
+      "policyProgram": {
+        "$ref": "#/Address"
+      },
+      "verifierProgram": {
+        "$ref": "#/Address"
+      }
+    }
+  },
+  "MissingProofEscalated": {
+    "type": "object",
+    "description": "DRAFT (M5).",
+    "required": [
+      "job",
+      "agentWallet"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "job": {
+        "$ref": "#/Address"
+      },
+      "agentWallet": {
+        "$ref": "#/Address"
+      }
+    }
+  },
+  "MppPaymentVerified": {
+    "type": "object",
+    "description": "DRAFT (M6).",
+    "required": [
+      "institution",
+      "policy",
+      "stripeReceiptHash",
+      "amount"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "institution": {
+        "$ref": "#/Address"
+      },
+      "policy": {
+        "$ref": "#/Address"
+      },
+      "stripeReceiptHash": {
+        "$ref": "#/Hex32"
+      },
+      "amount": {
+        "$ref": "#/U64"
+      }
+    }
+  },
+  "OperatorState": {
+    "type": "object",
+    "description": "seeds = [\"operator_state\", institution] (institution = square_policy `Institution` PDA)",
+    "required": [
+      "institution",
+      "dailySpent",
+      "dayStartUnix",
+      "totalLifetimePayments",
+      "bump"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "institution": {
+        "$ref": "#/Address"
+      },
+      "dailySpent": {
+        "$ref": "#/U64",
+        "description": "Released amount in the current UTC day (settlement-mint atomic units); circuit public input."
+      },
+      "dayStartUnix": {
+        "type": "integer",
+        "format": "int64",
+        "description": "UTC midnight that starts the current window."
+      },
+      "totalLifetimePayments": {
+        "$ref": "#/U64"
+      },
+      "bump": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 255
+      }
+    }
+  },
+  "Policy": {
+    "type": "object",
+    "description": "seeds = [\"policy\", institution, policy_id]",
+    "required": [
+      "institution",
+      "policyId",
+      "commitment",
+      "dailyCeiling",
+      "buyerRoot",
+      "version",
+      "active",
+      "createdAt",
+      "updatedAt",
+      "bump"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "institution": {
+        "$ref": "#/Address"
+      },
+      "policyId": {
+        "$ref": "#/Hex32"
+      },
+      "commitment": {
+        "$ref": "#/Hex32",
+        "description": "Salted Poseidon commitment of the policy (the policy itself stays off chain)."
+      },
+      "dailyCeiling": {
+        "$ref": "#/U64",
+        "description": "Public daily spending ceiling in settlement-mint atomic units (USDC: 6 decimals)."
+      },
+      "buyerRoot": {
+        "$ref": "#/Hex32",
+        "description": "Root of the salted approved-buyer Merkle tree; all zeros = unrestricted."
+      },
+      "version": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 4294967295
+      },
+      "active": {
+        "type": "boolean"
+      },
+      "createdAt": {
+        "type": "integer",
+        "format": "int64"
+      },
+      "updatedAt": {
+        "type": "integer",
+        "format": "int64"
+      },
+      "bump": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 255
+      }
+    }
+  },
+  "PolicyCommitted": {
+    "type": "object",
+    "required": [
+      "policy",
+      "institution",
+      "policyId",
+      "commitment",
+      "dailyCeiling",
+      "version"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "policy": {
+        "$ref": "#/Address"
+      },
+      "institution": {
+        "$ref": "#/Address"
+      },
+      "policyId": {
+        "$ref": "#/Hex32"
+      },
+      "commitment": {
+        "$ref": "#/Hex32"
+      },
+      "dailyCeiling": {
+        "$ref": "#/U64"
+      },
+      "version": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 4294967295
+      }
+    }
+  },
+  "PolicyDeactivated": {
+    "type": "object",
+    "required": [
+      "policy"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "policy": {
+        "$ref": "#/Address"
+      }
+    }
+  },
+  "PolicyUpdated": {
+    "type": "object",
+    "required": [
+      "policy",
+      "commitment",
+      "dailyCeiling",
+      "version"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "policy": {
+        "$ref": "#/Address"
+      },
+      "commitment": {
+        "$ref": "#/Hex32"
+      },
+      "dailyCeiling": {
+        "$ref": "#/U64"
+      },
+      "version": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 4294967295
+      }
+    }
+  },
+  "RegistryConfig": {
+    "type": "object",
+    "description": "Singleton. seeds = [\"registry_config\"]",
+    "required": [
+      "admin",
+      "screenerAuthority",
+      "screeningTtlSecs",
+      "bump"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "admin": {
+        "$ref": "#/Address"
+      },
+      "screenerAuthority": {
+        "$ref": "#/Address"
+      },
+      "screeningTtlSecs": {
+        "type": "integer",
+        "format": "int64",
+        "description": "Lifetime of a screening record; `expires_at = screened_at + screening_ttl_secs`."
+      },
+      "bump": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 255
+      }
+    }
+  },
+  "RegistryConfigUpdated": {
+    "type": "object",
+    "required": [
+      "admin",
+      "screenerAuthority",
+      "screeningTtlSecs"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "admin": {
+        "$ref": "#/Address"
+      },
+      "screenerAuthority": {
+        "$ref": "#/Address"
+      },
+      "screeningTtlSecs": {
+        "type": "integer",
+        "format": "int64"
+      }
+    }
+  },
+  "ReleaseProof": {
+    "type": "object",
+    "description": "seeds = [\"release_proof\", job]",
+    "required": [
+      "job",
+      "institution",
+      "policy",
+      "payee",
+      "netAmount",
+      "mint",
+      "dailySpentBefore",
+      "proofTimestamp",
+      "verdict",
+      "refusalCode",
+      "consumed",
+      "bump"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "job": {
+        "$ref": "#/Address"
+      },
+      "institution": {
+        "$ref": "#/Address",
+        "description": "square_policy `Institution` PDA (key of the `OperatorState` it advances)."
+      },
+      "policy": {
+        "$ref": "#/Address"
+      },
+      "payee": {
+        "$ref": "#/Address",
+        "description": "Address the proof is bound to: the agent wallet, or the claim buyer if the receivable was sold."
+      },
+      "netAmount": {
+        "$ref": "#/U64",
+        "description": "Amount the payee receives; escrow compares it with its own net at release."
+      },
+      "mint": {
+        "$ref": "#/Address"
+      },
+      "dailySpentBefore": {
+        "$ref": "#/U64",
+        "description": "`OperatorState.daily_spent` the proof was built against; a different value at release = stale."
+      },
+      "proofTimestamp": {
+        "type": "integer",
+        "format": "int64"
+      },
+      "verdict": {
+        "$ref": "#/ReleaseVerdict"
+      },
+      "refusalCode": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 65535,
+        "description": "Policy rule that refused the release (0 when compliant). Codes defined with the circuit (BC-19)."
+      },
+      "consumed": {
+        "type": "boolean"
+      },
+      "bump": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 255
+      }
+    }
+  },
+  "ReleaseRecorded": {
+    "type": "object",
+    "required": [
+      "job",
+      "institution",
+      "netAmount",
+      "dailySpent",
+      "dayStartUnix"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "job": {
+        "$ref": "#/Address"
+      },
+      "institution": {
+        "$ref": "#/Address"
+      },
+      "netAmount": {
+        "$ref": "#/U64"
+      },
+      "dailySpent": {
+        "$ref": "#/U64"
+      },
+      "dayStartUnix": {
+        "type": "integer",
+        "format": "int64"
+      }
+    }
+  },
+  "ReleaseRefused": {
+    "type": "object",
+    "required": [
+      "job",
+      "refusalCode",
+      "refundedAmount",
+      "releaseProof"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "job": {
+        "$ref": "#/Address"
+      },
+      "refusalCode": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 65535
+      },
+      "refundedAmount": {
+        "$ref": "#/U64"
+      },
+      "releaseProof": {
+        "$ref": "#/Address"
+      }
+    }
+  },
+  "ReleaseVerified": {
+    "type": "object",
+    "required": [
+      "job",
+      "payee",
+      "netAmount",
+      "releaseProof"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "job": {
+        "$ref": "#/Address"
+      },
+      "payee": {
+        "$ref": "#/Address"
+      },
+      "netAmount": {
+        "$ref": "#/U64"
+      },
+      "releaseProof": {
+        "oneOf": [
+          {
+            "$ref": "#/Address"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      }
+    }
+  },
+  "ReputationRecorded": {
+    "type": "object",
+    "required": [
+      "agentRecord",
+      "job",
+      "jobsCompleted",
+      "jobsFailed",
+      "jobsDisputed",
+      "totalEarned"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "agentRecord": {
+        "$ref": "#/Address"
+      },
+      "job": {
+        "$ref": "#/Address"
+      },
+      "jobsCompleted": {
+        "$ref": "#/U64"
+      },
+      "jobsFailed": {
+        "$ref": "#/U64"
+      },
+      "jobsDisputed": {
+        "$ref": "#/U64"
+      },
+      "totalEarned": {
+        "$ref": "#/U64"
+      }
+    }
+  },
+  "ScreeningStatus": {
+    "type": "string",
+    "enum": [
+      "clear",
+      "flagged"
+    ]
+  },
+  "ScreeningRecord": {
+    "type": "object",
+    "description": "seeds = [\"screening\", wallet]",
+    "required": [
+      "wallet",
+      "status",
+      "sourceHash",
+      "screenedAt",
+      "expiresAt",
+      "bump"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "wallet": {
+        "$ref": "#/Address"
+      },
+      "status": {
+        "$ref": "#/ScreeningStatus"
+      },
+      "sourceHash": {
+        "$ref": "#/Hex32",
+        "description": "Hash of the screening evidence (provider response / list version)."
+      },
+      "screenedAt": {
+        "type": "integer",
+        "format": "int64"
+      },
+      "expiresAt": {
+        "type": "integer",
+        "format": "int64"
+      },
+      "bump": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 255
+      }
+    }
+  },
+  "ScreeningRecorded": {
+    "type": "object",
+    "required": [
+      "wallet",
+      "status",
+      "sourceHash",
+      "expiresAt"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "wallet": {
+        "$ref": "#/Address"
+      },
+      "status": {
+        "$ref": "#/ScreeningStatus"
+      },
+      "sourceHash": {
+        "$ref": "#/Hex32"
+      },
+      "expiresAt": {
+        "type": "integer",
+        "format": "int64"
+      }
+    }
+  },
+  "TravelRuleCommitted": {
+    "type": "object",
+    "description": "DRAFT (M5).",
+    "required": [
+      "job",
+      "commitment"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "job": {
+        "$ref": "#/Address"
+      },
+      "commitment": {
+        "$ref": "#/Hex32"
+      }
+    }
+  },
+  "ValidationOutcome": {
+    "type": "string",
+    "enum": [
+      "verified",
+      "refused",
+      "noGate",
+      "noPayout"
+    ]
+  },
+  "ValidationRecord": {
+    "type": "object",
+    "description": "seeds = [\"validation\", job] — gate outcome of a settled job (BC-26); written once per job.",
+    "required": [
+      "job",
+      "agentRecord",
+      "outcome",
+      "refusalCode",
+      "recordedAt",
+      "bump",
+      "policy",
+      "releaseProof"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "job": {
+        "$ref": "#/Address"
+      },
+      "agentRecord": {
+        "$ref": "#/Address"
+      },
+      "outcome": {
+        "$ref": "#/ValidationOutcome"
+      },
+      "refusalCode": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 65535,
+        "description": "`ReleaseProof.refusal_code` when Refused, else 0."
+      },
+      "recordedAt": {
+        "type": "integer",
+        "format": "int64"
+      },
+      "bump": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 255
+      },
+      "policy": {
+        "oneOf": [
+          {
+            "$ref": "#/Address"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "releaseProof": {
+        "oneOf": [
+          {
+            "$ref": "#/Address"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      }
+    }
+  },
+  "ValidationRecorded": {
+    "type": "object",
+    "required": [
+      "job",
+      "agentRecord",
+      "outcome",
+      "refusalCode"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "job": {
+        "$ref": "#/Address"
+      },
+      "agentRecord": {
+        "$ref": "#/Address"
+      },
+      "outcome": {
+        "$ref": "#/ValidationOutcome"
+      },
+      "refusalCode": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 65535
+      }
+    }
+  },
+  "VerifierConfig": {
+    "type": "object",
+    "description": "Singleton. seeds = [\"verifier_config\"]",
+    "required": [
+      "admin",
+      "escrowProgram",
+      "policyProgram",
+      "mppAuthority",
+      "vkVersion",
+      "bump"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "admin": {
+        "$ref": "#/Address"
+      },
+      "escrowProgram": {
+        "$ref": "#/Address",
+        "description": "Owner of `Job` / `ClaimListing`; its [\"escrow_authority\"] PDA may call `record_release`."
+      },
+      "policyProgram": {
+        "$ref": "#/Address",
+        "description": "Owner of `Institution` / `Policy` accounts read by the verifier."
+      },
+      "mppAuthority": {
+        "$ref": "#/Address",
+        "description": "DRAFT (M6): ed25519 key of the compliance-api MPP attestations."
+      },
+      "vkVersion": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 65535,
+        "description": "Version of the embedded verifying key (bumped after the phase-2 ceremony, BC-38)."
+      },
+      "bump": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 255
+      }
+    }
+  },
+  "VerifierConfigUpdated": {
+    "type": "object",
+    "required": [
+      "admin",
+      "escrowProgram",
+      "policyProgram",
+      "mppAuthority",
+      "vkVersion"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "admin": {
+        "$ref": "#/Address"
+      },
+      "escrowProgram": {
+        "$ref": "#/Address"
+      },
+      "policyProgram": {
+        "$ref": "#/Address"
+      },
+      "mppAuthority": {
+        "$ref": "#/Address"
+      },
+      "vkVersion": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 65535
+      }
+    }
+  },
+  "WorkSubmitted": {
+    "type": "object",
+    "required": [
+      "job",
+      "workHash",
+      "deliveryUri",
+      "challengeEnd"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "job": {
+        "$ref": "#/Address"
+      },
+      "workHash": {
+        "$ref": "#/Hex32"
+      },
+      "deliveryUri": {
+        "type": "string"
+      },
+      "challengeEnd": {
+        "type": "integer",
+        "format": "int64"
+      }
+    }
+  },
+  "AgentDeregisteredEvent": {
+    "type": "object",
+    "required": [
+      "program",
+      "name",
+      "data"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "program": {
+        "type": "string",
+        "const": "registry"
+      },
+      "name": {
+        "type": "string",
+        "const": "AgentDeregistered"
+      },
+      "data": {
+        "$ref": "#/AgentDeregistered"
+      }
+    }
+  },
+  "AgentOwnershipTransferredEvent": {
+    "type": "object",
+    "required": [
+      "program",
+      "name",
+      "data"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "program": {
+        "type": "string",
+        "const": "registry"
+      },
+      "name": {
+        "type": "string",
+        "const": "AgentOwnershipTransferred"
+      },
+      "data": {
+        "$ref": "#/AgentOwnershipTransferred"
+      }
+    }
+  },
+  "AgentRegisteredEvent": {
+    "type": "object",
+    "required": [
+      "program",
+      "name",
+      "data"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "program": {
+        "type": "string",
+        "const": "registry"
+      },
+      "name": {
+        "type": "string",
+        "const": "AgentRegistered"
+      },
+      "data": {
+        "$ref": "#/AgentRegistered"
+      }
+    }
+  },
+  "AgentStatusChangedEvent": {
+    "type": "object",
+    "required": [
+      "program",
+      "name",
+      "data"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "program": {
+        "type": "string",
+        "const": "registry"
+      },
+      "name": {
+        "type": "string",
+        "const": "AgentStatusChanged"
+      },
+      "data": {
+        "$ref": "#/AgentStatusChanged"
+      }
+    }
+  },
+  "AgentUpdatedEvent": {
+    "type": "object",
+    "required": [
+      "program",
+      "name",
+      "data"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "program": {
+        "type": "string",
+        "const": "registry"
+      },
+      "name": {
+        "type": "string",
+        "const": "AgentUpdated"
+      },
+      "data": {
+        "$ref": "#/AgentUpdated"
+      }
+    }
+  },
+  "RegistryConfigUpdatedEvent": {
+    "type": "object",
+    "required": [
+      "program",
+      "name",
+      "data"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "program": {
+        "type": "string",
+        "const": "registry"
+      },
+      "name": {
+        "type": "string",
+        "const": "RegistryConfigUpdated"
+      },
+      "data": {
+        "$ref": "#/RegistryConfigUpdated"
+      }
+    }
+  },
+  "ScreeningRecordedEvent": {
+    "type": "object",
+    "required": [
+      "program",
+      "name",
+      "data"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "program": {
+        "type": "string",
+        "const": "registry"
+      },
+      "name": {
+        "type": "string",
+        "const": "ScreeningRecorded"
+      },
+      "data": {
+        "$ref": "#/ScreeningRecorded"
+      }
+    }
+  },
+  "BuyerRootCommittedEvent": {
+    "type": "object",
+    "required": [
+      "program",
+      "name",
+      "data"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "program": {
+        "type": "string",
+        "const": "policy"
+      },
+      "name": {
+        "type": "string",
+        "const": "BuyerRootCommitted"
+      },
+      "data": {
+        "$ref": "#/BuyerRootCommitted"
+      }
+    }
+  },
+  "InstitutionCreatedEvent": {
+    "type": "object",
+    "required": [
+      "program",
+      "name",
+      "data"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "program": {
+        "type": "string",
+        "const": "policy"
+      },
+      "name": {
+        "type": "string",
+        "const": "InstitutionCreated"
+      },
+      "data": {
+        "$ref": "#/InstitutionCreated"
+      }
+    }
+  },
+  "InstitutionMultisigSetEvent": {
+    "type": "object",
+    "required": [
+      "program",
+      "name",
+      "data"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "program": {
+        "type": "string",
+        "const": "policy"
+      },
+      "name": {
+        "type": "string",
+        "const": "InstitutionMultisigSet"
+      },
+      "data": {
+        "$ref": "#/InstitutionMultisigSet"
+      }
+    }
+  },
+  "PolicyCommittedEvent": {
+    "type": "object",
+    "required": [
+      "program",
+      "name",
+      "data"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "program": {
+        "type": "string",
+        "const": "policy"
+      },
+      "name": {
+        "type": "string",
+        "const": "PolicyCommitted"
+      },
+      "data": {
+        "$ref": "#/PolicyCommitted"
+      }
+    }
+  },
+  "PolicyDeactivatedEvent": {
+    "type": "object",
+    "required": [
+      "program",
+      "name",
+      "data"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "program": {
+        "type": "string",
+        "const": "policy"
+      },
+      "name": {
+        "type": "string",
+        "const": "PolicyDeactivated"
+      },
+      "data": {
+        "$ref": "#/PolicyDeactivated"
+      }
+    }
+  },
+  "PolicyUpdatedEvent": {
+    "type": "object",
+    "required": [
+      "program",
+      "name",
+      "data"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "program": {
+        "type": "string",
+        "const": "policy"
+      },
+      "name": {
+        "type": "string",
+        "const": "PolicyUpdated"
+      },
+      "data": {
+        "$ref": "#/PolicyUpdated"
+      }
+    }
+  },
+  "ComplianceProofSetEvent": {
+    "type": "object",
+    "required": [
+      "program",
+      "name",
+      "data"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "program": {
+        "type": "string",
+        "const": "verifier"
+      },
+      "name": {
+        "type": "string",
+        "const": "ComplianceProofSet"
+      },
+      "data": {
+        "$ref": "#/ComplianceProofSet"
+      }
+    }
+  },
+  "MppPaymentVerifiedEvent": {
+    "type": "object",
+    "required": [
+      "program",
+      "name",
+      "data"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "program": {
+        "type": "string",
+        "const": "verifier"
+      },
+      "name": {
+        "type": "string",
+        "const": "MppPaymentVerified"
+      },
+      "data": {
+        "$ref": "#/MppPaymentVerified"
+      }
+    }
+  },
+  "ReleaseRecordedEvent": {
+    "type": "object",
+    "required": [
+      "program",
+      "name",
+      "data"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "program": {
+        "type": "string",
+        "const": "verifier"
+      },
+      "name": {
+        "type": "string",
+        "const": "ReleaseRecorded"
+      },
+      "data": {
+        "$ref": "#/ReleaseRecorded"
+      }
+    }
+  },
+  "VerifierConfigUpdatedEvent": {
+    "type": "object",
+    "required": [
+      "program",
+      "name",
+      "data"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "program": {
+        "type": "string",
+        "const": "verifier"
+      },
+      "name": {
+        "type": "string",
+        "const": "VerifierConfigUpdated"
+      },
+      "data": {
+        "$ref": "#/VerifierConfigUpdated"
+      }
+    }
+  },
+  "ArbitratorsUpdatedEvent": {
+    "type": "object",
+    "required": [
+      "program",
+      "name",
+      "data"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "program": {
+        "type": "string",
+        "const": "escrow"
+      },
+      "name": {
+        "type": "string",
+        "const": "ArbitratorsUpdated"
+      },
+      "data": {
+        "$ref": "#/ArbitratorsUpdated"
+      }
+    }
+  },
+  "ClaimBoughtEvent": {
+    "type": "object",
+    "required": [
+      "program",
+      "name",
+      "data"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "program": {
+        "type": "string",
+        "const": "escrow"
+      },
+      "name": {
+        "type": "string",
+        "const": "ClaimBought"
+      },
+      "data": {
+        "$ref": "#/ClaimBought"
+      }
+    }
+  },
+  "ClaimCancelledEvent": {
+    "type": "object",
+    "required": [
+      "program",
+      "name",
+      "data"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "program": {
+        "type": "string",
+        "const": "escrow"
+      },
+      "name": {
+        "type": "string",
+        "const": "ClaimCancelled"
+      },
+      "data": {
+        "$ref": "#/ClaimCancelled"
+      }
+    }
+  },
+  "ClaimListedEvent": {
+    "type": "object",
+    "required": [
+      "program",
+      "name",
+      "data"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "program": {
+        "type": "string",
+        "const": "escrow"
+      },
+      "name": {
+        "type": "string",
+        "const": "ClaimListed"
+      },
+      "data": {
+        "$ref": "#/ClaimListed"
+      }
+    }
+  },
+  "DisputeDecidedEvent": {
+    "type": "object",
+    "required": [
+      "program",
+      "name",
+      "data"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "program": {
+        "type": "string",
+        "const": "escrow"
+      },
+      "name": {
+        "type": "string",
+        "const": "DisputeDecided"
+      },
+      "data": {
+        "$ref": "#/DisputeDecided"
+      }
+    }
+  },
+  "DisputeLapsedEvent": {
+    "type": "object",
+    "required": [
+      "program",
+      "name",
+      "data"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "program": {
+        "type": "string",
+        "const": "escrow"
+      },
+      "name": {
+        "type": "string",
+        "const": "DisputeLapsed"
+      },
+      "data": {
+        "$ref": "#/DisputeLapsed"
+      }
+    }
+  },
+  "DisputeRaisedEvent": {
+    "type": "object",
+    "required": [
+      "program",
+      "name",
+      "data"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "program": {
+        "type": "string",
+        "const": "escrow"
+      },
+      "name": {
+        "type": "string",
+        "const": "DisputeRaised"
+      },
+      "data": {
+        "$ref": "#/DisputeRaised"
+      }
+    }
+  },
+  "DisputeResolvedEvent": {
+    "type": "object",
+    "required": [
+      "program",
+      "name",
+      "data"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "program": {
+        "type": "string",
+        "const": "escrow"
+      },
+      "name": {
+        "type": "string",
+        "const": "DisputeResolved"
+      },
+      "data": {
+        "$ref": "#/DisputeResolved"
+      }
+    }
+  },
+  "DisputeVoteEvent": {
+    "type": "object",
+    "required": [
+      "program",
+      "name",
+      "data"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "program": {
+        "type": "string",
+        "const": "escrow"
+      },
+      "name": {
+        "type": "string",
+        "const": "DisputeVote"
+      },
+      "data": {
+        "$ref": "#/DisputeVote"
+      }
+    }
+  },
+  "EscrowConfigUpdatedEvent": {
+    "type": "object",
+    "required": [
+      "program",
+      "name",
+      "data"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "program": {
+        "type": "string",
+        "const": "escrow"
+      },
+      "name": {
+        "type": "string",
+        "const": "EscrowConfigUpdated"
+      },
+      "data": {
+        "$ref": "#/EscrowConfigUpdated"
+      }
+    }
+  },
+  "FinalizedEvent": {
+    "type": "object",
+    "required": [
+      "program",
+      "name",
+      "data"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "program": {
+        "type": "string",
+        "const": "escrow"
+      },
+      "name": {
+        "type": "string",
+        "const": "Finalized"
+      },
+      "data": {
+        "$ref": "#/Finalized"
+      }
+    }
+  },
+  "JobAcceptedEvent": {
+    "type": "object",
+    "required": [
+      "program",
+      "name",
+      "data"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "program": {
+        "type": "string",
+        "const": "escrow"
+      },
+      "name": {
+        "type": "string",
+        "const": "JobAccepted"
+      },
+      "data": {
+        "$ref": "#/JobAccepted"
+      }
+    }
+  },
+  "JobAgentWalletSyncedEvent": {
+    "type": "object",
+    "required": [
+      "program",
+      "name",
+      "data"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "program": {
+        "type": "string",
+        "const": "escrow"
+      },
+      "name": {
+        "type": "string",
+        "const": "JobAgentWalletSynced"
+      },
+      "data": {
+        "$ref": "#/JobAgentWalletSynced"
+      }
+    }
+  },
+  "JobCancelledEvent": {
+    "type": "object",
+    "required": [
+      "program",
+      "name",
+      "data"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "program": {
+        "type": "string",
+        "const": "escrow"
+      },
+      "name": {
+        "type": "string",
+        "const": "JobCancelled"
+      },
+      "data": {
+        "$ref": "#/JobCancelled"
+      }
+    }
+  },
+  "JobCreatedEvent": {
+    "type": "object",
+    "required": [
+      "program",
+      "name",
+      "data"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "program": {
+        "type": "string",
+        "const": "escrow"
+      },
+      "name": {
+        "type": "string",
+        "const": "JobCreated"
+      },
+      "data": {
+        "$ref": "#/JobCreated"
+      }
+    }
+  },
+  "JobFundedEvent": {
+    "type": "object",
+    "required": [
+      "program",
+      "name",
+      "data"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "program": {
+        "type": "string",
+        "const": "escrow"
+      },
+      "name": {
+        "type": "string",
+        "const": "JobFunded"
+      },
+      "data": {
+        "$ref": "#/JobFunded"
+      }
+    }
+  },
+  "MissingProofEscalatedEvent": {
+    "type": "object",
+    "required": [
+      "program",
+      "name",
+      "data"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "program": {
+        "type": "string",
+        "const": "escrow"
+      },
+      "name": {
+        "type": "string",
+        "const": "MissingProofEscalated"
+      },
+      "data": {
+        "$ref": "#/MissingProofEscalated"
+      }
+    }
+  },
+  "ReleaseRefusedEvent": {
+    "type": "object",
+    "required": [
+      "program",
+      "name",
+      "data"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "program": {
+        "type": "string",
+        "const": "escrow"
+      },
+      "name": {
+        "type": "string",
+        "const": "ReleaseRefused"
+      },
+      "data": {
+        "$ref": "#/ReleaseRefused"
+      }
+    }
+  },
+  "ReleaseVerifiedEvent": {
+    "type": "object",
+    "required": [
+      "program",
+      "name",
+      "data"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "program": {
+        "type": "string",
+        "const": "escrow"
+      },
+      "name": {
+        "type": "string",
+        "const": "ReleaseVerified"
+      },
+      "data": {
+        "$ref": "#/ReleaseVerified"
+      }
+    }
+  },
+  "ReputationRecordedEvent": {
+    "type": "object",
+    "required": [
+      "program",
+      "name",
+      "data"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "program": {
+        "type": "string",
+        "const": "escrow"
+      },
+      "name": {
+        "type": "string",
+        "const": "ReputationRecorded"
+      },
+      "data": {
+        "$ref": "#/ReputationRecorded"
+      }
+    }
+  },
+  "TravelRuleCommittedEvent": {
+    "type": "object",
+    "required": [
+      "program",
+      "name",
+      "data"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "program": {
+        "type": "string",
+        "const": "escrow"
+      },
+      "name": {
+        "type": "string",
+        "const": "TravelRuleCommitted"
+      },
+      "data": {
+        "$ref": "#/TravelRuleCommitted"
+      }
+    }
+  },
+  "ValidationRecordedEvent": {
+    "type": "object",
+    "required": [
+      "program",
+      "name",
+      "data"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "program": {
+        "type": "string",
+        "const": "escrow"
+      },
+      "name": {
+        "type": "string",
+        "const": "ValidationRecorded"
+      },
+      "data": {
+        "$ref": "#/ValidationRecorded"
+      }
+    }
+  },
+  "WorkSubmittedEvent": {
+    "type": "object",
+    "required": [
+      "program",
+      "name",
+      "data"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "program": {
+        "type": "string",
+        "const": "escrow"
+      },
+      "name": {
+        "type": "string",
+        "const": "WorkSubmitted"
+      },
+      "data": {
+        "$ref": "#/WorkSubmitted"
+      }
+    }
+  },
+  "ProgramEventPayload": {
+    "oneOf": [
+      {
+        "$ref": "#/AgentDeregisteredEvent"
+      },
+      {
+        "$ref": "#/AgentOwnershipTransferredEvent"
+      },
+      {
+        "$ref": "#/AgentRegisteredEvent"
+      },
+      {
+        "$ref": "#/AgentStatusChangedEvent"
+      },
+      {
+        "$ref": "#/AgentUpdatedEvent"
+      },
+      {
+        "$ref": "#/RegistryConfigUpdatedEvent"
+      },
+      {
+        "$ref": "#/ScreeningRecordedEvent"
+      },
+      {
+        "$ref": "#/BuyerRootCommittedEvent"
+      },
+      {
+        "$ref": "#/InstitutionCreatedEvent"
+      },
+      {
+        "$ref": "#/InstitutionMultisigSetEvent"
+      },
+      {
+        "$ref": "#/PolicyCommittedEvent"
+      },
+      {
+        "$ref": "#/PolicyDeactivatedEvent"
+      },
+      {
+        "$ref": "#/PolicyUpdatedEvent"
+      },
+      {
+        "$ref": "#/ComplianceProofSetEvent"
+      },
+      {
+        "$ref": "#/MppPaymentVerifiedEvent"
+      },
+      {
+        "$ref": "#/ReleaseRecordedEvent"
+      },
+      {
+        "$ref": "#/VerifierConfigUpdatedEvent"
+      },
+      {
+        "$ref": "#/ArbitratorsUpdatedEvent"
+      },
+      {
+        "$ref": "#/ClaimBoughtEvent"
+      },
+      {
+        "$ref": "#/ClaimCancelledEvent"
+      },
+      {
+        "$ref": "#/ClaimListedEvent"
+      },
+      {
+        "$ref": "#/DisputeDecidedEvent"
+      },
+      {
+        "$ref": "#/DisputeLapsedEvent"
+      },
+      {
+        "$ref": "#/DisputeRaisedEvent"
+      },
+      {
+        "$ref": "#/DisputeResolvedEvent"
+      },
+      {
+        "$ref": "#/DisputeVoteEvent"
+      },
+      {
+        "$ref": "#/EscrowConfigUpdatedEvent"
+      },
+      {
+        "$ref": "#/FinalizedEvent"
+      },
+      {
+        "$ref": "#/JobAcceptedEvent"
+      },
+      {
+        "$ref": "#/JobAgentWalletSyncedEvent"
+      },
+      {
+        "$ref": "#/JobCancelledEvent"
+      },
+      {
+        "$ref": "#/JobCreatedEvent"
+      },
+      {
+        "$ref": "#/JobFundedEvent"
+      },
+      {
+        "$ref": "#/MissingProofEscalatedEvent"
+      },
+      {
+        "$ref": "#/ReleaseRefusedEvent"
+      },
+      {
+        "$ref": "#/ReleaseVerifiedEvent"
+      },
+      {
+        "$ref": "#/ReputationRecordedEvent"
+      },
+      {
+        "$ref": "#/TravelRuleCommittedEvent"
+      },
+      {
+        "$ref": "#/ValidationRecordedEvent"
+      },
+      {
+        "$ref": "#/WorkSubmittedEvent"
+      }
+    ],
+    "discriminator": {
+      "propertyName": "name",
+      "mapping": {
+        "AgentDeregistered": "#/AgentDeregisteredEvent",
+        "AgentOwnershipTransferred": "#/AgentOwnershipTransferredEvent",
+        "AgentRegistered": "#/AgentRegisteredEvent",
+        "AgentStatusChanged": "#/AgentStatusChangedEvent",
+        "AgentUpdated": "#/AgentUpdatedEvent",
+        "RegistryConfigUpdated": "#/RegistryConfigUpdatedEvent",
+        "ScreeningRecorded": "#/ScreeningRecordedEvent",
+        "BuyerRootCommitted": "#/BuyerRootCommittedEvent",
+        "InstitutionCreated": "#/InstitutionCreatedEvent",
+        "InstitutionMultisigSet": "#/InstitutionMultisigSetEvent",
+        "PolicyCommitted": "#/PolicyCommittedEvent",
+        "PolicyDeactivated": "#/PolicyDeactivatedEvent",
+        "PolicyUpdated": "#/PolicyUpdatedEvent",
+        "ComplianceProofSet": "#/ComplianceProofSetEvent",
+        "MppPaymentVerified": "#/MppPaymentVerifiedEvent",
+        "ReleaseRecorded": "#/ReleaseRecordedEvent",
+        "VerifierConfigUpdated": "#/VerifierConfigUpdatedEvent",
+        "ArbitratorsUpdated": "#/ArbitratorsUpdatedEvent",
+        "ClaimBought": "#/ClaimBoughtEvent",
+        "ClaimCancelled": "#/ClaimCancelledEvent",
+        "ClaimListed": "#/ClaimListedEvent",
+        "DisputeDecided": "#/DisputeDecidedEvent",
+        "DisputeLapsed": "#/DisputeLapsedEvent",
+        "DisputeRaised": "#/DisputeRaisedEvent",
+        "DisputeResolved": "#/DisputeResolvedEvent",
+        "DisputeVote": "#/DisputeVoteEvent",
+        "EscrowConfigUpdated": "#/EscrowConfigUpdatedEvent",
+        "Finalized": "#/FinalizedEvent",
+        "JobAccepted": "#/JobAcceptedEvent",
+        "JobAgentWalletSynced": "#/JobAgentWalletSyncedEvent",
+        "JobCancelled": "#/JobCancelledEvent",
+        "JobCreated": "#/JobCreatedEvent",
+        "JobFunded": "#/JobFundedEvent",
+        "MissingProofEscalated": "#/MissingProofEscalatedEvent",
+        "ReleaseRefused": "#/ReleaseRefusedEvent",
+        "ReleaseVerified": "#/ReleaseVerifiedEvent",
+        "ReputationRecorded": "#/ReputationRecordedEvent",
+        "TravelRuleCommitted": "#/TravelRuleCommittedEvent",
+        "ValidationRecorded": "#/ValidationRecordedEvent",
+        "WorkSubmitted": "#/WorkSubmittedEvent"
+      }
+    }
+  },
+  "DeregisterAgentArgs": {
+    "type": "object",
+    "required": [],
+    "additionalProperties": false,
+    "properties": {}
+  },
+  "DeregisterAgentCall": {
+    "type": "object",
+    "description": "Terminal: sets `Deregistered`. The record is kept (not closed) so the same (creator, agent_id) can never be re-registered and inherit the agent's reputation or did:aip.",
+    "required": [
+      "program",
+      "instruction",
+      "args"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "program": {
+        "type": "string",
+        "const": "registry"
+      },
+      "instruction": {
+        "type": "string",
+        "const": "deregisterAgent"
+      },
+      "args": {
+        "$ref": "#/DeregisterAgentArgs"
+      }
+    }
+  },
+  "InitRegistryConfigArgs": {
+    "type": "object",
+    "required": [
+      "screenerAuthority",
+      "screeningTtlSecs"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "screenerAuthority": {
+        "$ref": "#/Address"
+      },
+      "screeningTtlSecs": {
+        "type": "integer",
+        "format": "int64"
+      }
+    }
+  },
+  "InitRegistryConfigCall": {
+    "type": "object",
+    "description": "Creates the singleton registry config. Only the program upgrade authority (Squads vault) can call it (checked through `program_data`), so the config cannot be front-run.",
+    "required": [
+      "program",
+      "instruction",
+      "args"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "program": {
+        "type": "string",
+        "const": "registry"
+      },
+      "instruction": {
+        "type": "string",
+        "const": "initRegistryConfig"
+      },
+      "args": {
+        "$ref": "#/InitRegistryConfigArgs"
+      }
+    }
+  },
+  "RecordScreeningArgs": {
+    "type": "object",
+    "required": [
+      "wallet",
+      "status",
+      "sourceHash"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "wallet": {
+        "$ref": "#/Address"
+      },
+      "status": {
+        "$ref": "#/ScreeningStatus"
+      },
+      "sourceHash": {
+        "$ref": "#/Hex32"
+      }
+    }
+  },
+  "RecordScreeningCall": {
+    "type": "object",
+    "description": "Flow step 3: the screener service (BE-16) records a sanctions screening result for a wallet. Escrow reads it on `fund_job` (institution and agent), `buy_claim` (buyer) and release (payee).",
+    "required": [
+      "program",
+      "instruction",
+      "args"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "program": {
+        "type": "string",
+        "const": "registry"
+      },
+      "instruction": {
+        "type": "string",
+        "const": "recordScreening"
+      },
+      "args": {
+        "$ref": "#/RecordScreeningArgs"
+      }
+    }
+  },
+  "RegisterAgentArgs": {
+    "type": "object",
+    "required": [
+      "agentId",
+      "agentCardUri",
+      "agentCardHash",
+      "wallet"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "agentId": {
+        "type": "string"
+      },
+      "agentCardUri": {
+        "type": "string"
+      },
+      "agentCardHash": {
+        "$ref": "#/Hex32"
+      },
+      "wallet": {
+        "$ref": "#/Address"
+      }
+    }
+  },
+  "RegisterAgentCall": {
+    "type": "object",
+    "description": "Flow step 2: an agent registers; it resolves as did:aip (Solana profile, BC-14). `agent_id` is an immutable slug, unique per creator and never reusable (see `deregister_agent`).",
+    "required": [
+      "program",
+      "instruction",
+      "args"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "program": {
+        "type": "string",
+        "const": "registry"
+      },
+      "instruction": {
+        "type": "string",
+        "const": "registerAgent"
+      },
+      "args": {
+        "$ref": "#/RegisterAgentArgs"
+      }
+    }
+  },
+  "SetAgentStatusArgs": {
+    "type": "object",
+    "required": [
+      "status"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "status": {
+        "$ref": "#/AgentStatus"
+      }
+    }
+  },
+  "SetAgentStatusCall": {
+    "type": "object",
+    "description": "Pauses (`Inactive`) or resumes (`Active`) the agent. Escrow rejects `create_job` and `accept_job` for a non-active agent; jobs already accepted can still be delivered and settled. `Deregistered` is not accepted here.",
+    "required": [
+      "program",
+      "instruction",
+      "args"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "program": {
+        "type": "string",
+        "const": "registry"
+      },
+      "instruction": {
+        "type": "string",
+        "const": "setAgentStatus"
+      },
+      "args": {
+        "$ref": "#/SetAgentStatusArgs"
+      }
+    }
+  },
+  "TransferAgentOwnershipArgs": {
+    "type": "object",
+    "required": [
+      "newOwner"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "newOwner": {
+        "$ref": "#/Address"
+      }
+    }
+  },
+  "TransferAgentOwnershipCall": {
+    "type": "object",
+    "description": "Transfers ownership. The PDA is derived from the immutable `creator`, so the address stays stable.",
+    "required": [
+      "program",
+      "instruction",
+      "args"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "program": {
+        "type": "string",
+        "const": "registry"
+      },
+      "instruction": {
+        "type": "string",
+        "const": "transferAgentOwnership"
+      },
+      "args": {
+        "$ref": "#/TransferAgentOwnershipArgs"
+      }
+    }
+  },
+  "UpdateAgentArgs": {
+    "type": "object",
+    "required": [
+      "agentCardUri",
+      "agentCardHash",
+      "wallet"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "agentCardUri": {
+        "type": "string"
+      },
+      "agentCardHash": {
+        "$ref": "#/Hex32"
+      },
+      "wallet": {
+        "$ref": "#/Address"
+      }
+    }
+  },
+  "UpdateAgentCall": {
+    "type": "object",
+    "description": "Updates the agent card pointer/hash and the agent wallet. Owner only. Jobs keep the wallet they were created with until the owner calls escrow `sync_agent_wallet`.",
+    "required": [
+      "program",
+      "instruction",
+      "args"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "program": {
+        "type": "string",
+        "const": "registry"
+      },
+      "instruction": {
+        "type": "string",
+        "const": "updateAgent"
+      },
+      "args": {
+        "$ref": "#/UpdateAgentArgs"
+      }
+    }
+  },
+  "UpdateRegistryConfigArgs": {
+    "type": "object",
+    "required": [
+      "screenerAuthority",
+      "screeningTtlSecs"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "screenerAuthority": {
+        "$ref": "#/Address"
+      },
+      "screeningTtlSecs": {
+        "type": "integer",
+        "format": "int64"
+      }
+    }
+  },
+  "UpdateRegistryConfigCall": {
+    "type": "object",
+    "description": "Rotates the screener authority and the screening record lifetime.",
+    "required": [
+      "program",
+      "instruction",
+      "args"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "program": {
+        "type": "string",
+        "const": "registry"
+      },
+      "instruction": {
+        "type": "string",
+        "const": "updateRegistryConfig"
+      },
+      "args": {
+        "$ref": "#/UpdateRegistryConfigArgs"
+      }
+    }
+  },
+  "DeactivatePolicyArgs": {
+    "type": "object",
+    "required": [],
+    "additionalProperties": false,
+    "properties": {}
+  },
+  "DeactivatePolicyCall": {
+    "type": "object",
+    "description": "Deactivates a policy: no new jobs can reference it. Existing jobs settle against their snapshot.",
+    "required": [
+      "program",
+      "instruction",
+      "args"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "program": {
+        "type": "string",
+        "const": "policy"
+      },
+      "instruction": {
+        "type": "string",
+        "const": "deactivatePolicy"
+      },
+      "args": {
+        "$ref": "#/DeactivatePolicyArgs"
+      }
+    }
+  },
+  "InitInstitutionArgs": {
+    "type": "object",
+    "required": [
+      "name"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "name": {
+        "type": "string"
+      }
+    }
+  },
+  "InitInstitutionCall": {
+    "type": "object",
+    "description": "Creates the institution account for `authority` (which becomes `owner_key`).",
+    "required": [
+      "program",
+      "instruction",
+      "args"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "program": {
+        "type": "string",
+        "const": "policy"
+      },
+      "instruction": {
+        "type": "string",
+        "const": "initInstitution"
+      },
+      "args": {
+        "$ref": "#/InitInstitutionArgs"
+      }
+    }
+  },
+  "SetBuyerRootArgs": {
+    "type": "object",
+    "required": [
+      "buyerRoot"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "buyerRoot": {
+        "$ref": "#/Hex32"
+      }
+    }
+  },
+  "SetBuyerRootCall": {
+    "type": "object",
+    "description": "Flow step 5 (institution side): publishes the root of the salted approved-buyer list. Leaf = sha256(buyer_pubkey || leaf_salt); escrow `buy_claim` checks a Merkle proof against the current root. An all-zero root means \"no buyer restriction\".",
+    "required": [
+      "program",
+      "instruction",
+      "args"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "program": {
+        "type": "string",
+        "const": "policy"
+      },
+      "instruction": {
+        "type": "string",
+        "const": "setBuyerRoot"
+      },
+      "args": {
+        "$ref": "#/SetBuyerRootArgs"
+      }
+    }
+  },
+  "SetInstitutionMultisigArgs": {
+    "type": "object",
+    "required": [
+      "multisig",
+      "vaultIndex"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "multisig": {
+        "$ref": "#/Address"
+      },
+      "vaultIndex": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 255
+      }
+    }
+  },
+  "SetInstitutionMultisigCall": {
+    "type": "object",
+    "description": "Binds (or, signed by the current vault, rebinds) a Squads v4 multisig. Afterwards only its vault PDA (`vault_index`) may sign as authority.",
+    "required": [
+      "program",
+      "instruction",
+      "args"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "program": {
+        "type": "string",
+        "const": "policy"
+      },
+      "instruction": {
+        "type": "string",
+        "const": "setInstitutionMultisig"
+      },
+      "args": {
+        "$ref": "#/SetInstitutionMultisigArgs"
+      }
+    }
+  },
+  "SetPolicyArgs": {
+    "type": "object",
+    "required": [
+      "policyId",
+      "commitment",
+      "dailyCeiling"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "policyId": {
+        "$ref": "#/Hex32"
+      },
+      "commitment": {
+        "$ref": "#/Hex32"
+      },
+      "dailyCeiling": {
+        "$ref": "#/U64"
+      }
+    }
+  },
+  "SetPolicyCall": {
+    "type": "object",
+    "description": "Flow step 1: commits a spending policy. Only the salted Poseidon commitment and the public daily ceiling (settlement-mint atomic units) are stored.",
+    "required": [
+      "program",
+      "instruction",
+      "args"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "program": {
+        "type": "string",
+        "const": "policy"
+      },
+      "instruction": {
+        "type": "string",
+        "const": "setPolicy"
+      },
+      "args": {
+        "$ref": "#/SetPolicyArgs"
+      }
+    }
+  },
+  "UpdatePolicyArgs": {
+    "type": "object",
+    "required": [
+      "commitment",
+      "dailyCeiling"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "commitment": {
+        "$ref": "#/Hex32"
+      },
+      "dailyCeiling": {
+        "$ref": "#/U64"
+      }
+    }
+  },
+  "UpdatePolicyCall": {
+    "type": "object",
+    "description": "Replaces the commitment and/or daily ceiling and increments `version`. Existing jobs keep the snapshot taken at `create_job`.",
+    "required": [
+      "program",
+      "instruction",
+      "args"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "program": {
+        "type": "string",
+        "const": "policy"
+      },
+      "instruction": {
+        "type": "string",
+        "const": "updatePolicy"
+      },
+      "args": {
+        "$ref": "#/UpdatePolicyArgs"
+      }
+    }
+  },
+  "InitVerifierConfigArgs": {
+    "type": "object",
+    "required": [
+      "escrowProgram",
+      "policyProgram",
+      "mppAuthority"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "escrowProgram": {
+        "$ref": "#/Address"
+      },
+      "policyProgram": {
+        "$ref": "#/Address"
+      },
+      "mppAuthority": {
+        "$ref": "#/Address"
+      }
+    }
+  },
+  "InitVerifierConfigCall": {
+    "type": "object",
+    "description": "Creates the singleton verifier config. Only the program upgrade authority (Squads vault) can call it. `escrow_program` / `policy_program` pin the owners checked on account-read.",
+    "required": [
+      "program",
+      "instruction",
+      "args"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "program": {
+        "type": "string",
+        "const": "verifier"
+      },
+      "instruction": {
+        "type": "string",
+        "const": "initVerifierConfig"
+      },
+      "args": {
+        "$ref": "#/InitVerifierConfigArgs"
+      }
+    }
+  },
+  "RecordReleaseArgs": {
+    "type": "object",
+    "required": [],
+    "additionalProperties": false,
+    "properties": {}
+  },
+  "RecordReleaseCall": {
+    "type": "object",
+    "description": "CPI-only (escrow, signed by its `escrow_authority` PDA): marks the release proof consumed and advances `OperatorState.daily_spent` (UTC-day rollover) by the released net amount.",
+    "required": [
+      "program",
+      "instruction",
+      "args"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "program": {
+        "type": "string",
+        "const": "verifier"
+      },
+      "instruction": {
+        "type": "string",
+        "const": "recordRelease"
+      },
+      "args": {
+        "$ref": "#/RecordReleaseArgs"
+      }
+    }
+  },
+  "SetComplianceProofArgs": {
+    "type": "object",
+    "required": [
+      "proofA",
+      "proofB",
+      "proofC",
+      "publicInputs"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "proofA": {
+        "type": "string",
+        "pattern": "^[0-9a-f]{128}$"
+      },
+      "proofB": {
+        "type": "string",
+        "pattern": "^[0-9a-f]{256}$"
+      },
+      "proofC": {
+        "type": "string",
+        "pattern": "^[0-9a-f]{128}$"
+      },
+      "publicInputs": {
+        "type": "array",
+        "items": {
+          "$ref": "#/Hex32"
+        },
+        "minItems": 10,
+        "maxItems": 10
+      }
+    }
+  },
+  "SetComplianceProofCall": {
+    "type": "object",
+    "description": "Flow step 7: verifies a Groth16 proof (alt_bn128) against the job's policy snapshot (`Job.policy_commitment`, `Job.policy_daily_ceiling`) and binds it to the job as the chain will pay it now: payee (claim buyer if the receivable was sold), net amount, mint, the institution's daily counter and the clock. Writes `ReleaseProof` with a verdict; a refusing proof records `Refused` + reason code. Can be re-bound until escrow consumes it.",
+    "required": [
+      "program",
+      "instruction",
+      "args"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "program": {
+        "type": "string",
+        "const": "verifier"
+      },
+      "instruction": {
+        "type": "string",
+        "const": "setComplianceProof"
+      },
+      "args": {
+        "$ref": "#/SetComplianceProofArgs"
+      }
+    }
+  },
+  "UpdateMppAuthorityArgs": {
+    "type": "object",
+    "required": [
+      "mppAuthority"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "mppAuthority": {
+        "$ref": "#/Address"
+      }
+    }
+  },
+  "UpdateMppAuthorityCall": {
+    "type": "object",
+    "description": "DRAFT (M6, BC-37): rotates the MPP attestation authority (replaces Aperture's compile-time key).",
+    "required": [
+      "program",
+      "instruction",
+      "args"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "program": {
+        "type": "string",
+        "const": "verifier"
+      },
+      "instruction": {
+        "type": "string",
+        "const": "updateMppAuthority"
+      },
+      "args": {
+        "$ref": "#/UpdateMppAuthorityArgs"
+      }
+    }
+  },
+  "VerifyMppPaymentProofArgs": {
+    "type": "object",
+    "required": [
+      "proofA",
+      "proofB",
+      "proofC",
+      "publicInputs"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "proofA": {
+        "type": "string",
+        "pattern": "^[0-9a-f]{128}$"
+      },
+      "proofB": {
+        "type": "string",
+        "pattern": "^[0-9a-f]{256}$"
+      },
+      "proofC": {
+        "type": "string",
+        "pattern": "^[0-9a-f]{128}$"
+      },
+      "publicInputs": {
+        "type": "array",
+        "items": {
+          "$ref": "#/Hex32"
+        },
+        "minItems": 10,
+        "maxItems": 10
+      }
+    }
+  },
+  "VerifyMppPaymentProofCall": {
+    "type": "object",
+    "description": "DRAFT (M6, BC-37): Stripe MPP path — checks the compliance-api ed25519 attestation from the preceding Ed25519 precompile instruction and records the payment proof.",
+    "required": [
+      "program",
+      "instruction",
+      "args"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "program": {
+        "type": "string",
+        "const": "verifier"
+      },
+      "instruction": {
+        "type": "string",
+        "const": "verifyMppPaymentProof"
+      },
+      "args": {
+        "$ref": "#/VerifyMppPaymentProofArgs"
+      }
+    }
+  },
+  "AcceptJobArgs": {
+    "type": "object",
+    "required": [
+      "specHash"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "specHash": {
+        "$ref": "#/Hex32"
+      }
+    }
+  },
+  "AcceptJobCall": {
+    "type": "object",
+    "description": "The job's agent wallet accepts a funded job; the agent record must be Active. `spec_hash` guards against a swapped spec.",
+    "required": [
+      "program",
+      "instruction",
+      "args"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "program": {
+        "type": "string",
+        "const": "escrow"
+      },
+      "instruction": {
+        "type": "string",
+        "const": "acceptJob"
+      },
+      "args": {
+        "$ref": "#/AcceptJobArgs"
+      }
+    }
+  },
+  "BuyClaimArgs": {
+    "type": "object",
+    "required": [
+      "price",
+      "leafSalt",
+      "merkleProof"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "price": {
+        "$ref": "#/U64"
+      },
+      "leafSalt": {
+        "$ref": "#/Hex32"
+      },
+      "merkleProof": {
+        "type": "array",
+        "items": {
+          "$ref": "#/Hex32"
+        }
+      }
+    }
+  },
+  "BuyClaimCall": {
+    "type": "object",
+    "description": "A screened buyer on the institution's approved list buys the receivable. `price` must equal the listing price (front-running guard). Leaf = sha256(buyer || leaf_salt), checked against the current `policy.buyer_root`; jobs without a policy or with an all-zero root are unrestricted.",
+    "required": [
+      "program",
+      "instruction",
+      "args"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "program": {
+        "type": "string",
+        "const": "escrow"
+      },
+      "instruction": {
+        "type": "string",
+        "const": "buyClaim"
+      },
+      "args": {
+        "$ref": "#/BuyClaimArgs"
+      }
+    }
+  },
+  "CancelClaimArgs": {
+    "type": "object",
+    "required": [],
+    "additionalProperties": false,
+    "properties": {}
+  },
+  "CancelClaimCall": {
+    "type": "object",
+    "description": "The seller withdraws an unsold listing; the account is closed and its rent returned.",
+    "required": [
+      "program",
+      "instruction",
+      "args"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "program": {
+        "type": "string",
+        "const": "escrow"
+      },
+      "instruction": {
+        "type": "string",
+        "const": "cancelClaim"
+      },
+      "args": {
+        "$ref": "#/CancelClaimArgs"
+      }
+    }
+  },
+  "CancelJobArgs": {
+    "type": "object",
+    "required": [],
+    "additionalProperties": false,
+    "properties": {}
+  },
+  "CancelJobCall": {
+    "type": "object",
+    "description": "The institution cancels an Open / Funded job, or an Accepted job after `deadline`; the vault balance is refunded and the vault closed (rent to `job.rent_payer`).",
+    "required": [
+      "program",
+      "instruction",
+      "args"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "program": {
+        "type": "string",
+        "const": "escrow"
+      },
+      "instruction": {
+        "type": "string",
+        "const": "cancelJob"
+      },
+      "args": {
+        "$ref": "#/CancelJobArgs"
+      }
+    }
+  },
+  "CommitTravelRuleArgs": {
+    "type": "object",
+    "required": [
+      "commitment"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "commitment": {
+        "$ref": "#/Hex32"
+      }
+    }
+  },
+  "CommitTravelRuleCall": {
+    "type": "object",
+    "description": "DRAFT (M5, BC-34): binds a salted Travel Rule commitment (no PII on chain). Required before `fund_job` when `amount >= params.travel_rule_threshold` (threshold 0 = disabled).",
+    "required": [
+      "program",
+      "instruction",
+      "args"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "program": {
+        "type": "string",
+        "const": "escrow"
+      },
+      "instruction": {
+        "type": "string",
+        "const": "commitTravelRule"
+      },
+      "args": {
+        "$ref": "#/CommitTravelRuleArgs"
+      }
+    }
+  },
+  "CreateJobArgs": {
+    "type": "object",
+    "required": [
+      "specHash",
+      "amount",
+      "deadline",
+      "challengePeriod"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "specHash": {
+        "$ref": "#/Hex32"
+      },
+      "amount": {
+        "$ref": "#/U64"
+      },
+      "deadline": {
+        "type": "integer",
+        "format": "int64"
+      },
+      "challengePeriod": {
+        "$ref": "#/U64"
+      }
+    }
+  },
+  "CreateJobCall": {
+    "type": "object",
+    "description": "Flow step 3a: the institution opens a job for an active registered agent and creates its empty vault. With the optional `policy` account the job is proof-gated and snapshots the policy's commitment, daily ceiling and version. Funds move in `fund_job`.",
+    "required": [
+      "program",
+      "instruction",
+      "args"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "program": {
+        "type": "string",
+        "const": "escrow"
+      },
+      "instruction": {
+        "type": "string",
+        "const": "createJob"
+      },
+      "args": {
+        "$ref": "#/CreateJobArgs"
+      }
+    }
+  },
+  "EscalateMissingProofArgs": {
+    "type": "object",
+    "required": [],
+    "additionalProperties": false,
+    "properties": {}
+  },
+  "EscalateMissingProofCall": {
+    "type": "object",
+    "description": "DRAFT (M5, BC-24/BC-33): the agent's recourse when a policy job has no bound release proof `proof_timeout_secs` after `challenge_end`: opens a dispute without bond.",
+    "required": [
+      "program",
+      "instruction",
+      "args"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "program": {
+        "type": "string",
+        "const": "escrow"
+      },
+      "instruction": {
+        "type": "string",
+        "const": "escalateMissingProof"
+      },
+      "args": {
+        "$ref": "#/EscalateMissingProofArgs"
+      }
+    }
+  },
+  "ExecuteResolutionArgs": {
+    "type": "object",
+    "required": [],
+    "additionalProperties": false,
+    "properties": {}
+  },
+  "ExecuteResolutionCall": {
+    "type": "object",
+    "description": "Permissionless: pays out a `Resolved` dispute. The agent-side amount goes through the same payee resolution and proof gate as `finalize_payment` (no keeper fee); the bond is slashed to the agent side (FavorAgent) or returned to the institution. Closes the vaults.",
+    "required": [
+      "program",
+      "instruction",
+      "args"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "program": {
+        "type": "string",
+        "const": "escrow"
+      },
+      "instruction": {
+        "type": "string",
+        "const": "executeResolution"
+      },
+      "args": {
+        "$ref": "#/ExecuteResolutionArgs"
+      }
+    }
+  },
+  "FinalizePaymentArgs": {
+    "type": "object",
+    "required": [],
+    "additionalProperties": false,
+    "properties": {}
+  },
+  "FinalizePaymentCall": {
+    "type": "object",
+    "description": "Flow steps 6-8, permissionless crank. After `challenge_end` with no dispute: - no policy: pay the payee (claim buyer if sold, else agent wallet) `amount - keeper fee`; - policy: read `ReleaseProof` [\"release_proof\", job] owned by square_verifier. Missing -> `ProofRequired` (escrow waits). `Compliant` with matching payee / net / mint / daily counter -> pay the payee, CPI `record_release`, `ReleaseVerified`. `Refused` -> refund the net to the institution, `ReleaseRefused` with the reason code.  The keeper fee is paid in every branch. Reputation goes to the agent record (not the buyer); a `ValidationRecord` is written; the vault is closed and its rent returned to `job.rent_payer`.",
+    "required": [
+      "program",
+      "instruction",
+      "args"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "program": {
+        "type": "string",
+        "const": "escrow"
+      },
+      "instruction": {
+        "type": "string",
+        "const": "finalizePayment"
+      },
+      "args": {
+        "$ref": "#/FinalizePaymentArgs"
+      }
+    }
+  },
+  "FundJobArgs": {
+    "type": "object",
+    "required": [],
+    "additionalProperties": false,
+    "properties": {}
+  },
+  "FundJobCall": {
+    "type": "object",
+    "description": "Flow step 3b: locks `amount` in the vault. Both parties need a fresh, clear screening record. CCTP (DRAFT M6, BC-36): runs in the same tx after the CCTP `receive_message` that mints USDC to the institution's token account; no separate instruction is planned.",
+    "required": [
+      "program",
+      "instruction",
+      "args"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "program": {
+        "type": "string",
+        "const": "escrow"
+      },
+      "instruction": {
+        "type": "string",
+        "const": "fundJob"
+      },
+      "args": {
+        "$ref": "#/FundJobArgs"
+      }
+    }
+  },
+  "InitConfigArgs": {
+    "type": "object",
+    "required": [
+      "settlementMint",
+      "arbitrators",
+      "threshold",
+      "params",
+      "linked"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "settlementMint": {
+        "$ref": "#/Address"
+      },
+      "arbitrators": {
+        "type": "array",
+        "items": {
+          "$ref": "#/Address"
+        }
+      },
+      "threshold": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 255
+      },
+      "params": {
+        "$ref": "#/EscrowParams"
+      },
+      "linked": {
+        "$ref": "#/LinkedPrograms"
+      }
+    }
+  },
+  "InitConfigCall": {
+    "type": "object",
+    "description": "Creates the singleton config. Only the program upgrade authority (Squads vault) can call it. `settlement_mint` is the only job mint (USDC); `linked` pins the registry / policy / verifier program IDs used for account-read owner checks.",
+    "required": [
+      "program",
+      "instruction",
+      "args"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "program": {
+        "type": "string",
+        "const": "escrow"
+      },
+      "instruction": {
+        "type": "string",
+        "const": "initConfig"
+      },
+      "args": {
+        "$ref": "#/InitConfigArgs"
+      }
+    }
+  },
+  "LapseDisputeArgs": {
+    "type": "object",
+    "required": [],
+    "additionalProperties": false,
+    "properties": {}
+  },
+  "LapseDisputeCall": {
+    "type": "object",
+    "description": "DRAFT (M5, BC-33): permissionless after `dispute.deadline` without a decision. Returns the bond and drops the dispute: the job goes back to `Delivered` and settles through `finalize_payment`.",
+    "required": [
+      "program",
+      "instruction",
+      "args"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "program": {
+        "type": "string",
+        "const": "escrow"
+      },
+      "instruction": {
+        "type": "string",
+        "const": "lapseDispute"
+      },
+      "args": {
+        "$ref": "#/LapseDisputeArgs"
+      }
+    }
+  },
+  "ListClaimArgs": {
+    "type": "object",
+    "required": [
+      "price"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "price": {
+        "$ref": "#/U64"
+      }
+    }
+  },
+  "ListClaimCall": {
+    "type": "object",
+    "description": "The agent lists its receivable on a delivered job below face value.",
+    "required": [
+      "program",
+      "instruction",
+      "args"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "program": {
+        "type": "string",
+        "const": "escrow"
+      },
+      "instruction": {
+        "type": "string",
+        "const": "listClaim"
+      },
+      "args": {
+        "$ref": "#/ListClaimArgs"
+      }
+    }
+  },
+  "RaiseDisputeArgs": {
+    "type": "object",
+    "required": [
+      "reasonHash",
+      "bond"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "reasonHash": {
+        "$ref": "#/Hex32"
+      },
+      "bond": {
+        "$ref": "#/U64"
+      }
+    }
+  },
+  "RaiseDisputeCall": {
+    "type": "object",
+    "description": "The institution disputes a delivery inside the challenge window with a bond `>= max(amount * min_bond_bps / 10_000, min_bond_absolute)`. One dispute per job.",
+    "required": [
+      "program",
+      "instruction",
+      "args"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "program": {
+        "type": "string",
+        "const": "escrow"
+      },
+      "instruction": {
+        "type": "string",
+        "const": "raiseDispute"
+      },
+      "args": {
+        "$ref": "#/RaiseDisputeArgs"
+      }
+    }
+  },
+  "ResolveDisputeArgs": {
+    "type": "object",
+    "required": [
+      "resolution"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "resolution": {
+        "$ref": "#/DisputeResolution"
+      }
+    }
+  },
+  "ResolveDisputeCall": {
+    "type": "object",
+    "description": "One arbitrator vote. The first vote sets the pending resolution, later votes must match it; reaching the threshold moves the job to `Resolved` (`DisputeDecided`). No funds move here.",
+    "required": [
+      "program",
+      "instruction",
+      "args"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "program": {
+        "type": "string",
+        "const": "escrow"
+      },
+      "instruction": {
+        "type": "string",
+        "const": "resolveDispute"
+      },
+      "args": {
+        "$ref": "#/ResolveDisputeArgs"
+      }
+    }
+  },
+  "SubmitWorkArgs": {
+    "type": "object",
+    "required": [
+      "workHash",
+      "deliveryUri"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "workHash": {
+        "$ref": "#/Hex32"
+      },
+      "deliveryUri": {
+        "type": "string"
+      }
+    }
+  },
+  "SubmitWorkCall": {
+    "type": "object",
+    "description": "Flow step 4: delivery; the challenge window opens (`challenge_end = now + challenge_period`).",
+    "required": [
+      "program",
+      "instruction",
+      "args"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "program": {
+        "type": "string",
+        "const": "escrow"
+      },
+      "instruction": {
+        "type": "string",
+        "const": "submitWork"
+      },
+      "args": {
+        "$ref": "#/SubmitWorkArgs"
+      }
+    }
+  },
+  "SyncAgentWalletArgs": {
+    "type": "object",
+    "required": [],
+    "additionalProperties": false,
+    "properties": {}
+  },
+  "SyncAgentWalletCall": {
+    "type": "object",
+    "description": "The agent record owner re-points an unsettled job to the record's current wallet (after a wallet rotation with registry `update_agent`). A sold receivable keeps paying the buyer.",
+    "required": [
+      "program",
+      "instruction",
+      "args"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "program": {
+        "type": "string",
+        "const": "escrow"
+      },
+      "instruction": {
+        "type": "string",
+        "const": "syncAgentWallet"
+      },
+      "args": {
+        "$ref": "#/SyncAgentWalletArgs"
+      }
+    }
+  },
+  "UpdateArbitratorsArgs": {
+    "type": "object",
+    "required": [
+      "arbitrators",
+      "threshold"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "arbitrators": {
+        "type": "array",
+        "items": {
+          "$ref": "#/Address"
+        }
+      },
+      "threshold": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 255
+      }
+    }
+  },
+  "UpdateArbitratorsCall": {
+    "type": "object",
+    "description": "Replaces the arbitrator set (N <= 7, 2 <= M <= N) and bumps `arbitrator_set_version`. DRAFT (M5, BC-32): rule for disputes that are active while the set changes.",
+    "required": [
+      "program",
+      "instruction",
+      "args"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "program": {
+        "type": "string",
+        "const": "escrow"
+      },
+      "instruction": {
+        "type": "string",
+        "const": "updateArbitrators"
+      },
+      "args": {
+        "$ref": "#/UpdateArbitratorsArgs"
+      }
+    }
+  },
+  "UpdateParamsArgs": {
+    "type": "object",
+    "required": [
+      "params"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "params": {
+        "$ref": "#/EscrowParams"
+      }
+    }
+  },
+  "UpdateParamsCall": {
+    "type": "object",
+    "description": "Updates challenge bounds, bond, keeper fee and the M5 draft parameters.",
+    "required": [
+      "program",
+      "instruction",
+      "args"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "program": {
+        "type": "string",
+        "const": "escrow"
+      },
+      "instruction": {
+        "type": "string",
+        "const": "updateParams"
+      },
+      "args": {
+        "$ref": "#/UpdateParamsArgs"
+      }
+    }
+  },
+  "InstructionCall": {
+    "oneOf": [
+      {
+        "$ref": "#/DeregisterAgentCall"
+      },
+      {
+        "$ref": "#/InitRegistryConfigCall"
+      },
+      {
+        "$ref": "#/RecordScreeningCall"
+      },
+      {
+        "$ref": "#/RegisterAgentCall"
+      },
+      {
+        "$ref": "#/SetAgentStatusCall"
+      },
+      {
+        "$ref": "#/TransferAgentOwnershipCall"
+      },
+      {
+        "$ref": "#/UpdateAgentCall"
+      },
+      {
+        "$ref": "#/UpdateRegistryConfigCall"
+      },
+      {
+        "$ref": "#/DeactivatePolicyCall"
+      },
+      {
+        "$ref": "#/InitInstitutionCall"
+      },
+      {
+        "$ref": "#/SetBuyerRootCall"
+      },
+      {
+        "$ref": "#/SetInstitutionMultisigCall"
+      },
+      {
+        "$ref": "#/SetPolicyCall"
+      },
+      {
+        "$ref": "#/UpdatePolicyCall"
+      },
+      {
+        "$ref": "#/InitVerifierConfigCall"
+      },
+      {
+        "$ref": "#/RecordReleaseCall"
+      },
+      {
+        "$ref": "#/SetComplianceProofCall"
+      },
+      {
+        "$ref": "#/UpdateMppAuthorityCall"
+      },
+      {
+        "$ref": "#/VerifyMppPaymentProofCall"
+      },
+      {
+        "$ref": "#/AcceptJobCall"
+      },
+      {
+        "$ref": "#/BuyClaimCall"
+      },
+      {
+        "$ref": "#/CancelClaimCall"
+      },
+      {
+        "$ref": "#/CancelJobCall"
+      },
+      {
+        "$ref": "#/CommitTravelRuleCall"
+      },
+      {
+        "$ref": "#/CreateJobCall"
+      },
+      {
+        "$ref": "#/EscalateMissingProofCall"
+      },
+      {
+        "$ref": "#/ExecuteResolutionCall"
+      },
+      {
+        "$ref": "#/FinalizePaymentCall"
+      },
+      {
+        "$ref": "#/FundJobCall"
+      },
+      {
+        "$ref": "#/InitConfigCall"
+      },
+      {
+        "$ref": "#/LapseDisputeCall"
+      },
+      {
+        "$ref": "#/ListClaimCall"
+      },
+      {
+        "$ref": "#/RaiseDisputeCall"
+      },
+      {
+        "$ref": "#/ResolveDisputeCall"
+      },
+      {
+        "$ref": "#/SubmitWorkCall"
+      },
+      {
+        "$ref": "#/SyncAgentWalletCall"
+      },
+      {
+        "$ref": "#/UpdateArbitratorsCall"
+      },
+      {
+        "$ref": "#/UpdateParamsCall"
+      }
+    ],
+    "discriminator": {
+      "propertyName": "instruction",
+      "mapping": {
+        "deregisterAgent": "#/DeregisterAgentCall",
+        "initRegistryConfig": "#/InitRegistryConfigCall",
+        "recordScreening": "#/RecordScreeningCall",
+        "registerAgent": "#/RegisterAgentCall",
+        "setAgentStatus": "#/SetAgentStatusCall",
+        "transferAgentOwnership": "#/TransferAgentOwnershipCall",
+        "updateAgent": "#/UpdateAgentCall",
+        "updateRegistryConfig": "#/UpdateRegistryConfigCall",
+        "deactivatePolicy": "#/DeactivatePolicyCall",
+        "initInstitution": "#/InitInstitutionCall",
+        "setBuyerRoot": "#/SetBuyerRootCall",
+        "setInstitutionMultisig": "#/SetInstitutionMultisigCall",
+        "setPolicy": "#/SetPolicyCall",
+        "updatePolicy": "#/UpdatePolicyCall",
+        "initVerifierConfig": "#/InitVerifierConfigCall",
+        "recordRelease": "#/RecordReleaseCall",
+        "setComplianceProof": "#/SetComplianceProofCall",
+        "updateMppAuthority": "#/UpdateMppAuthorityCall",
+        "verifyMppPaymentProof": "#/VerifyMppPaymentProofCall",
+        "acceptJob": "#/AcceptJobCall",
+        "buyClaim": "#/BuyClaimCall",
+        "cancelClaim": "#/CancelClaimCall",
+        "cancelJob": "#/CancelJobCall",
+        "commitTravelRule": "#/CommitTravelRuleCall",
+        "createJob": "#/CreateJobCall",
+        "escalateMissingProof": "#/EscalateMissingProofCall",
+        "executeResolution": "#/ExecuteResolutionCall",
+        "finalizePayment": "#/FinalizePaymentCall",
+        "fundJob": "#/FundJobCall",
+        "initConfig": "#/InitConfigCall",
+        "lapseDispute": "#/LapseDisputeCall",
+        "listClaim": "#/ListClaimCall",
+        "raiseDispute": "#/RaiseDisputeCall",
+        "resolveDispute": "#/ResolveDisputeCall",
+        "submitWork": "#/SubmitWorkCall",
+        "syncAgentWallet": "#/SyncAgentWalletCall",
+        "updateArbitrators": "#/UpdateArbitratorsCall",
+        "updateParams": "#/UpdateParamsCall"
+      }
+    }
+  }
+}

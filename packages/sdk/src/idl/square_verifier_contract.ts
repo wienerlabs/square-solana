@@ -1,0 +1,1110 @@
+/**
+ * Program IDL in camelCase format in order to be used in JS/TS.
+ *
+ * Note that this is only a type helper and is not the actual IDL. The original
+ * IDL can be found at `target/idl/square_verifier_contract.json`.
+ */
+export type SquareVerifierContract = {
+  "address": "AzKirEv7h5PstLNYNqLj7fCXU9EFA6nSnuoed3QkmUfU",
+  "metadata": {
+    "name": "squareVerifierContract",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Square verifier arayüz sözleşmesi — gövdesiz Anchor stub'ı (BC-44)"
+  },
+  "instructions": [
+    {
+      "name": "initVerifierConfig",
+      "docs": [
+        "Creates the singleton verifier config. Only the program upgrade authority (Squads vault) can",
+        "call it. `escrow_program` / `policy_program` pin the owners checked on account-read."
+      ],
+      "discriminator": [
+        228,
+        255,
+        83,
+        138,
+        84,
+        153,
+        172,
+        210
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "docs": [
+            "Must be the program upgrade authority."
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  101,
+                  114,
+                  105,
+                  102,
+                  105,
+                  101,
+                  114,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "program",
+          "address": "AzKirEv7h5PstLNYNqLj7fCXU9EFA6nSnuoed3QkmUfU"
+        },
+        {
+          "name": "programData"
+        },
+        {
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "escrowProgram",
+          "type": "pubkey"
+        },
+        {
+          "name": "policyProgram",
+          "type": "pubkey"
+        },
+        {
+          "name": "mppAuthority",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "recordRelease",
+      "docs": [
+        "CPI-only (escrow, signed by its `escrow_authority` PDA): marks the release proof consumed and",
+        "advances `OperatorState.daily_spent` (UTC-day rollover) by the released net amount."
+      ],
+      "discriminator": [
+        237,
+        90,
+        189,
+        31,
+        107,
+        253,
+        118,
+        81
+      ],
+      "accounts": [
+        {
+          "name": "escrowAuthority",
+          "docs": [
+            "PDA [\"escrow_authority\"] of `config.escrow_program`; signs via `invoke_signed`."
+          ],
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  101,
+                  114,
+                  105,
+                  102,
+                  105,
+                  101,
+                  114,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "releaseProof",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  101,
+                  108,
+                  101,
+                  97,
+                  115,
+                  101,
+                  95,
+                  112,
+                  114,
+                  111,
+                  111,
+                  102
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "release_proof.job",
+                "account": "releaseProof"
+              }
+            ]
+          }
+        },
+        {
+          "name": "operatorState",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  111,
+                  112,
+                  101,
+                  114,
+                  97,
+                  116,
+                  111,
+                  114,
+                  95,
+                  115,
+                  116,
+                  97,
+                  116,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "release_proof.institution",
+                "account": "releaseProof"
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "setComplianceProof",
+      "docs": [
+        "Flow step 7: verifies a Groth16 proof (alt_bn128) against the job's policy snapshot",
+        "(`Job.policy_commitment`, `Job.policy_daily_ceiling`) and binds it to the job as the chain will",
+        "pay it now: payee (claim buyer if the receivable was sold), net amount, mint, the institution's",
+        "daily counter and the clock. Writes `ReleaseProof` with a verdict; a refusing proof records",
+        "`Refused` + reason code. Can be re-bound until escrow consumes it."
+      ],
+      "discriminator": [
+        184,
+        236,
+        97,
+        91,
+        18,
+        234,
+        30,
+        81
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "docs": [
+            "Pays rent and fees; separate from the role signer (fee payer / sponsored transactions)."
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "authority",
+          "docs": [
+            "The institution's current authority (key, or its Squads vault once bound)."
+          ],
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  101,
+                  114,
+                  105,
+                  102,
+                  105,
+                  101,
+                  114,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "institution"
+        },
+        {
+          "name": "policy"
+        },
+        {
+          "name": "job",
+          "docs": [
+            "`job.policy == policy`; supplies the policy snapshot, mint and default payee."
+          ]
+        },
+        {
+          "name": "claimListing",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  108,
+                  97,
+                  105,
+                  109
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "job"
+              }
+            ],
+            "program": {
+              "kind": "account",
+              "path": "config.escrow_program",
+              "account": "verifierConfig"
+            }
+          }
+        },
+        {
+          "name": "operatorState",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  111,
+                  112,
+                  101,
+                  114,
+                  97,
+                  116,
+                  111,
+                  114,
+                  95,
+                  115,
+                  116,
+                  97,
+                  116,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "institution"
+              }
+            ]
+          }
+        },
+        {
+          "name": "releaseProof",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  101,
+                  108,
+                  101,
+                  97,
+                  115,
+                  101,
+                  95,
+                  112,
+                  114,
+                  111,
+                  111,
+                  102
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "job"
+              }
+            ]
+          }
+        },
+        {
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "proofA",
+          "type": {
+            "array": [
+              "u8",
+              64
+            ]
+          }
+        },
+        {
+          "name": "proofB",
+          "type": {
+            "array": [
+              "u8",
+              128
+            ]
+          }
+        },
+        {
+          "name": "proofC",
+          "type": {
+            "array": [
+              "u8",
+              64
+            ]
+          }
+        },
+        {
+          "name": "publicInputs",
+          "type": {
+            "array": [
+              {
+                "array": [
+                  "u8",
+                  32
+                ]
+              },
+              10
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "updateMppAuthority",
+      "docs": [
+        "DRAFT (M6, BC-37): rotates the MPP attestation authority (replaces Aperture's compile-time key)."
+      ],
+      "discriminator": [
+        74,
+        134,
+        252,
+        88,
+        58,
+        87,
+        139,
+        165
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "signer": true,
+          "relations": [
+            "config"
+          ]
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  101,
+                  114,
+                  105,
+                  102,
+                  105,
+                  101,
+                  114,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "mppAuthority",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "verifyMppPaymentProof",
+      "docs": [
+        "DRAFT (M6, BC-37): Stripe MPP path — checks the compliance-api ed25519 attestation from the",
+        "preceding Ed25519 precompile instruction and records the payment proof."
+      ],
+      "discriminator": [
+        91,
+        1,
+        37,
+        88,
+        220,
+        232,
+        8,
+        48
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "authority",
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  101,
+                  114,
+                  105,
+                  102,
+                  105,
+                  101,
+                  114,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "institution"
+        },
+        {
+          "name": "policy"
+        },
+        {
+          "name": "operatorState",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  111,
+                  112,
+                  101,
+                  114,
+                  97,
+                  116,
+                  111,
+                  114,
+                  95,
+                  115,
+                  116,
+                  97,
+                  116,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "institution"
+              }
+            ]
+          }
+        },
+        {
+          "name": "instructionsSysvar",
+          "address": "Sysvar1nstructions1111111111111111111111111"
+        },
+        {
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "proofA",
+          "type": {
+            "array": [
+              "u8",
+              64
+            ]
+          }
+        },
+        {
+          "name": "proofB",
+          "type": {
+            "array": [
+              "u8",
+              128
+            ]
+          }
+        },
+        {
+          "name": "proofC",
+          "type": {
+            "array": [
+              "u8",
+              64
+            ]
+          }
+        },
+        {
+          "name": "publicInputs",
+          "type": {
+            "array": [
+              {
+                "array": [
+                  "u8",
+                  32
+                ]
+              },
+              10
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "operatorState",
+      "discriminator": [
+        253,
+        164,
+        195,
+        158,
+        226,
+        13,
+        170,
+        145
+      ]
+    },
+    {
+      "name": "releaseProof",
+      "discriminator": [
+        50,
+        120,
+        52,
+        111,
+        218,
+        178,
+        109,
+        119
+      ]
+    },
+    {
+      "name": "verifierConfig",
+      "discriminator": [
+        176,
+        103,
+        248,
+        36,
+        138,
+        167,
+        176,
+        220
+      ]
+    }
+  ],
+  "events": [
+    {
+      "name": "complianceProofSet",
+      "discriminator": [
+        223,
+        20,
+        235,
+        112,
+        163,
+        89,
+        246,
+        4
+      ]
+    },
+    {
+      "name": "mppPaymentVerified",
+      "discriminator": [
+        129,
+        76,
+        251,
+        254,
+        14,
+        217,
+        49,
+        129
+      ]
+    },
+    {
+      "name": "releaseRecorded",
+      "discriminator": [
+        64,
+        212,
+        61,
+        124,
+        137,
+        26,
+        181,
+        14
+      ]
+    },
+    {
+      "name": "verifierConfigUpdated",
+      "discriminator": [
+        205,
+        34,
+        160,
+        252,
+        177,
+        234,
+        231,
+        191
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "invalidProof",
+      "msg": "Groth16 proof verification failed"
+    },
+    {
+      "code": 6001,
+      "name": "policyMismatch",
+      "msg": "Job has no policy or references a different policy"
+    },
+    {
+      "code": 6002,
+      "name": "snapshotMismatch",
+      "msg": "Proof commitment or ceiling does not match the job's policy snapshot"
+    },
+    {
+      "code": 6003,
+      "name": "payeeMismatch",
+      "msg": "Proof payee does not match the address the escrow will pay"
+    },
+    {
+      "code": 6004,
+      "name": "mintMismatch",
+      "msg": "Proof mint does not match the job mint"
+    },
+    {
+      "code": 6005,
+      "name": "staleProof",
+      "msg": "Proof was built against an outdated daily counter or clock"
+    },
+    {
+      "code": 6006,
+      "name": "proofAlreadyConsumed",
+      "msg": "Release proof already consumed"
+    },
+    {
+      "code": 6007,
+      "name": "unauthorized",
+      "msg": "Signer is not authorized for this operation"
+    },
+    {
+      "code": 6008,
+      "name": "invalidLinkedAccount",
+      "msg": "Account owner or seeds do not match the linked program"
+    },
+    {
+      "code": 6009,
+      "name": "invalidJobState",
+      "msg": "Job is not in a state that accepts a release proof"
+    },
+    {
+      "code": 6010,
+      "name": "invalidMppAttestation",
+      "msg": "MPP attestation missing or signed by an unexpected key"
+    },
+    {
+      "code": 6011,
+      "name": "notImplemented",
+      "msg": "Interface contract stub: not implemented"
+    }
+  ],
+  "types": [
+    {
+      "name": "complianceProofSet",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "job",
+            "type": "pubkey"
+          },
+          {
+            "name": "policy",
+            "type": "pubkey"
+          },
+          {
+            "name": "verdict",
+            "type": {
+              "defined": {
+                "name": "releaseVerdict"
+              }
+            }
+          },
+          {
+            "name": "refusalCode",
+            "type": "u16"
+          },
+          {
+            "name": "payee",
+            "type": "pubkey"
+          },
+          {
+            "name": "netAmount",
+            "type": "u64"
+          },
+          {
+            "name": "mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "dailySpentBefore",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "mppPaymentVerified",
+      "docs": [
+        "DRAFT (M6)."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "institution",
+            "type": "pubkey"
+          },
+          {
+            "name": "policy",
+            "type": "pubkey"
+          },
+          {
+            "name": "stripeReceiptHash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "operatorState",
+      "docs": [
+        "seeds = [\"operator_state\", institution] (institution = square_policy `Institution` PDA)"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "institution",
+            "type": "pubkey"
+          },
+          {
+            "name": "dailySpent",
+            "docs": [
+              "Released amount in the current UTC day (settlement-mint atomic units); circuit public input."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "dayStartUnix",
+            "docs": [
+              "UTC midnight that starts the current window."
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "totalLifetimePayments",
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "releaseProof",
+      "docs": [
+        "seeds = [\"release_proof\", job]"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "job",
+            "type": "pubkey"
+          },
+          {
+            "name": "institution",
+            "docs": [
+              "square_policy `Institution` PDA (key of the `OperatorState` it advances)."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "policy",
+            "type": "pubkey"
+          },
+          {
+            "name": "payee",
+            "docs": [
+              "Address the proof is bound to: the agent wallet, or the claim buyer if the receivable was sold."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "netAmount",
+            "docs": [
+              "Amount the payee receives; escrow compares it with its own net at release."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "dailySpentBefore",
+            "docs": [
+              "`OperatorState.daily_spent` the proof was built against; a different value at release = stale."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "proofTimestamp",
+            "type": "i64"
+          },
+          {
+            "name": "verdict",
+            "type": {
+              "defined": {
+                "name": "releaseVerdict"
+              }
+            }
+          },
+          {
+            "name": "refusalCode",
+            "docs": [
+              "Policy rule that refused the release (0 when compliant). Codes defined with the circuit (BC-19)."
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "consumed",
+            "type": "bool"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "releaseRecorded",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "job",
+            "type": "pubkey"
+          },
+          {
+            "name": "institution",
+            "type": "pubkey"
+          },
+          {
+            "name": "netAmount",
+            "type": "u64"
+          },
+          {
+            "name": "dailySpent",
+            "type": "u64"
+          },
+          {
+            "name": "dayStartUnix",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "releaseVerdict",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "compliant"
+          },
+          {
+            "name": "refused"
+          }
+        ]
+      }
+    },
+    {
+      "name": "verifierConfig",
+      "docs": [
+        "Singleton. seeds = [\"verifier_config\"]"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "admin",
+            "type": "pubkey"
+          },
+          {
+            "name": "escrowProgram",
+            "docs": [
+              "Owner of `Job` / `ClaimListing`; its [\"escrow_authority\"] PDA may call `record_release`."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "policyProgram",
+            "docs": [
+              "Owner of `Institution` / `Policy` accounts read by the verifier."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "mppAuthority",
+            "docs": [
+              "DRAFT (M6): ed25519 key of the compliance-api MPP attestations."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "vkVersion",
+            "docs": [
+              "Version of the embedded verifying key (bumped after the phase-2 ceremony, BC-38)."
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "verifierConfigUpdated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "admin",
+            "type": "pubkey"
+          },
+          {
+            "name": "escrowProgram",
+            "type": "pubkey"
+          },
+          {
+            "name": "policyProgram",
+            "type": "pubkey"
+          },
+          {
+            "name": "mppAuthority",
+            "type": "pubkey"
+          },
+          {
+            "name": "vkVersion",
+            "type": "u16"
+          }
+        ]
+      }
+    }
+  ],
+  "constants": [
+    {
+      "name": "operatorStateSeed",
+      "type": "bytes",
+      "value": "[111, 112, 101, 114, 97, 116, 111, 114, 95, 115, 116, 97, 116, 101]"
+    },
+    {
+      "name": "releaseProofSeed",
+      "type": "bytes",
+      "value": "[114, 101, 108, 101, 97, 115, 101, 95, 112, 114, 111, 111, 102]"
+    },
+    {
+      "name": "verifierConfigSeed",
+      "type": "bytes",
+      "value": "[118, 101, 114, 105, 102, 105, 101, 114, 95, 99, 111, 110, 102, 105, 103]"
+    }
+  ]
+};
