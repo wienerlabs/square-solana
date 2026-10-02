@@ -10,8 +10,8 @@ use crate::state::{ProofRecord, ComplianceStatus, OperatorState};
 
 /// Adım 8c — MPP B-flow verifier.
 ///
-/// Counterpart to verify_payment_proof_v2 for payments that settled through
-/// Stripe instead of an SPL Token-2022 transfer. The trust model is "Stripe
+/// Verifies payments that settled through Stripe instead of an SPL
+/// Token-2022 transfer. The trust model is "Stripe
 /// is a trusted oracle" — the compliance-api signs every verified Stripe
 /// PaymentIntent's canonical Poseidon hash with its MPP_AUTHORITY ed25519
 /// keypair, and the on-chain verifier checks that signature inside the same
@@ -32,8 +32,8 @@ use crate::state::{ProofRecord, ComplianceStatus, OperatorState};
 /// Replay protection: the ProofRecord PDA is seeded by policy_data_hash, so
 /// every (policy, payment) tuple gets a unique PDA. Anchor's `init` (not
 /// `init_if_needed`) on the proof_record account would fail-closed on a
-/// second submission — but we keep `init_if_needed` for parity with v2 and
-/// rely on the `consumed` flag to refuse replays.
+/// second submission — but we keep `init_if_needed` and rely on the
+/// `consumed` flag to refuse replays.
 #[derive(Accounts)]
 #[instruction(
     proof_a: [u8; 64],

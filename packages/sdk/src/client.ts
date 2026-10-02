@@ -1,8 +1,8 @@
-// Square client imzaları: 4 program için typed client, tx builder'lar ve 8 adım akışı.
+// Square client sözleşmesi: 4 program için typed client, tx builder'lar ve 8 adım akışı (uygulama BE-08).
 // Adım 1 (policy commitment) ve 7 (ispat bağlama) kurum tarafıdır: @squaresdk/solana-policy.
 import type { Idl, Program } from '@coral-xyz/anchor';
 import type { Commitment, Connection, PublicKey, TransactionInstruction, VersionedTransaction } from '@solana/web3.js';
-import { NotImplementedError, type ProgramErrorRef } from '@squaresdk/solana-types';
+import type { ProgramErrorRef } from '@squaresdk/solana-types';
 import type { SquarePda } from './pda.js';
 import type { SquareIdls, SquareProgramIds } from './programs.js';
 import type {
@@ -25,8 +25,8 @@ export interface WalletLike {
 
 export interface SquareClientConfig {
   connection: Connection;
-  /** Varsayılan: SOURCE_PROGRAM_IDS (yalnızca yerel geliştirme). */
-  programIds?: SquareProgramIds;
+  /** Ortam yapılandırmasından gelen program kimlikleri (BC-09); varsayılan yok. */
+  programIds: SquareProgramIds;
   wallet?: WalletLike;
   commitment?: Commitment;
 }
@@ -110,6 +110,5 @@ export interface SquareClient {
   mapError(error: unknown): ProgramErrorRef | null;
 }
 
-export function createSquareClient(config: SquareClientConfig): SquareClient {
-  throw new NotImplementedError('createSquareClient', 'BE-08');
-}
+/** `SquareClient` fabrikası; uygulama BE-08'de. */
+export type CreateSquareClient = (config: SquareClientConfig) => SquareClient;

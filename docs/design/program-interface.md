@@ -1,34 +1,35 @@
 # Program arayüz sözleşmesi
 
-**Sözleşme sürümü:** v0.1.0 (taslak) · **Issue:** BC-44 (#101) · **Stub'lar:** [`interfaces/`](../../interfaces/) · **IDL'ler:** [`idl/`](../../idl/)
+**Sözleşme sürümü:** v0.1.1 (taslak) · **Issue:** BC-44 (#101), BC-47 (#119) · **IDL'ler:** [`idl/`](../../idl/)
 
-Bu doküman Square'in dört Solana programının (`square_registry`, `square_policy`, `square_verifier`, `square_escrow`) dış arayüzünü sabitler: instruction adları ve argümanları, hesap sırası ve imzacılar, account düzenleri, PDA seed'leri, event'ler ve hata kodları. Backend (BE-35 API/SDK sözleşmesi, servisler) ve frontend (FE-24 mock) gerçek programları beklemeden bu sözleşmeye karşı geliştirir. Gerçek programlar `programs/` altında taşındıkça ve değiştikçe bu arayüze uyar; uyum BC-13 ile CI'da denetlenir.
+Bu doküman Square'in dört Solana programının (`square_registry`, `square_policy`, `square_verifier`, `square_escrow`) dış arayüzünü sabitler: instruction adları ve argümanları, hesap sırası ve imzacılar, account düzenleri, PDA seed'leri, event'ler ve hata kodları. Backend (BE-35 API/SDK sözleşmesi, servisler) ve frontend (FE-24 veri katmanı) bu sözleşmeye göre geliştirir. Gerçek programlar `programs/` altında taşındıkça ve değiştikçe bu arayüze uyar; uyum BC-13 ile CI'da denetlenir.
 
-Sözleşmenin tek doğruluk kaynağı stub'lardan üretilen IDL'lerdir. Bu dokümandaki referans tabloları ([§10](#10-referans-tabloları)) IDL'den üretilmiştir. IDL'in taşımadığı kurallar (programlar arası okumaların owner ve alan kontrolleri, akış ve durum geçişleri) §3–§8'de yazılıdır.
+Sözleşmenin tek doğruluk kaynağı `idl/*.json` dosyalarıdır. Bu dokümandaki referans tabloları ([§10](#10-referans-tabloları)) IDL'den üretilmiştir. IDL'in taşımadığı kurallar (programlar arası okumaların owner ve alan kontrolleri, akış ve durum geçişleri) §3–§8'de yazılıdır.
 
-## 1. Dosyalar ve derleme
+## 1. Dosyalar
 
-| Program | Stub crate | IDL | Gerçek program | Program ID (geçici) |
-|---|---|---|---|---|
-| `square_registry` | `interfaces/square-registry-contract` | `idl/square_registry_contract.json` | `programs/square-registry` (BC-07, henüz yok) | `CgchXu2dRV3r9E1YjRhp4kbeLLtv1Xz61yoerJzp1Vbc` |
-| `square_policy` | `interfaces/square-policy-contract` | `idl/square_policy_contract.json` | `programs/square-policy` (BC-05) | `FXD7ycSguBQw7o3DXqq4VUBHtdx5ZQpu9P2zb4KG4ZEU` |
-| `square_verifier` | `interfaces/square-verifier-contract` | `idl/square_verifier_contract.json` | `programs/square-verifier` (BC-05) | `AzKirEv7h5PstLNYNqLj7fCXU9EFA6nSnuoed3QkmUfU` |
-| `square_escrow` | `interfaces/square-escrow-contract` | `idl/square_escrow_contract.json` | `programs/square-escrow` (BC-04, henüz yok) | `5hstj5grBUL1BeSaPLYpgkD6n3ALasmbseRvKRFfCVNT` |
+| Program | IDL | Gerçek program | Program ID (kaynak program) |
+|---|---|---|---|
+| `square_registry` | `idl/square_registry_contract.json` | `programs/square-registry` (BC-07) | `CgchXu2dRV3r9E1YjRhp4kbeLLtv1Xz61yoerJzp1Vbc` |
+| `square_policy` | `idl/square_policy_contract.json` | `programs/square-policy` (BC-05) | `FXD7ycSguBQw7o3DXqq4VUBHtdx5ZQpu9P2zb4KG4ZEU` |
+| `square_verifier` | `idl/square_verifier_contract.json` | `programs/square-verifier` (BC-05) | `AzKirEv7h5PstLNYNqLj7fCXU9EFA6nSnuoed3QkmUfU` |
+| `square_escrow` | `idl/square_escrow_contract.json` | `programs/square-escrow` (BC-04, henüz yok) | `5hstj5grBUL1BeSaPLYpgkD6n3ALasmbseRvKRFfCVNT` |
 
-- **Program ID'leri:** Stub'lar kaynak programların (aip-registry, Aperture policy-registry ve verifier, Covenant) `declare_id!` değerlerini taşır. IDL'deki `address` alanı bu yüzden gerçek programla aynıdır. Yeni Square ID'leri BC-09'da atanır; o zaman stub, IDL ve bu doküman birlikte güncellenir ve sözleşme sürümü artar. İstemciler adresi IDL'e gömülü bırakmamalı, ortam yapılandırmasından almalıdır.
-- **Ayrı Anchor workspace'i:** Stub'lar Cargo workspace'inin üyesidir (`cargo build/clippy --workspace` onları derler), ancak Anchor açısından `interfaces/Anchor.toml` ile ayrı bir workspace'tir. Böylece kökte çalışan `anchor build`, `anchor deploy` ve `anchor keys sync` stub'lara dokunmaz. Stub'lar deploy edilmez.
+- **Program ID'leri:** IDL'deki `address` alanı, taşınan kaynak programların gerçek ID'leridir (aip-registry, Aperture policy-registry ve verifier, Covenant). Square ID'leri BC-09'da atanır; o zaman IDL ve bu doküman birlikte güncellenir ve sözleşme sürümü artar. İstemciler adresi IDL'den değil, ortam yapılandırmasından alır.
 - **IDL adları:** IDL'in `metadata.name` alanı `square_<program>_contract` biçimindedir. İstemci üretiminde kullanılacak ad (`square_<program>`) BE-35'te kesinleşir.
-- **Stub davranışı:** Her instruction `NotImplemented` hatası döner. Bu varyant her hata enum'unun **son** sırasındadır; gerçek programlar onu kaldırdığında sözleşmedeki hata kodları kaymaz.
-- **Hata kodları:** Anchor varsayılanıyla her programda 6000'den başlar ve programlar arasında çakışır. Örneğin escrow tx'inde `record_release` CPI'ından dönen bir verifier hatası, escrow koduyla aynı numarayı taşıyabilir. İstemciler hatayı (program ID, kod) çiftiyle eşler. `#[error_code(offset)]` kullanılmadı, çünkü Anchor 0.31 IDL'e offset'i yazmıyor; IDL ile program birbirinden ayrılırdı.
+- **Hata kodları:** Anchor varsayılanıyla her programda 6000'den başlar ve programlar arasında çakışır. Örneğin escrow tx'inde `record_release` CPI'ından dönen bir verifier hatası, escrow koduyla aynı numarayı taşıyabilir. İstemciler hatayı (program ID, kod) çiftiyle eşler. `#[error_code(offset)]` kullanılmaz, çünkü Anchor 0.31 IDL'e offset'i yazmıyor; IDL ile program birbirinden ayrılırdı.
 
-### IDL üretimi
+### IDL'lerin bakımı
+
+Sözleşme değişikliği doğrudan `idl/*.json` üzerinde, sürüm notuyla ([§11](#11-sözleşme-değişiklik-kaydı)) yapılır. Türetilen dosyalar aynı PR'da yeniden üretilir:
 
 ```bash
-interfaces/build-idl.sh          # stub'ları derler, IDL'leri idl/ altına kopyalar
-interfaces/build-idl.sh --check  # IDL'leri üretir ve idl/ ile karşılaştırır (CI için, BC-13)
+pnpm --filter @squaresdk/solana-types gen   # zod + OpenAPI şemaları
+pnpm --filter @squaresdk/solana-sdk gen     # SDK'nın IDL kopyası + Anchor uyumlu camelCase TS tipleri
+pnpm contract:check                         # ikisinin güncelliği (CI: contract.yml)
 ```
 
-Anchor 0.31, `target/deploy` klasörü yokken yapılan ilk derlemede `declare_id!` değerlerini rastgele anahtarlarla değiştirir (program ID eşitlemesi). Betik bu klasörü önceden açar ve derlemeden sonra ID'lerin değişmediğini doğrular. Bir stub değiştiğinde aynı PR'da IDL yeniden üretilir, `idl/` güncellenir ve [§11](#11-sözleşme-değişiklik-kaydı)'e kayıt düşülür.
+Bir program gerçek uygulamasına kavuştuğunda, o programın `anchor build` ile ürettiği IDL'in `idl/`'dakiyle aynı olması BC-13'te CI'a eklenir. Anchor 0.31, `target/deploy` klasörü yokken yapılan ilk derlemede `declare_id!` değerlerini rastgele anahtarlarla değiştirir (program ID eşitlemesi); temiz bir klonda derlemeden önce `mkdir -p target/deploy` gerekir.
 
 ## 2. Roller
 
@@ -203,16 +204,16 @@ Sözleşme, BE-35'in (API ve SDK sözleşmesi) ihtiyaçlarına göre gözden ge�
 | Opsiyonel hesaplar | IDL `optional: true`. Anchor TS, PDA'sı bilinen opsiyonel hesapları (ör. `release_proof`) policy'siz işlerde de doldurabilir; program, bu durumda başlatılmamış hesabı "yok" sayar | ✓ (not) |
 | `@squaresdk/solana-types` için job, policy, agent ve claim modelleri | IDL `accounts` + `types` (ör. `Job`, `Policy`, `AgentRecord`, `ClaimListing`, `ReleaseProof`) | ✓ |
 | Event payload şemaları (indexer, API) | IDL `events` + `types`; §10 tabloları | ✓ |
-| Hata kodlarının API yanıt zarfına eşlenmesi | IDL `errors`; (program ID, kod) çifti ile eşlenir; `NotImplemented` sonda | ✓ |
+| Hata kodlarının API yanıt zarfına eşlenmesi | IDL `errors`; (program ID, kod) çifti ile eşlenir | ✓ |
 | Hesap filtreleme (indexer, keeper `memcmp`) | IDL `accounts[].discriminator` + sabit önekli düzen (§5) | ✓ |
 | Birim ve tip kuralları | Tutarlar `u64` settlement mint atomik birimi (USDC 6 ondalık), zamanlar `i64` unix saniye, hash'ler `[u8; 32]` | ✓ |
 | Program adresleri | IDL `address` geçicidir (BC-09); SDK adresi yapılandırmadan almalı | ✓ (not) |
 | Policy meta (off-chain) | Policy içeriği zincirde yok; yalnızca `commitment`, `daily_ceiling`, `buyer_root`. Meta şeması BE-35'te tanımlanır | ✓ (kapsam dışı) |
-| "Program tipleri IDL ile birebir" CI kontrolü | `idl/*.json` commit'li; `interfaces/build-idl.sh --check` sapmayı yakalar (§1) | ✓ |
+| "Program tipleri IDL ile birebir" CI kontrolü | `idl/*.json` tek kaynak; `pnpm contract:check` türetilen dosyaların sapmasını yakalar (§1) | ✓ |
 
 ## 10. Referans tabloları
 
-IDL'den üretilmiştir; instruction'lar alfabetik sıradadır. "(w)" yazılabilir imzacıyı gösterir. Hata kodları her programda `6000 + sıra` biçimindedir; `NotImplemented` yalnızca stub'a aittir.
+IDL'den üretilmiştir; instruction'lar alfabetik sıradadır. "(w)" yazılabilir imzacıyı gösterir. Hata kodları her programda `6000 + sıra` biçimindedir.
 
 ### 10.1 square_registry
 
@@ -241,7 +242,7 @@ IDL'den üretilmiştir; instruction'lar alfabetik sıradadır. "(w)" yazılabili
 | `RegistryConfigUpdated` | `admin: pubkey`, `screener_authority: pubkey`, `screening_ttl_secs: i64` |
 | `ScreeningRecorded` | `wallet: pubkey`, `status: ScreeningStatus`, `source_hash: [u8; 32]`, `expires_at: i64` |
 
-#### Hata kodları (8)
+#### Hata kodları (7)
 
 | Kod | Ad | Mesaj |
 |---|---|---|
@@ -252,7 +253,6 @@ IDL'den üretilmiştir; instruction'lar alfabetik sıradadır. "(w)" yazılabili
 | 6004 | `AgentDeregistered` | Agent is deregistered |
 | 6005 | `InvalidAgentStatus` | Status cannot be set with this instruction |
 | 6006 | `InvalidScreeningTtl` | Screening TTL must be positive |
-| 6007 | `NotImplemented` | Interface contract stub: not implemented |
 
 ### 10.2 square_policy
 
@@ -278,7 +278,7 @@ IDL'den üretilmiştir; instruction'lar alfabetik sıradadır. "(w)" yazılabili
 | `PolicyDeactivated` | `policy: pubkey` |
 | `PolicyUpdated` | `policy: pubkey`, `commitment: [u8; 32]`, `daily_ceiling: u64`, `version: u32` |
 
-#### Hata kodları (6)
+#### Hata kodları (5)
 
 | Kod | Ad | Mesaj |
 |---|---|---|
@@ -287,7 +287,6 @@ IDL'den üretilmiştir; instruction'lar alfabetik sıradadır. "(w)" yazılabili
 | 6002 | `PolicyInactive` | Policy is not active |
 | 6003 | `InvalidDailyCeiling` | Daily ceiling must be greater than zero |
 | 6004 | `InvalidMultisigVault` | Multisig vault does not match the Squads v4 derivation |
-| 6005 | `NotImplemented` | Interface contract stub: not implemented |
 
 ### 10.3 square_verifier
 
@@ -310,7 +309,7 @@ IDL'den üretilmiştir; instruction'lar alfabetik sıradadır. "(w)" yazılabili
 | `ReleaseRecorded` | `job: pubkey`, `institution: pubkey`, `net_amount: u64`, `daily_spent: u64`, `day_start_unix: i64` |
 | `VerifierConfigUpdated` | `admin: pubkey`, `escrow_program: pubkey`, `policy_program: pubkey`, `mpp_authority: pubkey`, `vk_version: u16` |
 
-#### Hata kodları (12)
+#### Hata kodları (11)
 
 | Kod | Ad | Mesaj |
 |---|---|---|
@@ -325,7 +324,6 @@ IDL'den üretilmiştir; instruction'lar alfabetik sıradadır. "(w)" yazılabili
 | 6008 | `InvalidLinkedAccount` | Account owner or seeds do not match the linked program |
 | 6009 | `InvalidJobState` | Job is not in a state that accepts a release proof |
 | 6010 | `InvalidMppAttestation` | MPP attestation missing or signed by an unexpected key |
-| 6011 | `NotImplemented` | Interface contract stub: not implemented |
 
 ### 10.4 square_escrow
 
@@ -381,7 +379,7 @@ IDL'den üretilmiştir; instruction'lar alfabetik sıradadır. "(w)" yazılabili
 | `ValidationRecorded` | `job: pubkey`, `agent_record: pubkey`, `outcome: ValidationOutcome`, `refusal_code: u16` |
 | `WorkSubmitted` | `job: pubkey`, `work_hash: [u8; 32]`, `delivery_uri: string`, `challenge_end: i64` |
 
-#### Hata kodları (49)
+#### Hata kodları (48)
 
 | Kod | Ad | Mesaj |
 |---|---|---|
@@ -433,12 +431,12 @@ IDL'den üretilmiştir; instruction'lar alfabetik sıradadır. "(w)" yazılabili
 | 6045 | `LinkedProgramMismatch` | Account owner does not match the linked program in the config |
 | 6046 | `ProofTimeoutNotReached` | Proof timeout has not passed yet |
 | 6047 | `TravelRuleCommitmentRequired` | Travel Rule commitment required above the threshold |
-| 6048 | `NotImplemented` | Interface contract stub: not implemented |
 
 ## 11. Sözleşme değişiklik kaydı
 
-**Sürümleme:** `MAJOR.MINOR.PATCH`. 1.0.0'a kadar geriye uyumsuz her değişiklik MINOR'u artırır: instruction, argüman, hesap sırası, account düzeni, seed, event alanı ya da hata kodu sırası. Yalnızca doküman veya yorum değişiklikleri PATCH'i artırır. Her değişiklik aynı PR'da stub'ı, `idl/` altındaki IDL'i ve bu tabloyu günceller; PR açıklaması değişikliği ve etkilenen issue'ları listeler.
+**Sürümleme:** `MAJOR.MINOR.PATCH`. 1.0.0'a kadar geriye uyumsuz her değişiklik MINOR'u artırır: instruction, argüman, hesap sırası, account düzeni, seed, event alanı ya da hata kodu sırası. Yalnızca doküman veya yorum değişiklikleri PATCH'i artırır. Her değişiklik aynı PR'da `idl/` altındaki IDL'i, türetilen dosyaları (`pnpm contract:check`) ve bu tabloyu günceller; PR açıklaması değişikliği ve etkilenen issue'ları listeler.
 
 | Sürüm | Değişiklik | Issue / PR |
 |---|---|---|
 | v0.1.0 | İlk taslak: 4 program, 38 instruction, 13 account, 40 event, 75 hata kodu (4'ü stub'a ait `NotImplemented`); M5–M6 taslakları (§7) | BC-44 (#101) |
+| v0.1.1 | Gövdesiz stub programlar (`interfaces/`) kaldırıldı; sözleşmenin tek kaynağı `idl/*.json` (proje kuralı: placeholder yok). Stub'a ait `NotImplemented` hata girdileri IDL'den çıktı; diğer kodların sırası değişmedi. Toplam: 38 instruction, 13 account, 40 event, 71 hata kodu | BC-47 (#119) |

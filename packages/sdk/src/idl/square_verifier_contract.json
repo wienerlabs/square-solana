@@ -4,7 +4,7 @@
     "name": "square_verifier_contract",
     "version": "0.1.0",
     "spec": "0.1.0",
-    "description": "Square verifier arayüz sözleşmesi — gövdesiz Anchor stub'ı (BC-44)"
+    "description": "Square verifier arayüz sözleşmesi (BC-44)"
   },
   "instructions": [
     {
@@ -767,11 +767,6 @@
       "code": 6010,
       "name": "InvalidMppAttestation",
       "msg": "MPP attestation missing or signed by an unexpected key"
-    },
-    {
-      "code": 6011,
-      "name": "NotImplemented",
-      "msg": "Interface contract stub: not implemented"
     }
   ],
   "types": [

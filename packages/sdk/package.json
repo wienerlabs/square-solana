@@ -1,7 +1,7 @@
 {
   "name": "@squaresdk/solana-sdk",
   "version": "0.1.0",
-  "description": "Square Solana SDK: 4 program için typed client, PDA'lar, tx builder'lar, event decoder, API client — BE-35 imzaları (gövdeler BE-08)",
+  "description": "Square Solana SDK sözleşmesi: 4 programın IDL'leri, IDL'den türetilen tipler, client / PDA / tx builder / REST client arayüzleri (uygulama BE-08, BE-18)",
   "license": "MIT",
   "private": true,
   "type": "module",
@@ -17,7 +17,9 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "node --test \"test/*.test.mjs\""
+    "test": "node --test \"test/*.test.mjs\"",
+    "gen": "node scripts/gen-idl-types.mjs",
+    "gen:check": "node scripts/gen-idl-types.mjs --check"
   },
   "dependencies": {
     "@coral-xyz/anchor": "0.31.1",

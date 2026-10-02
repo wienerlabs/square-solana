@@ -17,7 +17,7 @@ pub struct ProofRecord {
     pub consumed: bool,
     /// Raw 32-byte transfer-destination wallet pubkey the proof commits to.
     /// Filled from public_inputs[2] (high 16 bytes) + public_inputs[3] (low
-    /// 16 bytes) at verify_payment_proof_v2 time.
+    /// 16 bytes) when the proof is verified.
     pub recipient: [u8; 32],
     /// Raw 32-byte SPL mint pubkey, derived the same way from public_inputs[5,6].
     pub token_mint: [u8; 32],

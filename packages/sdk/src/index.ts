@@ -1,4 +1,5 @@
-// @squaresdk/solana-sdk — BE-35 imzaları (sözleşme v0.1.0). Gövdeler BE-08 / BE-18 ile gelir.
+// @squaresdk/solana-sdk — BE-35 sözleşmesi (v0.1.1): IDL'ler, IDL'den türetilen tipler ve arayüzler.
+// Uygulamalar BE-08 (client, PDA, spec hash) ve BE-18 (REST client) ile gelir.
 export * from './programs.js';
 export * from './types.js';
 export * from './pda.js';
