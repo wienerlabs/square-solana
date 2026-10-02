@@ -1,9 +1,8 @@
 use anchor_lang::prelude::*;
 
 /// Per-operator compliance status, seeded by ["compliance", operator_key].
-/// Updated by the verify instructions (today only verify_mpp_payment_proof is
-/// enabled). The transfer hook that read it was removed in BC-11; BC-21
-/// replaces this account with `ReleaseProof`.
+/// Updated by verify_mpp_payment_proof. BC-21 replaces this account with
+/// `ReleaseProof` (docs/design/program-interface.md).
 #[account]
 #[derive(InitSpace)]
 pub struct ComplianceStatus {
