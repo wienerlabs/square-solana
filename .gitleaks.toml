@@ -1,0 +1,33 @@
+# gitleaks yapılandırması.
+#
+# Varsayılan kural seti olduğu gibi kullanılır. İstisnalar, Arc Square'deki düzende olduğu gibi,
+# YOL değil DEĞER bazında ve gerekçesiyle yazılır: yol bazında bir istisna o dosyaya sonradan
+# girecek gerçek bir sırrı da görünmez yapar. CI kapısı ve Covenant'tan uyarlanacak ek kurallar
+# BC-13'te eklenir.
+#
+# Not: tekil [allowlist] bloğundaki `regexes`, `useDefault = true` ile birlikte uygulanmaz;
+# çoğul [[allowlists]] + `regexTarget` kullanılır (gitleaks 8.30).
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = """Ed25519 did:key tanımlayıcıları açık anahtardır, sır değildir: did:key:z6Mk…
+multicodec 0xed01 önekli bir Ed25519 açık anahtarının base58btc kodlamasıdır (did:aip test
+vektörleri, docs/did-aip/). generic-api-key kuralı `key:` ve ardından gelen yüksek entropili
+değer yüzünden takılıyor. regexTarget = "match": yalnızca eşleşmesi tam olarak bir did:key
+parçası olan bulgu bastırılır; aynı satırdaki başka bir sır yine yakalanır (yerelde doğrulandı)."""
+regexTarget = "match"
+regexes = ['''^key:z6Mk[1-9A-HJ-NP-Za-km-z]{44}"?$''']
+
+[[allowlists]]
+description = """BC-05 ile gelen Aperture verifier'ındaki Groth16 doğrulama anahtarı sabitleri:
+doğrulama anahtarı herkese açıktır, sır değildir. generic-api-key kuralının "sır" sandığı değer
+aslında tip adı (`Groth16Verifyingkey`). .gitleaksignore'daki parmak izleri commit'e bağlı
+olduğundan yalnızca `gitleaks git` taramasında işe yarar; bu istisna `gitleaks dir` için de
+geçerlidir. Satır bazında ve yalnızca bu iki sabit: VK satırının hemen altına ya da dosyanın
+sonuna konan sahte bir sır yine yakalandı (yerelde doğrulandı). VK yeniden üretilip sabit adı
+değişirse (BC-20, BC-21) burası da güncellenir."""
+regexTarget = "line"
+# gitleaks "line" hedefine bulgunun öncesinden bağlam da girer; ^ ve $ satır başına (?m) ile bağlanır.
+regexes = ['''(?m)^pub const APERTURE_(PAYMENT|BATCH)_VK: Groth16Verifyingkey = Groth16Verifyingkey \{$''']
