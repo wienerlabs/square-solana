@@ -35,7 +35,7 @@ pnpm license:write
 | `yaml` | npm | ISC | dev | `@squaresdk/solana-sdk`, `@squaresdk/solana-types` | ✓ |
 | `zod` | npm | MIT | runtime | `@squaresdk/solana-types` | ✓ |
 
-**Özet:** 8 npm, 4 Cargo doğrudan bağımlılık; lisans dağılımı: 6× MIT, 3× Apache-2.0, 1× (MIT OR Apache-2.0), 1× ISC, 1× MIT OR Apache-2.0.
+**Özet:** 8 npm, 4 Cargo doğrudan bağımlılık; lisans dağılımı: 6× MIT, 3× Apache-2.0, 2× MIT OR Apache-2.0, 1× ISC.
 <!-- license-inventory:end -->
 
 Kaynak projelerin (Aperture, AIP, Covenant) kendi lisansları ve telif bildirimleri
