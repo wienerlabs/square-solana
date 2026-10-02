@@ -1,0 +1,17 @@
+# Rust / Anchor
+target/
+.anchor/
+test-ledger/
+
+# Node
+node_modules/
+dist/
+.turbo/
+
+# Ortam ve anahtarlar
+.env*
+!.env.example
+*keypair*.json
+
+# Sistem
+.DS_Store
