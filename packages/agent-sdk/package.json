@@ -1,0 +1,41 @@
+{
+  "name": "@aipagents/agent-sdk",
+  "version": "0.2.1",
+  "publishConfig": {
+    "access": "public"
+  },
+  "description": "Build AIP-compatible AI agents in minutes. Create agents that earn USDC on Solana.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": ["dist", "README.md"],
+  "scripts": {
+    "build": "tsc",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "aip", "agent", "ai-agent", "solana", "usdc",
+    "a2a", "json-rpc", "claude", "haiku", "sdk",
+    "agent-internet-protocol", "marketplace"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Agent-Internet-Protocol/aip-website.git",
+    "directory": "packages/agent-sdk"
+  },
+  "homepage": "https://github.com/Agent-Internet-Protocol/aip-website/tree/main/packages/agent-sdk",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.39.0",
+    "express": "^4.21.2"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.0",
+    "typescript": "^5.9.3"
+  },
+  "peerDependencies": {
+    "@solana/web3.js": "^1.98.0"
+  },
+  "peerDependenciesMeta": {
+    "@solana/web3.js": { "optional": true }
+  }
+}
