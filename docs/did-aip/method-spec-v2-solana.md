@@ -165,7 +165,7 @@ injective in both directions, as in v2 §1.3.
 ### 4.1 Logical view (Normative)
 
 A resolver reads the following fields of `AgentRecord`. The names are those of the program interface
-contract (BC-44, `interfaces/square-registry-contract`); the byte layout is the registry's IDL. This
+contract (BC-44, `idl/square_registry_contract.json`); the byte layout is the registry's IDL. This
 profile fixes their meaning, not their encoding.
 
 | Field | Type | Meaning |
@@ -521,9 +521,9 @@ Facts a v1 implementation needs and the v1 specification does not give:
 - `CgchXu2dRV3r9E1YjRhp4kbeLLtv1Xz61yoerJzp1Vbc` is the v1 program, not a Registry of this profile,
   and a resolver MUST NOT accept it as the `registry` segment of a `solana` DID: step 4 of §6.1
   rejects it with `registryNotAllowed`, whether or not the resolver keeps an allowlist. The BC-44
-  interface stubs, and the v1 code imported into `programs/square-registry` (BC-07), declare this id
-  until BC-09 assigns Square program ids, so a client that took the registry address from today's
-  IDL would build DIDs naming the v1 program. Both programs call their account `AgentRecord` and so
+  IDL (`idl/square_registry_contract.json`) carries this id as its address, and the v1 code imported
+  into `programs/square-registry` (BC-07) declares it, until BC-09 assigns Square program ids, so a
+  client that took the registry address from today's IDL would build DIDs naming the v1 program. Both programs call their account `AgentRecord` and so
   share its Anchor discriminator: step 6 of §6.1 cannot tell them apart, so the check is by program
   id, before any network call.
 
@@ -652,7 +652,7 @@ not require service types to be registered.
 | Item | Consequence |
 |---|---|
 | BC-15 `square_registry` | Implements §4.2: no DID field, `["agent", creator, agent_id]` seeds, `Deregistered` instead of close, card URI and hash written together, wallet reset on transfer |
-| BC-44 program interface | v0.1.0 already matches §3.4, §4.1 and §7: same seeds and field names, no DID field, no close, `Inactive` / `Deregistered`, card URI and hash. Not stated there yet: the wallet reset on transfer (§4.2.5). Its stubs declare the v1 program id until BC-09 (§9.2) |
+| BC-44 program interface | v0.1.1 (`idl/*.json`) already matches §3.4, §4.1 and §7: same seeds and field names, no DID field, no close, `Inactive` / `Deregistered`, card URI and hash. Not stated there yet: the wallet reset on transfer (§4.2.5). Its registry IDL carries the v1 program id as its address until BC-09 (§9.2) |
 | BC-16 events | Registry events carry the record address; the DID is derived, not emitted |
 | BE-09 `@squaresdk/solana-identity` | Implements §6 and §9 and consumes `test-vectors.json`; the v1 path decodes the c427872 layout, and the v1 program id is rejected as a registry (§6.1 step 4, §9.2) |
 | BC-07 registry import | Source: `dr-wilson-empty/aip-beta`. Its registry at c427872 is the code deployed as v1 (§9.2) |
