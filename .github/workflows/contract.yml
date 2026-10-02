@@ -1,5 +1,5 @@
-# BE-35: API / SDK sözleşmesinin BC-44 IDL'leriyle hizası. Anchor gerektirmez; IDL'lerin stub'lardan
-# yeniden üretimi (interfaces/build-idl.sh --check) Anchor kurulumuyla birlikte BC-13'te eklenir.
+# BE-35: API / SDK sözleşmesinin BC-44 IDL'leriyle (idl/*.json) hizası. Gerçek programlar geldikçe
+# programların IDL'inin idl/ ile aynı olduğu denetimi BC-13'te eklenir.
 # Genel TS CI'ı (lint, pack smoke) BE-03'tedir; bu iş akışı oraya taşınabilir.
 name: contract
 
@@ -23,8 +23,8 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - name: IDL → zod / OpenAPI şemaları güncel
-        run: pnpm --filter @squaresdk/solana-types gen:check
+      - name: IDL → zod / OpenAPI şemaları ve SDK tipleri güncel
+        run: pnpm contract:check
       - name: OpenAPI lint
         run: pnpm openapi:lint
       - name: Derleme, tip kontrolü (IDL tip testleri dahil) ve hizalama testleri

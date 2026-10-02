@@ -1,7 +1,7 @@
 {
   "name": "@squaresdk/solana-identity",
   "version": "0.1.0",
-  "description": "did:aip çözümleyici (v2 Solana + v1), DID Document ve agent card doğrulama — BE-35 imzaları (gövdeler BE-09)",
+  "description": "did:aip çözümleyici (v2 Solana + v1), DID Document ve agent card doğrulama — BE-35 sözleşmesi (uygulama BE-09)",
   "license": "MIT",
   "private": true,
   "type": "module",
@@ -16,8 +16,7 @@
   ],
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "node --test \"test/*.test.mjs\""
+    "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
     "@solana/web3.js": "^1.99.0",

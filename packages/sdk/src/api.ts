@@ -1,38 +1,37 @@
-// REST API client imzaları. Metot adları docs/api/openapi.yaml `operationId`'leriyle birebir aynıdır
-// (test: packages/sdk/test). Uygulaması BE-18 ile birlikte; FE-24 mock'u bu arayüzü uygular.
-import {
-  NotImplementedError,
-  type Address,
-  type AgentCard,
-  type AgentCardHosting,
-  type AgentStatus,
-  type AgentView,
-  type ApiEnvelope,
-  type ApiKey,
-  type ApiKeyCreate,
-  type ApiKeyCreated,
-  type AuthChallenge,
-  type AuthChallengeRequest,
-  type ClaimStatus,
-  type ClaimView,
-  type DeliveryReceipt,
-  type DisputeView,
-  type Health,
-  type IndexedEvent,
-  type InstitutionView,
-  type JobStatus,
-  type JobView,
-  type KeeperAction,
-  type PolicyMeta,
-  type PolicyView,
-  type ProveRequest,
-  type ProveResponse,
-  type ScreeningView,
-  type Session,
-  type SessionRequest,
-  type SquareProgram,
-  type TxRequest,
-  type UnsignedTx,
+// REST API client sözleşmesi. Metot adları docs/api/openapi.yaml `operationId`'leriyle birebir aynıdır
+// (test: packages/sdk/test). Uygulaması BE-18 ile birlikte; web app veri katmanı (FE-24) bu arayüzü kullanır.
+import type {
+  Address,
+  AgentCard,
+  AgentCardHosting,
+  AgentStatus,
+  AgentView,
+  ApiEnvelope,
+  ApiKey,
+  ApiKeyCreate,
+  ApiKeyCreated,
+  AuthChallenge,
+  AuthChallengeRequest,
+  ClaimStatus,
+  ClaimView,
+  DeliveryReceipt,
+  DisputeView,
+  Health,
+  IndexedEvent,
+  InstitutionView,
+  JobStatus,
+  JobView,
+  KeeperAction,
+  PolicyMeta,
+  PolicyView,
+  ProveRequest,
+  ProveResponse,
+  ScreeningView,
+  Session,
+  SessionRequest,
+  SquareProgram,
+  TxRequest,
+  UnsignedTx,
 } from '@squaresdk/solana-types';
 
 export interface PageParams {
@@ -120,6 +119,5 @@ export interface ApiClientConfig {
   fetch?: typeof fetch;
 }
 
-export function createApiClient(config: ApiClientConfig): SquareApi {
-  throw new NotImplementedError('createApiClient', 'BE-18');
-}
+/** `SquareApi` fabrikası; uygulama BE-18 ile birlikte. */
+export type CreateApiClient = (config: ApiClientConfig) => SquareApi;

@@ -1,4 +1,5 @@
-# BC-45 (#111): her PR'da proje sahibini reviewer olarak ister.
+# BC-45 (#111): her PR'da `REVIEWER` repo değişkenindeki kullanıcıyı reviewer olarak ister
+# (Settings → Secrets and variables → Actions → Variables).
 # CODEOWNERS bu repoda kullanılmaz (proje sahibi kararı): GitHub Free planında private repolarda
 # otomatik atama yapmıyor. Bu iş akışı aynı işi Actions ile yapar.
 #
@@ -14,13 +15,10 @@ on:
 permissions:
   pull-requests: write
 
-env:
-  REVIEWER: MuhammedAkinci
-
 jobs:
   request-review:
     # GitHub, PR'ın yazarını reviewer olarak eklemeye izin vermez; taslak PR'lar hazır olunca istenir.
-    if: github.event.pull_request.user.login != 'MuhammedAkinci' && !github.event.pull_request.draft
+    if: vars.REVIEWER != '' && github.event.pull_request.user.login != vars.REVIEWER && !github.event.pull_request.draft
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -29,4 +27,5 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR: ${{ github.event.pull_request.number }}
           REPO: ${{ github.repository }}
+          REVIEWER: ${{ vars.REVIEWER }}
         run: gh api "repos/$REPO/pulls/$PR/requested_reviewers" -f "reviewers[]=$REVIEWER" --silent
