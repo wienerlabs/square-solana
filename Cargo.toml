@@ -2,6 +2,10 @@
 resolver = "2"
 members = ["programs/*", "crates/*"]
 
+# Proje lisansı (BC-02, docs/licensing.md); crate'ler `license.workspace = true` ile devralabilir.
+[workspace.package]
+license = "Apache-2.0"
+
 [profile.release]
 overflow-checks = true
 lto = "fat"

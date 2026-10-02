@@ -9,7 +9,8 @@ Proje belgeleri. Mevcut olanlar bağlantılı; diğerleri ilgili issue ile eklen
 | `did-aip/` | `did:aip` v2 Solana (CAIP-2) profil spesifikasyonu ve test vektörleri | [BC-14] |
 | `design/` | program arayüz sözleşmesi (`program-interface.md`), normatif event şeması (`events.md`) | [BC-44], [BC-16] |
 | [`provenance/`](provenance/) | taşınan dizinlerin kaynak repo, commit ve yöntem kayıtları (issue başına bir dosya) | [BC-04], [BC-05], [BC-06], [BC-07], [BE-02] |
-| `THIRD_PARTY_LICENSES.md` | üçüncü taraf lisans envanteri | [BC-02] |
+| [`licensing.md`](licensing.md) | lisans politikası: proje lisansı, taşınan kodun bildirimleri, bağımlılık lisansları | [BC-02] |
+| [`THIRD_PARTY_LICENSES.md`](THIRD_PARTY_LICENSES.md) | üçüncü taraf lisans envanteri (üretilir) | [BC-02] |
 | `legal/relicensing/` | Covenant LGPL kodu için yazılı yeniden lisanslama onayları | [BC-03] |
 | `deploy/` | ağ bazında deploy kayıtları (ör. `devnet.md`) | [BC-30] |
 | `runbooks/` | operasyon runbook'ları (ör. `upgrade.md`) | [BC-09] |
