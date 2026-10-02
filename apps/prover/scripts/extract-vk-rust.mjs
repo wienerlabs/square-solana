@@ -14,19 +14,18 @@
 //   G2 -> 128 bytes = x1 || x0 || y1 || y0 (Fp2 components reversed vs snarkjs)
 //
 // This script prints Rust source that can be pasted into
-// programs/verifier/src/groth16_vk.rs.
+// programs/square-verifier/src/groth16_vk.rs.
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-const vkPath = process.argv[2]
-  ?? path.resolve(__dirname, '..', 'artifacts', 'payment_vk.json');
-const constName = process.argv[3] ?? 'APERTURE_PAYMENT_VK';
-const nrInputsConst = process.argv[4] ?? 'PAYMENT_NR_INPUTS';
+const [vkPath, constName, nrInputsConst] = process.argv.slice(2);
+if (!vkPath || !constName || !nrInputsConst) {
+  console.error(
+    'Usage: node extract-vk-rust.mjs <vk.json> <VK_CONST_NAME> <NR_INPUTS_CONST_NAME>',
+  );
+  process.exit(2);
+}
 
 const vk = JSON.parse(fs.readFileSync(vkPath, 'utf8'));
 

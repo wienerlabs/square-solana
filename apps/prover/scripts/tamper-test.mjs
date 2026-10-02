@@ -11,7 +11,13 @@ import { fileURLToPath } from 'node:url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const BASE_URL = process.env.PROVER_BASE_URL ?? 'http://localhost:3003';
+function requireBaseUrl() {
+  const url = process.env.PROVER_BASE_URL;
+  if (!url) throw new Error('PROVER_BASE_URL is required (e.g. the running prover service URL)');
+  return url.replace(/\/+$/, '');
+}
+
+const BASE_URL = requireBaseUrl();
 const VK_PATH = path.resolve(
   __dirname,
   '..',
@@ -29,7 +35,10 @@ const COMPLIANT_INPUT = {
   payment_token_mint: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
   payment_recipient: 'CBDjvUkZZ6ucrVGrU3vRraasTytha8oVg2NLCxAHE25b',
   payment_endpoint_category: 'compute',
-  daily_spent_so_far_lamports: 50000000,
+  policy_id: '9f1c2a4e-5b7d-4c3a-8e2f-1a6b9d0c7e54',
+  operator_id: '4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU',
+  daily_spent_before_lamports: 50000000,
+  current_unix_timestamp: Math.floor(Date.now() / 1000),
 };
 
 function stringBigIntAdd(a, b) {
@@ -97,6 +106,8 @@ async function main() {
     '\nAll checks passed. The proof is cryptographically bound to both the',
   );
   console.log('proof bytes AND the public inputs — a fake prover could not do this.');
+  // snarkjs keeps its curve worker threads alive; exit explicitly.
+  process.exit(0);
 }
 
 main().catch((err) => {

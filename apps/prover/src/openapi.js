@@ -2,11 +2,13 @@
 // exposes. Returned verbatim from GET /api-docs.json so the dashboard's
 // API docs page can render it. Kept inline (no codegen) because the API is
 // tiny and rarely changes — two endpoints.
+import { packageInfo } from './package-info.js';
+
 export const openapiSpec = {
   openapi: '3.0.3',
   info: {
     title: 'Aperture Prover Service',
-    version: '0.1.0',
+    version: packageInfo.version,
     description:
       'Generates Groth16 zero-knowledge proofs for the Aperture payment compliance circuit (Circom + snarkjs). Output is pre-formatted for on-chain verification via groth16-solana.',
   },
@@ -66,8 +68,8 @@ export const openapiSpec = {
         type: 'object',
         properties: {
           status: { type: 'string', example: 'healthy' },
-          service: { type: 'string', example: 'aperture-prover-service' },
-          version: { type: 'string', example: '0.1.0' },
+          service: { type: 'string', example: packageInfo.name },
+          version: { type: 'string', example: packageInfo.version },
           backend: { type: 'string', example: 'circom+snarkjs' },
         },
       },

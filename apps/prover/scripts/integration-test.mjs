@@ -3,22 +3,28 @@
 //
 // Usage:
 //   1. Start prover-service in another terminal:
-//      cd services/prover-service && PROVER_SERVICE_PORT=3099 npm run dev
+//      PROVER_SERVICE_PORT=<port> CORS_ORIGINS=<origin> pnpm --filter @squaresdk/solana-prover dev
 //   2. Run this script:
-//      node services/prover-service/scripts/integration-test.mjs
+//      PROVER_BASE_URL=http://<host>:<port> node apps/prover/scripts/integration-test.mjs
 //
 // What it validates:
 //   - /prove endpoint returns a 200 for a known-compliant input fixture.
 //   - proof_a / proof_b / proof_c decode to 64 / 128 / 64 byte buffers.
 //   - public_inputs[0] encodes is_compliant canonically (zero or one).
-//   - public_inputs[1] matches raw_public[1] (Poseidon journal digest).
+//   - every public_inputs[i] is the 32-byte big-endian encoding of raw_public[i].
 //   - A bad fixture (amount over per-tx limit) still yields a verifiable
 //     proof but with is_compliant = 0 — the circuit proves the check was
 //     performed, not that the outcome was positive.
 
 import assert from 'node:assert/strict';
 
-const BASE_URL = process.env.PROVER_BASE_URL ?? 'http://localhost:3099';
+function requireBaseUrl() {
+  const url = process.env.PROVER_BASE_URL;
+  if (!url) throw new Error('PROVER_BASE_URL is required (e.g. the running prover service URL)');
+  return url.replace(/\/+$/, '');
+}
+
+const BASE_URL = requireBaseUrl();
 
 function compliantInput() {
   return {
@@ -31,7 +37,10 @@ function compliantInput() {
     payment_token_mint: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
     payment_recipient: 'CBDjvUkZZ6ucrVGrU3vRraasTytha8oVg2NLCxAHE25b',
     payment_endpoint_category: 'compute',
-    daily_spent_so_far_lamports: 50000000,
+    policy_id: '9f1c2a4e-5b7d-4c3a-8e2f-1a6b9d0c7e54',
+    operator_id: '4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU',
+    daily_spent_before_lamports: 50000000,
+    current_unix_timestamp: Math.floor(Date.now() / 1000),
   };
 }
 
@@ -85,20 +94,20 @@ async function run() {
   assertBufferLen(ok.groth16.proof_a, 64, 'proof_a');
   assertBufferLen(ok.groth16.proof_b, 128, 'proof_b');
   assertBufferLen(ok.groth16.proof_c, 64, 'proof_c');
-  assert.equal(ok.groth16.public_inputs.length, 2, 'public_inputs count');
-  assertIsCompliantEncoding(ok.groth16.public_inputs[0], true, 'public_inputs[0]');
-  const journalBytes = assertBufferLen(
-    ok.groth16.public_inputs[1],
-    32,
-    'public_inputs[1]',
-  );
-  const rawDigest = BigInt(ok.raw_public[1]);
-  const encodedDigest = BigInt('0x' + journalBytes.toString('hex'));
   assert.equal(
-    rawDigest,
-    encodedDigest,
-    'public_inputs[1] must equal raw_public[1] as a field element',
+    ok.groth16.public_inputs.length,
+    ok.raw_public.length,
+    'public_inputs count must match raw_public',
   );
+  assertIsCompliantEncoding(ok.groth16.public_inputs[0], true, 'public_inputs[0]');
+  ok.groth16.public_inputs.forEach((value, i) => {
+    const bytes = assertBufferLen(value, 32, `public_inputs[${i}]`);
+    assert.equal(
+      BigInt('0x' + bytes.toString('hex')),
+      BigInt(ok.raw_public[i]),
+      `public_inputs[${i}] must equal raw_public[${i}] as a field element`,
+    );
+  });
   console.log(`  ok — ${ok.proving_time_ms} ms`);
 
   console.log('→ over-limit case');
