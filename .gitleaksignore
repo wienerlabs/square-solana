@@ -1,0 +1,6 @@
+# Kabul edilmiş gitleaks yanlış alarmları (secret değil). Her satır bir bulgunun parmak izi.
+# Yeni bir satır eklemeden önce bulgunun secret olmadığını doğrulayın ve gerekçeyi buraya yazın.
+
+# BC-05 — Groth16 doğrulama anahtarı sabitleri (public VK), Aperture verifier geçmişi
+c768e68915d85a2e815459bfb34292b960fbd3f8:programs/square-verifier/src/groth16_vk.rs:generic-api-key:23
+c768e68915d85a2e815459bfb34292b960fbd3f8:programs/square-verifier/src/groth16_vk.rs:generic-api-key:35
