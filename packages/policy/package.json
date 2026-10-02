@@ -1,7 +1,7 @@
 {
   "name": "@squaresdk/solana-policy",
   "version": "0.1.0",
-  "description": "Kurum tarafı: politika commitment'ı, alıcı Merkle ağacı, release witness'ı, ispat ve bağlama — BE-35 imzaları (gövdeler BE-10)",
+  "description": "Kurum tarafı: politika commitment'ı, alıcı Merkle ağacı, release witness'ı, ispat ve bağlama — BE-35 sözleşmesi (uygulama BE-10)",
   "license": "Apache-2.0",
   "private": true,
   "type": "module",
@@ -16,8 +16,7 @@
   ],
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "node --test \"test/*.test.mjs\""
+    "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
     "@solana/web3.js": "^1.99.0",

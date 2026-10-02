@@ -73,7 +73,7 @@ prover, screener), `@squaresdk/solana-*` paketleri ve Next.js web uygulaması.
 | Dizin | İçerik |
 |---|---|
 | [`programs/`](programs/) | Anchor programları: escrow, policy, verifier, registry |
-| `interfaces/`, `idl/` | Programların arayüz sözleşmesi: gövdesiz stub'lar ve IDL'leri ([`docs/design/program-interface.md`](docs/design/program-interface.md)) |
+| [`idl/`](idl/) | Program arayüz sözleşmesinin tek kaynağı: IDL'ler ([`docs/design/program-interface.md`](docs/design/program-interface.md)) |
 | [`crates/`](crates/) | Paylaşılan Rust crate'leri (`square-common`) |
 | [`circuits/`](circuits/) | Circom uyum devresi ve trusted setup belgeleri |
 | [`packages/`](packages/) | TS paketleri (`@squaresdk/solana-*`) |

@@ -1,8 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["programs/*", "interfaces/*", "crates/*"]
-# interfaces/ kendi Anchor.toml'u ile ayrı bir Anchor workspace'i; onun çıktı klasörü crate değildir.
-exclude = ["interfaces/target"]
+members = ["programs/*", "crates/*"]
 
 # Proje lisansı (BC-02, docs/licensing.md); crate'ler `license.workspace = true` ile devralabilir.
 [workspace.package]

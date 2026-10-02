@@ -10,7 +10,7 @@
     "typecheck": "turbo run typecheck",
     "openapi:lint": "redocly lint",
     "openapi:docs": "redocly build-docs square -o dist/api/index.html",
-    "contract:check": "interfaces/build-idl.sh --check && pnpm --filter @squaresdk/solana-types gen:check",
+    "contract:check": "pnpm --filter @squaresdk/solana-types gen:check && pnpm --filter @squaresdk/solana-sdk gen:check",
     "license:check": "node scripts/license/inventory.mjs --check",
     "license:write": "node scripts/license/inventory.mjs --write"
   },

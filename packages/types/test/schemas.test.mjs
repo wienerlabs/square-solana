@@ -53,9 +53,8 @@ test('JOB_STATUS_TO_TASK_STATE her job durumunu kapsar', () => {
   assert.deepEqual(Object.keys(t.JOB_STATUS_TO_TASK_STATE).sort(), [...t.JobStatusSchema.options].sort());
 });
 
-test('IDL_PROGRAMS: hata kodları 6000 ile başlar, NotImplemented sonda', () => {
+test('IDL_PROGRAMS: hata kodları 6000 ile başlar ve ardışık', () => {
   for (const p of Object.values(t.IDL_PROGRAMS)) {
-    assert.equal(p.errors[0].code, 6000);
-    assert.equal(p.errors.at(-1).name, 'NotImplemented');
+    p.errors.forEach((e, i) => assert.equal(e.code, 6000 + i));
   }
 });

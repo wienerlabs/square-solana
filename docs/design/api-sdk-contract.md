@@ -1,8 +1,8 @@
 # API ve SDK sözleşmesi
 
-**Sözleşme sürümü:** v0.1.0 (taslak) · **Issue:** BE-35 (#102) · **Dayandığı program sözleşmesi:** BC-44 v0.1.0 ([program-interface.md](program-interface.md))
+**Sözleşme sürümü:** v0.1.1 (taslak) · **Issue:** BE-35 (#102), BC-47 (#119) · **Dayandığı program sözleşmesi:** BC-44 v0.1.1 ([program-interface.md](program-interface.md))
 
-Bu doküman Square'in HTTP API'sini ve TypeScript paketlerinin dış yüzeyini sabitler. Frontend (FE-24 mock) ve servisler (BE-18 API, BE-14 indexer, BE-15 keeper, BE-11 prover) bu sözleşmeye karşı geliştirir. Paketlerin gövdeleri `NotImplementedError` fırlatır; hata, fonksiyonu uygulayacak issue'yu (`issue` alanı) taşır.
+Bu doküman Square'in HTTP API'sini ve TypeScript paketlerinin dış yüzeyini sabitler. Frontend (FE-24 veri katmanı) ve servisler (BE-18 API, BE-14 indexer, BE-15 keeper, BE-11 prover) bu sözleşmeye göre geliştirir. Paketler yalnızca şemaları, IDL'den türetilen tipleri ve arayüzleri içerir; arayüzlerin uygulamaları ilgili issue'larda (BE-07/08/09/10/18) yazılır. Paketlerde mock, placeholder gövde ya da sabit adres yoktur (proje kuralı).
 
 ## 1. Dosyalar
 
@@ -14,7 +14,7 @@ Bu doküman Square'in HTTP API'sini ve TypeScript paketlerinin dış yüzeyini s
 | `packages/sdk` → `@squaresdk/solana-sdk` | 4 program için client, PDA'lar, tx builder'lar, 8 adım akışı, event / hata yardımcıları, REST API client | BE-08, BE-18 |
 | `packages/identity` → `@squaresdk/solana-identity` | did:aip çözümleyici, DID Document, agent card doğrulama | BE-09 |
 | `packages/policy` → `@squaresdk/solana-policy` | Politika commitment'ı, alıcı Merkle ağacı, release witness'ı, prover, ispat bağlama | BE-10 |
-| `.github/workflows/contract.yml` | Hizalama CI'ı (Anchor gerektirmez) | BE-03 / BC-13 devralabilir |
+| `.github/workflows/contract.yml` | Hizalama CI'ı | BE-03 / BC-13 devralabilir |
 
 **Yayımlama:** Sözleşme, `main`'deki sürümlü dosyalardır. `pnpm openapi:docs` tek dosyalık HTML belge üretir (`dist/api/index.html`, commit'lenmez). Paketler şimdilik `private`; npm'e yayın ayrı bir karar.
 
@@ -25,13 +25,13 @@ Hiza dört katmanda kurulur, hepsi CI'da denetlenir:
 | Katman | Nasıl | Denetim |
 |---|---|---|
 | Zincir verisinin JSON şemaları | `packages/types/scripts/gen-idl-schemas.mjs` `idl/*.json`'dan zod (`src/generated/idl.ts`) ve JSON Schema (`docs/api/schemas/idl.json`) üretir. Hesaplar, event'ler, tipler, instruction argümanları, `InstructionCall` ve `ProgramEventPayload` birleşimleri | `pnpm --filter @squaresdk/solana-types gen:check` |
-| SDK'nın zincir tipleri | `interfaces/build-idl.sh`, Anchor'ın ürettiği IDL JSON'unu ve camelCase TS tip dosyasını `packages/sdk/src/idl/`'a kopyalar. `IxArgs`, `IxAccounts`, hesap tipleri ve `InstructionBuilders` bu tiplerden türetilir; elle tip yazılmaz | `interfaces/build-idl.sh --check` (Anchor, BC-13), `test/contract.test.mjs` (JSON birebir), `type-tests/ix-args.ts` (`tsc --noEmit`) |
+| SDK'nın zincir tipleri | `packages/sdk/scripts/gen-idl-types.mjs`, `idl/*.json`'un kopyasını ve Anchor CLI ile aynı dönüşümle camelCase TS tip dosyasını `packages/sdk/src/idl/`'a yazar (çıktı Anchor'ınkiyle bayt bayt aynı). `IxArgs`, `IxAccounts`, hesap tipleri ve `InstructionBuilders` bu tiplerden türetilir; elle tip yazılmaz | `pnpm --filter @squaresdk/solana-sdk gen:check`, `test/contract.test.mjs` (JSON birebir), `type-tests/ix-args.ts` (`tsc --noEmit`) |
 | Elle yazılan API şemaları | Görünümler ve işlem şemaları hem zod'da hem OpenAPI'de yazılıdır | `packages/types/test/openapi-alignment.test.mjs`: alan adları, zorunlu alanlar, enum'lar |
 | REST client ↔ spec | `SquareApi` metot adları = OpenAPI `operationId`'leri | Tip düzeyi (`API_OPERATIONS`) + `packages/sdk/test/contract.test.mjs` |
 
 **Program sözleşmesi değişince:**
-1. Stub'ı değiştir, `interfaces/build-idl.sh` çalıştır.
-2. `pnpm --filter @squaresdk/solana-types gen` ile şemaları yeniden üret.
+1. `idl/*.json`'u değiştir.
+2. `pnpm --filter @squaresdk/solana-types gen` ve `pnpm --filter @squaresdk/solana-sdk gen` ile türetilen dosyaları yeniden üret.
 3. Gerekiyorsa elle yazılan görünümleri ve OpenAPI'yi güncelle, `pnpm contract:check && pnpm test` çalıştır.
 4. İki dokümanın değişiklik kaydına sürüm notu düş.
 
@@ -110,7 +110,7 @@ Tüm `/v1` yanıtları `{ success, data, error, meta }` biçimindedir. `meta.req
 ## 8. Açık noktalar
 
 1. **A2A eşlemesi (BE-17):** `JOB_STATUS_TO_TASK_STATE` taslaktır. Örneğin `disputed → input-required` ve `refunded → failed` eşlemeleri BE-17'de kesinleşir.
-2. **Agent card (BC-14, BE-07, BE-09):** `registrations[]` biçimi BC-14 spec'iyle (#109) hizalı yazıldı. #109'daki alan adı farkları (`registrant`, `agent_wallet`) program sözleşmesinin bir sonraki sürümünde kapanır; o zaman `AgentRecord` şeması üreteçle kendiliğinden değişir.
+2. **Agent card (BC-14, BE-07, BE-09):** `registrations[]` biçimi BC-14 spec'iyle (#109) hizalı. Spec, sözleşmenin `AgentRecord` alan adlarını benimsedi; devirde cüzdanın yeni sahibe sıfırlanması kuralı program sözleşmesine BC-15 ile eklenecek.
 3. **Policy dokümanı (BE-10):** `PolicyDocument` alanları Aperture'ın politika şemasından uyarlanmıştır. Devre girdileri (BC-19) kesinleşince normalizasyon kuralları değişebilir.
 4. **Auth (BE-18):** İmzalanan mesajın metni (alan adı ve süre) ve oturum belirteci biçimi BE-18'de belirlenir. Sözleşme yalnızca alanları sabitler.
 5. **Prover servisi (BE-11):** `apps/prover`'ın kendi OpenAPI'si olacak. `/v1/prove` API'de vekil olarak kalır mı, BE-11 ile BE-18 birlikte karar verir.
@@ -123,3 +123,4 @@ Tüm `/v1` yanıtları `{ success, data, error, meta }` biçimindedir. `meta.req
 | Sürüm | Değişiklik | Issue / PR |
 |---|---|---|
 | v0.1.0 | İlk taslak: 28 operasyonluk OpenAPI 3.1 spec; IDL'den üretilen zod ve JSON Schema'lar; 4 paketin gövdesiz imzaları; hizalama testleri ve CI | BE-35 (#102) |
+| v0.1.1 | Placeholder'lar kaldırıldı (proje kuralı): `NotImplementedError` ve onu fırlatan gövdeler, `SOURCE_PROGRAM_IDS`, OpenAPI'deki `localhost` sunucusu ve `not_implemented` hata kodu çıktı. sdk / identity / policy yalnızca tip ve arayüz (`SquareClient`, `SquareApi`, `SquarePda`, `SpecHashing`, `SquareIdentity`, `SquarePolicyKit`, `Create*` fabrika tipleri) sunar; `SquareClientConfig.programIds` zorunlu. SDK IDL tipleri `idl/*.json`'dan üretilir | BC-47 (#119) |

@@ -17,7 +17,6 @@ export const ApiErrorCodeSchema = z.enum([
   'rpc_unavailable',
   'db_unavailable',
   'prover_unavailable',
-  'not_implemented',
   'internal_error',
 ]);
 export type ApiErrorCode = z.infer<typeof ApiErrorCodeSchema>;

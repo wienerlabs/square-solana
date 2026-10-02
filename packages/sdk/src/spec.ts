@@ -1,12 +1,9 @@
-// Job spec hash'i: RFC 8785 (JCS) kanonik JSON + SHA-256. `create_job`'un `specHash` argümanı.
-import { NotImplementedError } from '@squaresdk/solana-types';
+// Job spec hash'i sözleşmesi: RFC 8785 (JCS) kanonik JSON + SHA-256, `create_job`'un `specHash` argümanı.
+// Uygulama BE-08'de; bu dosya yalnızca arayüzü tanımlar.
 
-/** RFC 8785 kanonik JSON. */
-export function canonicalizeSpec(spec: unknown): string {
-  throw new NotImplementedError('canonicalizeSpec', 'BE-08');
-}
-
-/** SHA-256(canonicalizeSpec(spec)), 32 bayt. */
-export function specHash(spec: unknown): Uint8Array {
-  throw new NotImplementedError('specHash', 'BE-08');
+export interface SpecHashing {
+  /** RFC 8785 kanonik JSON. */
+  canonicalizeSpec(spec: unknown): string;
+  /** SHA-256(canonicalizeSpec(spec)), 32 bayt. */
+  specHash(spec: unknown): Uint8Array;
 }
