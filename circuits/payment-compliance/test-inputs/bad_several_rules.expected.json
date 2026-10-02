@@ -1,0 +1,25 @@
+{
+  "description": "150 USDC at 20:13 with 900 already spent: per-transaction, both daily ceilings and the window, all reported.",
+  "refusal_code": "99",
+  "refused_rules": [
+    "PER_TX",
+    "DAILY_PRIVATE",
+    "OUTSIDE_TIME_WINDOW",
+    "DAILY_CEILING"
+  ],
+  "public_signals": {
+    "refusal_code": "99",
+    "policy_commitment": "17040439076184967394581195263985121356537750946887965865812216376066378039915",
+    "daily_ceiling": "1000000000",
+    "payee_high": "39603846859677690964152807649152072222",
+    "payee_low": "127117542171637602946942707218743329092",
+    "net_amount": "150000000",
+    "mint_high": "78778434590469691778792206732500675843",
+    "mint_low": "57655239994631203757795580049291751079",
+    "daily_spent_before": "900000000",
+    "current_unix_timestamp": "1790021600",
+    "job_high": "49796695054203276470969200263641897190",
+    "job_low": "13782664408477402011771783189819232979",
+    "stripe_receipt_hash": "0"
+  }
+}

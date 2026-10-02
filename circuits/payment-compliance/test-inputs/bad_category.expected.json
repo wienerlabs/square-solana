@@ -1,0 +1,22 @@
+{
+  "description": "Payment category \"gambling\" is not allowed.",
+  "refusal_code": "16",
+  "refused_rules": [
+    "CATEGORY_NOT_ALLOWED"
+  ],
+  "public_signals": {
+    "refusal_code": "16",
+    "policy_commitment": "17040439076184967394581195263985121356537750946887965865812216376066378039915",
+    "daily_ceiling": "1000000000",
+    "payee_high": "39603846859677690964152807649152072222",
+    "payee_low": "127117542171637602946942707218743329092",
+    "net_amount": "25000000",
+    "mint_high": "78778434590469691778792206732500675843",
+    "mint_low": "57655239994631203757795580049291751079",
+    "daily_spent_before": "200000000",
+    "current_unix_timestamp": "1790000000",
+    "job_high": "49796695054203276470969200263641897190",
+    "job_low": "13782664408477402011771783189819232979",
+    "stripe_receipt_hash": "0"
+  }
+}
