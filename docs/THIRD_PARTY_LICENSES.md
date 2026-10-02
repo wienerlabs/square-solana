@@ -22,12 +22,13 @@ pnpm license:write
 <!-- license-inventory:begin -->
 | Paket | Ekosistem | Lisans | Kapsam | Kullanan | Durum |
 |---|---|---|---|---|---|
-| `anchor-lang` | cargo | Apache-2.0 | runtime | `policy-registry`, `verifier` | ✓ |
+| `anchor-lang` | cargo | Apache-2.0 | runtime | `policy-registry`, `square-escrow-contract`, `square-policy-contract`, `square-registry-contract`, `square-verifier-contract`, `verifier` | ✓ |
+| `anchor-spl` | cargo | Apache-2.0 | runtime | `square-escrow-contract` | ✓ |
 | `groth16-solana` | cargo | MIT | runtime | `verifier` | ✓ |
 | `sha2` | cargo | MIT OR Apache-2.0 | runtime | `policy-registry`, `verifier` | ✓ |
 | `turbo` | npm | MIT | dev | `@squaresdk/solana-monorepo` | ✓ |
 
-**Özet:** 1 npm, 3 Cargo doğrudan bağımlılık; lisans dağılımı: 2× MIT, 1× Apache-2.0, 1× MIT OR Apache-2.0.
+**Özet:** 1 npm, 4 Cargo doğrudan bağımlılık; lisans dağılımı: 2× Apache-2.0, 2× MIT, 1× MIT OR Apache-2.0.
 <!-- license-inventory:end -->
 
 Kaynak projelerin (Aperture, AIP, Covenant) kendi lisansları ve telif bildirimleri
