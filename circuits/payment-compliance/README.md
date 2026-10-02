@@ -1,5 +1,18 @@
 # Aperture Payment Prover (Circom)
 
+> **Square notu (BC-06).** Bu dizin `wienerlabs/aperture` `circuits/payment-prover`'dan geçmişiyle
+> taşındı ([`docs/provenance/BC-06.md`](../../docs/provenance/BC-06.md)). Aşağıdaki metin Aperture'ın
+> orijinal README'sidir; yalnızca `hello.circom`'un yolu güncellendi.
+>
+> - Prover artefaktları (`.r1cs`, `.wasm`, `.zkey`, `.ptau`, doğrulama anahtarı) repoya girmez
+>   (`.gitignore`). Geliştirme setup'ı ve artefakt pipeline'ı BC-20'de.
+> - `examples/hello.circom` iş anlamı taşımayan bir araç zinciri sağlamasıdır; üretim devresi
+>   `payment.circom`.
+> - Bağımlılıklar bu dizinde `npm ci` ile kurulur; dizin pnpm workspace'inin parçası değildir.
+> - Doğrulanan araç: circom 2.2.3. `payment.circom`: 2863 doğrusal olmayan + 4514 doğrusal kısıt,
+>   73 private girdi, 10 public çıktı.
+> - Devrenin release ispatına uyarlanması BC-19, kamusal phase-2 ceremony BC-38.
+
 This is the Circom + snarkjs rewrite of the payment-prover zero-knowledge
 circuit. It replaces the archived RISC Zero implementation under
 `_archive/risc0/` with a Groth16 pipeline that runs on commodity
@@ -41,13 +54,13 @@ npm install -g snarkjs
 
 ## Hello-world pipeline
 
-The `hello.circom` file proves knowledge of two field elements that sum to
+The `examples/hello.circom` file proves knowledge of two field elements that sum to
 a public value — a sanity check, not part of the production flow.
 
 ```bash
 cd circuits/payment-prover
 mkdir -p build
-circom hello.circom --r1cs --wasm --sym -o build
+circom examples/hello.circom --r1cs --wasm --sym -o build
 cd build
 
 # One-time ceremony (local, not production)
