@@ -1,5 +1,5 @@
-// PDA türetme imzaları. Seed'ler BC-44 sözleşmesindeki tabloyla aynıdır (docs/design/program-interface.md §5).
-import { NotImplementedError } from '@squaresdk/solana-types';
+// PDA türetme sözleşmesi. Seed'ler BC-44 sözleşmesindeki tabloyla aynıdır (docs/design/program-interface.md §5).
+// Uygulama BE-08'de; bu dosya yalnızca arayüzü tanımlar.
 import type { PublicKey } from '@solana/web3.js';
 import type { SquareProgramIds } from './programs.js';
 import type { Pda } from './types.js';
@@ -27,6 +27,5 @@ export interface SquarePda {
   escrowAuthority(): Pda;
 }
 
-export function createPda(programIds: SquareProgramIds): SquarePda {
-  throw new NotImplementedError('createPda', 'BE-08');
-}
+/** Program kimliklerinden `SquarePda` üreten fabrika. */
+export type CreatePda = (programIds: SquareProgramIds) => SquarePda;
