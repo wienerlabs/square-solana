@@ -5,7 +5,7 @@ Proje belgeleri. Mevcut olanlar bağlantılı; diğerleri ilgili issue ile eklen
 | Yol | İçerik | Issue |
 |---|---|---|
 | [`analysis/`](analysis/) | Birleştirme analizi; [§12](analysis/square-solana-analysis.md#12-kararlar) kesin kararlar | — |
-| `decisions/` | ADR'ler: §12 kararlarının kalıcı kaydı | [BE-06] |
+| [`decisions/`](decisions/) | ADR'ler: §12 kararlarının kalıcı kaydı ([0001](decisions/0001-ts-paket-adlandirma-ve-surumleme.md): TS paket adlandırma ve sürümleme) | [BE-06], [BE-01] |
 | [`did-aip/`](did-aip/) | [`did:aip` v2 Solana (CAIP-2) profil spesifikasyonu](did-aip/method-spec-v2-solana.md) ve [test vektörleri](did-aip/test-vectors.json) | [BC-14] |
 | [`design/`](design/) | [program arayüz sözleşmesi](design/program-interface.md), [API ve SDK sözleşmesi](design/api-sdk-contract.md), normatif event şeması (`events.md`) | [BC-44], [BE-35], [BC-16] |
 | [`api/`](api/) | [OpenAPI 3.1 spec](api/openapi.yaml) (28 operasyon); [`schemas/idl.json`](api/schemas/idl.json) IDL'den üretilen JSON Schema'lar, elle düzenlenmez | [BE-35] |
@@ -27,6 +27,7 @@ Proje belgeleri. Mevcut olanlar bağlantılı; diğerleri ilgili issue ile eklen
 [BC-16]: https://github.com/wienerlabs/square-solana/issues/23
 [BC-30]: https://github.com/wienerlabs/square-solana/issues/38
 [BC-44]: https://github.com/wienerlabs/square-solana/issues/101
+[BE-01]: https://github.com/wienerlabs/square-solana/issues/15
 [BE-02]: https://github.com/wienerlabs/square-solana/issues/16
 [BE-06]: https://github.com/wienerlabs/square-solana/issues/20
 [BE-35]: https://github.com/wienerlabs/square-solana/issues/102
