@@ -118,15 +118,8 @@ PROVER_BASE_URL=http://<host>:<port> node apps/prover/scripts/tamper-test.mjs
 
 The artifacts here were compiled from Aperture's 10-output circuit and match
 the verification key in `programs/square-verifier/src/groth16_vk.rs`. The
-Square release circuit (`circuits/payment-compliance/`, 13 outputs) gets new
-artifacts and a new verification key together (BC-20 / BC-21):
-
-```bash
-cd circuits/payment-compliance
-# (follow the README there to recompile + rerun ceremony)
-cp build/payment_js/payment.wasm      ../../apps/prover/artifacts/
-cp build/payment_final.zkey           ../../apps/prover/artifacts/payment.zkey
-cp build/payment_vk.json              ../../apps/prover/artifacts/
-node ../../apps/prover/scripts/extract-vk-rust.mjs \
-  ../../apps/prover/artifacts/payment_vk.json APERTURE_PAYMENT_VK PAYMENT_NR_INPUTS
-```
+Square release circuit (`circuits/payment-compliance/`, 13 outputs) has its own
+artifact pipeline (BC-20): `circuits/payment-compliance/scripts/release-artifacts.mjs`
+produces and checks the release zkey, its verification key and
+`programs/square-verifier/src/release_vk.rs`. Moving this service to those
+artifacts is BE-11.

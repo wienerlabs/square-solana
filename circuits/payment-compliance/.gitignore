@@ -10,3 +10,6 @@ node_modules/
 *_js/
 *_cpp/
 *_vk.json
+
+# BC-20: release zkey (tekrar üretilemez; dev phase-2) ve manifest commit'lenir.
+!artifacts/payment.zkey
