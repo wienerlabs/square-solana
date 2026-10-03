@@ -1,6 +1,6 @@
 # API ve SDK sözleşmesi
 
-**Sözleşme sürümü:** v0.5.1 (taslak) · **Issue:** BE-35 (#102), BC-47 (#119), BE-07 (#39), BE-08 (#40), BE-09 (#41), BE-10 (#42), BE-11 (#44) · **Dayandığı program sözleşmesi:** BC-44 v0.2.0 ([program-interface.md](program-interface.md))
+**Sözleşme sürümü:** v0.5.2 (taslak) · **Issue:** BE-35 (#102), BC-47 (#119), BE-07 (#39), BE-08 (#40), BE-09 (#41), BE-10 (#42), BE-11 (#44), BC-02 (#2) · **Dayandığı program sözleşmesi:** BC-44 v0.2.0 ([program-interface.md](program-interface.md))
 
 Bu doküman Square'in HTTP API'sini ve TypeScript paketlerinin dış yüzeyini sabitler. Frontend (FE-24 veri katmanı) ve servisler (BE-18 API, BE-14 indexer, BE-15 keeper, BE-11 prover) bu sözleşmeye göre geliştirir. `@squaresdk/solana-sdk`'nin zincir tarafı BE-08, `@squaresdk/solana-identity` BE-09, `@squaresdk/solana-policy` BE-10 ile uygulandı; REST client'ın uygulaması BE-18'de. Paketlerde mock, placeholder gövde ya da sabit adres yoktur (proje kuralı).
 
@@ -130,6 +130,7 @@ Tüm `/v1` yanıtları `{ success, data, error, meta }` biçimindedir. `meta.req
 | Sürüm | Değişiklik | Issue / PR |
 |---|---|---|
 | v0.1.0 | İlk taslak: 28 operasyonluk OpenAPI 3.1 spec; IDL'den üretilen zod ve JSON Schema'lar; 4 paketin gövdesiz imzaları; hizalama testleri ve CI | BE-35 (#102) |
+| v0.5.2 | OpenAPI `info.license` repo lisansına (`LICENSE`, `NOTICE`) hizalandı: `MIT` yerine `Apache-2.0`, `name` ve SPDX `identifier` aynı değer. Yalnızca spec metadata'sı; HTTP yüzeyi, şemalar ve imzalar değişmedi. `openapi-alignment.test.mjs` artık `info.version`'ı `API_CONTRACT_VERSION` ile, `info.license`'ı kök `package.json` lisansıyla karşılaştırır | BC-02 (#2) |
 | v0.5.1 | `POST /v1/prove` 409 `conflict` döner: `artifactVersion` prover'da yüklü zkey'in SHA-256'sı değilse (`details.expected` doğru sürüm). Yanıt bileşeni `Conflict`. Prover servisi (`apps/prover`) aynı uç noktayı sunar | BE-11 (#44) |
 | v0.5.0 | `@squaresdk/solana-policy` uygulandı (BE-10); `SquarePolicyKit` arayüzü yerine fonksiyonlar dışa aktarılır. Değişen imzalar: `generatePolicySalt` → `generatePolicySecret` + `derivePolicySalts` (yaprak başına 8 salt, `PolicySalts`); `computePolicyCommitment(policy, salts)`; `buildReleaseWitness` `connection` yerine client'ın bağlantısını kullanır, `salts` ve `paymentCategory` alır; `createLocalProver` `groth16` backend'ini, `createRemoteProver` beklenen `artifactVersion`'ı alır; `watchJobProof` `paymentCategory`, `authority`, `buildOptions`, `intervalMs`, `refreshBeforeSecs` alır ve `onError` zorunlu. `NormalizedPolicy` devrenin politika girdileridir. HTTP yüzeyi değişmedi | BE-10 (#42) |
 | v0.4.0 | Program sözleşmesi v0.2.0'a dayanır (`set_compliance_proof` yol A, alıcı Merkle kuralı). `ProveResponse.publicInputs` 10 yerine release devresinin 13 sinyali | BE-10 (#42) |

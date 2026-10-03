@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Square Solana API
-  version: 0.5.1
+  version: 0.5.2
   summary: Square HTTP API sözleşmesi (BE-35), uygulaması apps/api (BE-18).
   description: |
     Contract-first API sözleşmesi. Zincirdeki hesaplar, event'ler ve instruction argümanları
@@ -12,8 +12,8 @@ info:
     zamanlar unix saniyesi, alan adları camelCase. Tüm `/v1` yanıtları `{ success, data, error, meta }`
     zarfıyla döner. Ayrıntılar: docs/design/api-sdk-contract.md.
   license:
-    name: MIT
-    identifier: MIT
+    name: Apache-2.0
+    identifier: Apache-2.0
 tags:
   - name: auth
     description: Cüzdan Ed25519 oturumu ve API anahtarları.
