@@ -2,6 +2,19 @@
 import { randomBytes } from 'node:crypto';
 import { Keypair } from '@solana/web3.js';
 import { SQUARE_IDLS } from '@squaresdk/solana-sdk';
+import {
+  AgentStatusSchema,
+  ApiKeyScopeSchema,
+  ClaimStatusSchema,
+  DisputeResolutionSchema,
+  JobStatusSchema,
+  KeeperActionKindSchema,
+  KeeperOutcomeSchema,
+  KeeperReasonSchema,
+  ReleaseVerdictSchema,
+  ScreeningStatusSchema,
+  ValidationOutcomeSchema,
+} from '@squaresdk/solana-types';
 import bs58 from 'bs58';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 // @ts-expect-error -- JS betiği; tip bildirimi yok.
@@ -69,6 +82,32 @@ describe('migration', () => {
     const expected = (formatConstraints() as { name: string }[]).map((c) => c.name);
     expect(expected.length).toBeGreaterThan(0);
     expect(expected.filter((name) => !present.has(name))).toEqual([]);
+  });
+});
+
+describe('@squaresdk/solana-types ile hiza', () => {
+  it('veritabanı enum değerleri API / SDK şemalarıyla birebir aynı', async () => {
+    const rows = await db.client.$queryRaw<{ type: string; label: string }[]>`
+      SELECT t.typname AS type, e.enumlabel AS label
+      FROM pg_enum e JOIN pg_type t ON t.oid = e.enumtypid
+      ORDER BY t.typname, e.enumsortorder`;
+    const labels = (type: string) => rows.filter((r) => r.type === type).map((r) => r.label);
+    const expected: Record<string, readonly string[]> = {
+      JobStatus: JobStatusSchema.options,
+      ClaimStatus: ClaimStatusSchema.options,
+      AgentStatus: AgentStatusSchema.options,
+      ScreeningStatus: ScreeningStatusSchema.options,
+      ValidationOutcome: ValidationOutcomeSchema.options,
+      ReleaseVerdict: ReleaseVerdictSchema.options,
+      DisputeResolution: DisputeResolutionSchema.options.map((option) => option.shape.kind.value),
+      KeeperActionKind: KeeperActionKindSchema.options,
+      KeeperOutcome: KeeperOutcomeSchema.options,
+      KeeperReason: KeeperReasonSchema.options,
+      ApiKeyScope: ApiKeyScopeSchema.options,
+    };
+    for (const [type, values] of Object.entries(expected)) {
+      expect(labels(type), type).toEqual([...values]);
+    }
   });
 });
 

@@ -39,6 +39,7 @@
   "devDependencies": {
     "@solana/web3.js": "^1.99.0",
     "@squaresdk/solana-config": "workspace:*",
+    "@squaresdk/solana-types": "workspace:*",
     "@testcontainers/postgresql": "^12.2.0",
     "@types/pg": "^8.23.1",
     "bs58": "^6.0.0",
