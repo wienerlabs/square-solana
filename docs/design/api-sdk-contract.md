@@ -1,6 +1,6 @@
 # API ve SDK sözleşmesi
 
-**Sözleşme sürümü:** v0.3.0 (taslak) · **Issue:** BE-35 (#102), BC-47 (#119), BE-07 (#39), BE-08 (#40), BE-09 (#41) · **Dayandığı program sözleşmesi:** BC-44 v0.1.1 ([program-interface.md](program-interface.md))
+**Sözleşme sürümü:** v0.4.0 (taslak) · **Issue:** BE-35 (#102), BC-47 (#119), BE-07 (#39), BE-08 (#40), BE-09 (#41), BE-10 (#42) · **Dayandığı program sözleşmesi:** BC-44 v0.2.0 ([program-interface.md](program-interface.md))
 
 Bu doküman Square'in HTTP API'sini ve TypeScript paketlerinin dış yüzeyini sabitler. Frontend (FE-24 veri katmanı) ve servisler (BE-18 API, BE-14 indexer, BE-15 keeper, BE-11 prover) bu sözleşmeye göre geliştirir. `@squaresdk/solana-sdk`'nin zincir tarafı BE-08, `@squaresdk/solana-identity` BE-09 ile uygulandı; policy ve REST client'ın uygulamaları BE-10 ve BE-18'de. Paketlerde mock, placeholder gövde ya da sabit adres yoktur (proje kuralı).
 
@@ -127,6 +127,7 @@ Tüm `/v1` yanıtları `{ success, data, error, meta }` biçimindedir. `meta.req
 | Sürüm | Değişiklik | Issue / PR |
 |---|---|---|
 | v0.1.0 | İlk taslak: 28 operasyonluk OpenAPI 3.1 spec; IDL'den üretilen zod ve JSON Schema'lar; 4 paketin gövdesiz imzaları; hizalama testleri ve CI | BE-35 (#102) |
+| v0.4.0 | Program sözleşmesi v0.2.0'a dayanır (`set_compliance_proof` yol A, alıcı Merkle kuralı). `ProveResponse.publicInputs` 10 yerine release devresinin 13 sinyali | BE-10 (#42) |
 | v0.3.0 | `AgentCard` tek şema: ERC-8004 kayıt dosyası alanları eklendi (`type` zorunlu, `services` zorunlu ve `url` ile aynı uç noktalı bir `A2A` girdisi içerir, `active`, `x402Support`), `AgentService` bileşeni. `@squaresdk/solana-identity` arayüzü did:aip Solana profiline hizalandı: `ParsedDidAip` v2 Solana / v2 EVM / v1 birleşimi, `DidDocument.capabilityInvocation`, spesifikasyonun çözüm metadata'sı (`versionId`, `agentStatus`, `deactivation`, `agentCard`, `crossRegistrations`, v1 `deprecated` …), hata kodları ve uyarılar, `ResolverOptions.connections` / `card` / `crossRegistrationLimit`; uygulama `squareIdentity` | BE-09 (#41) |
 | v0.2.1 | SDK zincir tarafı uygulandı (BE-08): `createSquareClient` (4 program client'ı, IDL builder'ları, `buildTx`, `decodeEvents`, `mapError`, 8 adımın `flow` builder'ları), `createPda`, `specHashing`, `workHash`. Yalnızca ekleme; imzalar değişmedi | BE-08 (#40) |
 | v0.2.0 | `PolicyDocument` release devresine hizalandı: `institution`, gizli `maxDaily` eklendi; `maxPerPayment` → `maxPerTx`, `mintWhitelist` → `tokenWhitelist` (≤ 10), `blockedPayees` ≤ 10, `allowedCategories` 1–8 (her biri 1–32 bayt UTF-8), `timeWindows` → tek `timeWindow` (UTC, gün adları, `start ≤ end`); devrede karşılığı olmayan `allowedAgentRecords` çıktı. `AipV1AgentCardSchema` (did:aip v1 kartı, AIP'den). Veritabanı enum'ları bu şemalarla testte hizalı (BE-04). HTTP yüzeyi değişmedi | BE-07 (#39) |

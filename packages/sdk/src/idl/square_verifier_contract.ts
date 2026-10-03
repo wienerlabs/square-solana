@@ -213,11 +213,14 @@ export type SquareVerifierContract = {
     {
       "name": "setComplianceProof",
       "docs": [
-        "Flow step 7: verifies a Groth16 proof (alt_bn128) against the job's policy snapshot",
-        "(`Job.policy_commitment`, `Job.policy_daily_ceiling`) and binds it to the job as the chain will",
-        "pay it now: payee (claim buyer if the receivable was sold), net amount, mint, the institution's",
-        "daily counter and the clock. Writes `ReleaseProof` with a verdict; a refusing proof records",
-        "`Refused` + reason code. Can be re-bound until escrow consumes it."
+        "Flow step 7: verifies a Groth16 proof (alt_bn128) of the release circuit (13 public signals,",
+        "docs/design/release-circuit.md §2). The program builds ten of the signals itself from the",
+        "accounts: the job's policy snapshot (`Job.policy_commitment`, `Job.policy_daily_ceiling`), the",
+        "payee (claim buyer if the receivable was sold, else `Job.agent_wallet`), the mint, the",
+        "institution's daily counter (`OperatorState`, UTC day rollover applied), the job address and a",
+        "zero `stripe_receipt_hash`. The caller supplies `refusal_code`, `net_amount` and",
+        "`proof_timestamp`, which must be within the clock tolerance. Writes `ReleaseProof` with a verdict;",
+        "a refusing proof records `Refused` + reason code. Can be re-bound until escrow consumes it."
       ],
       "discriminator": [
         184,
@@ -405,18 +408,25 @@ export type SquareVerifierContract = {
           }
         },
         {
-          "name": "publicInputs",
-          "type": {
-            "array": [
-              {
-                "array": [
-                  "u8",
-                  32
-                ]
-              },
-              10
-            ]
-          }
+          "name": "refusalCode",
+          "docs": [
+            "Public signal 0: bit mask of broken rules, 0 when compliant (release-circuit.md §3)."
+          ],
+          "type": "u16"
+        },
+        {
+          "name": "netAmount",
+          "docs": [
+            "Public signal 5: amount the payee receives."
+          ],
+          "type": "u64"
+        },
+        {
+          "name": "proofTimestamp",
+          "docs": [
+            "Public signal 9: the instant the proof evaluates the policy at (Unix seconds)."
+          ],
+          "type": "i64"
         }
       ]
     },

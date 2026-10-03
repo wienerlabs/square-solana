@@ -136,7 +136,7 @@ Her iki yolda da:
 | `ReleaseProof.refusal_code` | "devreyle BC-19'da tanımlanır" | §3'teki bit maskesi |
 | `verify_mpp_payment_proof` | 10 sinyal | aynı 13 sinyal; `stripe_receipt_hash` ≠ 0 |
 
-Sözleşme (`idl/*.json`) Muhammed'de (BC-44, BC-21); bu tablo öneridir, bu PR IDL'e dokunmuyor.
+Program sözleşmesi v0.2.0'da (BE-10) `set_compliance_proof` için **yol A** uygulandı: argümanlar `proof_a/b/c`, `refusal_code: u16`, `net_amount: u64`, `proof_timestamp: i64`. `verify_mpp_payment_proof`'un geçişi BC-37'de.
 
 ## 7. Gizlilik
 

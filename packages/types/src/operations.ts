@@ -112,7 +112,8 @@ export const ProveResponseSchema = z.object({
   proofA: hexBytes(64),
   proofB: hexBytes(128),
   proofC: hexBytes(64),
-  publicInputs: z.array(Hex32).length(10),
+  /** Release devresinin 13 public sinyali, devre sırasıyla (release-circuit.md §2). */
+  publicInputs: z.array(Hex32).length(13),
   provingMs: z.number().int().min(0),
 });
 export type ProveResponse = z.infer<typeof ProveResponseSchema>;
