@@ -27,7 +27,7 @@ pnpm license:write
 | `sha2` | cargo | MIT OR Apache-2.0 | runtime | `policy-registry` | ✓ |
 | `@anthropic-ai/sdk` | npm | MIT | runtime | `@squaresdk/solana-agent-sdk` | ✓ |
 | `@changesets/cli` | npm | MIT | dev | `@squaresdk/solana-monorepo` | ✓ |
-| `@coral-xyz/anchor` | npm | (MIT OR Apache-2.0) | runtime | `@squaresdk/solana-identity`, `@squaresdk/solana-policy`, `@squaresdk/solana-sdk` | ✓ |
+| `@coral-xyz/anchor` | npm | (MIT OR Apache-2.0) | runtime | `@squaresdk/solana-identity`, `@squaresdk/solana-policy`, `@squaresdk/solana-sdk`, `@squaresdk/solana-web` | ✓ |
 | `@eslint/js` | npm | MIT | runtime | `@squaresdk/solana-config` | ✓ |
 | `@fontsource/open-runde` | npm | OFL-1.1 | runtime | `@squaresdk/solana-web` | ✓ |
 | `@modelcontextprotocol/sdk` | npm | MIT | runtime | `@squaresdk/solana-mcp` | ✓ |
@@ -36,12 +36,13 @@ pnpm license:write
 | `@prisma/adapter-pg` | npm | Apache-2.0 | runtime | `@squaresdk/solana-db` | ✓ |
 | `@prisma/client` | npm | Apache-2.0 | runtime | `@squaresdk/solana-db` | ✓ |
 | `@redocly/cli` | npm | MIT | dev | `@squaresdk/solana-monorepo` | ✓ |
-| `@solana/spl-token` | npm | Apache-2.0 | runtime | `@squaresdk/solana-sdk` | ✓ |
+| `@solana/spl-token` | npm | Apache-2.0 | runtime | `@squaresdk/solana-sdk`, `@squaresdk/solana-web` | ✓ |
 | `@solana/wallet-adapter-base` | npm | Apache-2.0 | runtime | `@squaresdk/solana-web` | ✓ |
 | `@solana/wallet-adapter-phantom` | npm | Apache-2.0 | runtime | `@squaresdk/solana-web` | ✓ |
 | `@solana/wallet-adapter-react` | npm | Apache-2.0 | runtime | `@squaresdk/solana-web` | ✓ |
 | `@solana/wallet-adapter-react-ui` | npm | Apache-2.0 | runtime | `@squaresdk/solana-web` | ✓ |
 | `@solana/wallet-adapter-solflare` | npm | Apache-2.0 | runtime | `@squaresdk/solana-web` | ✓ |
+| `@solana/wallet-standard-chains` | npm | Apache-2.0 | runtime | `@squaresdk/solana-web` | ✓ |
 | `@solana/web3.js` | npm | MIT | runtime | `@squaresdk/solana-agent-sdk`, `@squaresdk/solana-compliance-api`, `@squaresdk/solana-db`, `@squaresdk/solana-identity`, `@squaresdk/solana-policy`, `@squaresdk/solana-sdk`, `@squaresdk/solana-web` | ✓ |
 | `@tailwindcss/postcss` | npm | MIT | dev | `@squaresdk/solana-web` | ✓ |
 | `@testcontainers/postgresql` | npm | MIT | runtime | `@squaresdk/solana-db` | ✓ |
@@ -95,7 +96,7 @@ pnpm license:write
 | `yaml` | npm | ISC | dev | `@squaresdk/solana-sdk`, `@squaresdk/solana-types` | ✓ |
 | `zod` | npm | MIT | runtime | `@squaresdk/solana-compliance-api`, `@squaresdk/solana-mcp`, `@squaresdk/solana-prover`, `@squaresdk/solana-types` | ✓ |
 
-**Özet:** 69 npm, 3 Cargo doğrudan bağımlılık; lisans dağılımı: 51× MIT, 12× Apache-2.0, 2× GPL-3.0, 2× MIT OR Apache-2.0, 1× BSD-2-Clause, 1× ISC, 1× MPL-2.0, 1× OFL-1.1, 1× Unlicense.
+**Özet:** 70 npm, 3 Cargo doğrudan bağımlılık; lisans dağılımı: 51× MIT, 13× Apache-2.0, 2× GPL-3.0, 2× MIT OR Apache-2.0, 1× BSD-2-Clause, 1× ISC, 1× MPL-2.0, 1× OFL-1.1, 1× Unlicense.
 
 **Mainnet öncesi hukuki inceleme gerektirenler:**
 - `circomlibjs` (npm) — GPL-3.0. Poseidon hash (devreyle aynı sabitler); yalnızca apps/compliance-api (BE-02). Yayınlanan bir pakette yok; snarkjs ile aynı onay kapsamında.
