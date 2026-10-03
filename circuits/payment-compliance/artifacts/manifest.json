@@ -1,0 +1,46 @@
+{
+  "circuit": "circuits/payment-compliance/payment.circom",
+  "circom": "2.2.3",
+  "snarkjs": "0.7.6",
+  "circuitHash": "77b902b33184bc4497ad7ac96adcbbee4b5513bdcabafaaa4e2266819cfdcf86daf9ff3171fc5b4384001b5c24b928f159ea3774e3d5a5215e88e0dba594ead3",
+  "r1cs": {
+    "sha256": "3a745d1b573f01022a221b1a40f65634396b0b6e18e275d5a1494ccd1b16657b"
+  },
+  "wasm": {
+    "sha256": "1cfffa7288d7320773b2d11e177e3d6124a2b58bd68bd6c43c61bda357e753c1"
+  },
+  "phase1": {
+    "ceremony": "Perpetual Powers of Tau",
+    "contribution": 80,
+    "file": "ppot_0080_14.ptau",
+    "power": 14,
+    "bytes": 18967698,
+    "sha256": "3ca1149e9349b22b0ee0649399cfb787677129b7b1189d1899fc0d615d9583db",
+    "blake2b": "a91842802f01b33fd42f5f69c3e49879ae03f0ae1f448b0c151244c9957024bd30bf5e3cc999ff2aeb02ebb959124a3a6a3cc20691cb4843a1234a02232072f3",
+    "url": "https://pse-trusted-setup-ppot.s3.eu-central-1.amazonaws.com/pot28_0080/ppot_0080_14.ptau"
+  },
+  "phase2": {
+    "kind": "development",
+    "assurance": "none: single contribution, not a public ceremony (BC-38)",
+    "contributions": [
+      {
+        "index": 1,
+        "name": "Square BC-20 dev phase-2 (single contribution, not a ceremony)",
+        "hash": "8a9f69c31017ce95707d218e34c76f63c840bdf755ffd7df963a9b849b14a060def395c1bb909ba2c29ceacbf9f5a9c991ba5153329ace5b8f92ddd808df02cd"
+      }
+    ]
+  },
+  "zkey": {
+    "file": "circuits/payment-compliance/artifacts/payment.zkey",
+    "bytes": 5990408,
+    "sha256": "008adfb1dcce7df9fc107c97dd139624798454dec3c07df240701c1262a69288"
+  },
+  "verificationKey": {
+    "file": "circuits/payment-compliance/artifacts/verification_key.json",
+    "sha256": "5805c92bc72bf386dec9f2a191431e7288bee5db583409f8ead2a498d1e2ce35"
+  },
+  "rust": {
+    "file": "programs/square-verifier/src/release_vk.rs",
+    "sha256": "4114da55d9c4700a13e8952d4b71d3ece172753cbbf471fba1984ef1f642136d"
+  }
+}
