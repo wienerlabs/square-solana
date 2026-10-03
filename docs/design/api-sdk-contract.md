@@ -1,6 +1,6 @@
 # API ve SDK sözleşmesi
 
-**Sözleşme sürümü:** v0.5.2 (taslak) · **Issue:** BE-35 (#102), BC-47 (#119), BE-07 (#39), BE-08 (#40), BE-09 (#41), BE-10 (#42), BE-11 (#44), BC-02 (#2) · **Dayandığı program sözleşmesi:** BC-44 v0.2.0 ([program-interface.md](program-interface.md))
+**Sözleşme sürümü:** v0.6.0 (taslak) · **Issue:** BE-35 (#102), BC-47 (#119), BE-07 (#39), BE-08 (#40), BE-09 (#41), BE-10 (#42), BE-11 (#44), BC-02 (#2), BE-17 (#50) · **Dayandığı program sözleşmesi:** BC-44 v0.2.0 ([program-interface.md](program-interface.md))
 
 Bu doküman Square'in HTTP API'sini ve TypeScript paketlerinin dış yüzeyini sabitler. Frontend (FE-24 veri katmanı) ve servisler (BE-18 API, BE-14 indexer, BE-15 keeper, BE-11 prover) bu sözleşmeye göre geliştirir. `@squaresdk/solana-sdk`'nin zincir tarafı BE-08, `@squaresdk/solana-identity` BE-09, `@squaresdk/solana-policy` BE-10 ile uygulandı; REST client'ın uygulaması BE-18'de. Paketlerde mock, placeholder gövde ya da sabit adres yoktur (proje kuralı).
 
@@ -14,6 +14,7 @@ Bu doküman Square'in HTTP API'sini ve TypeScript paketlerinin dış yüzeyini s
 | `packages/sdk` → `@squaresdk/solana-sdk` | 4 program için client, PDA'lar, tx builder'lar, 8 adım akışı, event / hata yardımcıları, REST API client | BE-08, BE-18 |
 | `packages/identity` → `@squaresdk/solana-identity` | did:aip çözümleyici, DID Document, agent card doğrulama | BE-09 |
 | `packages/policy` → `@squaresdk/solana-policy` | Politika commitment'ı, alıcı Merkle ağacı, release witness'ı, prover, ispat bağlama | BE-10 |
+| `packages/a2a` → `@squaresdk/solana-a2a` | A2A v1.0 görev protokolü: JSON-RPC sunucusu ve istemcisi, SSE, Postgres görev deposu, görev ↔ job durum eşlemesi ([a2a.md](a2a.md)) | BE-17 |
 | `.github/workflows/contract.yml`, `.github/workflows/packages.yml` | Hizalama CI'ı: üretilen dosyaların güncelliği ve OpenAPI lint `contract.yml`'da; derleme, tip ve hizalama testleri `packages.yml`'da (`idl/`, `docs/api/` ya da `docs/did-aip/` değişince tam koşu) | BE-35, BE-03 |
 
 **Yayımlama:** Sözleşme, `main`'deki sürümlü dosyalardır. `pnpm openapi:docs` tek dosyalık HTML belge üretir (`dist/api/index.html`, commit'lenmez). Paketler şimdilik `private`; npm'e yayın ayrı bir karar.
@@ -116,7 +117,7 @@ Tüm `/v1` yanıtları `{ success, data, error, meta }` biçimindedir. `meta.req
 
 ## 8. Açık noktalar
 
-1. **A2A eşlemesi (BE-17):** `JOB_STATUS_TO_TASK_STATE` taslaktır. Örneğin `disputed → input-required` ve `refunded → failed` eşlemeleri BE-17'de kesinleşir.
+1. **A2A eşlemesi (BE-17):** v0.6.0'da kesinleşti: görev agent'ın işidir; kabul `WORKING`, teslim `COMPLETED` yapar, teslimden sonraki dispute, ödeme ve iade görev durumunu değiştirmez (`metadata.square.jobStatus`). Eşleme tabloları ve kurallar [a2a.md](a2a.md) §3'te.
 2. **Agent card (BC-14, BE-09):** Tek şema v0.3.0'da kesinleşti: kart hem ERC-8004 kayıt dosyası (`type`, `services`, `registrations`, `active`) hem A2A AgentCard'ıdır; DID çözücüsü servisleri `services`'ten üretir ([did:aip Solana profili](../did-aip/method-spec-v2-solana.md) §5.4–§5.5). Devirde cüzdanın yeni sahibe sıfırlanması kuralı program sözleşmesine BC-15 ile eklenecek.
 3. **Policy dokümanı (BE-10):** `PolicyDocument` v0.2.0'da release devresinin politika girdilerine hizalandı (BE-07, [release-circuit.md](release-circuit.md) §4–§5): yuva sınırları `POLICY_CIRCUIT_LIMITS`, tek UTC penceresi, gün adları devrenin maske sırasıyla. Alanların alan elemanlarına çevrilmesi ve commitment `normalizePolicy` / `computePolicyCommitment`'tadır (BE-10); `circuits/payment-compliance/scripts/release-input.mjs`'in 14 senaryosuyla bayt bayt aynı olduğu CI'da denetlenir.
 4. **Auth (BE-18):** İmzalanan mesajın metni (alan adı ve süre) ve oturum belirteci biçimi BE-18'de belirlenir. Sözleşme yalnızca alanları sabitler.
@@ -130,6 +131,7 @@ Tüm `/v1` yanıtları `{ success, data, error, meta }` biçimindedir. `meta.req
 | Sürüm | Değişiklik | Issue / PR |
 |---|---|---|
 | v0.1.0 | İlk taslak: 28 operasyonluk OpenAPI 3.1 spec; IDL'den üretilen zod ve JSON Schema'lar; 4 paketin gövdesiz imzaları; hizalama testleri ve CI | BE-35 (#102) |
+| v0.6.0 | A2A görev şemaları A2A v1.0'a (a2aproject/A2A v1.0.1, JSON-RPC bağlaması) hizalandı, geriye uyumsuz: `TaskStateSchema` değerleri ProtoJSON adlarıdır (`TASK_STATE_SUBMITTED` …; `unknown` çıktı), `TaskSchema` v1.0 görevidir (`status: TaskStatus`; `status.message` metin yerine `Message`, `status.timestamp` isteğe bağlı; `artifacts`, `history` eklendi; `contextId` ve `metadata` isteğe bağlı, Square bağı `metadata.square` içinde `SquareTaskMetadataSchema`). Eklenenler: `Message`, `Part`, `Artifact`, `TaskStatus`, akış olayları, `StreamResponse`, yöntem istek ve yanıtları, JSON-RPC zarfı, `A2A_METHODS`, `A2A_ERROR_CODES`, `A2A_PROTOCOL_VERSION`, `TERMINAL_TASK_STATES`, `INTERRUPTED_TASK_STATES`. `JOB_STATUS_TO_TASK_STATE` kesinleşti: teslimden sonraki job durumları `COMPLETED` kalır (`disputed` artık `input-required`, `refunded` artık `failed` değil; [a2a.md](a2a.md) §3). Yeni paket `@squaresdk/solana-a2a`. HTTP yüzeyi değişmedi | BE-17 (#50) |
 | v0.5.2 | OpenAPI `info.license` repo lisansına (`LICENSE`, `NOTICE`) hizalandı: `MIT` yerine `Apache-2.0`, `name` ve SPDX `identifier` aynı değer. Yalnızca spec metadata'sı; HTTP yüzeyi, şemalar ve imzalar değişmedi. `openapi-alignment.test.mjs` artık `info.version`'ı `API_CONTRACT_VERSION` ile, `info.license`'ı kök `package.json` lisansıyla karşılaştırır | BC-02 (#2) |
 | v0.5.1 | `POST /v1/prove` 409 `conflict` döner: `artifactVersion` prover'da yüklü zkey'in SHA-256'sı değilse (`details.expected` doğru sürüm). Yanıt bileşeni `Conflict`. Prover servisi (`apps/prover`) aynı uç noktayı sunar | BE-11 (#44) |
 | v0.5.0 | `@squaresdk/solana-policy` uygulandı (BE-10); `SquarePolicyKit` arayüzü yerine fonksiyonlar dışa aktarılır. Değişen imzalar: `generatePolicySalt` → `generatePolicySecret` + `derivePolicySalts` (yaprak başına 8 salt, `PolicySalts`); `computePolicyCommitment(policy, salts)`; `buildReleaseWitness` `connection` yerine client'ın bağlantısını kullanır, `salts` ve `paymentCategory` alır; `createLocalProver` `groth16` backend'ini, `createRemoteProver` beklenen `artifactVersion`'ı alır; `watchJobProof` `paymentCategory`, `authority`, `buildOptions`, `intervalMs`, `refreshBeforeSecs` alır ve `onError` zorunlu. `NormalizedPolicy` devrenin politika girdileridir. HTTP yüzeyi değişmedi | BE-10 (#42) |
