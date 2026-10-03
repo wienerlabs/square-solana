@@ -12,6 +12,7 @@ export const ignores = [
   '**/.turbo/**',
   'packages/types/src/generated/**',
   'packages/sdk/src/idl/**',
+  'db/src/generated/**',
   'circuits/**/build/**',
 ];
 

@@ -30,16 +30,19 @@ pnpm license:write
 | `@coral-xyz/anchor` | npm | (MIT OR Apache-2.0) | runtime | `@squaresdk/solana-sdk` | ✓ |
 | `@eslint/js` | npm | MIT | runtime | `@squaresdk/solana-config` | ✓ |
 | `@modelcontextprotocol/sdk` | npm | MIT | runtime | `@squaresdk/solana-mcp` | ✓ |
+| `@prisma/adapter-pg` | npm | Apache-2.0 | runtime | `@squaresdk/solana-db` | ✓ |
+| `@prisma/client` | npm | Apache-2.0 | runtime | `@squaresdk/solana-db` | ✓ |
 | `@redocly/cli` | npm | MIT | dev | `@squaresdk/solana-monorepo` | ✓ |
-| `@solana/web3.js` | npm | MIT | runtime | `@squaresdk/solana-agent-sdk`, `@squaresdk/solana-compliance-api`, `@squaresdk/solana-identity`, `@squaresdk/solana-policy`, `@squaresdk/solana-prover`, `@squaresdk/solana-sdk` | ✓ |
+| `@solana/web3.js` | npm | MIT | runtime | `@squaresdk/solana-agent-sdk`, `@squaresdk/solana-compliance-api`, `@squaresdk/solana-db`, `@squaresdk/solana-identity`, `@squaresdk/solana-policy`, `@squaresdk/solana-prover`, `@squaresdk/solana-sdk` | ✓ |
+| `@testcontainers/postgresql` | npm | MIT | runtime | `@squaresdk/solana-db` | ✓ |
 | `@types/cors` | npm | MIT | dev | `@squaresdk/solana-compliance-api` | ✓ |
 | `@types/express` | npm | MIT | dev | `@squaresdk/solana-agent-sdk`, `@squaresdk/solana-compliance-api` | ✓ |
 | `@types/node` | npm | MIT | dev | `@squaresdk/solana-agent-sdk`, `@squaresdk/solana-compliance-api`, `@squaresdk/solana-mcp`, `@squaresdk/solana-monorepo` | ✓ |
-| `@types/pg` | npm | MIT | dev | `@squaresdk/solana-compliance-api` | ✓ |
+| `@types/pg` | npm | MIT | dev | `@squaresdk/solana-compliance-api`, `@squaresdk/solana-db` | ✓ |
 | `@types/swagger-jsdoc` | npm | MIT | dev | `@squaresdk/solana-compliance-api` | ✓ |
 | `@types/swagger-ui-express` | npm | MIT | dev | `@squaresdk/solana-compliance-api` | ✓ |
 | `@types/uuid` | npm | MIT | dev | `@squaresdk/solana-compliance-api` | ✓ |
-| `bs58` | npm | MIT | runtime | `@squaresdk/solana-compliance-api`, `@squaresdk/solana-prover` | ✓ |
+| `bs58` | npm | MIT | runtime | `@squaresdk/solana-compliance-api`, `@squaresdk/solana-db`, `@squaresdk/solana-prover` | ✓ |
 | `circomlibjs` | npm | GPL-3.0 | runtime | `@squaresdk/solana-compliance-api`, `@squaresdk/solana-prover` | ⚠️ inceleme |
 | `cors` | npm | MIT | runtime | `@squaresdk/solana-compliance-api`, `@squaresdk/solana-prover` | ✓ |
 | `dotenv` | npm | BSD-2-Clause | runtime | `@squaresdk/solana-compliance-api` | ✓ |
@@ -49,8 +52,9 @@ pnpm license:write
 | `globals` | npm | MIT | runtime | `@squaresdk/solana-config` | ✓ |
 | `helmet` | npm | MIT | runtime | `@squaresdk/solana-compliance-api`, `@squaresdk/solana-prover` | ✓ |
 | `node-cache` | npm | MIT | runtime | `@squaresdk/solana-compliance-api` | ✓ |
-| `pg` | npm | MIT | runtime | `@squaresdk/solana-compliance-api` | ✓ |
+| `pg` | npm | MIT | runtime | `@squaresdk/solana-compliance-api`, `@squaresdk/solana-db` | ✓ |
 | `prettier` | npm | MIT | dev | `@squaresdk/solana-monorepo` | ✓ |
+| `prisma` | npm | Apache-2.0 | runtime | `@squaresdk/solana-db` | ✓ |
 | `snarkjs` | npm | GPL-3.0 | runtime | `@squaresdk/solana-prover` | ⚠️ inceleme |
 | `stripe` | npm | MIT | runtime | `@squaresdk/solana-compliance-api` | ✓ |
 | `swagger-jsdoc` | npm | MIT | runtime | `@squaresdk/solana-compliance-api` | ✓ |
@@ -61,11 +65,11 @@ pnpm license:write
 | `typescript` | npm | Apache-2.0 | dev | `@squaresdk/solana-monorepo` | ✓ |
 | `typescript-eslint` | npm | MIT | runtime | `@squaresdk/solana-config` | ✓ |
 | `uuid` | npm | MIT | runtime | `@squaresdk/solana-compliance-api` | ✓ |
-| `vitest` | npm | MIT | dev | `@squaresdk/solana-sdk`, `@squaresdk/solana-types` | ✓ |
+| `vitest` | npm | MIT | dev | `@squaresdk/solana-db`, `@squaresdk/solana-sdk`, `@squaresdk/solana-types` | ✓ |
 | `yaml` | npm | ISC | dev | `@squaresdk/solana-sdk`, `@squaresdk/solana-types` | ✓ |
 | `zod` | npm | MIT | runtime | `@squaresdk/solana-compliance-api`, `@squaresdk/solana-mcp`, `@squaresdk/solana-types` | ✓ |
 
-**Özet:** 39 npm, 3 Cargo doğrudan bağımlılık; lisans dağılımı: 33× MIT, 2× Apache-2.0, 2× GPL-3.0, 2× MIT OR Apache-2.0, 1× BSD-2-Clause, 1× ISC, 1× Unlicense.
+**Özet:** 43 npm, 3 Cargo doğrudan bağımlılık; lisans dağılımı: 34× MIT, 5× Apache-2.0, 2× GPL-3.0, 2× MIT OR Apache-2.0, 1× BSD-2-Clause, 1× ISC, 1× Unlicense.
 
 **Mainnet öncesi hukuki inceleme gerektirenler:**
 - `circomlibjs` (npm) — GPL-3.0. Poseidon hash (devreyle aynı sabitler); yalnızca apps/prover ve apps/compliance-api (BE-02). Yayınlanan bir pakette yok; snarkjs ile aynı onay kapsamında.

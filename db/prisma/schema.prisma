@@ -1,0 +1,589 @@
+// Square tek veritabanı (BE-04). Tasarım ve kararlar: docs/design/data-model.md.
+//
+// Zincir kaynak-gerçektir. Program hesaplarının tabloları (ayna tablolar) indexer'ın (BE-14)
+// zincirden kurduğu, yeniden üretilebilir görünümlerdir; API bu tablolardan okur ama hiçbir
+// servis bir ayna tabloya zincirde karşılığı olmayan bir değer yazmaz.
+//
+// Kodlama kuralları:
+// - Ayna tabloların `account` sütunu, hesabın IDL JSON kodlamasıdır (docs/design/api-sdk-contract.md §3)
+//   ve API'nin `account` alanına aynen gider. Diğer sütunlar filtre / sıralama için ondan çıkarılır.
+// - Adres: base58, VARCHAR(44). 32 bayt hash / commitment: küçük harf hex, CHAR(64).
+// - u64: NUMERIC(20, 0). Zincirden gelen zamanlar (unix saniyesi, i64): BIGINT.
+//   Veritabanının kendi zamanları (indexedAt, createdAt …): TIMESTAMPTZ.
+// - Enum değerleri JSON kodlamasıyla aynıdır (camelCase).
+// - Ayna tablolar arasında yabancı anahtar yoktur: hesapları anlık görüntüden (getProgramAccounts)
+//   dolduran bir backfill sırasız gelebilir; bütünlüğü zincir sağlar.
+
+generator client {
+  provider            = "prisma-client"
+  output              = "../src/generated/prisma"
+  moduleFormat        = "esm"
+  importFileExtension = "js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ---------------------------------------------------------------- referans ve indexer durumu
+
+enum ProgramName {
+  registry
+  policy
+  verifier
+  escrow
+}
+
+/// Square programları; seed `idl/*.json`'dan doldurur (adres ve sözleşme sürümü).
+model Program {
+  name       ProgramName    @id
+  programId  String         @unique @map("program_id") @db.VarChar(44)
+  /// IDL `metadata.version`.
+  idlVersion String         @map("idl_version") @db.Text
+  updatedAt  DateTime       @updatedAt @map("updated_at") @db.Timestamptz(3)
+  cursor     IndexerCursor?
+
+  @@map("programs")
+}
+
+/// Indexer'ın program başına kaldığı yer (BE-14).
+model IndexerCursor {
+  program       ProgramName @id
+  lastSlot      BigInt      @map("last_slot")
+  lastSignature String      @map("last_signature") @db.VarChar(88)
+  updatedAt     DateTime    @updatedAt @map("updated_at") @db.Timestamptz(3)
+  programRef    Program     @relation(fields: [program], references: [name], onDelete: Cascade)
+
+  @@map("indexer_cursors")
+}
+
+/// Ham program event'leri (`IndexedEvent`, API `/v1/events`). Yalnızca kesinleşmiş (finalized)
+/// tx'lerden yazılır; böylece fork geri alımı gerekmez.
+model ChainEvent {
+  id               BigInt      @id @default(autoincrement())
+  signature        String      @db.VarChar(88)
+  slot             BigInt
+  blockTime        BigInt?     @map("block_time")
+  instructionIndex Int         @map("instruction_index")
+  eventIndex       Int         @map("event_index")
+  program          ProgramName
+  /// IDL event adı (ör. `JobCreated`).
+  name             String      @db.Text
+  /// Event bir job'a aitse job adresi (`/v1/events?job=`).
+  job              String?     @db.VarChar(44)
+  /// `ProgramEventPayload` JSON'u.
+  payload          Json
+  indexedAt        DateTime    @default(now()) @map("indexed_at") @db.Timestamptz(3)
+
+  @@unique([signature, instructionIndex, eventIndex])
+  @@index([slot])
+  @@index([program, name, slot])
+  @@index([job, slot])
+  @@map("chain_events")
+}
+
+// ---------------------------------------------------------------- square_policy (ayna)
+
+model Institution {
+  address       String   @id @db.VarChar(44)
+  ownerKey      String   @map("owner_key") @db.VarChar(44)
+  /// Bağlı Squads vault'u (set_institution_multisig); yoksa null.
+  multisigVault String?  @map("multisig_vault") @db.VarChar(44)
+  name          String   @db.Text
+  account       Json
+  slot          BigInt
+  indexedAt     DateTime @map("indexed_at") @db.Timestamptz(3)
+
+  @@index([ownerKey])
+  @@index([multisigVault])
+  @@map("institutions")
+}
+
+model Policy {
+  address     String   @id @db.VarChar(44)
+  institution String   @db.VarChar(44)
+  policyId    String   @map("policy_id") @db.Char(64)
+  version     Int
+  active      Boolean
+  account     Json
+  slot        BigInt
+  indexedAt   DateTime @map("indexed_at") @db.Timestamptz(3)
+
+  @@unique([institution, policyId])
+  @@index([institution, active])
+  @@map("policies")
+}
+
+/// Politikanın herkese açık meta verisi (`PolicyMeta`). Kurallar ve salt asla burada tutulmaz;
+/// zincirde yalnızca commitment vardır.
+model PolicyMeta {
+  policy      String   @id @db.VarChar(44)
+  name        String   @db.VarChar(120)
+  description String?  @db.VarChar(2000)
+  labels      String[] @db.VarChar(40)
+  /// Yazan cüzdan (kurumun o anki yetkilisi).
+  updatedBy   String   @map("updated_by") @db.VarChar(44)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@map("policy_metas")
+}
+
+// ---------------------------------------------------------------- square_registry (ayna)
+
+enum AgentStatus {
+  active
+  inactive
+  deregistered
+}
+
+model Agent {
+  /// AgentRecord PDA'sı.
+  address       String      @id @db.VarChar(44)
+  creator       String      @db.VarChar(44)
+  owner         String      @db.VarChar(44)
+  wallet        String      @db.VarChar(44)
+  agentId       String      @map("agent_id") @db.Text
+  status        AgentStatus
+  agentCardUri  String      @map("agent_card_uri") @db.Text
+  agentCardHash String      @map("agent_card_hash") @db.Char(64)
+  account       Json
+  slot          BigInt
+  indexedAt     DateTime    @map("indexed_at") @db.Timestamptz(3)
+
+  @@unique([creator, agentId])
+  @@index([owner])
+  @@index([wallet])
+  @@index([status])
+  @@map("agents")
+}
+
+enum AgentCardSource {
+  /// API'nin barındırdığı kart (`putAgentCard`).
+  hosted
+  /// `agentCardUri`'den indirilen kart.
+  fetched
+}
+
+/// Agent card önbelleği. Kayıt sahibi kartı zincir kaydından önce yükleyebilir (8 adımın 2.si),
+/// bu yüzden `agents`'a yabancı anahtar yoktur.
+model AgentCard {
+  agentRecord String          @id @map("agent_record") @db.VarChar(44)
+  source      AgentCardSource
+  uri         String          @db.Text
+  /// Kartın ham baytları; hash doğrulaması ve barındırma bu baytlarla yapılır.
+  raw         Bytes
+  /// SHA-256(raw), küçük harf hex.
+  contentHash String          @map("content_hash") @db.Char(64)
+  /// Ayrıştırılmış kart (`AgentCard`).
+  content     Json
+  /// Karttaki yetenek kimlikleri (`/v1/agents?skill=`).
+  skills      String[]        @db.Text
+  /// `contentHash` zincirdeki `agentCardHash` ile son kontrolde eşleşti mi.
+  verified    Boolean
+  verifiedAt  DateTime?       @map("verified_at") @db.Timestamptz(3)
+  updatedAt   DateTime        @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@index([skills], type: Gin)
+  @@map("agent_cards")
+}
+
+enum ScreeningStatus {
+  clear
+  flagged
+}
+
+model Screening {
+  /// ScreeningRecord PDA'sı.
+  address    String          @id @db.VarChar(44)
+  wallet     String          @unique @db.VarChar(44)
+  status     ScreeningStatus
+  screenedAt BigInt          @map("screened_at")
+  expiresAt  BigInt          @map("expires_at")
+  sourceHash String          @map("source_hash") @db.Char(64)
+  account    Json
+  slot       BigInt
+  indexedAt  DateTime        @map("indexed_at") @db.Timestamptz(3)
+
+  @@index([status, expiresAt])
+  @@map("screenings")
+}
+
+// ---------------------------------------------------------------- square_escrow (ayna)
+
+enum JobStatus {
+  open
+  funded
+  accepted
+  delivered
+  disputed
+  resolved
+  released
+  refunded
+  cancelled
+}
+
+model Job {
+  address      String    @id @db.VarChar(44)
+  institution  String    @db.VarChar(44)
+  agentRecord  String    @map("agent_record") @db.VarChar(44)
+  agentWallet  String    @map("agent_wallet") @db.VarChar(44)
+  policy       String?   @db.VarChar(44)
+  mint         String    @db.VarChar(44)
+  amount       Decimal   @db.Decimal(20, 0)
+  specHash     String    @map("spec_hash") @db.Char(64)
+  status       JobStatus
+  createdAt    BigInt    @map("created_at")
+  deadline     BigInt
+  /// Teslimden sonra challenge penceresinin sonu; teslim edilmemişse 0 (keeper sorgusu).
+  challengeEnd BigInt    @map("challenge_end")
+  account      Json
+  slot         BigInt
+  indexedAt    DateTime  @map("indexed_at") @db.Timestamptz(3)
+  /// Hesap kapandıysa kapandığı slot.
+  closedSlot   BigInt?   @map("closed_slot")
+
+  @@unique([institution, specHash])
+  @@index([status, challengeEnd])
+  @@index([institution, status])
+  @@index([agentRecord, status])
+  @@index([agentWallet])
+  @@index([policy])
+  @@map("jobs")
+}
+
+enum DisputeResolution {
+  pending
+  favorAgent
+  favorInstitution
+  split
+}
+
+/// `Job.dispute` izdüşümü: job başına en fazla bir dispute (program kuralı). Hesap verisi
+/// `jobs.account` içindedir; bu tablo `/v1/disputes` filtresi ve sıralaması içindir.
+model Dispute {
+  job         String            @id @db.VarChar(44)
+  institution String            @db.VarChar(44)
+  agentRecord String            @map("agent_record") @db.VarChar(44)
+  jobStatus   JobStatus         @map("job_status")
+  challenger  String            @db.VarChar(44)
+  bond        Decimal           @db.Decimal(20, 0)
+  reasonHash  String            @map("reason_hash") @db.Char(64)
+  raisedAt    BigInt            @map("raised_at")
+  deadline    BigInt
+  resolution  DisputeResolution
+  lapsed      Boolean
+  slot        BigInt
+  indexedAt   DateTime          @map("indexed_at") @db.Timestamptz(3)
+
+  @@index([jobStatus, raisedAt])
+  @@index([institution])
+  @@index([agentRecord])
+  @@map("disputes")
+}
+
+enum ClaimStatus {
+  listed
+  bought
+  settled
+  defaulted
+}
+
+model Claim {
+  /// ClaimListing PDA'sı (`["claim", job]`); iptal edilip yeniden listelenebilir.
+  address    String      @id @db.VarChar(44)
+  job        String      @unique @db.VarChar(44)
+  seller     String      @db.VarChar(44)
+  /// Satılmadıysa null.
+  buyer      String?     @db.VarChar(44)
+  status     ClaimStatus
+  price      Decimal     @db.Decimal(20, 0)
+  faceValue  Decimal     @map("face_value") @db.Decimal(20, 0)
+  account    Json
+  slot       BigInt
+  indexedAt  DateTime    @map("indexed_at") @db.Timestamptz(3)
+  closedSlot BigInt?     @map("closed_slot")
+
+  @@index([status])
+  @@index([seller])
+  @@index([buyer])
+  @@map("claims")
+}
+
+model AgentReputation {
+  address       String   @id @db.VarChar(44)
+  agentRecord   String   @unique @map("agent_record") @db.VarChar(44)
+  jobsCompleted Decimal  @map("jobs_completed") @db.Decimal(20, 0)
+  totalEarned   Decimal  @map("total_earned") @db.Decimal(20, 0)
+  account       Json
+  slot          BigInt
+  indexedAt     DateTime @map("indexed_at") @db.Timestamptz(3)
+
+  @@index([jobsCompleted])
+  @@map("agent_reputations")
+}
+
+enum ValidationOutcome {
+  verified
+  refused
+  noGate
+  noPayout
+}
+
+model ValidationRecord {
+  address     String            @id @db.VarChar(44)
+  job         String            @unique @db.VarChar(44)
+  agentRecord String            @map("agent_record") @db.VarChar(44)
+  outcome     ValidationOutcome
+  account     Json
+  slot        BigInt
+  indexedAt   DateTime          @map("indexed_at") @db.Timestamptz(3)
+
+  @@index([agentRecord])
+  @@map("validation_records")
+}
+
+// ---------------------------------------------------------------- square_verifier (ayna)
+
+enum ReleaseVerdict {
+  compliant
+  refused
+}
+
+model ReleaseProof {
+  address        String         @id @db.VarChar(44)
+  job            String         @unique @db.VarChar(44)
+  institution    String         @db.VarChar(44)
+  policy         String         @db.VarChar(44)
+  payee          String         @db.VarChar(44)
+  verdict        ReleaseVerdict
+  refusalCode    Int            @map("refusal_code")
+  consumed       Boolean
+  netAmount      Decimal        @map("net_amount") @db.Decimal(20, 0)
+  proofTimestamp BigInt         @map("proof_timestamp")
+  account        Json
+  slot           BigInt
+  indexedAt      DateTime       @map("indexed_at") @db.Timestamptz(3)
+
+  @@index([institution])
+  @@index([consumed])
+  @@map("release_proofs")
+}
+
+// ---------------------------------------------------------------- zincir dışı veri
+
+/// Teslimat içeriğinin kaydı (`uploadDelivery`). İçerik nesne deposundadır; burada yalnızca
+/// konumu ve `submit_work`'e giden hash / URI tutulur.
+model Delivery {
+  id          String   @id @default(uuid()) @db.Uuid
+  job         String   @db.VarChar(44)
+  workHash    String   @map("work_hash") @db.Char(64)
+  deliveryUri String   @map("delivery_uri") @db.VarChar(128)
+  contentType String   @map("content_type") @db.VarChar(120)
+  byteSize    BigInt   @map("byte_size")
+  /// Nesne deposundaki anahtar.
+  storageKey  String   @map("storage_key") @db.Text
+  uploadedBy  String   @map("uploaded_by") @db.VarChar(44)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@unique([job, workHash])
+  @@map("deliveries")
+}
+
+enum KeeperActionKind {
+  finalizePayment
+  executeResolution
+  lapseDispute
+}
+
+enum KeeperOutcome {
+  submitted
+  confirmed
+  skipped
+  failed
+}
+
+enum KeeperReason {
+  challengeOpen
+  proofRequired
+  staleProof
+  screeningPending
+  unprofitable
+  rpcError
+  programError
+}
+
+/// Keeper günlüğü (`KeeperAction`, API `/v1/keeper/actions`, BE-15).
+model KeeperAction {
+  id            String           @id @default(uuid()) @db.Uuid
+  job           String           @db.VarChar(44)
+  action        KeeperActionKind
+  outcome       KeeperOutcome
+  /// Bekletme ya da başarısızlık sebebi; başarılı gönderimde null.
+  reason        KeeperReason?
+  signature     String?          @db.VarChar(88)
+  keeperFee     Decimal?         @map("keeper_fee") @db.Decimal(20, 0)
+  at            DateTime         @default(now()) @db.Timestamptz(3)
+  nextAttemptAt DateTime?        @map("next_attempt_at") @db.Timestamptz(3)
+
+  @@index([job, at])
+  @@index([outcome, at])
+  @@map("keeper_actions")
+}
+
+// ---------------------------------------------------------------- kullanıcılar ve yetki
+
+/// Cüzdanla oturum açan kullanıcı. Kimlik cüzdan adresidir.
+model User {
+  wallet     String          @id @db.VarChar(44)
+  createdAt  DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
+  lastSeenAt DateTime?       @map("last_seen_at") @db.Timestamptz(3)
+  challenges AuthChallenge[]
+  sessions   Session[]
+  apiKeys    ApiKey[]
+
+  @@map("users")
+}
+
+/// Cüzdanın imzalayacağı tek kullanımlık mesaj (`createAuthChallenge`).
+model AuthChallenge {
+  nonce      String    @id @db.Text
+  wallet     String    @db.VarChar(44)
+  message    String    @db.Text
+  expiresAt  DateTime  @map("expires_at") @db.Timestamptz(3)
+  consumedAt DateTime? @map("consumed_at") @db.Timestamptz(3)
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  user       User      @relation(fields: [wallet], references: [wallet], onDelete: Cascade)
+
+  @@index([wallet])
+  @@index([expiresAt])
+  @@map("auth_challenges")
+}
+
+/// Oturum. Belirtecin kendisi saklanmaz, yalnızca SHA-256'sı.
+model Session {
+  id        String    @id @default(uuid()) @db.Uuid
+  wallet    String    @db.VarChar(44)
+  tokenHash String    @unique @map("token_hash") @db.Char(64)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  expiresAt DateTime  @map("expires_at") @db.Timestamptz(3)
+  revokedAt DateTime? @map("revoked_at") @db.Timestamptz(3)
+  user      User      @relation(fields: [wallet], references: [wallet], onDelete: Cascade)
+
+  @@index([wallet])
+  @@index([expiresAt])
+  @@map("sessions")
+}
+
+enum ApiKeyScope {
+  read
+  txPrepare       @map("tx:prepare")
+  deliveriesWrite @map("deliveries:write")
+  agentsWrite     @map("agents:write")
+  prove
+}
+
+/// API anahtarı (`ApiKey`). Gizli değer saklanmaz, yalnızca SHA-256'sı; `prefix` listelemede gösterilir.
+model ApiKey {
+  id         String        @id @default(uuid()) @db.Uuid
+  wallet     String        @db.VarChar(44)
+  label      String        @db.VarChar(80)
+  prefix     String        @db.VarChar(16)
+  secretHash String        @unique @map("secret_hash") @db.Char(64)
+  scopes     ApiKeyScope[]
+  createdAt  DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  lastUsedAt DateTime?     @map("last_used_at") @db.Timestamptz(3)
+  revokedAt  DateTime?     @map("revoked_at") @db.Timestamptz(3)
+  user       User          @relation(fields: [wallet], references: [wallet], onDelete: Cascade)
+
+  @@index([wallet])
+  @@map("api_keys")
+}
+
+// ---------------------------------------------------------------- ödeme rayları
+
+/// İmzası doğrulanmış Stripe webhook'undan gelen MPP (fiat) ödemesi (BE-25). Kaynak:
+/// Aperture compliance-api `verified_payment_intents` (apps/compliance-api, migration 005).
+model MppPayment {
+  stripePaymentIntentId String   @id @map("stripe_payment_intent_id") @db.Text
+  /// Webhook event kimliği; Stripe'ın yeniden gönderimi ikinci satır üretemez.
+  stripeEventId         String   @unique @map("stripe_event_id") @db.Text
+  amountMinor           BigInt   @map("amount_minor")
+  /// ISO 4217, küçük harf.
+  currency              String   @db.Char(3)
+  /// Stripe PaymentIntent durumu; yalnızca `succeeded` satırlar kullanılabilir.
+  status                String   @db.Text
+  stripeCustomer        String?  @map("stripe_customer") @db.Text
+  /// Kanonik makbuzun Poseidon commitment'ı (devrenin `stripe_receipt_hash` girdisi).
+  receiptHash           String   @map("receipt_hash") @db.Char(64)
+  /// MPP authority'nin `receiptHash` üzerindeki Ed25519 imzası, base58.
+  authoritySignature    String   @map("authority_signature") @db.VarChar(88)
+  /// Ödemenin bağlandığı kurum ve job (BE-25 kararıyla doldurulur).
+  institution           String?  @db.VarChar(44)
+  job                   String?  @db.VarChar(44)
+  paidAt                DateTime @map("paid_at") @db.Timestamptz(3)
+  createdAt             DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@index([status])
+  @@index([institution])
+  @@index([job])
+  @@map("mpp_payments")
+}
+
+enum CctpTransferStatus {
+  /// Kaynak zincirde burn görüldü, Circle attestation'ı bekleniyor.
+  pendingAttestation
+  attested
+  /// Solana'da `receive_message` tamamlandı.
+  received
+  /// Job fonlandı.
+  funded
+  failed
+}
+
+/// CCTP ile gelen USDC (BE-26). Mesaj kimliği (kaynak domain, nonce) Circle CCTP'den gelir.
+model CctpTransfer {
+  id               String             @id @default(uuid()) @db.Uuid
+  sourceDomain     Int                @map("source_domain")
+  nonce            Decimal            @db.Decimal(20, 0)
+  sourceTxHash     String             @map("source_tx_hash") @db.Text
+  messageHash      String             @map("message_hash") @db.Char(64)
+  /// Circle attestation'ı (hex); gelmeden null.
+  attestation      String?            @db.Text
+  amount           Decimal            @db.Decimal(20, 0)
+  mintRecipient    String             @map("mint_recipient") @db.VarChar(44)
+  job              String?            @db.VarChar(44)
+  status           CctpTransferStatus
+  receiveSignature String?            @map("receive_signature") @db.VarChar(88)
+  fundSignature    String?            @map("fund_signature") @db.VarChar(88)
+  error            String?            @db.Text
+  createdAt        DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime           @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@unique([sourceDomain, nonce])
+  @@unique([messageHash])
+  @@index([status])
+  @@index([job])
+  @@map("cctp_transfers")
+}
+
+// ---------------------------------------------------------------- Travel Rule
+
+/// Travel Rule verisi (BE-23). Yalnızca şifreli tutulur (zarf şifreleme: veri anahtarı KMS'te);
+/// zincirde yalnızca commitment vardır (`TravelRuleCommitted`). Düz metin sütunu yoktur.
+model TravelRuleRecord {
+  id         String   @id @default(uuid()) @db.Uuid
+  job        String   @unique @db.VarChar(44)
+  /// Zincirdeki commitment.
+  commitment String   @db.Char(64)
+  ciphertext Bytes
+  /// Şifreleme algoritması (ör. AEAD adı) ve IV / nonce.
+  algorithm  String   @db.Text
+  iv         Bytes
+  /// Veri anahtarını saran KMS anahtarının kimliği ve sarılmış veri anahtarı.
+  kmsKeyId   String   @map("kms_key_id") @db.Text
+  wrappedKey Bytes    @map("wrapped_key")
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@map("travel_rule_records")
+}

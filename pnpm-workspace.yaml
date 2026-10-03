@@ -1,16 +1,28 @@
 packages:
   - 'packages/*'
   - 'apps/*'
+  - 'db'
 
 # Kurulum script'leri çalıştırılmaz (pnpm 10 varsayılanını açık karar olarak kaydeder):
 # - bufferutil, utf-8-validate: @solana/web3.js → ws'nin isteğe bağlı native hızlandırıcıları; JS yedekleri var.
 # - bigint-buffer (@solana/*), blake-hash (circomlibjs): native eklenti; yüklenemezse saf JS'e düşer.
 # - esbuild (tsx): ikili @esbuild/<platform> isteğe bağlı paketinden gelir; script yalnızca doğrular.
 # - @scarf/scarf (swagger-ui-express): kurulum telemetrisi; çalıştırılmaz.
+# - cpu-features, ssh2 (testcontainers → docker-modem): isteğe bağlı native kripto eklentisi; JS yedeği var.
+# - protobufjs: kurulum script'i yalnızca sürüm uyumluluğunu yazdırır.
 ignoredBuiltDependencies:
   - '@scarf/scarf'
   - bigint-buffer
   - blake-hash
   - bufferutil
+  - cpu-features
   - esbuild
+  - protobufjs
+  - ssh2
   - utf-8-validate
+
+# Çalıştırılan kurulum script'leri:
+# - prisma, @prisma/engines: migration'ları uygulayan schema engine ikilisini indirir (db/, BE-04).
+onlyBuiltDependencies:
+  - '@prisma/engines'
+  - prisma

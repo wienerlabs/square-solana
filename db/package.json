@@ -1,0 +1,58 @@
+{
+  "name": "@squaresdk/solana-db",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Square'in tek Postgres veritabanı: Prisma şeması, migration'lar, seed ve istemci.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./testing": {
+      "types": "./dist/testing.d.ts",
+      "import": "./dist/testing.js"
+    }
+  },
+  "files": [
+    "dist",
+    "prisma",
+    "prisma.config.ts"
+  ],
+  "scripts": {
+    "generate": "prisma generate",
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "migrate:deploy": "prisma migrate deploy",
+    "migrate:status": "prisma migrate status",
+    "seed": "prisma db seed"
+  },
+  "dependencies": {
+    "@prisma/adapter-pg": "7.10.0",
+    "@prisma/client": "7.10.0",
+    "@squaresdk/solana-sdk": "workspace:*",
+    "pg": "^8.23.1",
+    "prisma": "7.10.0"
+  },
+  "devDependencies": {
+    "@solana/web3.js": "^1.99.0",
+    "@squaresdk/solana-config": "workspace:*",
+    "@testcontainers/postgresql": "^12.2.0",
+    "@types/pg": "^8.23.1",
+    "bs58": "^6.0.0",
+    "vitest": "^5.0.3"
+  },
+  "peerDependencies": {
+    "@testcontainers/postgresql": "^12.2.0"
+  },
+  "peerDependenciesMeta": {
+    "@testcontainers/postgresql": {
+      "optional": true
+    }
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}
