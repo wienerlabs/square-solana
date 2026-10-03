@@ -43,7 +43,7 @@ importers:
         version: 6.0.0
       circomlibjs:
         specifier: ^0.1.7
-        version: 0.1.7(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+        version: 0.1.7(bufferutil@4.1.0)
       cors:
         specifier: ^2.8.5
         version: 2.8.6
@@ -113,7 +113,7 @@ importers:
         version: 6.0.0
       circomlibjs:
         specifier: ^0.1.7
-        version: 0.1.7(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+        version: 0.1.7(bufferutil@4.1.0)
       cors:
         specifier: ^2.8.5
         version: 2.8.6
@@ -155,6 +155,9 @@ importers:
       '@squaresdk/solana-config':
         specifier: workspace:*
         version: link:../packages/config
+      '@squaresdk/solana-types':
+        specifier: workspace:*
+        version: link:../packages/types
       '@testcontainers/postgresql':
         specifier: ^12.2.0
         version: 12.2.0
@@ -4085,7 +4088,7 @@ snapshots:
     dependencies:
       '@ethersproject/logger': 5.8.0
 
-  '@ethersproject/providers@5.8.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)':
+  '@ethersproject/providers@5.8.0(bufferutil@4.1.0)':
     dependencies:
       '@ethersproject/abstract-provider': 5.8.0
       '@ethersproject/abstract-signer': 5.8.0
@@ -4106,7 +4109,7 @@ snapshots:
       '@ethersproject/transactions': 5.8.0
       '@ethersproject/web': 5.8.0
       bech32: 1.1.4
-      ws: 8.18.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+      ws: 8.18.0(bufferutil@4.1.0)
     transitivePeerDependencies:
       - bufferutil
       - utf-8-validate
@@ -5306,11 +5309,11 @@ snapshots:
     dependencies:
       ffjavascript: 0.3.1
 
-  circomlibjs@0.1.7(bufferutil@4.1.0)(utf-8-validate@6.0.6):
+  circomlibjs@0.1.7(bufferutil@4.1.0):
     dependencies:
       blake-hash: 2.0.0
       blake2b: 2.1.4
-      ethers: 5.8.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+      ethers: 5.8.0(bufferutil@4.1.0)
       ffjavascript: 0.2.63
     transitivePeerDependencies:
       - bufferutil
@@ -5706,7 +5709,7 @@ snapshots:
 
   etag@1.8.1: {}
 
-  ethers@5.8.0(bufferutil@4.1.0)(utf-8-validate@6.0.6):
+  ethers@5.8.0(bufferutil@4.1.0):
     dependencies:
       '@ethersproject/abi': 5.8.0
       '@ethersproject/abstract-provider': 5.8.0
@@ -5726,7 +5729,7 @@ snapshots:
       '@ethersproject/networks': 5.8.0
       '@ethersproject/pbkdf2': 5.8.0
       '@ethersproject/properties': 5.8.0
-      '@ethersproject/providers': 5.8.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+      '@ethersproject/providers': 5.8.0(bufferutil@4.1.0)
       '@ethersproject/random': 5.8.0
       '@ethersproject/rlp': 5.8.0
       '@ethersproject/sha2': 5.8.0
@@ -6139,7 +6142,7 @@ snapshots:
 
   isexe@2.0.0: {}
 
-  isomorphic-ws@4.0.1(ws@7.5.13(bufferutil@4.1.0)(utf-8-validate@6.0.6)):
+  isomorphic-ws@4.0.1(ws@7.5.13(bufferutil@4.1.0)):
     dependencies:
       ws: 7.5.13(bufferutil@4.1.0)(utf-8-validate@6.0.6)
 
@@ -6168,7 +6171,7 @@ snapshots:
       delay: 5.0.0
       es6-promisify: 5.0.0
       eyes: 0.1.8
-      isomorphic-ws: 4.0.1(ws@7.5.13(bufferutil@4.1.0)(utf-8-validate@6.0.6))
+      isomorphic-ws: 4.0.1(ws@7.5.13(bufferutil@4.1.0))
       json-stringify-safe: 5.0.1
       stream-json: 1.9.1
       uuid: 8.3.2
@@ -7221,10 +7224,9 @@ snapshots:
       bufferutil: 4.1.0
       utf-8-validate: 6.0.6
 
-  ws@8.18.0(bufferutil@4.1.0)(utf-8-validate@6.0.6):
+  ws@8.18.0(bufferutil@4.1.0):
     optionalDependencies:
       bufferutil: 4.1.0
-      utf-8-validate: 6.0.6
 
   ws@8.22.0(bufferutil@4.1.0)(utf-8-validate@6.0.6):
     optionalDependencies:

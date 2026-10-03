@@ -55,3 +55,37 @@ export const AgentCardHostingSchema = z.object({
   agentCardHash: Hex32,
 });
 export type AgentCardHosting = z.infer<typeof AgentCardHostingSchema>;
+
+// ---------------------------------------------------------------- did:aip v1 (AIP) kartı
+
+/**
+ * AIP'nin (did:aip v1) kart biçimi. Square kartı değildir; v1 DID'lerini çözen BE-09 ve eski
+ * ajanları okuyan araçlar bu biçimi doğrular. Kaynak: dr-wilson-empty/aip-beta
+ * `src/lib/protocol/agent-card-schema.ts` @ 5a36fe0 (MIT, BE-07). Farkı: tutar ondalık sayı
+ * biçiminde olmalı (kaynak `parseFloat` ile "1abc" gibi değerleri de kabul ediyordu).
+ */
+export const AipV1AgentTypeSchema = z.enum(['LLM', 'Task', 'Execution']);
+export type AipV1AgentType = z.infer<typeof AipV1AgentTypeSchema>;
+
+export const AipV1CapabilitySchema = z.object({
+  id: z.string().trim().min(1),
+  description: z.string().trim().min(1),
+  pricing: z.object({
+    amount: z.string().regex(/^(0|[1-9][0-9]*)(\.[0-9]+)?$/, 'ondalık tutar bekleniyor'),
+    token: z.literal('USDC'),
+    network: z.literal('solana'),
+  }),
+});
+export type AipV1Capability = z.infer<typeof AipV1CapabilitySchema>;
+
+export const AipV1AgentCardSchema = z.object({
+  did: z.string().startsWith('did:'),
+  name: z.string().trim().min(1),
+  version: z.string().trim().min(1),
+  /** Yalnızca http(s); `javascript:`, `data:` vb. reddedilir. */
+  endpoint: z.url({ protocol: /^https?$/ }),
+  type: AipV1AgentTypeSchema,
+  capabilities: z.array(AipV1CapabilitySchema).min(1),
+  walletAddress: Address.optional(),
+});
+export type AipV1AgentCard = z.infer<typeof AipV1AgentCardSchema>;
