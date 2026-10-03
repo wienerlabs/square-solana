@@ -1,0 +1,45 @@
+{
+  "name": "@squaresdk/solana-compliance-api",
+  "version": "0.1.0",
+  "private": true,
+  "license": "MIT",
+  "main": "./dist/index.js",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx watch src/index.ts",
+    "start": "node dist/index.js",
+    "migrate": "tsx src/migrations/run.ts",
+    "migrate:rollback": "tsx src/migrations/rollback.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@solana/web3.js": "^1.98.4",
+    "bs58": "^6.0.0",
+    "circomlibjs": "^0.1.7",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "helmet": "^8.0.0",
+    "node-cache": "^5.1.2",
+    "pg": "^8.13.1",
+    "stripe": "^22.0.0",
+    "swagger-jsdoc": "^6.2.8",
+    "swagger-ui-express": "^5.0.1",
+    "tweetnacl": "^1.0.3",
+    "uuid": "^11.0.5",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^5.0.0",
+    "@types/pg": "^8.11.10",
+    "@types/swagger-jsdoc": "^6.0.4",
+    "@types/swagger-ui-express": "^4.1.7",
+    "@types/uuid": "^10.0.0",
+    "tsx": "^4.19.2",
+    "@types/node": "^24.0.0"
+  }
+}

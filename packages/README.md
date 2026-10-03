@@ -14,14 +14,17 @@ TypeScript paketleri (pnpm workspace). Dizin adı kısa ad, npm adı **`@squares
 | `observability/` | `@squaresdk/solana-observability` | logger, metrikler, health, alarm | [BE-12] |
 | `hardening/` | `@squaresdk/solana-hardening` | SSRF, idempotency, rate limit, RPC failover, imzalı eylemler | [BE-13] |
 | `a2a/` | `@squaresdk/solana-a2a` | JSON-RPC 2.0 görev protokolü, görev ↔ job durum eşlemesi | [BE-17] |
-| `agent-sdk/` | `@squaresdk/solana-agent-sdk` | agent yazma kiti | [BE-19] |
+| [`agent-sdk/`](agent-sdk/) | `@squaresdk/solana-agent-sdk` | agent yazma kiti | [BE-19] |
 | `x402/` | `@squaresdk/solana-x402` | x402 v2 gateway (resmi `@x402/*` üzerine) | [BE-24] |
-| `mcp/` | `@squaresdk/solana-mcp` | Square MCP sunucusu + agent MCP istemcisi | [BE-28] |
+| [`mcp/`](mcp/) | `@squaresdk/solana-mcp` | Square MCP sunucusu + agent MCP istemcisi | [BE-28] |
 | `hosted/` | `@squaresdk/solana-hosted` | konfigürasyondan çalışan kurum agent'ı | [BE-29] |
 | `cli/` | `@squaresdk/solana-cli` | komut satırı aracı | [BE-30] |
 
-Kaynak projelerden taşınan paketler (`covenant/sdk`, `covenant/mcp`, `aperture/shared/types`,
-`aip-beta/packages/agent-sdk`) geçmişleriyle gelir [BE-02].
+`mcp/` (covenant `mcp/`) ve `agent-sdk/` (aip-beta `packages/agent-sdk`) kaynak projelerden
+geçmişleriyle taşındı [BE-02]; uyarlanana kadar `private: true`. `covenant/sdk`,
+`aperture/shared/types` ve aip `src/lib/{identity,protocol}` toptan taşınmadı: ilgili paketin
+uygulama issue'sunda kaynak commit referansıyla işlenir (eşleme:
+[`docs/provenance/BE-02.md`](../docs/provenance/BE-02.md)).
 
 [BE-01]: https://github.com/wienerlabs/square-solana/issues/15
 [BE-02]: https://github.com/wienerlabs/square-solana/issues/16

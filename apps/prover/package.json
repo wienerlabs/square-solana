@@ -1,0 +1,28 @@
+{
+  "name": "@squaresdk/solana-prover",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Node.js HTTP service wrapping snarkjs to generate Groth16 proofs for the Aperture payment-compliance circuit.",
+  "license": "MIT",
+  "type": "module",
+  "main": "src/index.js",
+  "files": [
+    "src",
+    "artifacts"
+  ],
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js"
+  },
+  "dependencies": {
+    "bs58": "^6.0.0",
+    "circomlibjs": "^0.1.7",
+    "cors": "^2.8.5",
+    "express": "^4.21.2",
+    "helmet": "^8.0.0",
+    "snarkjs": "^0.7.5"
+  },
+  "devDependencies": {
+    "@solana/web3.js": "^1.98.4"
+  }
+}

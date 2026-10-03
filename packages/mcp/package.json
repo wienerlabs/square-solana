@@ -1,0 +1,38 @@
+{
+  "name": "@squaresdk/solana-mcp",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Model Context Protocol server for Covenant — the agent-to-agent settlement layer on Solana. Lets any MCP-speaking agent discover work, read jobs, and inspect the live settlement state. Stripe for AI agents.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "dist/server.js",
+  "bin": {
+    "covenant-mcp": "dist/server.js"
+  },
+  "files": [
+    "dist",
+    "src",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "solana",
+    "ai-agents",
+    "settlement",
+    "escrow",
+    "covenant",
+    "x402"
+  ]
+}

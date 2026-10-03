@@ -2,8 +2,15 @@ packages:
   - 'packages/*'
   - 'apps/*'
 
-# @solana/web3.js → ws'nin isteğe bağlı native hızlandırıcıları; JS yedekleri var, kurulum
-# script'leri çalıştırılmaz (pnpm 10 varsayılanını açık karar olarak kaydeder).
+# Kurulum script'leri çalıştırılmaz (pnpm 10 varsayılanını açık karar olarak kaydeder):
+# - bufferutil, utf-8-validate: @solana/web3.js → ws'nin isteğe bağlı native hızlandırıcıları; JS yedekleri var.
+# - bigint-buffer (@solana/*), blake-hash (circomlibjs): native eklenti; yüklenemezse saf JS'e düşer.
+# - esbuild (tsx): ikili @esbuild/<platform> isteğe bağlı paketinden gelir; script yalnızca doğrular.
+# - @scarf/scarf (swagger-ui-express): kurulum telemetrisi; çalıştırılmaz.
 ignoredBuiltDependencies:
+  - '@scarf/scarf'
+  - bigint-buffer
+  - blake-hash
   - bufferutil
+  - esbuild
   - utf-8-validate

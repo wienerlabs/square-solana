@@ -31,3 +31,18 @@ değişirse (BC-20, BC-21) burası da güncellenir."""
 regexTarget = "line"
 # gitleaks "line" hedefine bulgunun öncesinden bağlam da girer; ^ ve $ satır başına (?m) ile bağlanır.
 regexes = ['''(?m)^pub const APERTURE_(PAYMENT|BATCH)_VK: Groth16Verifyingkey = Groth16Verifyingkey \{$''']
+
+[[allowlists]]
+description = """BE-02 ile gelen prover'ın VK dönüştürme betiği (apps/prover/scripts/extract-vk-rust.mjs):
+yukarıdaki VK sabitlerini üreten satırın şablonu. generic-api-key kuralının "sır" sandığı değer
+yine tip adı (`Groth16Verifyingkey`). Satır bazında ve yalnızca bu şablon."""
+regexTarget = "line"
+# Kaynak geçmişinde şablon kendi satırında, Prettier sonrası console.log(...) içinde tek satır.
+regexes = ['''(?m)^\s*(console\.log\()?`pub const \$\{constName\}: Groth16Verifyingkey = Groth16Verifyingkey \{`(,|\);)?$''']
+
+[[allowlists]]
+description = """BE-02 ile gelen prover fixture'ları ve README'deki istek örneği: `payment_token_mint`
+alanında Solana mainnet USDC mint adresi (EPjF…). Mint adresi açık anahtardır, sır değildir.
+Satır bazında, yalnızca bu alan adı ve bu adresle."""
+regexTarget = "line"
+regexes = ['''(?m)^\s*"?payment_token_mint"?:\s*['"]EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v['"],?$''']

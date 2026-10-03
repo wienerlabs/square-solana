@@ -41,7 +41,21 @@ export const PERMISSIVE_EXCEPTIONS = new Set(['LLVM-exception']);
  *
  * @type {Record<string, {status: "cleared" | "review", note: string}>}
  */
-export const ASSESSED = {};
+export const ASSESSED = {
+  'npm:snarkjs': {
+    status: 'review',
+    note:
+      'GPL-3.0. Groth16 ispatı üretimi; yalnızca apps/prover (BE-02, Aperture prover-service). ' +
+      'Yayınlanan bir pakette yok. Servis imajı dağıtılmadan ya da yayınlanan bir paket ' +
+      '(ör. BE-10 createLocalProver) buna bağlanmadan önce hukuki onay gerekir.',
+  },
+  'npm:circomlibjs': {
+    status: 'review',
+    note:
+      'GPL-3.0. Poseidon hash (devreyle aynı sabitler); yalnızca apps/prover ve ' +
+      'apps/compliance-api (BE-02). Yayınlanan bir pakette yok; snarkjs ile aynı onay kapsamında.',
+  },
+};
 
 const OPERATORS = new Set(['AND', 'OR', 'WITH']);
 
