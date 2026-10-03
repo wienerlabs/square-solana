@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Square Solana API
-  version: 0.3.0
+  version: 0.4.0
   summary: Square HTTP API sözleşmesi (BE-35), uygulaması apps/api (BE-18).
   description: |
     Contract-first API sözleşmesi. Zincirdeki hesaplar, event'ler ve instruction argümanları
@@ -1260,8 +1260,9 @@ components:
         proofC: { type: string, pattern: '^[0-9a-f]{128}$' }
         publicInputs:
           type: array
-          minItems: 10
-          maxItems: 10
+          description: Release devresinin 13 public sinyali, devre sırasıyla (release-circuit.md §2).
+          minItems: 13
+          maxItems: 13
           items: { $ref: './schemas/idl.json#/Hex32' }
         provingMs: { type: integer, minimum: 0 }
 
