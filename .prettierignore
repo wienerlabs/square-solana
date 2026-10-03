@@ -6,6 +6,7 @@ target
 pnpm-lock.yaml
 packages/types/src/generated
 packages/sdk/src/idl
+db/src/generated
 docs/api/schemas
 idl
 programs
