@@ -5,7 +5,7 @@ smoke ([§9](../docs/analysis/square-solana-analysis.md#9-%C3%B6nerilen-monorepo
 
 | Konu | Issue |
 |---|---|
-| [`license/`](license/): lisans envanteri ve CI kapısı (`pnpm license:check`, `pnpm license:write`) | [BC-02] |
+| [`license/`](license/): lisans envanteri, paketlerdeki `LICENSE` / `NOTICE` kopyaları ve CI kapısı (`pnpm license:check`, `pnpm license:write`) | [BC-02] |
 | Address Lookup Table, compute budget, priority fee | [BC-28] |
 | Devnet deploy + init (escrow config, screener authority, ALT) | [BC-30] |
 | Devnet uçtan uca smoke: 8 adım gerçek işlemlerle, tx / CU / ücret raporu | [BC-31] |

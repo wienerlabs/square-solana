@@ -16,7 +16,9 @@ Bir kaynak projeden dizin taşıyan PR, aynı PR'da:
 1. kaynağın `LICENSE` dosyasını taşınan dizinde korur (ör. `programs/square-policy/LICENSE`);
 2. kaynak repo, commit ve yöntemi [`provenance/`](provenance/) altında issue başına bir dosyaya
    yazar (ör. [`provenance/BC-05.md`](provenance/BC-05.md));
-3. taşınan yolu `NOTICE`'teki ilgili bölüme ekler.
+3. taşınan yolu `NOTICE`'teki ilgili bölüme ekler;
+4. paketlerdeki `NOTICE` kopyalarını `pnpm license:write` ile günceller
+   ([Dağıtılan paketler](#dağıtılan-paketler)).
 
 Dosyalara tek tek başlık eklenmez, birinci taraf kod CI'da denetlenmez.
 
@@ -28,6 +30,32 @@ zorunlu değildir:
 ```rust
 // SPDX-License-Identifier: Apache-2.0
 ```
+
+## Dağıtılan paketler
+
+Apache-2.0 madde 4(a) lisans metninin, madde 4(d) `NOTICE`'teki bildirimlerin dağıtılan kopyayla
+birlikte verilmesini ister; `NOTICE`'teki MIT bildirimleri (Aperture, AIP) de bu kodun her
+kopyasında bulunmalıdır. npm paketinde bu, tarball'da `dist/` ve `package.json`'ın yanında `LICENSE`
+ve `NOTICE` bulunması demektir.
+
+- `license` alanı `Apache-2.0` olan bir `packages/*` paketi `private` değilse ya da `files`'ta
+  `LICENSE` veya `NOTICE` listeliyorsa, kökteki `LICENSE` ve `NOTICE`'in bayt bayt aynı kopyalarını
+  düz dosya olarak commit'li tutar ve ikisini de `files`'ta listeler. Böylece `private` kaldırılan
+  paket kopyasız yayımlanamaz; yayından önce eklenen kopyalar da aynı biçimde denetlenir. Kopyaları
+  `pnpm license:write` yazar.
+- Kopyalar tarball'a sıradan dosya olarak girer; sonuç paketleyen araca (`pnpm pack`, `npm pack`,
+  `changeset publish`) ve script ayarına bağlı değildir. Seçilmeyen yollar:
+  - `prepack` ile paketleme anında kopyalama: `.npmrc`'de `ignore-scripts=true` olan ortamda script
+    çalışmaz ve tarball iki dosya olmadan, hatasız çıkar;
+  - `files`'ta `../../LICENSE`: npm girdiyi atlar, pnpm paket dizininin dışını gösteren
+    `package/../../LICENSE` girdisi yazar;
+  - sembolik bağ: pnpm de npm de bağı tarball'a koymaz.
+- `NOTICE` kırpılmadan kopyalanır. Madde 4(d) pakete ilgisiz bildirimleri çıkarmaya izin verir ama
+  zorunlu tutmaz; paketlerde Aperture ve AIP'ten uyarlanan kod da var (ör. `packages/types`).
+- Apache-2.0 olmayan paket (ör. `packages/agent-sdk`, MIT) kuralın dışındadır: `LICENSE` dosyası
+  kaynağından gelir ve `pnpm license:write` ona dokunmaz.
+- `pnpm license:check` kuralı denetler ([`pack-files.mjs`](../scripts/license/pack-files.mjs)); kök
+  `LICENSE` ya da `NOTICE` değişince `pnpm license:write` kopyaları günceller.
 
 ## Üçüncü taraf bağımlılıklar
 
@@ -57,6 +85,7 @@ pnpm license:write
 node --test "scripts/**/*.test.mjs"
 ```
 
-`license:check` runtime bağımlılık lisanslarını ve `THIRD_PARTY_LICENSES.md`'deki tablonun
-güncelliğini denetler. Bağımlılık eklendiğinde ya da kaldırıldığında `license:write` çalıştırılıp
-tablo commit'lenir. CI: [`.github/workflows/license.yml`](../.github/workflows/license.yml).
+`license:check` runtime bağımlılık lisanslarını, `THIRD_PARTY_LICENSES.md`'deki tablonun
+güncelliğini ve paketlerdeki `LICENSE` / `NOTICE` kopyalarını denetler. Bağımlılık eklendiğinde ya
+da kaldırıldığında ya da kök `LICENSE` / `NOTICE` değiştiğinde `license:write` çalıştırılıp sonuç
+commit'lenir. CI: [`.github/workflows/license.yml`](../.github/workflows/license.yml).
