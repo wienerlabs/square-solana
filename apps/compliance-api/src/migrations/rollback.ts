@@ -1,14 +1,6 @@
 import { getClient, closePool } from '../utils/database.js';
 import { logger } from '../utils/logger.js';
-import * as migration001 from './001_create_compliance_tables.js';
-
-interface Migration {
-  name: string;
-  up: (client: import('pg').PoolClient) => Promise<void>;
-  down: (client: import('pg').PoolClient) => Promise<void>;
-}
-
-const migrations: Migration[] = [{ name: '001_create_compliance_tables', ...migration001 }];
+import { migrations } from './registry.js';
 
 async function rollbackLastMigration(): Promise<void> {
   const client = await getClient();
