@@ -6,7 +6,7 @@ Uygulama ve servisler (pnpm workspace). `package.json` adları `@squaresdk/solan
 
 | Dizin | Görev | Issue |
 |---|---|---|
-| `web/` | Next.js web uygulaması (`@solana/wallet-adapter-react`), 8 adımlı akış ve demo | [FE-01] |
+| [`web/`](web/) | Next.js web uygulaması (`@solana/wallet-adapter-react`); iskelet hazır, 8 adımlı akış ve demo M4'te | [FE-01] |
 | `api/` | REST API: auth, okuma uçları, tx hazırlama, teslimat yükleme | [BE-18] |
 | `indexer/` | Anchor event'lerinden Postgres'e indexer | [BE-14] |
 | `keeper/` | finalize crank (kârlılık, `ProofRequired` ve screening farkındalığı) | [BE-15] |

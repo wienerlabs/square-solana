@@ -8,6 +8,11 @@ node_modules/
 dist/
 .turbo/
 
+# Next.js (apps/web): derleme çıktısı ve `next` komutlarının ürettiği tip dosyası
+.next/
+next-env.d.ts
+*.tsbuildinfo
+
 # Ortam ve anahtarlar
 .env*
 !.env.example
