@@ -153,6 +153,9 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      # Depo runner kullanıcısına ait, konteyner root ile çalışır; git'in sahiplik denetimi yalnızca bu dizin için açılır.
+      - name: git güvenli dizin
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
       - name: Uygulanmış migration'lar değişmedi, yeniler sırada
         if: github.event_name == 'pull_request'
         env:
