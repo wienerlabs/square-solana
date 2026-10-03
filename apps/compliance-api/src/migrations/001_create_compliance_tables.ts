@@ -43,12 +43,6 @@ export async function up(client: pg.PoolClient): Promise<void> {
     CREATE INDEX idx_attestations_operator_id ON attestations(operator_id);
     CREATE INDEX idx_attestations_status ON attestations(status);
     CREATE INDEX idx_attestations_period ON attestations(operator_id, period_start, period_end);
-
-    CREATE TABLE IF NOT EXISTS migrations (
-      id SERIAL PRIMARY KEY,
-      name VARCHAR(255) NOT NULL UNIQUE,
-      applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    );
   `);
 }
 
@@ -56,6 +50,5 @@ export async function down(client: pg.PoolClient): Promise<void> {
   await client.query(`
     DROP TABLE IF EXISTS attestations;
     DROP TABLE IF EXISTS proof_records;
-    DROP TABLE IF EXISTS migrations;
   `);
 }
