@@ -4,5 +4,5 @@
     "rootDir": ".",
     "outDir": "dist"
   },
-  "include": ["src", "type-tests"]
+  "include": ["src", "type-tests", "test"]
 }
