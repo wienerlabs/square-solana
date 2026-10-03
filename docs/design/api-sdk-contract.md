@@ -14,7 +14,7 @@ Bu doküman Square'in HTTP API'sini ve TypeScript paketlerinin dış yüzeyini s
 | `packages/sdk` → `@squaresdk/solana-sdk` | 4 program için client, PDA'lar, tx builder'lar, 8 adım akışı, event / hata yardımcıları, REST API client | BE-08, BE-18 |
 | `packages/identity` → `@squaresdk/solana-identity` | did:aip çözümleyici, DID Document, agent card doğrulama | BE-09 |
 | `packages/policy` → `@squaresdk/solana-policy` | Politika commitment'ı, alıcı Merkle ağacı, release witness'ı, prover, ispat bağlama | BE-10 |
-| `.github/workflows/contract.yml` | Hizalama CI'ı | BE-03 / BC-13 devralabilir |
+| `.github/workflows/contract.yml`, `.github/workflows/packages.yml` | Hizalama CI'ı: üretilen dosyaların güncelliği ve OpenAPI lint `contract.yml`'da; derleme, tip ve hizalama testleri `packages.yml`'da (`idl/`, `docs/api/` ya da `docs/did-aip/` değişince tam koşu) | BE-35, BE-03 |
 
 **Yayımlama:** Sözleşme, `main`'deki sürümlü dosyalardır. `pnpm openapi:docs` tek dosyalık HTML belge üretir (`dist/api/index.html`, commit'lenmez). Paketler şimdilik `private`; npm'e yayın ayrı bir karar.
 
