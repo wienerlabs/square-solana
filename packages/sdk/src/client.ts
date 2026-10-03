@@ -1,10 +1,15 @@
-// Square client sözleşmesi: 4 program için typed client, tx builder'lar ve 8 adım akışı (uygulama BE-08).
-// Adım 1 (policy commitment) ve 7 (ispat bağlama) kurum tarafıdır: @squaresdk/solana-policy.
-import type { Idl, Program } from '@coral-xyz/anchor';
+// Square client: 4 program için typed client, tx builder'lar ve 8 adım akışı (BE-35 sözleşmesi,
+// uygulama BE-08). Adım 1 (policy commitment) ve 7 (ispat bağlama) kurum tarafıdır:
+// @squaresdk/solana-policy.
+import { Program, type Idl, type Provider } from '@coral-xyz/anchor';
 import type { Commitment, Connection, PublicKey, TransactionInstruction, VersionedTransaction } from '@solana/web3.js';
 import type { ProgramErrorRef } from '@squaresdk/solana-types';
-import type { SquarePda } from './pda.js';
-import type { SquareIdls, SquareProgramIds } from './programs.js';
+import { mapProgramError } from './errors.js';
+import { decodeEventLogs } from './events.js';
+import { createFlow } from './flow.js';
+import { createPda, type SquarePda } from './pda.js';
+import { SQUARE_IDLS, type SquareIdls, type SquareProgramIds, type SquareProgramName } from './programs.js';
+import { buildVersionedTx } from './tx.js';
 import type {
   BuildOptions,
   BuiltTx,
@@ -128,5 +133,71 @@ export interface SquareClient {
   mapError(error: unknown): ProgramErrorRef | null;
 }
 
-/** `SquareClient` fabrikası; uygulama BE-08'de. */
+/** `SquareClient` fabrikası. */
 export type CreateSquareClient = (config: SquareClientConfig) => SquareClient;
+
+const PROGRAM_NAMES = Object.keys(SQUARE_IDLS) as SquareProgramName[];
+
+/** IDL'deki adresi yapılandırmadaki program kimliğiyle değiştirip Anchor programı kurar. */
+function program<I extends Idl>(idl: I, address: PublicKey, provider: Provider): Program<I> {
+  return new Program<I>({ ...idl, address: address.toBase58() }, provider);
+}
+
+function programClient<I extends Idl, A>(prog: Program<I>): ProgramClient<I, A> {
+  const methods = prog.methods as Record<
+    string,
+    (...args: unknown[]) => { accountsPartial(a: unknown): { instruction(): Promise<TransactionInstruction> } }
+  >;
+  const instructions = Object.fromEntries(
+    Object.keys(methods).map((name) => [
+      name,
+      (args: readonly unknown[], accounts: unknown) =>
+        methods[name]!(...args)
+          .accountsPartial(accounts)
+          .instruction(),
+    ]),
+  ) as unknown as InstructionBuilders<I>; // her IDL instruction'ı için çalışma zamanında eşlenir; imzalar IDL tiplerinden
+  const accounts = prog.account as Record<string, { fetchNullable(address: PublicKey): Promise<unknown> }>;
+  return {
+    program: prog,
+    instructions,
+    async fetch(account, address) {
+      const namespace = accounts[account];
+      if (!namespace) throw new Error(`${prog.idl.metadata.name}: ${account} hesap tipi yok`);
+      return (await namespace.fetchNullable(address)) as A[typeof account] | null;
+    },
+  };
+}
+
+export const createSquareClient: CreateSquareClient = (config) => {
+  const commitment = config.commitment ?? config.connection.commitment;
+  if (!commitment) throw new Error('commitment gerekli: config.commitment ya da connection commitment');
+  const provider: Provider = { connection: config.connection };
+  const programs = {
+    registry: program(SQUARE_IDLS.registry, config.programIds.registry, provider),
+    policy: program(SQUARE_IDLS.policy, config.programIds.policy, provider),
+    verifier: program(SQUARE_IDLS.verifier, config.programIds.verifier, provider),
+    escrow: program(SQUARE_IDLS.escrow, config.programIds.escrow, provider),
+  };
+  const pda = createPda(config.programIds);
+  const buildTx = (instructions: readonly TransactionInstruction[], options: BuildOptions) =>
+    buildVersionedTx(config.connection, commitment, instructions, options);
+  const sources = PROGRAM_NAMES.map((name) => ({
+    name,
+    programId: config.programIds[name].toBase58(),
+    coder: programs[name].coder,
+    idl: programs[name].idl as Idl,
+  }));
+  return {
+    programIds: config.programIds,
+    pda,
+    registry: programClient<SquareIdls['registry'], RegistryAccounts>(programs.registry),
+    policy: programClient<SquareIdls['policy'], PolicyAccounts>(programs.policy),
+    verifier: programClient<SquareIdls['verifier'], VerifierAccounts>(programs.verifier),
+    escrow: programClient<SquareIdls['escrow'], EscrowAccounts>(programs.escrow),
+    flow: createFlow({ connection: config.connection, programIds: config.programIds, pda, ...programs, buildTx }),
+    buildTx,
+    decodeEvents: (logs, context) => decodeEventLogs(sources, logs, context),
+    mapError: (error) => mapProgramError(sources, error),
+  };
+};

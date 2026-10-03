@@ -26,8 +26,15 @@ test('SQUARE_IDLS, idl/ dosyalarıyla aynı', () => {
   }
 });
 
-test('SDK çalışma zamanında yalnızca IDL verisi ve sözleşme sabitlerini dışa aktarır', () => {
-  assert.deepEqual(Object.keys(sdk).sort(), ['API_OPERATIONS', 'SQUARE_IDLS']);
+test('SDK çalışma zamanı dışa aktarımları beklenen yüzeyle aynı (BE-35 + BE-08)', () => {
+  assert.deepEqual(Object.keys(sdk).sort(), [
+    'API_OPERATIONS',
+    'SQUARE_IDLS',
+    'createPda',
+    'createSquareClient',
+    'specHashing',
+    'workHash',
+  ]);
 });
 
 test('src/idl kopyaları idl/ ile aynı', () => {
