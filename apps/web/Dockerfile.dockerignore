@@ -1,0 +1,10 @@
+# Yalnızca apps/web/Dockerfile için (BuildKit, <Dockerfile>.dockerignore). Yerel derleme çıktıları imaja girmez;
+# Railway zaten temiz bir klondan derler.
+**/node_modules
+**/.next
+**/.turbo
+**/dist
+**/target
+**/*.tsbuildinfo
+**/next-env.d.ts
+**/.env*
