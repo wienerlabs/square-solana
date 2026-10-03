@@ -7,7 +7,7 @@ describe('parseWebConfig', () => {
   it('accepts a cluster and an https RPC URL', () => {
     expect(parseWebConfig(valid)).toEqual({
       ok: true,
-      config: { cluster: 'devnet', rpcUrl: 'https://rpc.example.org/v1?api-key=secret' },
+      config: { cluster: 'devnet', rpcUrl: 'https://rpc.example.org/v1?api-key=secret', programIds: {} },
     });
   });
 
@@ -42,7 +42,36 @@ describe('parseWebConfig', () => {
       SQUARE_SOLANA_CLUSTER: ' devnet\n',
       SQUARE_SOLANA_RPC_URL: ' https://rpc.example.org ',
     });
-    expect(result).toEqual({ ok: true, config: { cluster: 'devnet', rpcUrl: 'https://rpc.example.org' } });
+    expect(result).toEqual({
+      ok: true,
+      config: { cluster: 'devnet', rpcUrl: 'https://rpc.example.org', programIds: {} },
+    });
+  });
+});
+
+describe('program ids', () => {
+  // Gerçek adresler: Circle'ın devnet USDC mint'i ve native SOL mint'i (yalnızca biçim denetimi için).
+  const A = '4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU';
+  const B = 'So11111111111111111111111111111111111111112';
+
+  it('are optional and read from SQUARE_PROGRAM_ID_*', () => {
+    const result = parseWebConfig({ ...valid, SQUARE_PROGRAM_ID_REGISTRY: A, SQUARE_PROGRAM_ID_ESCROW: ` ${B} ` });
+    expect(result.ok && result.config.programIds).toEqual({ registry: A, escrow: B });
+  });
+
+  it('reject a value that is not a 32-byte base58 address', () => {
+    const result = parseWebConfig({
+      ...valid,
+      SQUARE_PROGRAM_ID_POLICY: 'not-an-address',
+      SQUARE_PROGRAM_ID_VERIFIER: '1111',
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.errors).toEqual([
+        'SQUARE_PROGRAM_ID_POLICY is not a Solana address',
+        'SQUARE_PROGRAM_ID_VERIFIER is not a Solana address',
+      ]);
+    }
   });
 });
 

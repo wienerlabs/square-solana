@@ -1,6 +1,13 @@
 # apps/web — `@squaresdk/solana-web`
 
-Square'in web uygulaması: Next.js 16 (App Router), React 19, Tailwind CSS 4 ve `@solana/wallet-adapter-react` ([§12.4](../../docs/analysis/square-solana-analysis.md#124-varsay%C4%B1lanlar)). Şu an iskelet (FE-01) ve tasarım sistemi (FE-02) var: cüzdan bağlantısı, bağlı cüzdanın adresi ve bakiyesi, yapılandırılan ağın canlı durumu ve `/design`'daki bileşen kataloğu. 8 adımın sayfaları M4'te gelir.
+Square'in web uygulaması: Next.js 16 (App Router), React 19, Tailwind CSS 4 ve `@solana/wallet-adapter-react` ([§12.4](../../docs/analysis/square-solana-analysis.md#124-varsay%C4%B1lanlar)). Şu an iskelet (FE-01), tasarım sistemi (FE-02) ve landing (FE-15) var. 8 adımın sayfaları M4'te gelir.
+
+| Rota | İçerik |
+|---|---|
+| `/` | Landing: değer önerisi, 8 adımlı akış, programlar ve ağ (canlı); bütün butonlar uygulamaya gider |
+| `/app` | Uygulama: bağlı cüzdanın adresi ve bakiyesi, ağın canlı durumu |
+| `/design` | Bileşen kataloğu |
+| `/healthz` | Sağlık kontrolü (Railway) |
 
 ## Yapılandırma
 
@@ -10,6 +17,7 @@ Değerler ortamdan gelir ve kök layout'ta **istek anında, sunucuda** okunur (`
 |---|---|
 | `SQUARE_SOLANA_CLUSTER` | `devnet`, `testnet`, `mainnet-beta` ya da `localnet` |
 | `SQUARE_SOLANA_RPC_URL` | O cluster'ın JSON-RPC ucu; `https` (yalnızca `localnet` için `http`). WebSocket ucu web3.js tarafından bundan türetilir |
+| `SQUARE_PROGRAM_ID_{REGISTRY,POLICY,VERIFIER,ESCROW}` | İsteğe bağlı: programların o cluster'daki adresi (db ile aynı adlar; IDL'deki adres kullanılmaz). Tanımlı olan program landing'de adresi ve zincirdeki deploy durumuyla, tanımlı olmayan "Not configured" olarak görünür. Geçersiz bir değer yapılandırma hatasıdır |
 
 RPC adresi istemci bileşenine (`ConnectionProvider`) gider, yani tarayıcıya iner: ekranda yalnızca host gösterilse de sayfa yükünde görünür. İçinde API anahtarı olan bir RPC kullanılacaksa ya alan adıyla kısıtlanmış (domain allowlist'li) bir anahtar ya da anahtarı sunucuda tutan bir vekil gerekir.
 

@@ -1,4 +1,4 @@
-import { CLUSTERS, ENV_VARS } from '@/lib/config';
+import { CLUSTERS, ENV_VARS, PROGRAMS, PROGRAM_ID_ENV } from '@/lib/config';
 
 // Sunucu bileşeni: yapılandırma eksikse uygulamanın yerine gösterilir. Varsayılana düşülmez.
 export function ConfigError({ errors }: { errors: string[] }) {
@@ -18,6 +18,12 @@ export function ConfigError({ errors }: { errors: string[] }) {
         <dd className="text-muted">{CLUSTERS.join(' | ')}</dd>
         <dt className="font-mono">{ENV_VARS.rpcUrl}</dt>
         <dd className="text-muted">JSON-RPC endpoint of that cluster (https)</dd>
+        {PROGRAMS.map((program) => (
+          <div key={program} className="contents">
+            <dt className="font-mono">{PROGRAM_ID_ENV[program]}</dt>
+            <dd className="text-muted">Optional: address of the {program} program on that cluster</dd>
+          </div>
+        ))}
       </dl>
     </main>
   );
