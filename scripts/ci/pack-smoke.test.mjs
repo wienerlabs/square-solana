@@ -117,3 +117,15 @@ test('yayınlanan paket LICENSE ve NOTICE taşımalı', () => {
     [],
   );
 });
+
+test("takma adla kurulan birinci taraf paket de yerel tarball'dan çözülmeli", () => {
+  const lock = {
+    packages: {
+      'node_modules/@squaresdk/solana-types': { resolved: 'file:../t/types.tgz' },
+      'node_modules/cfg-alias': { name: '@squaresdk/solana-config', resolved: 'https://registry.example/cfg.tgz' },
+    },
+  };
+  assert.deepEqual(unresolvedFromLock(lock, ['@squaresdk/solana-types']), [
+    'node_modules/cfg-alias yerel tarball yerine https://registry.example/cfg.tgz adresinden çözüldü',
+  ]);
+});

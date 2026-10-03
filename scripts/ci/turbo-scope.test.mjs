@@ -124,3 +124,12 @@ test('özet dosya adlarını kod bloğunda listeler; ters tırnak biçimi bozama
   });
   assert.match(summary, /```text\na`b\.md\nidl\/x\.json\n```/);
 });
+
+test('özet çiti dosya adındaki en uzun ters tırnak dizisinden uzundur', () => {
+  const summary = formatSummary({
+    scope: { mode: 'full', reason: 'paket dışı girdi değişti', fullTriggers: ['a````b'] },
+    packages: [],
+    lines: ['mode=full'],
+  });
+  assert.match(summary, /`````text\na````b\n`````/);
+});

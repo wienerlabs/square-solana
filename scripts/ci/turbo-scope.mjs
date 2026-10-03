@@ -79,7 +79,12 @@ function affectedPackages(baseSha) {
 }
 
 export function formatSummary({ scope, packages, lines }) {
-  const block = (items) => ['```text', ...items, '```'];
+  const longestTicks = Math.max(
+    0,
+    ...[...scope.fullTriggers, ...packages].map((s) => Math.max(0, ...(s.match(/`+/g) ?? []).map((run) => run.length))),
+  );
+  const fence = '`'.repeat(Math.max(3, longestTicks + 1));
+  const block = (items) => [`${fence}text`, ...items, fence];
   return [
     `### Kapsam: ${scope.mode === 'full' ? 'tam koşu' : 'etkilenen paketler'}`,
     `Sebep: ${scope.reason}.`,

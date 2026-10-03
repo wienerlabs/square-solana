@@ -100,7 +100,10 @@ export function unresolvedFromLock(lock, names) {
   for (const [key, entry] of Object.entries(entries)) {
     if (names.some((name) => key === `node_modules/${name}`)) continue;
     const installed = key.slice(key.lastIndexOf('node_modules/') + 'node_modules/'.length);
-    if ([...scopes].some((scope) => installed.startsWith(scope)) && !isLocal(entry)) {
+    const firstParty = [installed, entry.name ?? ''].some((name) =>
+      [...scopes].some((scope) => name.startsWith(scope)),
+    );
+    if (firstParty && !isLocal(entry)) {
       errors.push(`${key} yerel tarball yerine ${entry.resolved} adresinden çözüldü`);
     }
   }
@@ -159,7 +162,15 @@ function smoke(work) {
   writeFileSync(join(consumer, 'package.json'), `${JSON.stringify(consumerManifest(tarballs), null, 2)}\n`);
   run('npm', npmInstallArgs(), { cwd: consumer, stdio: 'inherit' });
 
-  const errors = unresolvedFromLock(JSON.parse(readFileSync(join(consumer, 'package-lock.json'), 'utf8')), PUBLISHABLE);
+  const lockErrors = unresolvedFromLock(
+    JSON.parse(readFileSync(join(consumer, 'package-lock.json'), 'utf8')),
+    PUBLISHABLE,
+  );
+  if (lockErrors.length) {
+    for (const error of lockErrors) console.error(`HATA: ${error}`);
+    return false;
+  }
+  const errors = [];
   for (const name of PUBLISHABLE) {
     const installed = join(consumer, 'node_modules', ...name.split('/'));
     const manifest = JSON.parse(readFileSync(join(installed, 'package.json'), 'utf8'));
