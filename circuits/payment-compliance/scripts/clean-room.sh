@@ -10,8 +10,8 @@ set -euo pipefail
 COMMAND="${1:-check}"
 REPO="$(git -C "$(dirname "$0")" rev-parse --show-toplevel)"
 NODE_MAJOR="$(tr -d '[:space:]' < "$REPO/.nvmrc")"
-CIRCOM_URL="https://github.com/iden3/circom/releases/download/v2.2.3/circom-linux-amd64"
-CIRCOM_SHA256="85342c7ff332d948df7c0c50ecf201e6129349aef550ce873f3c811b79fe53a3"
+# shellcheck source=circom.env
+source "$(dirname "$0")/circom.env"
 
 case "$COMMAND" in
   check) OUT_MOUNT=() ;;
