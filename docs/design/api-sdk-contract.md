@@ -1,8 +1,8 @@
 # API ve SDK sözleşmesi
 
-**Sözleşme sürümü:** v0.2.1 (taslak) · **Issue:** BE-35 (#102), BC-47 (#119), BE-07 (#39), BE-08 (#40) · **Dayandığı program sözleşmesi:** BC-44 v0.1.1 ([program-interface.md](program-interface.md))
+**Sözleşme sürümü:** v0.3.0 (taslak) · **Issue:** BE-35 (#102), BC-47 (#119), BE-07 (#39), BE-08 (#40), BE-09 (#41) · **Dayandığı program sözleşmesi:** BC-44 v0.1.1 ([program-interface.md](program-interface.md))
 
-Bu doküman Square'in HTTP API'sini ve TypeScript paketlerinin dış yüzeyini sabitler. Frontend (FE-24 veri katmanı) ve servisler (BE-18 API, BE-14 indexer, BE-15 keeper, BE-11 prover) bu sözleşmeye göre geliştirir. `@squaresdk/solana-sdk`'nin zincir tarafı BE-08 ile uygulandı (`createSquareClient`, `createPda`, `specHashing`, `workHash`); identity, policy ve REST client'ın uygulamaları BE-09, BE-10 ve BE-18'de. Paketlerde mock, placeholder gövde ya da sabit adres yoktur (proje kuralı).
+Bu doküman Square'in HTTP API'sini ve TypeScript paketlerinin dış yüzeyini sabitler. Frontend (FE-24 veri katmanı) ve servisler (BE-18 API, BE-14 indexer, BE-15 keeper, BE-11 prover) bu sözleşmeye göre geliştirir. `@squaresdk/solana-sdk`'nin zincir tarafı BE-08, `@squaresdk/solana-identity` BE-09 ile uygulandı; policy ve REST client'ın uygulamaları BE-10 ve BE-18'de. Paketlerde mock, placeholder gövde ya da sabit adres yoktur (proje kuralı).
 
 ## 1. Dosyalar
 
@@ -114,7 +114,7 @@ Tüm `/v1` yanıtları `{ success, data, error, meta }` biçimindedir. `meta.req
 ## 8. Açık noktalar
 
 1. **A2A eşlemesi (BE-17):** `JOB_STATUS_TO_TASK_STATE` taslaktır. Örneğin `disputed → input-required` ve `refunded → failed` eşlemeleri BE-17'de kesinleşir.
-2. **Agent card (BC-14, BE-07, BE-09):** `registrations[]` biçimi BC-14 spec'iyle (#109) hizalı. Spec, sözleşmenin `AgentRecord` alan adlarını benimsedi; devirde cüzdanın yeni sahibe sıfırlanması kuralı program sözleşmesine BC-15 ile eklenecek.
+2. **Agent card (BC-14, BE-09):** Tek şema v0.3.0'da kesinleşti: kart hem ERC-8004 kayıt dosyası (`type`, `services`, `registrations`, `active`) hem A2A AgentCard'ıdır; DID çözücüsü servisleri `services`'ten üretir ([did:aip Solana profili](../did-aip/method-spec-v2-solana.md) §5.4–§5.5). Devirde cüzdanın yeni sahibe sıfırlanması kuralı program sözleşmesine BC-15 ile eklenecek.
 3. **Policy dokümanı (BE-10):** `PolicyDocument` v0.2.0'da release devresinin politika girdilerine hizalandı (BE-07, [release-circuit.md](release-circuit.md) §4–§5): yuva sınırları `POLICY_CIRCUIT_LIMITS`, tek UTC penceresi, gün adları devrenin maske sırasıyla. Alanların alan elemanlarına çevrilmesi ve commitment BE-10'da `normalizePolicy` / `computePolicyCommitment`'ta; `circuits/payment-compliance/scripts/release-input.mjs` ile bayt bayt aynı olmalı.
 4. **Auth (BE-18):** İmzalanan mesajın metni (alan adı ve süre) ve oturum belirteci biçimi BE-18'de belirlenir. Sözleşme yalnızca alanları sabitler.
 5. **Prover servisi (BE-11):** `apps/prover`'ın kendi OpenAPI'si olacak. `/v1/prove` API'de vekil olarak kalır mı, BE-11 ile BE-18 birlikte karar verir.
@@ -127,6 +127,7 @@ Tüm `/v1` yanıtları `{ success, data, error, meta }` biçimindedir. `meta.req
 | Sürüm | Değişiklik | Issue / PR |
 |---|---|---|
 | v0.1.0 | İlk taslak: 28 operasyonluk OpenAPI 3.1 spec; IDL'den üretilen zod ve JSON Schema'lar; 4 paketin gövdesiz imzaları; hizalama testleri ve CI | BE-35 (#102) |
+| v0.3.0 | `AgentCard` tek şema: ERC-8004 kayıt dosyası alanları eklendi (`type` zorunlu, `services` zorunlu ve `url` ile aynı uç noktalı bir `A2A` girdisi içerir, `active`, `x402Support`), `AgentService` bileşeni. `@squaresdk/solana-identity` arayüzü did:aip Solana profiline hizalandı: `ParsedDidAip` v2 Solana / v2 EVM / v1 birleşimi, `DidDocument.capabilityInvocation`, spesifikasyonun çözüm metadata'sı (`versionId`, `agentStatus`, `deactivation`, `agentCard`, `crossRegistrations`, v1 `deprecated` …), hata kodları ve uyarılar, `ResolverOptions.connections` / `card` / `crossRegistrationLimit`; uygulama `squareIdentity` | BE-09 (#41) |
 | v0.2.1 | SDK zincir tarafı uygulandı (BE-08): `createSquareClient` (4 program client'ı, IDL builder'ları, `buildTx`, `decodeEvents`, `mapError`, 8 adımın `flow` builder'ları), `createPda`, `specHashing`, `workHash`. Yalnızca ekleme; imzalar değişmedi | BE-08 (#40) |
 | v0.2.0 | `PolicyDocument` release devresine hizalandı: `institution`, gizli `maxDaily` eklendi; `maxPerPayment` → `maxPerTx`, `mintWhitelist` → `tokenWhitelist` (≤ 10), `blockedPayees` ≤ 10, `allowedCategories` 1–8 (her biri 1–32 bayt UTF-8), `timeWindows` → tek `timeWindow` (UTC, gün adları, `start ≤ end`); devrede karşılığı olmayan `allowedAgentRecords` çıktı. `AipV1AgentCardSchema` (did:aip v1 kartı, AIP'den). Veritabanı enum'ları bu şemalarla testte hizalı (BE-04). HTTP yüzeyi değişmedi | BE-07 (#39) |
 | v0.1.1 | Placeholder'lar kaldırıldı (proje kuralı): `NotImplementedError` ve onu fırlatan gövdeler, `SOURCE_PROGRAM_IDS`, OpenAPI'deki `localhost` sunucusu ve `not_implemented` hata kodu çıktı. sdk / identity / policy yalnızca tip ve arayüz (`SquareClient`, `SquareApi`, `SquarePda`, `SpecHashing`, `SquareIdentity`, `SquarePolicyKit`, `Create*` fabrika tipleri) sunar; `SquareClientConfig.programIds` zorunlu. SDK IDL tipleri `idl/*.json`'dan üretilir | BC-47 (#119) |
