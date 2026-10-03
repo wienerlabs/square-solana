@@ -105,6 +105,17 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Pack, boş projeye kurulum ve düz Node ile import
         run: node scripts/ci/pack-smoke.mjs
+      # engines tabanı (`node >= 24`): paketler Node 24.0.0'da da düz ESM ile açılmalı (#139).
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24.0.0
+      - name: Paket kurulum smoke'u engines tabanında (Node 24.0.0)
+        run: node scripts/ci/pack-smoke.mjs
+      - name: Derlenmiş sdk ve policy engines tabanında (Node 24.0.0) düz Node ESM ile açılır
+        run: |
+          node --version
+          node packages/sdk/test/node-esm/list-claim.mjs
+          node packages/policy/test/node-esm/set-compliance-proof.mjs
 
   db-migrations:
     name: Prisma migration kontrolü

@@ -4,6 +4,10 @@ TypeScript paketleri (pnpm workspace). Dizin adı kısa ad, npm adı **`@squares
 ([§12.4](../docs/analysis/square-solana-analysis.md#124-varsay%C4%B1lanlar)); `square` ve
 `@square/*` adları kullanılmaz. Adlandırma, ortak yapılandırma ve sürümleme [BE-01] ile kurulur.
 
+Apache-2.0 olarak yayımlanacak paket kökteki `LICENSE` ve `NOTICE`'in commit'li kopyalarını taşır
+ve ikisini `files`'ta listeler ([lisans politikası](../docs/licensing.md#dağıtılan-paketler));
+kopyaları `pnpm license:write` yazar, `pnpm license:check` denetler.
+
 | Dizin | npm adı | İçerik | Issue |
 |---|---|---|---|
 | `config/` | `@squaresdk/solana-config` | tsconfig, eslint, prettier ortak ayarları | [BE-01] |

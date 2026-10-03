@@ -272,9 +272,6 @@ importers:
 
   packages/policy:
     dependencies:
-      '@coral-xyz/anchor':
-        specifier: 0.31.1
-        version: 0.31.1(bufferutil@4.1.0)(typescript@5.9.3)
       '@noble/hashes':
         specifier: ^1.8.0
         version: 1.8.0
@@ -287,16 +284,25 @@ importers:
       '@squaresdk/solana-types':
         specifier: workspace:*
         version: link:../types
+      bn.js:
+        specifier: ^5.2.5
+        version: 5.2.5
       poseidon-lite:
         specifier: ^0.3.0
         version: 0.3.0
     devDependencies:
+      '@coral-xyz/anchor':
+        specifier: 0.31.1
+        version: 0.31.1(bufferutil@4.1.0)(typescript@5.9.3)
       '@noble/curves':
         specifier: 2.4.0
         version: 2.4.0
       '@squaresdk/solana-config':
         specifier: workspace:*
         version: link:../config
+      '@types/bn.js':
+        specifier: ^5.2.0
+        version: 5.2.0
       '@vitest/coverage-v8':
         specifier: ^5.0.3
         version: 5.0.3(vitest@5.0.3)
@@ -324,10 +330,16 @@ importers:
       '@squaresdk/solana-types':
         specifier: workspace:*
         version: link:../types
+      bn.js:
+        specifier: ^5.2.5
+        version: 5.2.5
     devDependencies:
       '@squaresdk/solana-config':
         specifier: workspace:*
         version: link:../config
+      '@types/bn.js':
+        specifier: ^5.2.0
+        version: 5.2.0
       '@vitest/coverage-v8':
         specifier: ^5.0.3
         version: 5.0.3(vitest@5.0.3)
@@ -1326,6 +1338,9 @@ packages:
     resolution: {integrity: sha512-88Xv2f7SLGVJ68lRRx8o375dKmnZYNdDtvlKcPA0kZpcF93eAQd8l96BKQ0/AMHG0bMJA0Z5QqoqtetxzNsC+g==}
     cpu: [arm64]
     os: [win32]
+
+  '@types/bn.js@5.2.0':
+    resolution: {integrity: sha512-DLbJ1BPqxvQhIGbeu8VbUC1DiAiahHtAYvA0ZEAa4P31F7IaArc8z3C3BRQdWX4mtLQuABG4yzp76ZrS02Ui1Q==}
 
   '@types/body-parser@1.19.6':
     resolution: {integrity: sha512-HLFeCYgz89uk22N5Qg3dvGvsv46B8GLvKKo1zKG4NybA8U2DiEO3w9lqGg29t/tfLRJpJ6iQxnVw4OnB7MoM9g==}
@@ -5005,6 +5020,10 @@ snapshots:
 
   '@turbo/windows-arm64@2.11.7':
     optional: true
+
+  '@types/bn.js@5.2.0':
+    dependencies:
+      '@types/node': 24.19.1
 
   '@types/body-parser@1.19.6':
     dependencies:

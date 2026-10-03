@@ -2,7 +2,7 @@
 // `SquarePda`'dan, payee / mint / rent ödeyicisi zincirdeki job ve alacak kaydından, token programı
 // mint hesabının sahibinden. Token hesabı gereken alıcı tarafların ATA'sı aynı tx'te idempotent
 // olarak açılır. Program adresleri yapılandırmadan gelir (BC-09).
-import { BN, type Program } from '@coral-xyz/anchor';
+import type { Program } from '@coral-xyz/anchor';
 import {
   createAssociatedTokenAccountIdempotentInstruction,
   getAssociatedTokenAddressSync,
@@ -10,6 +10,7 @@ import {
   TOKEN_PROGRAM_ID,
 } from '@solana/spl-token';
 import { SystemProgram, type Connection, type PublicKey, type TransactionInstruction } from '@solana/web3.js';
+import BN from 'bn.js';
 import type { SquareFlow } from './client.js';
 import type { SquarePda } from './pda.js';
 import type { SquareIdls, SquareProgramIds } from './programs.js';
