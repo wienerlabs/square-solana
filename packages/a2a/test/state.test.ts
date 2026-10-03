@@ -7,7 +7,12 @@ const JOBS = JobStatusSchema.options;
 
 describe('canTransition', () => {
   it('terminal görev hiçbir duruma geçmez', () => {
-    for (const from of ['TASK_STATE_COMPLETED', 'TASK_STATE_FAILED', 'TASK_STATE_CANCELED', 'TASK_STATE_REJECTED'] as const) {
+    for (const from of [
+      'TASK_STATE_COMPLETED',
+      'TASK_STATE_FAILED',
+      'TASK_STATE_CANCELED',
+      'TASK_STATE_REJECTED',
+    ] as const) {
       for (const to of STATES) expect(canTransition(from, to), `${from} → ${to}`).toBe(false);
     }
   });

@@ -29,7 +29,9 @@ test('A2A sürümü ve görev durumları v1.0 (ProtoJSON enum adları)', () => {
 test('Part: text, raw, url ya da data alanlarından tam olarak biri', () => {
   assert.ok(t.PartSchema.safeParse({ text: 'merhaba' }).success);
   assert.ok(t.PartSchema.safeParse({ data: { spec: 1 }, mediaType: 'application/json' }).success);
-  assert.ok(t.PartSchema.safeParse({ url: 'https://agent.example/d/1', mediaType: 'text/plain', filename: 'a.txt' }).success);
+  assert.ok(
+    t.PartSchema.safeParse({ url: 'https://agent.example/d/1', mediaType: 'text/plain', filename: 'a.txt' }).success,
+  );
   assert.ok(t.PartSchema.safeParse({ raw: 'aGVsbG8=' }).success);
   assert.ok(!t.PartSchema.safeParse({}).success);
   assert.ok(!t.PartSchema.safeParse({ text: 'a', url: 'https://x.example' }).success);
@@ -67,7 +69,12 @@ test('StreamResponse ve SendMessageResponse: tek bir yük', () => {
     }).success,
   );
   assert.ok(!t.StreamResponseSchema.safeParse({}).success);
-  assert.ok(!t.StreamResponseSchema.safeParse({ statusUpdate: status, message: { messageId: 'm', role: 'ROLE_AGENT', parts: [{ text: 'x' }] } }).success);
+  assert.ok(
+    !t.StreamResponseSchema.safeParse({
+      statusUpdate: status,
+      message: { messageId: 'm', role: 'ROLE_AGENT', parts: [{ text: 'x' }] },
+    }).success,
+  );
   assert.ok(!t.SendMessageResponseSchema.safeParse({}).success);
 });
 
@@ -84,7 +91,9 @@ test('istek parametreleri', () => {
 });
 
 test('JSON-RPC 2.0 zarfı ve A2A hata kodları (spec §5.4)', () => {
-  assert.ok(t.JsonRpcRequestSchema.safeParse({ jsonrpc: '2.0', id: 1, method: 'GetTask', params: { id: 't' } }).success);
+  assert.ok(
+    t.JsonRpcRequestSchema.safeParse({ jsonrpc: '2.0', id: 1, method: 'GetTask', params: { id: 't' } }).success,
+  );
   assert.ok(!t.JsonRpcRequestSchema.safeParse({ jsonrpc: '1.0', id: 1, method: 'GetTask' }).success);
   assert.deepEqual(t.A2A_ERROR_CODES, {
     parseError: -32700,
@@ -104,7 +113,7 @@ test('JSON-RPC 2.0 zarfı ve A2A hata kodları (spec §5.4)', () => {
   });
 });
 
-test('job durumu → görev durumu: görev agent\'ın işidir, settlement görev durumunu değiştirmez', () => {
+test("job durumu → görev durumu: görev agent'ın işidir, settlement görev durumunu değiştirmez", () => {
   assert.deepEqual(t.JOB_STATUS_TO_TASK_STATE, {
     open: 'TASK_STATE_SUBMITTED',
     funded: 'TASK_STATE_SUBMITTED',

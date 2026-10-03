@@ -46,7 +46,9 @@ describe('parseParams', () => {
       expect(error).toBeInstanceOf(A2aError);
       const e = error as A2aError;
       expect(e.code).toBe(-32602);
-      const detail = e.data?.find((d) => d['@type'] === BAD_REQUEST_TYPE) as { fieldViolations: { field: string }[] };
+      const detail = e.data?.find((d) => d['@type'] === BAD_REQUEST_TYPE) as unknown as {
+        fieldViolations: { field: string }[];
+      };
       expect(detail.fieldViolations.map((v) => v.field).sort()).toEqual(['historyLength', 'id']);
     }
   });
