@@ -10,7 +10,7 @@
 // - Adres: base58, VARCHAR(44). 32 bayt hash / commitment: küçük harf hex, CHAR(64).
 // - u64: NUMERIC(20, 0). Zincirden gelen zamanlar (unix saniyesi, i64): BIGINT.
 //   Veritabanının kendi zamanları (indexedAt, createdAt …): TIMESTAMPTZ.
-// - Enum değerleri JSON kodlamasıyla aynıdır (camelCase).
+// - Enum değerleri JSON kodlamasıyla aynıdır (camelCase); A2A enum'ları ProtoJSON adlarıyladır (TASK_STATE_*, ROLE_*).
 // - Ayna tablolar arasında yabancı anahtar yoktur: hesapları anlık görüntüden (getProgramAccounts)
 //   dolduran bir backfill sırasız gelebilir; bütünlüğü zincir sağlar.
 
@@ -608,14 +608,15 @@ enum A2aRole {
 }
 
 /// A2A görevi: bir agent'ın bir job için yaptığı iş (docs/design/a2a.md). Zincir dışı tablodur; job ve
-/// agent kaydının doğruluk kaynağı zincirdir, burada görevin protokol durumu tutulur.
+/// agent kaydının doğruluk kaynağı zincirdir, burada görevin protokol durumu tutulur. Görevin A2A
+/// bağlamı (`contextId`) job adresidir. Bir job için en fazla bir terminal olmayan görev olur: migration'daki
+/// kısmi tekil indeks `a2a_tasks_active_job_key`.
 model A2aTask {
   id              String       @id @default(uuid()) @db.Uuid
   /// Görevi sunan agent'ın AgentRecord PDA'sı.
   agentRecord     String       @map("agent_record") @db.VarChar(44)
   /// Kimliği doğrulanmış çağıran; görevler yalnızca onu açan çağırana görünür.
   caller          String       @db.Text
-  contextId       String       @map("context_id") @db.Text
   job             String       @db.VarChar(44)
   specHash        String       @map("spec_hash") @db.Char(64)
   state           A2aTaskState
@@ -627,8 +628,8 @@ model A2aTask {
   /// Görevi açan mesajın kimliği ve içeriğinin SHA-256'sı; aynı mesaj ikinci görev açmaz.
   createMessageId String       @map("create_message_id") @db.Text
   createHash      String       @map("create_hash") @db.Char(64)
-  /// Zincirden son okunan job durumu ve slotu.
-  jobStatus       JobStatus?   @map("job_status")
+  /// Sunucunun zincirde son gördüğü job durumu ve slotu; durum değişince yazılır (ayna veri değildir).
+  jobStatus       JobStatus    @map("job_status")
   jobSlot         BigInt?      @map("job_slot")
   /// İyimser eşzamanlılık sayacı; her güncelleme bir artırır.
   version         Int          @default(0)
@@ -638,7 +639,6 @@ model A2aTask {
 
   @@unique([agentRecord, caller, createMessageId])
   @@index([agentRecord, caller, statusAt(sort: Desc)])
-  @@index([agentRecord, contextId])
   @@index([agentRecord, job])
   @@map("a2a_tasks")
 }
