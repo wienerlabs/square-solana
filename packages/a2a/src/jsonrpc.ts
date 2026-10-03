@@ -14,12 +14,15 @@ export function parseJsonRpc(body: string): ParsedRequest {
   }
   const parsed = JsonRpcRequestSchema.safeParse(value);
   if (parsed.success) return { ok: true, request: parsed.data };
-  const rawId = typeof value === 'object' && value !== null && !Array.isArray(value) ? (value as { id?: unknown }).id : null;
+  const rawId =
+    typeof value === 'object' && value !== null && !Array.isArray(value) ? (value as { id?: unknown }).id : null;
   const id = JsonRpcIdSchema.safeParse(rawId);
   return {
     ok: false,
     id: id.success ? id.data : null,
-    error: errors.invalidRequest(Array.isArray(value) ? 'toplu (batch) istek desteklenmez' : 'JSON-RPC 2.0 isteği değil'),
+    error: errors.invalidRequest(
+      Array.isArray(value) ? 'toplu (batch) istek desteklenmez' : 'JSON-RPC 2.0 isteği değil',
+    ),
   };
 }
 

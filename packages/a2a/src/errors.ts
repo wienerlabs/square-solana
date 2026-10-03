@@ -46,14 +46,22 @@ const C = A2A_ERROR_CODES;
 export const errors = {
   parse: () => new A2aError(C.parseError, 'Invalid JSON payload'),
   invalidRequest: (description: string, httpStatus = 200) =>
-    new A2aError(C.invalidRequest, 'Request payload validation error', [badRequest([{ field: '', description }])], httpStatus),
+    new A2aError(
+      C.invalidRequest,
+      'Request payload validation error',
+      [badRequest([{ field: '', description }])],
+      httpStatus,
+    ),
   methodNotFound: (method: string) =>
     new A2aError(C.methodNotFound, 'Method not found', [errorInfo('METHOD_NOT_FOUND', { method })]),
   invalidParams: (fieldViolations: readonly FieldViolation[]) =>
     new A2aError(C.invalidParams, 'Invalid parameters', [badRequest(fieldViolations)]),
   /** Square'e özgü parametre hatası: sebep `ErrorInfo.reason`'da (ör. `SPEC_HASH_MISMATCH`). */
   rejectedParams: (reason: string, field: string, description: string, metadata?: Readonly<Record<string, string>>) =>
-    new A2aError(C.invalidParams, 'Invalid parameters', [errorInfo(reason, metadata), badRequest([{ field, description }])]),
+    new A2aError(C.invalidParams, 'Invalid parameters', [
+      errorInfo(reason, metadata),
+      badRequest([{ field, description }]),
+    ]),
   internal: () => new A2aError(C.internalError, 'Internal error'),
   taskNotFound: () => new A2aError(C.taskNotFound, 'Task not found'),
   taskNotCancelable: (state: string) =>

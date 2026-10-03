@@ -148,7 +148,9 @@ export type StreamResponse = z.infer<typeof StreamResponseSchema>;
 
 export const SendMessageResponseSchema = z
   .object({ task: TaskSchema.optional(), message: MessageSchema.optional() })
-  .refine(exactlyOne(['task', 'message'] as const), { message: 'task ya da message alanlarından tam olarak biri gerekli' });
+  .refine(exactlyOne(['task', 'message'] as const), {
+    message: 'task ya da message alanlarından tam olarak biri gerekli',
+  });
 export type SendMessageResponse = z.infer<typeof SendMessageResponseSchema>;
 
 export const SendMessageConfigurationSchema = z.object({
