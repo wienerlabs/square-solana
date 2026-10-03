@@ -45,15 +45,15 @@ export const ASSESSED = {
   'npm:snarkjs': {
     status: 'review',
     note:
-      'GPL-3.0. Groth16 ispatı üretimi; çalışma zamanında yalnızca apps/prover (BE-02, Aperture prover-service). ' +
+      'GPL-3.0. Groth16 ispatı üretimi; çalışma zamanında yalnızca apps/prover (BE-11). ' +
       '@squaresdk/solana-policy (BE-10) yalnızca testlerde kullanır: createLocalProver snarkjs içermez, çağıranın ' +
       'kurduğu groth16 nesnesini alır. Servis imajı dağıtılmadan önce hukuki onay gerekir.',
   },
   'npm:circomlibjs': {
     status: 'review',
     note:
-      'GPL-3.0. Poseidon hash (devreyle aynı sabitler); yalnızca apps/prover ve ' +
-      'apps/compliance-api (BE-02). Yayınlanan bir pakette yok; snarkjs ile aynı onay kapsamında.',
+      'GPL-3.0. Poseidon hash (devreyle aynı sabitler); yalnızca apps/compliance-api (BE-02). ' +
+      'Yayınlanan bir pakette yok; snarkjs ile aynı onay kapsamında.',
   },
 };
 

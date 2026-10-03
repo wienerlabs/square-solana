@@ -11,3 +11,5 @@ test-ledger
 !**/.env.example
 **/*keypair*.json
 .DS_Store
+# Devre derleme çıktıları; imaj devreyi kendisi derler (apps/prover/Dockerfile).
+circuits/**/build
