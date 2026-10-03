@@ -33,6 +33,7 @@ CREATE TABLE "a2a_messages" (
     "message_id" TEXT NOT NULL,
     "role" "A2aRole" NOT NULL,
     "content" JSONB NOT NULL,
+    "pending" BOOLEAN NOT NULL DEFAULT false,
     "created_at" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "a2a_messages_pkey" PRIMARY KEY ("id")
@@ -55,7 +56,6 @@ CREATE UNIQUE INDEX "a2a_messages_task_id_message_id_key" ON "a2a_messages"("tas
 
 -- AddForeignKey
 ALTER TABLE "a2a_messages" ADD CONSTRAINT "a2a_messages_task_id_fkey" FOREIGN KEY ("task_id") REFERENCES "a2a_tasks"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
 
 
 -- Biçim kısıtları: scripts/check-constraints.mjs çıktısı (Prisma şeması CHECK ifade edemez).

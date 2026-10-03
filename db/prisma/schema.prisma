@@ -652,6 +652,8 @@ model A2aMessage {
   role      A2aRole
   /// `Message` JSON'u.
   content   Json
+  /// İstemcinin devam mesajı agent'a iletilip işlenene kadar true; yeniden başlatmada yeniden iletilir.
+  pending   Boolean  @default(false)
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
   task      A2aTask  @relation(fields: [taskId], references: [id], onDelete: Cascade)
 
