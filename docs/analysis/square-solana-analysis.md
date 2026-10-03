@@ -774,7 +774,7 @@ Araçlar: **pnpm workspaces + Turborepo** (TS), Cargo workspace (Rust), `solana-
 | Anchor | **En güncel kararlı sürüm**, M1'de sabitlenir |
 | Upgrade authority | **2-of-3 Squads** multisig: MuhammedAkinci, mehmethayirli, kh0ra |
 | DB | Tek Postgres + **Prisma** |
-| Hosting | **Vercel** (web) + **Railway** (api ve worker'lar) |
+| Hosting | **Railway** (web, api ve worker'lar); PR preview'ları Railway PR Environments. İlk karar Vercel (web) + Railway idi; [ADR 0002](../decisions/0002-web-hosting-railway.md) (BE-37, #133) ile değişti |
 | Wallet | `@solana/wallet-adapter-react` |
 | Görsel kimlik | Arc Square'den **referans** (kod taşınmaz) |
 | Monorepo araçları | **pnpm + Turborepo** |

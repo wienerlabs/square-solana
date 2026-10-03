@@ -1,8 +1,9 @@
 # apps/
 
 Uygulama ve servisler (pnpm workspace). `package.json` adları `@squaresdk/solana-<ad>` biçiminde ve
-`private: true` [BE-01]. Hosting: web **Vercel**, API ve worker'lar **Railway**
-([§12.4](../docs/analysis/square-solana-analysis.md#124-varsay%C4%B1lanlar), [BE-05]).
+`private: true` [BE-01]. Hosting: web, API ve worker'lar **Railway**
+([§12.4](../docs/analysis/square-solana-analysis.md#124-varsay%C4%B1lanlar),
+[ADR 0002](../docs/decisions/0002-web-hosting-railway.md), [BE-05]); PR preview'ları Railway PR Environments.
 
 | Dizin | Görev | Issue |
 |---|---|---|
