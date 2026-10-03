@@ -587,3 +587,74 @@ model TravelRuleRecord {
 
   @@map("travel_rule_records")
 }
+
+// ---------------------------------------------------------------- A2A görev deposu (BE-17)
+
+/// A2A v1.0 görev durumu; değerler protokolün JSON adlarıdır (`@squaresdk/solana-types` TaskStateSchema).
+enum A2aTaskState {
+  TASK_STATE_SUBMITTED
+  TASK_STATE_WORKING
+  TASK_STATE_COMPLETED
+  TASK_STATE_FAILED
+  TASK_STATE_CANCELED
+  TASK_STATE_INPUT_REQUIRED
+  TASK_STATE_REJECTED
+  TASK_STATE_AUTH_REQUIRED
+}
+
+enum A2aRole {
+  ROLE_USER
+  ROLE_AGENT
+}
+
+/// A2A görevi: bir agent'ın bir job için yaptığı iş (docs/design/a2a.md). Zincir dışı tablodur; job ve
+/// agent kaydının doğruluk kaynağı zincirdir, burada görevin protokol durumu tutulur.
+model A2aTask {
+  id              String       @id @default(uuid()) @db.Uuid
+  /// Görevi sunan agent'ın AgentRecord PDA'sı.
+  agentRecord     String       @map("agent_record") @db.VarChar(44)
+  /// Kimliği doğrulanmış çağıran; görevler yalnızca onu açan çağırana görünür.
+  caller          String       @db.Text
+  contextId       String       @map("context_id") @db.Text
+  job             String       @db.VarChar(44)
+  specHash        String       @map("spec_hash") @db.Char(64)
+  state           A2aTaskState
+  /// Durumla gelen agent mesajı (`TaskStatus.message`).
+  statusMessage   Json?        @map("status_message")
+  statusAt        DateTime     @map("status_at") @db.Timestamptz(3)
+  /// `Artifact[]` JSON'u.
+  artifacts       Json         @default("[]")
+  /// Görevi açan mesajın kimliği ve içeriğinin SHA-256'sı; aynı mesaj ikinci görev açmaz.
+  createMessageId String       @map("create_message_id") @db.Text
+  createHash      String       @map("create_hash") @db.Char(64)
+  /// Zincirden son okunan job durumu ve slotu.
+  jobStatus       JobStatus?   @map("job_status")
+  jobSlot         BigInt?      @map("job_slot")
+  /// İyimser eşzamanlılık sayacı; her güncelleme bir artırır.
+  version         Int          @default(0)
+  createdAt       DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime     @updatedAt @map("updated_at") @db.Timestamptz(3)
+  messages        A2aMessage[]
+
+  @@unique([agentRecord, caller, createMessageId])
+  @@index([agentRecord, caller, statusAt(sort: Desc)])
+  @@index([agentRecord, contextId])
+  @@index([agentRecord, job])
+  @@map("a2a_tasks")
+}
+
+/// Görevin mesaj geçmişi (`Task.history`).
+model A2aMessage {
+  id        String   @id @default(uuid()) @db.Uuid
+  taskId    String   @map("task_id") @db.Uuid
+  messageId String   @map("message_id") @db.Text
+  role      A2aRole
+  /// `Message` JSON'u.
+  content   Json
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  task      A2aTask  @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@unique([taskId, messageId])
+  @@index([taskId, createdAt])
+  @@map("a2a_messages")
+}
