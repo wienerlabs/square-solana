@@ -27,10 +27,11 @@ aslında tip adı (`Groth16Verifyingkey`). .gitleaksignore'daki parmak izleri co
 olduğundan yalnızca `gitleaks git` taramasında işe yarar; bu istisna `gitleaks dir` için de
 geçerlidir. Satır bazında ve yalnızca bu iki sabit: VK satırının hemen altına ya da dosyanın
 sonuna konan sahte bir sır yine yakalandı (yerelde doğrulandı). VK yeniden üretilip sabit adı
-değişirse (BC-20, BC-21) burası da güncellenir."""
+değişirse (BC-20, BC-21) burası da güncellenir. BC-20: release devresinin anahtarı
+`SQUARE_RELEASE_VK` (programs/square-verifier/src/release_vk.rs, pipeline üretir) eklendi."""
 regexTarget = "line"
 # gitleaks "line" hedefine bulgunun öncesinden bağlam da girer; ^ ve $ satır başına (?m) ile bağlanır.
-regexes = ['''(?m)^pub const APERTURE_(PAYMENT|BATCH)_VK: Groth16Verifyingkey = Groth16Verifyingkey \{$''']
+regexes = ['''(?m)^pub const (APERTURE_(PAYMENT|BATCH)|SQUARE_RELEASE)_VK: Groth16Verifyingkey = Groth16Verifyingkey \{$''']
 
 [[allowlists]]
 description = """BE-02 ile gelen prover'ın VK dönüştürme betiği (apps/prover/scripts/extract-vk-rust.mjs):

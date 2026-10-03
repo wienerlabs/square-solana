@@ -2,7 +2,16 @@ use anchor_lang::prelude::*;
 
 pub mod groth16_vk;
 pub mod instructions;
+/// Square release devresinin doğrulama anahtarı (BC-20, üretilir). `set_compliance_proof` BC-21'de kullanır.
+#[rustfmt::skip]
+pub mod release_vk;
 pub mod state;
+
+#[cfg(test)]
+mod release_vk_tests;
+#[cfg(test)]
+#[rustfmt::skip]
+mod release_vk_vector;
 
 use groth16_vk::PAYMENT_NR_INPUTS;
 use instructions::*;

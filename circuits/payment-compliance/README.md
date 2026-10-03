@@ -20,6 +20,8 @@ CIRCOM=/path/to/circom npm run build   # circom 2.2.3; build/ altına r1cs, wasm
 npm run fetch-ptau                     # PPoT katkı 80, 2^14 (~19 MB), sha256 ve blake2b ile doğrulanır
 npm test                               # 52 test; tamper testleri gerçek Groth16 ispatı üretir
 npm run inputs                         # test-inputs/'u yeniden üretir (--check: güncel mi)
+npm run artifacts:check                # release artefaktlarını yeniden üretip karşılaştırır (Node 24)
+scripts/clean-room.sh check            # aynısı, commit'lenmiş HEAD'in Docker'daki temiz klonunda
 ```
 
 `npm test`, derleme yoksa devre testlerini, PPoT dosyası yoksa tamper testlerini atlar ve sebebini yazar.
@@ -34,14 +36,47 @@ npm run inputs                         # test-inputs/'u yeniden üretir (--check
 | `scripts/generate_test_inputs.mjs` | `test-inputs/`: 14 senaryo, her biri için girdi ve beklenen public sinyaller |
 | `scripts/fetch-ptau.mjs` | Sabitlenmiş PPoT dosyasını indirir ve hash'ini doğrular |
 | `scripts/build.mjs` | `payment.circom` ve iki zaman damgası test devresini derler, kısıt sayısını yazar |
+| `scripts/release-artifacts.mjs` | Release artefakt hattı: `setup`, `check`, `write` (aşağıda) |
+| `scripts/clean-room.sh` | Hattı Docker'da temiz klonla çalıştırır (Node `.nvmrc`, circom 2.2.3 resmi ikilisi, sha256 doğrulanır) |
+| `scripts/groth16-solana.mjs`, `scripts/extract-vk-rust.mjs` | snarkjs → groth16-solana bayt düzeni; doğrulama anahtarı → Rust sabiti |
+| `artifacts/` | Release zkey'i, doğrulama anahtarı ve manifest (BC-20) |
 | `test/` | `node:test` testleri ve `test/circuits/` altındaki zaman damgası test devreleri |
 
 ## Anahtarlar
 
-Repoda proving ya da verifying key yoktur (`.gitignore`: `*.zkey`, `*_vk.json`, `*.ptau`). Testler, sabitlenmiş PPoT dosyası üzerinde rastgele entropiyle tek katkılı bir phase-2 ile `build/payment_test.zkey` üretir. Bu bir test anahtarıdır, zincirde hiçbir şey ona bağlanmaz.
+### Release anahtarı (BC-20)
 
-- Geliştirme anahtarı ve artefakt hattı (`vk.json` → `groth16_vk.rs`): BC-20.
-- Kamusal phase-2 ceremony: BC-38. O zamana kadar hiçbir anahtar için güvence iddiası yoktur.
+| Parça | Değer |
+|---|---|
+| Phase 1 | Perpetual Powers of Tau, katkı 80, 2^14: `ppot_0080_14.ptau`, 18 967 698 bayt |
+| Phase 1 sha256 | `3ca1149e9349b22b0ee0649399cfb787677129b7b1189d1899fc0d615d9583db` |
+| Phase 1 blake2b | `a91842802f01b33fd42f5f69c3e49879ae03f0ae1f448b0c151244c9957024bd30bf5e3cc999ff2aeb02ebb959124a3a6a3cc20691cb4843a1234a02232072f3` |
+| Phase 1 kaynağı | `https://pse-trusted-setup-ppot.s3.eu-central-1.amazonaws.com/pot28_0080/ppot_0080_14.ptau`; güven kaynağı adres değil hash'tir, yansılar: [privacy-ethereum/perpetualpowersoftau](https://github.com/privacy-ethereum/perpetualpowersoftau) |
+| Phase 2 | **Geliştirme:** tek katkı (`artifacts/manifest.json` → `phase2`) |
+| zkey | `artifacts/payment.zkey`; sha256 ve devre hash'i manifest'te |
+| Doğrulama anahtarı | `artifacts/verification_key.json` → `programs/square-verifier/src/release_vk.rs` (`SQUARE_RELEASE_VK`, 13 public girdi) |
+
+Hat (`scripts/release-artifacts.mjs`):
+
+- `setup`: tek seferlik. Yeni zkey üretir; entropi işletim sisteminden alınır ve hiçbir yere yazılmaz. Ardından `write` çalışır. Devre değişince yeniden çalıştırılır ve doğrulama anahtarı değişir.
+- `check`: her şeyi yeniden üretir ve commit'lenmiş hâliyle karşılaştırır:
+  - ptau hash'i;
+  - circom sürümü, r1cs ve wasm hash'leri;
+  - zkey'in bu r1cs ve ptau'dan türediği (`snarkjs zkey verify`), devre hash'i ve katkı kaydı;
+  - zkey'den çıkarılan doğrulama anahtarı ve Rust sabiti.
+
+  Bir fark hata verir. r1cs ve wasm macOS (circom kaynaktan) ile Linux'ta (resmi ikili) aynı hash'i verir.
+- `write [--vector]`: mevcut zkey'den doğrulama anahtarını, Rust dosyasını ve manifest'i yazar. `--vector`, `release_vk_vector.rs`'teki gerçek ispatı yeniler; `cargo test -p verifier` bu ispatı programın kullandığı groth16-solana ile doğrular.
+
+Hat `.nvmrc`'deki Node sürümüyle (24) çalışır. snarkjs 0.7.6'nın zkey doğrulaması ptau dosyasını açıp kapatmıyor; Node 24 bunu uyarıyla geçer, Node 26 ise hata fırlatır.
+
+### Disclosure
+
+**Phase-2 yalnızca geliştirme içindir.** Tek bir katkıdan oluşur, kamusal bir tören değildir ve **hiçbir güvence iddiası yoktur.** Katkıyı yapan taraf toksik atığı saklamış olsaydı sahte ispat üretebilirdi. Entropi saklanmadı, ama bu bir iddiadan öteye geçmez. Bu anahtar devnet ve test içindir; mainnet'e kamusal phase-2 töreninin (BC-38) anahtarıyla çıkılır. Phase 1 ise gerçek, çok katılımcılı bir törendir (PPoT, 80 katkı).
+
+### Test anahtarı
+
+Testler, aynı PPoT dosyası üzerinde rastgele entropiyle tek katkılı bir phase-2 ile `build/payment_test.zkey` üretir. Bu anahtar commit'lenmez ve zincirde hiçbir şey ona bağlanmaz.
 
 ## Köken
 

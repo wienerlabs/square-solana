@@ -191,7 +191,7 @@ npm test
 | `test/tamper.test.mjs` | Gerçek Groth16 ispatı: 13 sinyalden herhangi biri değişince doğrulama düşüyor; ret ispatı uyumlu gösterilemiyor; başka job ya da payee için doğrulanmıyor |
 | `test/constraints.test.mjs` | Kısıt sayısı ve sinyal sırası bu belgeyle aynı |
 
-Tamper testlerinin anahtarı, sabitlenmiş PPoT dosyası üzerinde rastgele entropiyle tek katkılı bir phase-2'dir. Yerelde üretilir, repoya girmez ve zincirde hiçbir şey ona bağlanmaz. Geliştirme anahtarı ve artefakt hattı BC-20'de, kamusal ceremony BC-38'de.
+Tamper testlerinin anahtarı, sabitlenmiş PPoT dosyası üzerinde rastgele entropiyle tek katkılı bir phase-2'dir. Yerelde üretilir, repoya girmez ve zincirde hiçbir şey ona bağlanmaz. Release anahtarı (BC-20) aynı PPoT dosyası üzerinde tek katkılı bir **geliştirme** phase-2'sidir. `circuits/payment-compliance/artifacts/` altında durur ve doğrulama anahtarı `square_verifier`'da `SQUARE_RELEASE_VK` olarak yer alır. Hat, PPoT hash'leri ve güvence notu: [`circuits/payment-compliance/README.md`](../../circuits/payment-compliance/README.md#anahtarlar). Kamusal ceremony BC-38'de.
 
 ## 11. Kaynaklar
 
