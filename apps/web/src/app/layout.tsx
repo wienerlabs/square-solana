@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { connection } from 'next/server';
 import { ConfigError } from '@/components/config-error';
 import { Header } from '@/components/header';
+import { NetworkBanner } from '@/components/network-banner';
 import { Providers } from '@/components/providers';
 import { ThemeProvider } from '@/components/theme-provider';
 import { parseWebConfig } from '@/lib/config';
@@ -27,6 +28,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
           {result.ok ? (
             <Providers config={result.config}>
               <Header />
+              <NetworkBanner />
               {children}
             </Providers>
           ) : (

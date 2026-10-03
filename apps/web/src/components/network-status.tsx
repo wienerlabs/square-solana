@@ -3,39 +3,33 @@
 import { useEffect, useState } from 'react';
 import { useConnection } from '@solana/wallet-adapter-react';
 import { caip2ChainId, rpcLabel } from '@/lib/config';
+import { useNetworkGuard } from './network-guard';
 import { useWebConfig } from './providers';
+import { StatusBadge } from './ui/status-badge';
 
 const SLOT_REFRESH_MS = 5_000;
 
-type State =
-  { status: 'loading' } | { status: 'ready'; genesisHash: string; slot: number } | { status: 'error'; message: string };
+type Slot = { status: 'loading' } | { status: 'ready'; slot: number } | { status: 'error'; message: string };
 
 export function NetworkStatus() {
   const { connection } = useConnection();
   const { cluster, rpcUrl } = useWebConfig();
-  const [state, setState] = useState<State>({ status: 'loading' });
+  const { rpc } = useNetworkGuard();
+  const [slot, setSlot] = useState<Slot>({ status: 'loading' });
 
   useEffect(() => {
     let active = true;
     let timer: ReturnType<typeof setTimeout> | undefined;
-
-    const refresh = async (genesisHash: string) => {
+    const refresh = async () => {
       try {
-        const slot = await connection.getSlot('confirmed');
-        if (active) setState({ status: 'ready', genesisHash, slot });
+        const value = await connection.getSlot('confirmed');
+        if (active) setSlot({ status: 'ready', slot: value });
       } catch (error) {
-        if (active) setState({ status: 'error', message: (error as Error).message });
+        if (active) setSlot({ status: 'error', message: (error as Error).message });
       }
-      if (active) timer = setTimeout(() => void refresh(genesisHash), SLOT_REFRESH_MS);
+      if (active) timer = setTimeout(() => void refresh(), SLOT_REFRESH_MS);
     };
-
-    connection
-      .getGenesisHash()
-      .then((genesisHash) => refresh(genesisHash))
-      .catch((error: Error) => {
-        if (active) setState({ status: 'error', message: error.message });
-      });
-
+    void refresh();
     return () => {
       active = false;
       if (timer) clearTimeout(timer);
@@ -50,19 +44,32 @@ export function NetworkStatus() {
         <dd className="font-mono">{cluster}</dd>
         <dt className="text-muted">RPC</dt>
         <dd className="font-mono break-all">{rpcLabel(rpcUrl)}</dd>
-        {state.status === 'ready' && (
+        <dt className="text-muted">Check</dt>
+        <dd>
+          {rpc.state === 'checking' && <StatusBadge tone="neutral">Checking…</StatusBadge>}
+          {rpc.state === 'ready' && !rpc.mismatch && (
+            <StatusBadge tone="success">{cluster === 'localnet' ? 'Local cluster' : `Matches ${cluster}`}</StatusBadge>
+          )}
+          {rpc.state === 'ready' && rpc.mismatch && <StatusBadge tone="danger">Wrong network</StatusBadge>}
+          {rpc.state === 'error' && <StatusBadge tone="danger">RPC error</StatusBadge>}
+        </dd>
+        {rpc.state === 'ready' && (
           <>
             <dt className="text-muted">Chain ID</dt>
-            <dd className="font-mono break-all">{caip2ChainId(state.genesisHash)}</dd>
+            <dd className="font-mono break-all">{caip2ChainId(rpc.genesisHash)}</dd>
+          </>
+        )}
+        {slot.status === 'ready' && (
+          <>
             <dt className="text-muted">Slot</dt>
-            <dd className="font-mono">{state.slot.toLocaleString('en-US')}</dd>
+            <dd className="font-mono">{slot.slot.toLocaleString('en-US')}</dd>
           </>
         )}
       </dl>
-      {state.status === 'loading' && <p className="mt-4 text-sm text-muted">Reading the cluster…</p>}
-      {state.status === 'error' && (
+      {rpc.state === 'ready' && rpc.mismatch && <p className="mt-4 text-sm text-danger-text">{rpc.mismatch}</p>}
+      {rpc.state === 'error' && (
         <p role="alert" className="mt-4 text-sm text-danger-text">
-          RPC request failed: {state.message}
+          RPC request failed: {rpc.message}
         </p>
       )}
     </section>

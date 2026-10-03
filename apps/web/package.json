@@ -13,13 +13,18 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@coral-xyz/anchor": "0.31.1",
     "@fontsource/open-runde": "^5.3.0",
+    "@solana/spl-token": "^0.4.15",
     "@solana/wallet-adapter-base": "^0.9.28",
     "@solana/wallet-adapter-phantom": "^0.9.30",
     "@solana/wallet-adapter-react": "^0.15.40",
     "@solana/wallet-adapter-react-ui": "^0.9.40",
     "@solana/wallet-adapter-solflare": "^0.6.34",
+    "@solana/wallet-standard-chains": "^1.1.2",
     "@solana/web3.js": "^1.99.0",
+    "@squaresdk/solana-identity": "workspace:*",
+    "@squaresdk/solana-sdk": "workspace:*",
     "@squaresdk/solana-types": "workspace:*",
     "next": "16.3.8",
     "next-themes": "^0.4.6",
