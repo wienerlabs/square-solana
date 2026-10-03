@@ -1,10 +1,10 @@
 // Adım 7: ispatı job'a bağlayan `set_compliance_proof` tx'i (program sözleşmesi v0.2.0, yol A).
 // Talimat ispatı ve üç sinyali taşır: refusal_code (0), net_amount (5), proof_timestamp (9); diğer
 // sinyalleri verifier hesaplardan kendisi kurar.
-import { BN } from '@coral-xyz/anchor';
 import { SystemProgram, type PublicKey } from '@solana/web3.js';
 import type { BuildOptions, BuiltTx, SquareClient } from '@squaresdk/solana-sdk';
 import type { ProveResponse } from '@squaresdk/solana-types';
+import BN from 'bn.js';
 
 /** Public sinyallerin sırası (release-circuit.md §2). */
 export const SIGNAL = Object.freeze({ refusalCode: 0, netAmount: 5, timestamp: 9 });
