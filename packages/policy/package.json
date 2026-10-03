@@ -1,7 +1,7 @@
 {
   "name": "@squaresdk/solana-policy",
   "version": "0.1.0",
-  "description": "Kurum tarafı: politika commitment'ı, alıcı Merkle ağacı, release witness'ı, ispat ve bağlama — BE-35 sözleşmesi (uygulama BE-10)",
+  "description": "Kurum tarafı: politika commitment'ı, alıcı Merkle ağacı, release witness'ı, ispat ve bağlama; BE-35 sözleşmesi (uygulama BE-10)",
   "license": "Apache-2.0",
   "private": true,
   "type": "module",
@@ -12,7 +12,9 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "LICENSE",
+    "NOTICE"
   ],
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
@@ -20,16 +22,18 @@
     "test": "vitest run --coverage"
   },
   "dependencies": {
-    "@coral-xyz/anchor": "0.31.1",
     "@noble/hashes": "^1.8.0",
     "@solana/web3.js": "^1.99.0",
     "@squaresdk/solana-sdk": "workspace:*",
     "@squaresdk/solana-types": "workspace:*",
+    "bn.js": "^5.2.5",
     "poseidon-lite": "^0.3.0"
   },
   "devDependencies": {
+    "@coral-xyz/anchor": "0.31.1",
     "@noble/curves": "2.4.0",
     "@squaresdk/solana-config": "workspace:*",
+    "@types/bn.js": "^5.2.0",
     "@vitest/coverage-v8": "^5.0.3",
     "snarkjs": "0.7.6",
     "vitest": "^5.0.3"

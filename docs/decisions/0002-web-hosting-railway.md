@@ -35,6 +35,9 @@ sıradan bir Node servisi olarak çalışıyor ve iki platformda da kod değişi
 - Her PR ortamı bütün servisleri ayağa kaldırdığı için maliyet PR başına artar. PR Environments'ın
   hangi servisleri kuracağı BE-05'te belirlenir.
 - Web tek bölgede tek container olarak sunulur; global CDN yok. Gerekirse önüne Cloudflare konabilir.
+- İmaj, `next start` yerine Next'in standalone sunucusunu (`server.js`) çalıştırır; bu da aynı Next.js
+  Node sunucusudur. Sebep boyut: standalone çıktı yalnızca sunucunun izlediği dosyaları taşır (43 MB;
+  `pnpm deploy --prod` ile 649 MB). Uygulama ayrıntısıdır, kararı değiştirmez (#132).
 - FE-01'in (#21) "Preview deploy çalışıyor" kriteri Railway PR Environments ile karşılanır.
 - BE-05'in (#19) iş kalemlerinde Vercel projesi yerine Railway'deki web servisi ve PR Environments
   vardır.

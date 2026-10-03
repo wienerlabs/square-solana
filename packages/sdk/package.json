@@ -12,7 +12,9 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "LICENSE",
+    "NOTICE"
   ],
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
@@ -26,10 +28,12 @@
     "@noble/hashes": "^1.8.0",
     "@solana/spl-token": "^0.4.15",
     "@solana/web3.js": "^1.99.0",
-    "@squaresdk/solana-types": "workspace:*"
+    "@squaresdk/solana-types": "workspace:*",
+    "bn.js": "^5.2.5"
   },
   "devDependencies": {
     "@squaresdk/solana-config": "workspace:*",
+    "@types/bn.js": "^5.2.0",
     "@vitest/coverage-v8": "^5.0.3",
     "vitest": "^5.0.3",
     "yaml": "^2.9.1"

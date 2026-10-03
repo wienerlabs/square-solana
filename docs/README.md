@@ -5,7 +5,7 @@ Proje belgeleri. Mevcut olanlar bağlantılı; diğerleri ilgili issue ile eklen
 | Yol | İçerik | Issue |
 |---|---|---|
 | [`analysis/`](analysis/) | Birleştirme analizi; [§12](analysis/square-solana-analysis.md#12-kararlar) kesin kararlar | — |
-| [`decisions/`](decisions/) | ADR'ler: §12 kararlarının kalıcı kaydı ([0001](decisions/0001-ts-paket-adlandirma-ve-surumleme.md): TS paket adlandırma ve sürümleme) | [BE-06], [BE-01] |
+| [`decisions/`](decisions/) | ADR'ler: §12 kararlarının kalıcı kaydı ([0001](decisions/0001-ts-paket-adlandirma-ve-surumleme.md): TS paket adlandırma ve sürümleme; [0002](decisions/0002-web-hosting-railway.md): web de Railway'de; 0003-0011: §12.1, §12.4 ve §12.5 kararları) ve [şablon](decisions/sablon.md) | [BE-06], [BE-01] |
 | [`did-aip/`](did-aip/) | [`did:aip` v2 Solana (CAIP-2) profil spesifikasyonu](did-aip/method-spec-v2-solana.md) ve [test vektörleri](did-aip/test-vectors.json) | [BC-14] |
 | [`design/`](design/) | [program arayüz sözleşmesi](design/program-interface.md), [API ve SDK sözleşmesi](design/api-sdk-contract.md), [veri modeli](design/data-model.md), normatif event şeması (`events.md`) | [BC-44], [BE-35], [BE-04], [BC-16] |
 | [`api/`](api/) | [OpenAPI 3.1 spec](api/openapi.yaml) (28 operasyon); [`schemas/idl.json`](api/schemas/idl.json) IDL'den üretilen JSON Schema'lar, elle düzenlenmez | [BE-35] |
