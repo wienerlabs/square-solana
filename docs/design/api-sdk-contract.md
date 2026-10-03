@@ -1,8 +1,8 @@
 # API ve SDK sözleşmesi
 
-**Sözleşme sürümü:** v0.2.0 (taslak) · **Issue:** BE-35 (#102), BC-47 (#119), BE-07 (#39) · **Dayandığı program sözleşmesi:** BC-44 v0.1.1 ([program-interface.md](program-interface.md))
+**Sözleşme sürümü:** v0.2.1 (taslak) · **Issue:** BE-35 (#102), BC-47 (#119), BE-07 (#39), BE-08 (#40) · **Dayandığı program sözleşmesi:** BC-44 v0.1.1 ([program-interface.md](program-interface.md))
 
-Bu doküman Square'in HTTP API'sini ve TypeScript paketlerinin dış yüzeyini sabitler. Frontend (FE-24 veri katmanı) ve servisler (BE-18 API, BE-14 indexer, BE-15 keeper, BE-11 prover) bu sözleşmeye göre geliştirir. Paketler yalnızca şemaları, IDL'den türetilen tipleri ve arayüzleri içerir; arayüzlerin uygulamaları ilgili issue'larda (BE-07/08/09/10/18) yazılır. Paketlerde mock, placeholder gövde ya da sabit adres yoktur (proje kuralı).
+Bu doküman Square'in HTTP API'sini ve TypeScript paketlerinin dış yüzeyini sabitler. Frontend (FE-24 veri katmanı) ve servisler (BE-18 API, BE-14 indexer, BE-15 keeper, BE-11 prover) bu sözleşmeye göre geliştirir. `@squaresdk/solana-sdk`'nin zincir tarafı BE-08 ile uygulandı (`createSquareClient`, `createPda`, `specHashing`, `workHash`); identity, policy ve REST client'ın uygulamaları BE-09, BE-10 ve BE-18'de. Paketlerde mock, placeholder gövde ya da sabit adres yoktur (proje kuralı).
 
 ## 1. Dosyalar
 
@@ -105,7 +105,11 @@ Tüm `/v1` yanıtları `{ success, data, error, meta }` biçimindedir. `meta.req
 | Anchor TS / web3.js | `@coral-xyz/anchor` 0.31.1, `@solana/web3.js` 1.x | Anchor CLI 0.31.1 ile aynı hat; sürüm birleştirme BC-08'de, `@solana/kit` geçişi BE-08'in kararı |
 | Native hızlandırıcılar | `bufferutil`, `utf-8-validate` kurulum script'leri çalıştırılmaz (`pnpm-workspace.yaml`) | İsteğe bağlı; JS yedekleri var. Kalan `utf-8-validate` peer uyarısı ve `uuid@8` deprecation'ı web3.js 1.x'in dolaylı bağımlılıklarından |
 | Node | `engines.node >= 24` | Node 24 LTS hattı (BC-43 `.nvmrc` ile aynı) |
-| Testler | `node:test`; YAML ayrıştırma için yalnızca test bağımlılığı `yaml` | Ek test çatısı gerekmiyor |
+| Testler | vitest; YAML ayrıştırma için yalnızca test bağımlılığı `yaml`. SDK'da kapsama eşiği %80 (`vitest run --coverage`) | BE-08 kabul kriteri; eşik altı CI'ı kırar |
+| Spec hash | RFC 8785 kanonikleştirme SDK'da yazılı, girdi önce I-JSON olarak denetlenir (sonlu olmayan sayı, tek başına surrogate, `undefined`, fonksiyon, düz olmayan nesne reddedilir); SHA-256 `@noble/hashes` | `canonicalize` paketi JSON olmayan değerleri sessizce geçiriyor ve tip bildirimi CJS çıktısıyla uyuşmuyor; RFC'nin test vektörleri testte |
+| Tx hesapları | 8 adımın builder'ları hesapları `accountsStrict` ile tamamen açık verir; PDA'lar `createPda`'dan, payee / mint / rent ödeyicisi zincirdeki job ve alacak kaydından, token programı mint'in sahibinden (SPL Token ya da Token-2022) | Anchor'ın çözücüsü çapraz program seed'leri için zincirden config okurdu; açık hesaplar IDL'e derleme zamanında bağlı |
+| Token hesapları | Ödeme alan tarafların (payee, kurum, alacak satıcısı) ATA'sı aynı tx'te idempotent açılır; ödeyici tx'i gönderen (keeper / çağıran / fee payer) | Settlement, alıcının hesabı yok diye düşmez |
+| Compute budget / ALT | `BuildOptions`'taki değerler yalnızca verilirse eklenir; SDK varsayılan CU sayısı uydurmaz. Ölçülmüş profiller BC-28'de | Proje kuralı (sabit değer yok) |
 
 ## 8. Açık noktalar
 
@@ -123,5 +127,6 @@ Tüm `/v1` yanıtları `{ success, data, error, meta }` biçimindedir. `meta.req
 | Sürüm | Değişiklik | Issue / PR |
 |---|---|---|
 | v0.1.0 | İlk taslak: 28 operasyonluk OpenAPI 3.1 spec; IDL'den üretilen zod ve JSON Schema'lar; 4 paketin gövdesiz imzaları; hizalama testleri ve CI | BE-35 (#102) |
+| v0.2.1 | SDK zincir tarafı uygulandı (BE-08): `createSquareClient` (4 program client'ı, IDL builder'ları, `buildTx`, `decodeEvents`, `mapError`, 8 adımın `flow` builder'ları), `createPda`, `specHashing`, `workHash`. Yalnızca ekleme; imzalar değişmedi | BE-08 (#40) |
 | v0.2.0 | `PolicyDocument` release devresine hizalandı: `institution`, gizli `maxDaily` eklendi; `maxPerPayment` → `maxPerTx`, `mintWhitelist` → `tokenWhitelist` (≤ 10), `blockedPayees` ≤ 10, `allowedCategories` 1–8 (her biri 1–32 bayt UTF-8), `timeWindows` → tek `timeWindow` (UTC, gün adları, `start ≤ end`); devrede karşılığı olmayan `allowedAgentRecords` çıktı. `AipV1AgentCardSchema` (did:aip v1 kartı, AIP'den). Veritabanı enum'ları bu şemalarla testte hizalı (BE-04). HTTP yüzeyi değişmedi | BE-07 (#39) |
 | v0.1.1 | Placeholder'lar kaldırıldı (proje kuralı): `NotImplementedError` ve onu fırlatan gövdeler, `SOURCE_PROGRAM_IDS`, OpenAPI'deki `localhost` sunucusu ve `not_implemented` hata kodu çıktı. sdk / identity / policy yalnızca tip ve arayüz (`SquareClient`, `SquareApi`, `SquarePda`, `SpecHashing`, `SquareIdentity`, `SquarePolicyKit`, `Create*` fabrika tipleri) sunar; `SquareClientConfig.programIds` zorunlu. SDK IDL tipleri `idl/*.json`'dan üretilir | BC-47 (#119) |
