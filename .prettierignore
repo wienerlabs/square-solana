@@ -3,6 +3,8 @@ node_modules
 dist
 target
 .turbo
+.next
+next-env.d.ts
 pnpm-lock.yaml
 packages/types/src/generated
 packages/sdk/src/idl

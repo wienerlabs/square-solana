@@ -1,0 +1,17 @@
+# Yalnızca apps/web/Dockerfile için (BuildKit, <Dockerfile>.dockerignore). Kök .dockerignore'un yerine geçer,
+# bu yüzden oradaki kurallar burada da var. Yerel çıktılar ve gizli dosyalar build bağlamına girmez;
+# Railway zaten temiz bir klondan derler.
+.git
+**/node_modules
+**/.next
+**/.turbo
+**/dist
+**/target
+.anchor
+test-ledger
+**/*.tsbuildinfo
+**/next-env.d.ts
+**/.env*
+**/*keypair*.json
+.DS_Store
+circuits/**/build

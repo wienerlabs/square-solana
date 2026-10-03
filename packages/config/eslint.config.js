@@ -10,6 +10,8 @@ export const ignores = [
   '**/dist/**',
   '**/target/**',
   '**/.turbo/**',
+  '**/.next/**',
+  '**/next-env.d.ts',
   'packages/types/src/generated/**',
   'packages/sdk/src/idl/**',
   'db/src/generated/**',
@@ -31,6 +33,11 @@ export default tseslint.config(
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
       'no-console': 'error',
     },
+  },
+  {
+    // Web uygulamasının bileşenleri tarayıcıda da çalışır.
+    files: ['apps/web/src/**/*.{ts,tsx}'],
+    languageOptions: { globals: { ...globals.browser } },
   },
   {
     // CLI betikleri sonucu terminale yazar.

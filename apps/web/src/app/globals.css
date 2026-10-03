@@ -1,0 +1,11 @@
+@import 'tailwindcss';
+
+/* Görsel kimlik ve tasarım sistemi FE-02'de; burada yalnızca nötr bir taban var. */
+:root {
+  color-scheme: light;
+}
+
+body {
+  background: var(--color-neutral-50);
+  color: var(--color-neutral-900);
+}
