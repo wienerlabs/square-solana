@@ -9,6 +9,7 @@ import * as t from '../dist/index.js';
 const spec = parse(readFileSync(new URL('../../../docs/api/openapi.yaml', import.meta.url), 'utf8'));
 const components = spec.components.schemas;
 const idlSchemas = JSON.parse(readFileSync(new URL('../../../docs/api/schemas/idl.json', import.meta.url), 'utf8'));
+const rootPackage = JSON.parse(readFileSync(new URL('../../../package.json', import.meta.url), 'utf8'));
 
 const OBJECTS = {
   ApiError: t.ApiErrorSchema,
@@ -87,4 +88,12 @@ test('IDL şemaları: her hesap, event ve instruction için OpenAPI şeması var
 
 test('ProgramErrorRef.program, IDL program adlarıyla aynı', () => {
   assert.deepEqual([...components.ProgramErrorRef.properties.program.enum].sort(), Object.keys(t.IDL_PROGRAMS).sort());
+});
+
+test('info.version, API_CONTRACT_VERSION ile aynı', () => {
+  assert.equal(spec.info.version, t.API_CONTRACT_VERSION);
+});
+
+test('info.license, repo lisansıyla aynı', () => {
+  assert.deepEqual(spec.info.license, { name: rootPackage.license, identifier: rootPackage.license });
 });

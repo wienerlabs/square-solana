@@ -15,7 +15,7 @@ export const metadata: Metadata = {
 };
 
 export default async function RootLayout({ children }: { children: ReactNode }) {
-  // Yapılandırma istek anında okunur: aynı derleme, Vercel'in her ortamında kendi değerleriyle çalışır.
+  // Yapılandırma istek anında okunur: aynı imaj, Railway'in her environment'ında kendi değerleriyle çalışır.
   await connection();
   const result = parseWebConfig(process.env);
 
