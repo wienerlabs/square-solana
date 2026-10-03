@@ -11,8 +11,8 @@ Bir agent'ın iş aldığı uç nokta. Kurumun agent'ı (A2A istemcisi) işi bir
 | JSON-RPC sunucusu (`createA2aServer`, `node:http` işleyicisi) | Push bildirimleri: yöntemler `-32003` döner; agent sunucusunun dışarıya istek atması SSRF yüzeyi açar, ihtiyaç doğarsa BE-13 korumalarıyla |
 | İstemci (`createA2aClient`) | `GetExtendedAgentCard`: `-32007`; kart barındırma BE-18 (`putAgentCard`, `agent_cards`) ve BE-19'da |
 | Postgres görev deposu (`@squaresdk/solana-a2a/prisma`) | gRPC ve HTTP+JSON bağlamaları; Square yalnızca JSON-RPC sunar |
-| Square kapısı: görevi açan mesaj zincirdeki job'a bağlanır | Çok kiracılık: istekteki `tenant` yok sayılır, bir sunucu tek bir `AgentRecord`'a hizmet eder |
-| Görev durum makinesi ve job eşlemesi | Cüzdan imzalı istekler: BE-13; şimdilik API anahtarı |
+| Square kapısı: görevi açan mesaj zincirdeki job'a ve çağıranın kurumuna bağlanır | Çok kiracılık: istekteki `tenant` yok sayılır, bir sunucu tek bir `AgentRecord`'a hizmet eder |
+| Görev durum makinesi ve job eşlemesi, yeniden başlatmada `resume()` | Cüzdan imzalı istekler: BE-13; şimdilik kuruma bağlanmış API anahtarı |
 
 Issue'daki dört mesaj A2A v1.0 yöntemlerine şöyle karşılık gelir: **create** `SendMessage` / `SendStreamingMessage`, **status** `GetTask`, `ListTasks` ve akıştaki `statusUpdate`, **cancel** `CancelTask`, **artifact** `Task.artifacts` ve akıştaki `artifactUpdate`.
 
@@ -20,8 +20,8 @@ Issue'daki dört mesaj A2A v1.0 yöntemlerine şöyle karşılık gelir: **creat
 
 | Yöntem | Davranış |
 |---|---|
-| `SendMessage` | `message.taskId` yoksa görev açar (§4), varsa göreve devam mesajı ekler. `configuration.returnImmediately: true` görevi hemen döner; aksi halde görev terminal ya da kesintili duruma gelene kadar, en fazla `blockingTimeoutMs` bekler ve güncel görevi döner. Sonuç her zaman `task`'tır |
-| `SendStreamingMessage` | `SendMessage` gibi açar; yanıt SSE akışıdır (§5) |
+| `SendMessage` | `message.taskId` yoksa görev açar (§4), varsa göreve devam mesajı ekler. `configuration.returnImmediately: true` görevi hemen döner. Aksi halde görev açılışta terminal ya da kesintili duruma gelene, devam mesajında ise mesajdan sonraki ilk kesintili ya da terminal duruma gelene kadar, en fazla `blockingTimeoutMs` bekler; istemci bağlantıyı kapatırsa bekleme biter. Sonuç her zaman `task`'tır |
+| `SendStreamingMessage` | `SendMessage` gibi açar ya da devam eder; yanıt SSE akışıdır (§5) |
 | `GetTask` | Görevi zincirle uzlaştırır (§3.3) ve döner. `historyLength` en fazla `maxHistory` |
 | `ListTasks` | Yalnızca çağıranın görevleri; `contextId`, `status`, `statusTimestampAfter` süzgeçleri; `pageSize` 1 ile 100 arası (varsayılan 50), `pageToken` imleçtir. Geçmiş yalnızca `historyLength` verilirse, artefaktlar yalnızca `includeArtifacts: true` ise döner |
 | `CancelTask` | Job zincirde kabul edilmeden önce (`open`, `funded`) ya da job iptal edilmişse (`cancelled`) görevi `CANCELED` yapar ve agent'ın sinyalini keser; aksi halde `-32002`. İptal edilmiş görevde tekrar çağrı aynı görevi döner |
@@ -29,7 +29,9 @@ Issue'daki dört mesaj A2A v1.0 yöntemlerine şöyle karşılık gelir: **creat
 | `CreateTaskPushNotificationConfig`, `GetTaskPushNotificationConfig`, `ListTaskPushNotificationConfigs`, `DeleteTaskPushNotificationConfig` | `-32003` |
 | `GetExtendedAgentCard` | `-32007` |
 
-Görevi ilerleten agent kodudur (`TaskExecutor`). Sunucu yeni görevde `onTask(context)`'i, devam mesajında `onMessage(context, message)`'ı çağırır. `context` şu geçişleri sunar: `working`, `requireInput`, `addArtifact` (`append`, `lastChunk`), `complete`, `fail`, `reject`. Her geçiş §3'teki kurallarla zincirden taze okunan job'a karşı denetlenir; kurala uymayan geçiş hata fırlatır ve görev değişmez. `onTask` hata fırlatırsa görev, kurallar izin veriyorsa `FAILED` olur.
+Görevi ilerleten agent kodudur (`TaskExecutor`). Sunucu yeni görevde `onTask(context)`'i, devam mesajında `onMessage(context, message)`'ı çağırır; bir görevin agent işleri sırayla çalışır. `context` görevi açan çağıranın kimliğini (`caller`), job'u ve görevi açan mesajı taşır ve şu geçişleri sunar: `working`, `requireInput`, `addArtifact` (`append`, `lastChunk`), `complete`, `fail`, `reject`. Her geçiş §3'teki kurallarla zincirden taze okunan job'a karşı denetlenir; kurala uymayan geçiş hata fırlatır ve görev değişmez. `onTask` hata fırlatırsa görev, kurallar izin veriyorsa `FAILED` olur.
+
+**Yeniden başlatma:** Agent işleri süreç içindedir. Sunucu yeniden başladıktan sonra `resume()` `SUBMITTED` ve `WORKING` görevleri zincirle uzlaştırır ve hâlâ öyleyse `onTask`'ı görevi açan mesajla yeniden çağırır; bu yüzden `onTask` tekrar çalıştırılabilir olmalıdır (ör. job zaten `accepted` ise kabulü tekrarlamaz). Kesintili görevler istemcinin mesajını bekler, yeniden verilmez. `close()` yeni istekleri HTTP 503 ile reddeder, akışları kapatır ve agent sinyallerini keser.
 
 ## 3. Görev durumu ↔ job durumu
 
@@ -67,55 +69,64 @@ Agent'ın yazdığı her durum zincirdeki job ile tutarlı olmalıdır (`consist
 
 ### 3.3 Kurallar
 
-- **Terminal görev değişmez.** `COMPLETED`, `FAILED`, `CANCELED`, `REJECTED` bir daha değişmez ve mesaj kabul etmez (spec §3.1.6). Job hâlâ `open` ya da `funded` ise terminal görevden sonra aynı job için yeni görev açılabilir.
+- **Terminal görev değişmez.** `COMPLETED`, `FAILED`, `CANCELED`, `REJECTED` bir daha değişmez ve yeni mesaj kabul etmez (spec §3.1.6). Job hâlâ `open` ya da `funded` ise terminal görevden sonra aynı job için yeni görev açılabilir.
 - **Geçişler:** Terminal olmayan bir görev herhangi bir duruma geçebilir; `SUBMITTED`'a yalnızca kesintili durumdan (`INPUT_REQUIRED`, `AUTH_REQUIRED`) dönülür (`canTransition`).
-- **Uzlaştırma yalnızca ileri gider.** `GetTask`, `CancelTask` ve `SubscribeToTask` job'u zincirden okur (`reconcile`): job `accepted` olunca `SUBMITTED` görev `WORKING` olur; job'un karşılığı terminal bir durumsa görev o duruma geçer. Görev hiçbir zaman geri gitmez, terminal görev job ne olursa olsun aynı kalır.
+- **Uzlaştırma yalnızca ileri gider.** `GetTask`, `CancelTask`, `SubscribeToTask` ve devam mesajı job'u zincirden okur (`reconcile`): job `accepted` olunca `SUBMITTED` görev `WORKING` olur; job'un karşılığı terminal bir durumsa görev o duruma geçer. Görev hiçbir zaman geri gitmez, terminal görev job ne olursa olsun aynı kalır. Okuma yalnızca görev ya da job durumu değişince yazar; yanıttaki slot her okumada günceldir.
+- **Zincir önce davranırsa:** Uzlaştırma görevi terminal yaparsa agent'ın sinyali kesilir. Agent'ın aynı terminal duruma geçişi (ör. `submit_work`'ten sonra `complete`) hata vermez, metni geçmişe eklenir.
 - **Tek etkin görev:** Bir job için aynı anda yalnızca bir terminal olmayan görev olur; ikincisi `JOB_HAS_ACTIVE_TASK` ile reddedilir.
 - **İptal:** İstemci yalnızca agent job'u zincirde kabul etmeden önce iptal edebilir. Kabulden sonra iş zincirdeki yoldan çözülür (`submit_work` ya da deadline sonrası `cancel_job`).
 
 ## 4. Square bağlaması: görevi açan mesaj
 
-Görevi açan mesaj `message.metadata.square = { job, specHash }` taşır. Sunucu, `createChainJobSource` ile escrow `Job` hesabını SDK üzerinden okur ve şunları denetler:
+Görevi açan mesaj `message.metadata.square = { job, specHash }` taşır. Sunucu `createChainJobSource` ile escrow `Job` hesabını okur ve şunları denetler:
 
 | Denetim | Red sebebi (`ErrorInfo.reason`, kod `-32602`) |
 |---|---|
 | `metadata.square.job` ve `specHash` var ve biçimleri doğru | `SQUARE_METADATA_REQUIRED` |
-| Job zincirde var | `JOB_NOT_FOUND` |
+| Hesap var, sahibi escrow programı ve `Job` olarak çözülüyor | `JOB_NOT_FOUND` |
 | Job'un `agent_record`'u bu sunucunun `AgentRecord`'u | `JOB_NOT_FOR_AGENT` |
+| Job'un `institution`'ı çağıranın kurumlarından biri (§6) | `JOB_NOT_FOR_CALLER` |
 | Job `open` ya da `funded` | `JOB_NOT_OPEN` (`metadata.jobStatus`) |
 | `specHash` job'un `spec_hash`'i; mesajda `data` parçası varsa ilkinin RFC 8785 + SHA-256'sı da aynı | `SPEC_HASH_MISMATCH` |
 | `message.contextId` verilmişse job adresi | `CONTEXT_ID_REJECTED` |
 
-Görevin `contextId`'si job adresidir; görev kimliği sunucuda üretilen UUID'dir. Aynı çağıran aynı `messageId` ile aynı içeriği yeniden gönderirse aynı görevi alır (yeniden deneme güvenli); farklı içerikle gönderirse `MESSAGE_ID_CONFLICT`. İçerik karşılaştırması mesajın kimlikler dışındaki alanlarının RFC 8785 + SHA-256'sıyladır (`messageContentHash`).
+**Sahip denetimi:** Anchor'ın hesap çözücüsü yalnızca 8 baytlık ayırıcıya bakar; başka bir programın aynı düzende yazdığı hesap bu yüzden job sayılmaz, hesabın sahibi escrow programı olmalıdır. Escrow programı `Job` hesabını yalnızca `create_job`'da `["job", institution, spec_hash]` PDA'sında oluşturduğu için ayrıca PDA karşılaştırması yapılmaz.
 
-Devam mesajında (`message.taskId` dolu) `contextId` görevinkiyle aynı olmalıdır (`CONTEXT_ID_MISMATCH`); terminal göreve (`TASK_TERMINAL`) ya da `onMessage` tanımlamayan agent'a (`CONTINUATION_NOT_SUPPORTED`) devam mesajı `-32004` ile reddedilir. İstemci mesajının rolü `ROLE_USER` olmalıdır.
+**Kurum bağı:** Çağıran yalnızca adına yetkili olduğu kurumun job'u için görev açabilir. Bu denetim job durumundan ve etkin görev kuralından önce yapılır; kuruma ait olmayan çağıran job için görev olup olmadığını öğrenemez. `open` (fonlanmamış) job için de görev açılabilir, ancak agent `accept_job`'u job fonlanmadan yapamaz; pahalı iş `funded` ya da `accepted` job'da başlar.
+
+Görevin `contextId`'si job adresidir; görev kimliği sunucuda üretilen UUID'dir. Aynı çağıran aynı `messageId` ile aynı içeriği yeniden gönderirse, job o arada ilerlemiş olsa da aynı görevi alır (tekrar deneme kapıdan önce aranır); farklı içerikle gönderirse `MESSAGE_ID_CONFLICT`. İçerik karşılaştırması mesajın kimlikler dışındaki alanlarının RFC 8785 + SHA-256'sıyladır (`messageContentHash`). Devam mesajları için de aynı kural geçerlidir.
+
+Devam mesajında (`message.taskId` dolu) `contextId` görevinkiyle aynı olmalıdır (`CONTEXT_ID_MISMATCH`). Terminal göreve (`TASK_TERMINAL`), `onMessage` tanımlamayan agent'a (`CONTINUATION_NOT_SUPPORTED`) ve geçmişi `maxMessagesPerTask` mesaja ulaşmış göreve (`TASK_MESSAGE_LIMIT`) devam mesajı `-32004` ile reddedilir; agent'ın kendi mesajları bu sınıra sayılır ama agent'ı engellemez. İstemci mesajının rolü `ROLE_USER` olmalıdır.
 
 ## 5. Akış (SSE)
 
 - Yanıt `text/event-stream`'dir. Her olay bir `data:` satırında, sonucu `StreamResponse` olan bir JSON-RPC yanıtıdır (spec §9.4.2). `StreamResponse` `task`, `message`, `statusUpdate` ya da `artifactUpdate` alanlarından tam olarak birini taşır.
 - İlk olay görevin anlık görüntüsüdür (`task`), sonra `statusUpdate` ve `artifactUpdate` olayları görev sürümü sırasıyla gelir. Anlık görüntüden önce yayımlanan olaylar bekletilir, sürümü görüntüden eski olanlar atlanır. Terminal `statusUpdate`'ten sonra akış kapanır; kesintili durumlarda açık kalır.
-- Kalp atışı `heartbeatMs`'de bir `: ping` yorum satırıdır. Akış en fazla `streamMaxDurationMs` sürer. Yazılmayı bekleyen veri `4 × maxBodyBytes`'ı aşarsa (yavaş tüketici) akış kapanır. İstemci `SubscribeToTask` ve `GetTask` ile kaldığı yerden devam eder.
-- Eşzamanlı akış sayısı toplamda `maxStreams`, çağıran başına `maxStreamsPerCaller` ile sınırlıdır. Yer görev açılmadan ayrılır: sınır aşılınca HTTP 429 (`-32000`) döner ve görev oluşmaz.
-- Canlı olaylar süreç içi veriyolundadır (`createTaskEventBus`). Kalıcı olan depodur; birden fazla sunucu örneği arasında olay dağıtımı açık noktadır (§10).
+- Kalp atışı `heartbeatMs`'de bir `: ping` yorum satırıdır. Akış en fazla `streamMaxDurationMs` sürer. Yazılmayı bekleyen veri `4 × maxBodyBytes`'ı aşarsa (yavaş tüketici) bağlantı hemen kesilir; kapanışta boşaltılamayan bağlantı bir kalp atışı süresi sonra kesilir. İstemci `SubscribeToTask` ve `GetTask` ile kaldığı yerden devam eder.
+- Akışlar ve bekleyen (`returnImmediately` verilmeyen) `SendMessage` istekleri uzun isteklerdir; eşzamanlı sayıları toplamda `maxStreams`, çağıran başına `maxStreamsPerCaller` ile sınırlıdır. Yer görev açılmadan ayrılır: sınır aşılınca HTTP 429 (`-32000`) döner ve görev oluşmaz.
+- Bir görevin yazmaları (agent geçişleri, artefaktlar, uzlaştırma, iptal, devam mesajı) ve agent işleri süreç içinde sırayla çalışır. Canlı olaylar süreç içi veriyolundadır (`createTaskEventBus`). Kalıcı olan depodur; birden fazla sunucu örneği açık noktadır (§10).
 
 ## 6. Kimlik ve güvenlik
 
-- **Kimlik:** Her istek `Authenticator` ile doğrulanır, doğrulanamazsa HTTP 401 (`-32000`). Görev yalnızca onu açan çağırana görünür; başka çağırana `-32001` döner, görevin varlığı sızmaz.
-- **API anahtarı:** `createApiKeyAuthenticator({ keySha256 })` `x-api-key` başlığının SHA-256'sını izinli listeyle sabit zamanda karşılaştırır. Anahtarın kendisi sunucuda tutulmaz; çağıran kimliği `api-key:<sha256>`'dır. Cüzdan imzalı istekler BE-13'te.
-- **Sürüm:** `A2A-Version` başlığı ya da sorgu parametresi `1.0` olmalıdır. Boş değer 0.3 sayılır ve `-32009` döner (spec §3.6.2).
-- **Girdi:** Yalnızca `POST` (405), `content-type: application/json` (415), gövde en fazla `maxBodyBytes` (413, bağlantı kapanır), toplu istek yok (`-32600`). Parametreler zod ile doğrulanır; hatalar alan yollarıyla `google.rpc.BadRequest` olarak döner. Mesaj başına en fazla 64 parça, kimlikler en fazla 256 karakter; parça URL'leri yalnızca `https`, `http` ya da `ipfs`.
-- **Hata ayrıntısı:** Tel üzerindeki mesajlar spesifikasyonun standart metinleridir. Depo ve agent hataları `-32603` olarak döner, ayrıntı yalnızca `onError`'a gider.
-- **İstemci:** Varsayılan olarak yalnızca `https` uç noktası (`allowInsecureHttp` yalnızca yerel geliştirme ve testler için). Yönlendirme izlenmez (`redirect: 'error'`), yanıt ve akış olayı boyutu `maxResponseBytes` ile sınırlıdır, akışta olaylar arası bekleme `timeoutMs`'i aşınca bağlantı kesilir. Yanıtlar zod ile doğrulanır, yanıt kimliği istekle eşleşmelidir; uymayan yanıt `-32006`'dır.
+- **Kimlik ve yetki:** Her istek gövdesi okunmadan `Authenticator` ile doğrulanır, doğrulanamazsa HTTP 401 (`-32000`) döner ve bağlantı kapanır. Çağıran (`Caller`) bir kimlik (`id`) ve adına görev açabileceği kurum adreslerini (`institutions`, `Job.institution`; Squads'a bağlı kurumda vault PDA'sı) taşır. Görev yalnızca onu açan çağırana görünür; başka çağırana, aynı kurumun başka anahtarına da `-32001` döner, görevin varlığı sızmaz.
+- **API anahtarı:** `createApiKeyAuthenticator({ keys: [{ keySha256, institutions }] })` `x-api-key` başlığının SHA-256'sını izinli listeyle sabit zamanda karşılaştırır. Anahtarın kendisi sunucuda tutulmaz; çağıran kimliği `api-key:<sha256>`'dır. Her anahtar en az bir kuruma bağlıdır, kurumsuz anahtar yapılandırması reddedilir. Cüzdan imzalı istekler BE-13'te; çağıranın cüzdanı job'un kurumuyla karşılaştırılır.
+- **Sürüm:** `A2A-Version` başlığı ya da sorgu parametresi `1.0` olmalıdır. Boş değer 0.3 sayılır ve `-32009` döner (spec §3.6.2). Hata ayrıntısında istenen sürüm yalnızca `MAJOR.MINOR` biçimindeyse yansıtılır.
+- **Girdi:** Yalnızca `POST` (405), `content-type: application/json` (415), gövde en fazla `maxBodyBytes` (413, bağlantı kapanır), toplu istek yok (`-32600`). Parametreler önce I-JSON'a (RFC 7493) göre denetlenir: NUL karakteri, eşleşmemiş UTF-16 surrogate, sonlu olmayan sayı (`1e999`) ve 64'ten derin iç içe değer `-32602`'dir (Postgres JSONB'si ve RFC 8785 bunları kabul etmez). Sonra zod ile doğrulanır; hatalar alan yollarıyla `google.rpc.BadRequest` olarak döner. Mesaj başına en fazla 64 parça, kimlikler en fazla 256 karakter; parça URL'leri yalnızca `https`, `http` ya da `ipfs`. Bir görevin artefaktları JSON olarak en fazla `maxArtifactBytes` bayttır.
+- **Hata ayrıntısı:** Tel üzerindeki mesajlar spesifikasyonun standart metinleridir. Depo, zincir ve agent hataları `-32603` olarak döner, ayrıntı yalnızca `onError`'a gider. `GetTask` ve `SubscribeToTask` zincir okunamazsa kayıttaki görevi döner; iptal ve devam mesajı zincir gerektirdiği için `-32603` döner.
+- **Sunucu zaman aşımları:** Paket `http.Server` kurmaz; `requestTimeout`, `headersTimeout` ve `keepAliveTimeout` sunucuyu kuran tarafındır.
+- **Agent kodu:** `message.referenceTaskIds`, `metadata` ve `extensions` çağırana göre süzülmez; agent kodu başka görevleri bu kimliklerle okumamalıdır.
+- **İstemci:** Varsayılan olarak yalnızca `https` uç noktası (`allowInsecureHttp` yalnızca yerel geliştirme ve testler için). Yönlendirme izlenmez (`redirect: 'error'`), yanıt ve akış olayı boyutu `maxResponseBytes` ile sınırlıdır. Akışta sunucudan veri (olay ya da kalp atışı) gelmeden `timeoutMs` geçerse bağlantı kesilir; tüketicinin olayı işleme süresi sayılmaz, toplam süreyi tüketici döngüden çıkarak sınırlar. Yanıtlar zod ile doğrulanır; başarılı yanıtın kimliği istekle eşleşmelidir (yalnızca hata yanıtı `null` kimlik taşıyabilir), uymayan yanıt `-32006`'dır. Hata mesajı 1024 karaktere kısaltılır, ayrıntılardan yalnızca `@type` taşıyan nesneler alınır. Uç nokta güvenilmeyen bir agent kartından geliyorsa iç ağ ve meta veri adreslerini engelleyen bir `fetch` verilmelidir (BE-13); varsayılan `fetch` adresi denetlemez.
 
 ## 7. Kalıcı depo
 
 `TaskStore` arayüzü depoyu soyutlar. Postgres uygulaması `createPrismaTaskStore(client)` ayrı alt yoldadır (`@squaresdk/solana-a2a/prisma`); `@squaresdk/solana-db`'ye yalnızca tip olarak bağlıdır, istemciyi çağıran verir. Tablolar `a2a_tasks` ve `a2a_messages` ([data-model.md](data-model.md) §2, zincir dışı tablolar).
 
-- **Eşzamanlılık:** Her görev satırının `version` sütunu vardır; güncelleme beklenen sürümle yapılır, çakışmada sunucu taze okuyup yeniden dener.
-- **Tek etkin görev:** Görev açma bir işlemde, `(agent_record, job)` üzerine `pg_advisory_xact_lock` alınarak yapılır; job için terminal olmayan görev varsa açılmaz.
+- **Eşzamanlılık:** Bir görevin yazmaları süreç içinde sıralıdır. Her görev satırının `version` sütunu vardır; güncelleme beklenen sürümle yapılır ve başka bir yazıcıyla çakışmada taze okunup yeniden denenir.
+- **Tek etkin görev:** Görev açma READ COMMITTED bir işlemde, `(agent_record, job)` üzerine `pg_advisory_xact_lock(hashtextextended(...))` alınarak yapılır; job için terminal olmayan görev varsa açılmaz. Kısmi tekil indeks `a2a_tasks_active_job_key` aynı kuralı kilidi almayan bir yazıcıya karşı da zorlar.
 - **Tekrar deneme:** `(agent_record, caller, create_message_id)` tekildir; aynı mesaj aynı görevi döner. `a2a_messages`'ta `(task_id, message_id)` tekildir; geçmiş ekleme sırasıyla (`bigserial`) döner.
-- **Biçim kısıtları:** Adres ve hash sütunları CHECK kısıtlarıyla zorlanır (`db/scripts/check-constraints.mjs`).
-- **Yeniden başlatma:** Görev, durumu, artefaktları ve geçmişi süreç belleğinde tutulmaz; sunucu yeniden başladığında depodan okunur (`test/two-agents.test.ts`).
+- **Bütünlük:** Durum geçişi ve durum mesajının geçmişe eklenmesi tek işlemdir. Adres ve hash sütunları CHECK kısıtlarıyla zorlanır (`db/scripts/check-constraints.mjs`). Görevin bağlamı job adresi olduğundan ayrı bir `context_id` sütunu yoktur.
+- **Okuma:** `ListTasks` artefaktları yalnızca istendiğinde okur; imleçli sayfalar indeksin `status_at` sınırıyla başlar.
+- **Yeniden başlatma:** Görev, durumu, artefaktları ve geçmişi süreç belleğinde tutulmaz; sunucu yeniden başladığında depodan okunur (`test/two-agents.test.ts`) ve `resume()` agent işlerini yeniden başlatır.
 
 ## 8. Hata kodları
 
@@ -124,16 +135,16 @@ Devam mesajında (`message.taskId` dolu) `contextId` görevinkiyle aynı olmalı
 | `-32700` | Gövde JSON değil |
 | `-32600` | JSON-RPC 2.0 isteği değil, toplu istek, yanlış content-type (HTTP 415) ya da büyük gövde (HTTP 413) |
 | `-32601` | Bilinmeyen yöntem |
-| `-32602` | Geçersiz parametre (`BadRequest`) ya da §4'teki Square sebepleri (`ErrorInfo`) |
+| `-32602` | Geçersiz parametre (`BadRequest`, I-JSON dahil) ya da §4'teki Square sebepleri (`ErrorInfo`) |
 | `-32603` | İç hata; ayrıntı tel üzerinde yok |
 | `-32001` | Görev yok ya da çağırana ait değil |
 | `-32002` | Görev iptal edilemez (§3.3) |
 | `-32003` | Push bildirimleri desteklenmiyor |
-| `-32004` | Terminal göreve abonelik ya da devam mesajı, devam mesajı desteklenmiyor |
+| `-32004` | Terminal göreve abonelik ya da devam mesajı, devam mesajı desteklenmiyor, görevin mesaj sınırı dolu |
 | `-32006` | İstemci: agent yanıtı geçersiz |
 | `-32007` | Genişletilmiş agent kartı yok |
 | `-32009` | Desteklenmeyen A2A sürümü |
-| `-32000` | Kimlik doğrulanamadı (HTTP 401) ya da akış sınırı (HTTP 429) |
+| `-32000` | Kimlik doğrulanamadı (HTTP 401), uzun istek sınırı (HTTP 429) ya da sunucu kapanıyor (HTTP 503) |
 
 ## 9. Kaynaklardan farklar
 
@@ -147,6 +158,8 @@ Devam mesajında (`message.taskId` dolu) `contextId` görevinkiyle aynı olmalı
 ## 10. Açık noktalar
 
 1. **Agent kartı (BE-19):** Repodaki `AgentCardSchema`'da A2A v1.0'ın `supportedInterfaces` alanı yok; dış istemciler uç noktayı bu alandan okur. Kartın v1.0'a hizalanması BE-19'da (`createAgent`, `/.well-known/agent-card.json`).
-2. **Birden fazla sunucu örneği:** Olay veriyolu süreç içidir. Aynı agent birden fazla örnekle çalışacaksa olaylar örnekler arasında dağıtılmalı (ör. Postgres `LISTEN/NOTIFY`); o zamana kadar akışlar görevi işleyen örnekten açılır.
-3. **Cüzdan imzalı kimlik (BE-13):** API anahtarı yerine çağıranın cüzdan imzası; `Authenticator` arayüzü değişmez.
+2. **Birden fazla sunucu örneği:** Sıralı yazım ve olay veriyolu süreç içidir. Aynı agent birden fazla örnekle çalışacaksa olaylar örnekler arasında dağıtılmalı (ör. Postgres `LISTEN/NOTIFY`); depo düzeyinde iyimser sürüm ve kısmi tekil indeks bu durumda da tutarlılığı korur.
+3. **Cüzdan imzalı kimlik ve hız sınırı (BE-13):** API anahtarı yerine çağıranın cüzdan imzası ve istek hız sınırı; `Authenticator` arayüzü değişmez.
 4. **Uzun bekleme:** Akışsız `SendMessage` en fazla `blockingTimeoutMs` bekler; daha uzun işler için istemci `returnImmediately` ile açıp akışa abone olur.
+5. **Yanıt boyutu ve sorgular:** Bir yanıttaki geçmiş `maxHistory` mesajla sınırlıdır, toplam bayt sınırı yoktur. `ListTasks` geçmiş istenirse görev başına bir geçmiş sorgusu yapar (sayfa başına en fazla 100). `status` süzgeci için ayrı indeks yok; çağıran başına görev sayısı büyürse `(agent_record, caller, state, status_at)` eklenir.
+6. **Saklama süresi:** Mesaj ve artefakt içerikleri JSONB olarak düz metin saklanır, silme ya da arşivleme kuralı yoktur.

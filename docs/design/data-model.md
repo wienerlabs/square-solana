@@ -68,8 +68,10 @@ Notlar:
 | `mpp_payments` | İmzası doğrulanmış Stripe webhook'undan gelen fiat ödemesi; makbuzun Poseidon commitment'ı ve MPP authority imzası | MPP rayı | BE-25 |
 | `cctp_transfers` | CCTP mesajı (kaynak domain + nonce), Circle attestation'ı, Solana'da receive ve fund imzaları | CCTP relayer | BE-26 |
 | `travel_rule_records` | Şifreli Travel Rule verisi; zincirdeki commitment ile bağlı | API | BE-23 |
-| `a2a_tasks` | A2A görevi: agent, çağıran, bağlı job ve spec hash'i, görev durumu, durum mesajı, artefaktlar, zincirden son okunan job durumu ve slot, iyimser `version`; `(agent_record, caller, create_message_id)` tekil | agent'ın A2A sunucusu ([a2a.md](a2a.md) §7) | BE-17 |
+| `a2a_tasks` | A2A görevi: agent, çağıran, bağlı job ve spec hash'i (görevin A2A bağlamı job adresidir), görev durumu, durum mesajı, artefaktlar, iyimser `version`. `job_status` ve `job_slot` sunucunun zincirde son gördüğü değerlerdir, ayna veri değildir. `(agent_record, caller, create_message_id)` tekil; kısmi tekil indeks job başına tek terminal olmayan görev | agent'ın A2A sunucusu ([a2a.md](a2a.md) §7) | BE-17 |
 | `a2a_messages` | Görev geçmişi: istemci ve agent mesajları, ekleme sırasıyla; `(task_id, message_id)` tekil, görev silinince silinir | agent'ın A2A sunucusu | BE-17 |
+
+A2A tablolarındaki mesaj ve artefakt içerikleri JSONB olarak düz metindir (Travel Rule ya da kişisel veri taşımaz); saklama ve silme kuralı henüz yoktur ([a2a.md](a2a.md) §10).
 
 Agent card kayıttan önce yüklenebilir: 8 adımın 2.sinde önce `putAgentCard`, sonra `registerAgent` gelir. Bu yüzden zincir dışı tablolardan ayna tablolara yabancı anahtar yoktur.
 
@@ -83,7 +85,7 @@ Agent card kayıttan önce yüklenebilir: 8 adımın 2.sinde önce `putAgentCard
 | `u64` | `NUMERIC(20, 0)` | CHECK: `0 … 2^64−1`. Prisma `Decimal` döner, API'de ondalık string |
 | Zincirden gelen zaman (`i64` unix saniyesi) | `BIGINT` | Sözleşmedeki değerin kendisi |
 | Veritabanının kendi zamanları | `TIMESTAMPTZ(3)` | `indexed_at`, `created_at`, `updated_at` … |
-| Enum | Postgres enum | Değerler JSON kodlamasıyla aynı (camelCase). `ApiKeyScope` API'deki adlarla saklanır (`tx:prepare` …) |
+| Enum | Postgres enum | Değerler JSON kodlamasıyla aynı (camelCase). `ApiKeyScope` API'deki adlarla saklanır (`tx:prepare` …); A2A enum'ları ProtoJSON adlarıyla (`TASK_STATE_*`, `ROLE_*`) |
 | Uzunluğu sözleşmede tanımlı olmayan metin | `TEXT` | Uydurma bir sınır konmaz. Sınırlar zod şemalarındaki değerlerdir (ör. `PolicyMeta.name` 120, `deliveryUri` 128) |
 
 Biçim kısıtlarını Prisma şeması ifade edemez. Bu yüzden [`db/scripts/check-constraints.mjs`](../../db/scripts/check-constraints.mjs) bunları sütun tipinden türetir ve migration'a SQL olarak eklenir. Test, şemadaki her kısıtın veritabanında bulunduğunu denetler.

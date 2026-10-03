@@ -11,6 +11,7 @@ ProtoJSON adlarıdır (`TASK_STATE_SUBMITTED` …), `TaskSchema` v1.0 görevidir
 şemaları eklendi. `JOB_STATUS_TO_TASK_STATE` kesinleşti: teslimden sonraki job durumları görevi
 `COMPLETED` bırakır, ödeme durumu `metadata.square.jobStatus`'tadır.
 
-`@squaresdk/solana-a2a`: ilk sürüm. JSON-RPC sunucusu (`createA2aServer`) ve istemcisi
-(`createA2aClient`), SSE akışları, görevi açan mesajın zincirdeki job'a bağlanması, görev ↔ job durum
-kuralları, API anahtarıyla kimlik ve `@squaresdk/solana-a2a/prisma` altında Postgres görev deposu.
+`@squaresdk/solana-a2a`: ilk sürüm. JSON-RPC sunucusu (`createA2aServer`, `resume`) ve istemcisi
+(`createA2aClient`), SSE akışları, görevi açan mesajın zincirdeki escrow job'una (sahibi escrow programı)
+ve çağıranın kurumuna bağlanması, görev ↔ job durum kuralları, kuruma bağlı API anahtarıyla kimlik ve
+`@squaresdk/solana-a2a/prisma` altında Postgres görev deposu.
