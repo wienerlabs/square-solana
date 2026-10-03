@@ -14,4 +14,4 @@ RUN addgroup --system --gid 1001 nodejs && \
 WORKDIR /app
 COPY --from=build --chown=appuser:nodejs /out ./
 USER appuser
-CMD ["sh", "-c", "node dist/migrations/run.js && node dist/index.js"]
+CMD ["sh", "-c", "node dist/migrations/run.js && exec node dist/index.js"]
