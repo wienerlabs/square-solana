@@ -1,25 +1,56 @@
 'use client';
 
 import dynamic from 'next/dynamic';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import { LogoMark } from './logo';
 import { useWebConfig } from './providers';
+import { ThemeToggle } from './theme-toggle';
 
 // Butonun etiketi cüzdan durumuna bağlı; sunucuda render edilirse hydration uyuşmazlığı çıkar.
 const WalletMultiButton = dynamic(async () => (await import('@solana/wallet-adapter-react-ui')).WalletMultiButton, {
   ssr: false,
 });
 
+const LINKS = [
+  { href: '/', label: 'Overview' },
+  { href: '/design', label: 'Design system' },
+] as const;
+
 export function Header() {
   const { cluster } = useWebConfig();
+  const pathname = usePathname();
   return (
-    <header className="border-b border-neutral-200 bg-white">
-      <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-6 py-4">
+    <header className="border-b border-border bg-surface">
+      <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-x-6 gap-y-3 px-6 py-3">
         <div className="flex items-center gap-3">
-          <span className="text-lg font-semibold tracking-tight">Square</span>
-          <span className="rounded-full border border-neutral-300 px-2.5 py-0.5 font-mono text-xs text-neutral-600">
+          <Link href="/" className="flex items-center gap-2 text-subheading font-semibold">
+            <LogoMark />
+            Square
+          </Link>
+          <span className="rounded-full border border-border px-2.5 py-0.5 font-mono text-caption text-muted">
             {cluster}
           </span>
         </div>
-        <WalletMultiButton />
+        <nav aria-label="Main" className="order-last flex w-full gap-1 text-sm sm:order-none sm:w-auto">
+          {LINKS.map((link) => {
+            const current = link.href === '/' ? pathname === '/' : pathname.startsWith(link.href);
+            return (
+              <Link
+                key={link.href}
+                href={link.href}
+                aria-current={current ? 'page' : undefined}
+                className={`rounded-full px-3 py-1.5 ${current ? 'bg-surface-muted font-medium text-text' : 'text-muted hover:text-text'}`}
+              >
+                {link.label}
+              </Link>
+            );
+          })}
+        </nav>
+        <div className="flex items-center gap-2">
+          <ThemeToggle />
+          <WalletMultiButton />
+        </div>
       </div>
     </header>
   );

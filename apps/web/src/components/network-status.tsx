@@ -43,25 +43,25 @@ export function NetworkStatus() {
   }, [connection]);
 
   return (
-    <section className="rounded-lg border border-neutral-200 bg-white p-6">
-      <h2 className="text-sm font-medium uppercase tracking-wide text-neutral-500">Network</h2>
+    <section className="rounded-card border border-border bg-surface p-6">
+      <h2 className="text-sm font-medium uppercase tracking-wide text-muted">Network</h2>
       <dl className="mt-4 grid grid-cols-[max-content_1fr] gap-x-6 gap-y-2 text-sm">
-        <dt className="text-neutral-500">Cluster</dt>
+        <dt className="text-muted">Cluster</dt>
         <dd className="font-mono">{cluster}</dd>
-        <dt className="text-neutral-500">RPC</dt>
+        <dt className="text-muted">RPC</dt>
         <dd className="font-mono break-all">{rpcLabel(rpcUrl)}</dd>
         {state.status === 'ready' && (
           <>
-            <dt className="text-neutral-500">Chain ID</dt>
+            <dt className="text-muted">Chain ID</dt>
             <dd className="font-mono break-all">{caip2ChainId(state.genesisHash)}</dd>
-            <dt className="text-neutral-500">Slot</dt>
+            <dt className="text-muted">Slot</dt>
             <dd className="font-mono">{state.slot.toLocaleString('en-US')}</dd>
           </>
         )}
       </dl>
-      {state.status === 'loading' && <p className="mt-4 text-sm text-neutral-500">Reading the cluster…</p>}
+      {state.status === 'loading' && <p className="mt-4 text-sm text-muted">Reading the cluster…</p>}
       {state.status === 'error' && (
-        <p role="alert" className="mt-4 text-sm text-red-700">
+        <p role="alert" className="mt-4 text-sm text-danger-text">
           RPC request failed: {state.message}
         </p>
       )}

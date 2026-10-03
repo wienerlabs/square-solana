@@ -4,7 +4,9 @@ import { connection } from 'next/server';
 import { ConfigError } from '@/components/config-error';
 import { Header } from '@/components/header';
 import { Providers } from '@/components/providers';
+import { ThemeProvider } from '@/components/theme-provider';
 import { parseWebConfig } from '@/lib/config';
+import { openRunde } from './fonts';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -18,16 +20,19 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
   const result = parseWebConfig(process.env);
 
   return (
-    <html lang="en">
-      <body className="min-h-screen antialiased">
-        {result.ok ? (
-          <Providers config={result.config}>
-            <Header />
-            {children}
-          </Providers>
-        ) : (
-          <ConfigError errors={result.errors} />
-        )}
+    // suppressHydrationWarning: next-themes, temayı boyamadan önce <html data-theme>'e yazar.
+    <html lang="en" className={openRunde.variable} suppressHydrationWarning>
+      <body className="min-h-screen">
+        <ThemeProvider>
+          {result.ok ? (
+            <Providers config={result.config}>
+              <Header />
+              {children}
+            </Providers>
+          ) : (
+            <ConfigError errors={result.errors} />
+          )}
+        </ThemeProvider>
       </body>
     </html>
   );
