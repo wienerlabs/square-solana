@@ -29,7 +29,7 @@ docker run --rm --platform linux/amd64 \
   "node:${NODE_MAJOR}-bookworm" bash -euo pipefail -c '
     git config --global --add safe.directory "*"
     git clone --quiet /src.git /work
-    curl -fsSL -o /usr/local/bin/circom "$CIRCOM_URL"
+    curl -fsSL --retry 5 -o /usr/local/bin/circom "$CIRCOM_URL"
     echo "$CIRCOM_SHA256  /usr/local/bin/circom" | sha256sum -c --quiet -
     chmod +x /usr/local/bin/circom
     cd /work/circuits/payment-compliance

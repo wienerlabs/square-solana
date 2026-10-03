@@ -6,7 +6,7 @@ DIR="$(cd "$(dirname "$0")/.." && pwd)"
 # shellcheck source=circom.env
 source "$DIR/scripts/circom.env"
 BIN="$(mktemp -d)/circom"
-curl -fsSL -o "$BIN" "$CIRCOM_URL"
+curl -fsSL --retry 5 -o "$BIN" "$CIRCOM_URL"
 echo "$CIRCOM_SHA256  $BIN" | sha256sum -c --quiet -
 chmod +x "$BIN"
 cd "$DIR"
