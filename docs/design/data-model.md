@@ -68,6 +68,8 @@ Notlar:
 | `mpp_payments` | İmzası doğrulanmış Stripe webhook'undan gelen fiat ödemesi; makbuzun Poseidon commitment'ı ve MPP authority imzası | MPP rayı | BE-25 |
 | `cctp_transfers` | CCTP mesajı (kaynak domain + nonce), Circle attestation'ı, Solana'da receive ve fund imzaları | CCTP relayer | BE-26 |
 | `travel_rule_records` | Şifreli Travel Rule verisi; zincirdeki commitment ile bağlı | API | BE-23 |
+| `a2a_tasks` | A2A görevi: agent, çağıran, bağlı job ve spec hash'i, görev durumu, durum mesajı, artefaktlar, zincirden son okunan job durumu ve slot, iyimser `version`; `(agent_record, caller, create_message_id)` tekil | agent'ın A2A sunucusu ([a2a.md](a2a.md) §7) | BE-17 |
+| `a2a_messages` | Görev geçmişi: istemci ve agent mesajları, ekleme sırasıyla; `(task_id, message_id)` tekil, görev silinince silinir | agent'ın A2A sunucusu | BE-17 |
 
 Agent card kayıttan önce yüklenebilir: 8 adımın 2.sinde önce `putAgentCard`, sonra `registerAgent` gelir. Bu yüzden zincir dışı tablolardan ayna tablolara yabancı anahtar yoktur.
 
@@ -127,7 +129,7 @@ Bir servis testlerinde bunu kullanacaksa `@testcontainers/postgresql`'i devDepen
 |---|---|
 | Covenant `app/prisma/schema.prisma` (Neon) | Kopyalanmadı: `app/` LGPL-2.1 ve yeniden lisanslama onayları (BC-03) bekleniyor. Şema Square sözleşmesinden (IDL + OpenAPI) baştan yazıldı. Covenant'ın gamification ve arena tabloları zaten kapsam dışı. |
 | Aperture compliance-api (ham `pg`) | `verified_payment_intents` alanları `mpp_payments`'a uyarlandı (Aperture MIT). compliance-api BE-25'e kadar kendi migration'larıyla çalışır. |
-| AIP Supabase (`scripts/schema.sql`) | `tasks`, `escrows`, `automations`, `agent_memory`, `hosted_agents` … AIP uygulamasına ait ve kapsam dışı. A2A görev deposu BE-17'de. |
+| AIP Supabase (`scripts/schema.sql`) | `tasks`, `escrows`, `automations`, `agent_memory`, `hosted_agents` … AIP uygulamasına ait ve kapsam dışı. A2A görev deposu `a2a_tasks` ve `a2a_messages` (BE-17). |
 
 ## 8. Şema review'u
 
