@@ -22,6 +22,7 @@ export const PUBLISHABLE = [
   '@squaresdk/solana-sdk',
   '@squaresdk/solana-identity',
   '@squaresdk/solana-policy',
+  '@squaresdk/solana-a2a',
 ];
 
 export const EXCLUDED = {
