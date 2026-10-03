@@ -1,5 +1,8 @@
-# BE-01: TS paketlerinin ad kuralı, lint / biçim ve derleme-test kontrolü.
-# Genel TS CI'ı (pack smoke vb.) BE-03 ile genişler.
+# BE-01, BE-03: TS paketlerinin ad kuralı, lint / biçim, derleme-test, paket kurulum smoke'u ve migration
+# kontrolü. PR'da derleme ve testler yalnızca etkilenen paketlerde koşar; paket dışı bir girdi değiştiyse
+# (kök yapılandırma, lockfile, IDL, API şeması, devre, workflow'lar) ve main'de hepsi koşar
+# (scripts/ci/turbo-scope.mjs). `ci-ok` tüm işlerin tek sonucudur; branch protection açıldığında zorunlu
+# kontrol olarak bu ad seçilir (GitHub Free planında private repoda bugün açılamıyor, #17).
 name: packages
 
 on:
@@ -10,31 +13,176 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  # PR'da yeni push eski koşuyu iptal eder; main'de her commit kendi grubundadır, hiçbiri iptal edilmez.
+  group: packages-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  TURBO_TELEMETRY_DISABLED: '1'
+
 jobs:
-  packages:
+  scope:
+    name: Kapsam, ad kuralı ve lint
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 10
+    outputs:
+      mode: ${{ steps.scope.outputs.mode }}
+      base: ${{ steps.scope.outputs.base }}
+      circuit: ${{ steps.scope.outputs.circuit }}
+      smoke: ${{ steps.scope.outputs.smoke }}
+      db: ${{ steps.scope.outputs.db }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
       - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: 24
+          node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - name: Paket adları @squaresdk/solana- ile başlıyor
         run: pnpm check:names
       - name: ESLint + Prettier
         run: pnpm lint
-      - name: Release devresi (circom 2.2.3; policy ispat testleri wasm ister)
+      - name: CI betiklerinin testleri
+        run: node --test "scripts/ci/*.test.mjs"
+      - name: Her workspace paketi yayınlanabilir ya da gerekçeli dışlanmış
+        run: node scripts/ci/pack-smoke.mjs --classify-only
+      - name: Kapsam (PR'da etkilenen paketler, main'de hepsi)
+        id: scope
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: node scripts/ci/turbo-scope.mjs
+
+  build-typecheck-test:
+    name: Derleme, tip kontrolü ve testler
+    needs: scope
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Release devresi (circom 2.2.3; policy ve prover testleri wasm ister)
+        if: needs.scope.outputs.circuit == 'true'
         run: circuits/payment-compliance/scripts/ci-build.sh
       - name: Derleme, tip kontrolü ve testler
-        run: pnpm turbo run build typecheck test
+        env:
+          MODE: ${{ needs.scope.outputs.mode }}
+          TURBO_SCM_BASE: ${{ needs.scope.outputs.base }}
+        run: |
+          if [ "$MODE" = affected ]; then
+            pnpm turbo run build typecheck test --affected
+          else
+            pnpm turbo run build typecheck test
+          fi
+
+  pack-smoke:
+    name: Paket kurulum smoke'u
+    needs: scope
+    if: needs.scope.outputs.smoke == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Pack, boş projeye kurulum ve düz Node ile import
+        run: node scripts/ci/pack-smoke.mjs
+      # engines tabanı (`node >= 24`): paketler Node 24.0.0'da da düz ESM ile açılmalı (#139).
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 24.0.0
+      - name: Paket kurulum smoke'u engines tabanında (Node 24.0.0)
+        run: node scripts/ci/pack-smoke.mjs
       - name: Derlenmiş sdk ve policy engines tabanında (Node 24.0.0) düz Node ESM ile açılır
         run: |
           node --version
           node packages/sdk/test/node-esm/list-claim.mjs
           node packages/policy/test/node-esm/set-compliance-proof.mjs
+
+  db-migrations:
+    name: Prisma migration kontrolü
+    needs: scope
+    if: needs.scope.outputs.db == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # İş konteynerde koşar; Postgres servisine servis adıyla (`postgres`) bağlanır.
+    container:
+      image: node:24-bookworm@sha256:64af3819f9275802414d7cdc38c27e9d82bd564dec4d4da87d008255d36c63b4
+    services:
+      postgres:
+        # db/src/testing.ts → TEST_POSTGRES_IMAGE ile aynı ana sürüm.
+        image: postgres:17-alpine@sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24
+        env:
+          POSTGRES_USER: square
+          POSTGRES_PASSWORD: square
+          POSTGRES_DB: square
+        options: >-
+          --health-cmd "pg_isready -U square -d square"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      # Yalnızca bu işin tek kullanımlık servis konteyneri; secret değil.
+      DATABASE_URL: postgresql://square:square@postgres:5432/square
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # Depo runner kullanıcısına ait, konteyner root ile çalışır; git'in sahiplik denetimi yalnızca bu dizin için açılır.
+      - name: git güvenli dizin
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+      - name: Uygulanmış migration'lar değişmedi, yeniler sırada
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: node scripts/ci/migrations-guard.mjs
+      - name: Migration'lar temiz veritabanında uygulanıyor
+        working-directory: db
+        run: pnpm exec prisma migrate deploy
+      - name: Veritabanı güncel
+        working-directory: db
+        run: pnpm exec prisma migrate status
+      - name: Uygulanan şema ile schema.prisma arasında fark yok
+        working-directory: db
+        run: pnpm exec prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --exit-code
+      - name: Fark varsa eksik migration'ın SQL'i
+        if: failure()
+        working-directory: db
+        run: pnpm exec prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --script
+
+  ci-ok:
+    name: ci-ok
+    if: always()
+    needs: [scope, build-typecheck-test, pack-smoke, db-migrations]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Bütün işler başarılı ya da kapsam dışında atlandı
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+        run: echo "$RESULTS" | jq -e 'to_entries | all(.value.result == "success" or .value.result == "skipped")'
