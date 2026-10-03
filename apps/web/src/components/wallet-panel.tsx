@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { LAMPORTS_PER_SOL } from '@solana/web3.js';
 import { useConnection, useWallet } from '@solana/wallet-adapter-react';
+import { Address } from './ui/address';
 
 type Balance = { status: 'loading' } | { status: 'ready'; lamports: number } | { status: 'error'; message: string };
 
@@ -35,23 +36,25 @@ export function WalletPanel() {
   }, [connection, publicKey]);
 
   return (
-    <section className="rounded-lg border border-neutral-200 bg-white p-6">
-      <h2 className="text-sm font-medium uppercase tracking-wide text-neutral-500">Wallet</h2>
+    <section className="rounded-card border border-border bg-surface p-6">
+      <h2 className="text-sm font-medium uppercase tracking-wide text-muted">Wallet</h2>
       {publicKey ? (
         <dl className="mt-4 grid grid-cols-[max-content_1fr] gap-x-6 gap-y-2 text-sm">
-          <dt className="text-neutral-500">Wallet</dt>
+          <dt className="text-muted">Wallet</dt>
           <dd>{wallet?.adapter.name}</dd>
-          <dt className="text-neutral-500">Address</dt>
-          <dd className="font-mono break-all">{publicKey.toBase58()}</dd>
-          <dt className="text-neutral-500">Balance</dt>
+          <dt className="text-muted">Address</dt>
+          <dd>
+            <Address value={publicKey.toBase58()} />
+          </dd>
+          <dt className="text-muted">Balance</dt>
           <dd className="font-mono">
             {balance.status === 'ready' && `${formatSol(balance.lamports)} SOL`}
             {balance.status === 'loading' && '…'}
-            {balance.status === 'error' && <span className="text-red-700">{balance.message}</span>}
+            {balance.status === 'error' && <span className="text-danger-text">{balance.message}</span>}
           </dd>
         </dl>
       ) : (
-        <p className="mt-4 text-sm text-neutral-600">Connect a wallet to see its address and balance.</p>
+        <p className="mt-4 text-sm text-muted">Connect a wallet to see its address and balance.</p>
       )}
     </section>
   );

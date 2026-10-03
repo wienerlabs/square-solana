@@ -49,6 +49,13 @@ export const ASSESSED = {
       '@squaresdk/solana-policy (BE-10) yalnızca testlerde kullanır: createLocalProver snarkjs içermez, çağıranın ' +
       'kurduğu groth16 nesnesini alır. Servis imajı dağıtılmadan önce hukuki onay gerekir.',
   },
+  'npm:@fontsource/open-runde': {
+    status: 'cleared',
+    note:
+      'OFL-1.1 (OpenRunde yazı tipi, apps/web, FE-02). OFL fontun yazılımla birlikte paketlenip dağıtılmasına izin ' +
+      'verir; tek başına satılamaz ve telif bildirimi ile lisans her kopyayla gelmelidir. Font dosyaları ' +
+      "değiştirilmeden sunulur; bildirim NOTICE'ta, lisans metni paketin LICENSE dosyasında.",
+  },
   'npm:circomlibjs': {
     status: 'review',
     note:
