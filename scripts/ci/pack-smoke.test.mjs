@@ -8,6 +8,8 @@ import {
   consumerManifest,
   exportSpecifiers,
   exportTargets,
+  importEnv,
+  missingLegalFiles,
   unresolvedFromLock,
 } from './pack-smoke.mjs';
 
@@ -81,4 +83,37 @@ test('tüketici kurulumu iç içe yapılır: başka paketin hoist ettiği bağı
   const args = npmInstallArgs();
   assert.ok(args.includes('--install-strategy=nested'));
   assert.ok(args.includes('--ignore-scripts'));
+});
+
+test("lockfile'da listede olmayan birinci taraf paket de registry'den çözülemez", () => {
+  const lock = {
+    packages: {
+      'node_modules/@squaresdk/solana-types': { resolved: 'file:../t/types.tgz' },
+      'node_modules/@squaresdk/solana-types/node_modules/@squaresdk/solana-config': {
+        resolved: 'https://registry.example/@squaresdk/solana-config.tgz',
+      },
+    },
+  };
+  assert.deepEqual(unresolvedFromLock(lock, ['@squaresdk/solana-types']), [
+    'node_modules/@squaresdk/solana-types/node_modules/@squaresdk/solana-config yerel tarball yerine https://registry.example/@squaresdk/solana-config.tgz adresinden çözüldü',
+  ]);
+});
+
+test('import süreci yalnızca gerekli ortam değişkenlerini alır', () => {
+  assert.deepEqual(importEnv({ PATH: '/bin', HOME: '/h', GITHUB_TOKEN: 'x', SECRET: 'y' }, '@a/x'), {
+    PATH: '/bin',
+    HOME: '/h',
+    SPEC: '@a/x',
+  });
+});
+
+test('yayınlanan paket LICENSE ve NOTICE taşımalı', () => {
+  assert.deepEqual(
+    missingLegalFiles((name) => name === 'LICENSE'),
+    ['NOTICE'],
+  );
+  assert.deepEqual(
+    missingLegalFiles(() => true),
+    [],
+  );
 });

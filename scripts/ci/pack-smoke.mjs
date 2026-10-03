@@ -88,15 +88,35 @@ export function consumerManifest(tarballs) {
 }
 
 export function unresolvedFromLock(lock, names) {
+  const entries = lock.packages ?? {};
+  const scopes = new Set(names.map((name) => `${name.split('/')[0]}/`));
+  const isLocal = (entry) => String(entry.resolved ?? '').startsWith('file:');
   const errors = [];
   for (const name of names) {
-    const entry = lock.packages?.[`node_modules/${name}`];
+    const entry = entries[`node_modules/${name}`];
     if (!entry) errors.push(`${name} lockfile'da yok`);
-    else if (!String(entry.resolved ?? '').startsWith('file:')) {
-      errors.push(`${name} yerel tarball yerine ${entry.resolved} adresinden çözüldü`);
+    else if (!isLocal(entry)) errors.push(`${name} yerel tarball yerine ${entry.resolved} adresinden çözüldü`);
+  }
+  for (const [key, entry] of Object.entries(entries)) {
+    if (names.some((name) => key === `node_modules/${name}`)) continue;
+    const installed = key.slice(key.lastIndexOf('node_modules/') + 'node_modules/'.length);
+    if ([...scopes].some((scope) => installed.startsWith(scope)) && !isLocal(entry)) {
+      errors.push(`${key} yerel tarball yerine ${entry.resolved} adresinden çözüldü`);
     }
   }
   return errors;
+}
+
+/** Import süreci yalnızca çalışması için gerekenleri alır; CI ortamının geri kalanı paket koduna geçmez. */
+export function importEnv(env, specifier) {
+  return Object.fromEntries(
+    Object.entries({ PATH: env.PATH, HOME: env.HOME, SPEC: specifier }).filter(([, value]) => value !== undefined),
+  );
+}
+
+/** Apache-2.0 §4: dağıtılan paket lisansı ve NOTICE'i taşır. */
+export function missingLegalFiles(exists) {
+  return ['LICENSE', 'NOTICE'].filter((name) => !exists(name));
 }
 
 function workspacePackageNames() {
@@ -143,6 +163,9 @@ function smoke(work) {
   for (const name of PUBLISHABLE) {
     const installed = join(consumer, 'node_modules', ...name.split('/'));
     const manifest = JSON.parse(readFileSync(join(installed, 'package.json'), 'utf8'));
+    for (const file of missingLegalFiles((name) => existsSync(join(installed, name)))) {
+      errors.push(`${name}: tarball'da ${file} yok`);
+    }
     for (const target of exportTargets(manifest.exports)) {
       if (!existsSync(join(installed, target))) errors.push(`${name}: exports hedefi tarball'da yok: ${target}`);
     }
@@ -155,7 +178,7 @@ function smoke(work) {
             '-e',
             'const m = await import(process.env.SPEC); console.log(Object.keys(m).length);',
           ],
-          { cwd: consumer, env: { ...process.env, SPEC: specifier }, stdio: ['ignore', 'pipe', 'pipe'] },
+          { cwd: consumer, env: importEnv(process.env, specifier), stdio: ['ignore', 'pipe', 'pipe'] },
         ).trim();
         if (Number(keys) === 0) errors.push(`${specifier}: modül hiçbir şey dışa aktarmıyor`);
         else console.log(`import: ${specifier} (${keys} dışa aktarım)`);

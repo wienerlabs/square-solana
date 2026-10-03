@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { classifyChanges, decideScope, formatOutputs } from './turbo-scope.mjs';
+import { classifyChanges, decideScope, formatOutputs, formatSummary } from './turbo-scope.mjs';
 
 test('yalnızca paket dizinleri ve belgeler değiştiyse etkilenen paketler', () => {
   const r = classifyChanges([
@@ -114,4 +114,13 @@ test('tam koşuda bütün bayraklar açık', () => {
     'smoke=true',
     'db=true',
   ]);
+});
+
+test('özet dosya adlarını kod bloğunda listeler; ters tırnak biçimi bozamaz', () => {
+  const summary = formatSummary({
+    scope: { mode: 'full', reason: 'paket dışı girdi değişti', fullTriggers: ['a`b.md', 'idl/x.json'] },
+    packages: [],
+    lines: ['mode=full'],
+  });
+  assert.match(summary, /```text\na`b\.md\nidl\/x\.json\n```/);
 });

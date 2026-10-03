@@ -78,6 +78,19 @@ function affectedPackages(baseSha) {
   return JSON.parse(out.slice(out.indexOf('{'))).packages.filter((name) => name !== '//');
 }
 
+export function formatSummary({ scope, packages, lines }) {
+  const block = (items) => ['```text', ...items, '```'];
+  return [
+    `### Kapsam: ${scope.mode === 'full' ? 'tam koşu' : 'etkilenen paketler'}`,
+    `Sebep: ${scope.reason}.`,
+    ...(scope.fullTriggers.length ? ['', 'Tam koşu isteyen dosyalar:', ...block(scope.fullTriggers)] : []),
+    ...(scope.mode === 'affected' ? ['', 'Etkilenen paketler:', ...block(packages.length ? packages : ['(yok)'])] : []),
+    '',
+    'Çıktılar:',
+    ...block(lines),
+  ].join('\n');
+}
+
 function main() {
   const event = process.env.GITHUB_EVENT_NAME ?? '';
   const baseSha = process.env.BASE_SHA ?? '';
@@ -92,18 +105,7 @@ function main() {
     }
   }
   const lines = formatOutputs({ mode: scope.mode, baseSha, packages, publishable: PUBLISHABLE });
-  const summary = [
-    `### Kapsam: ${scope.mode === 'full' ? 'tam koşu' : 'etkilenen paketler'}`,
-    `Sebep: ${scope.reason}.`,
-    ...(scope.fullTriggers.length
-      ? ['', 'Tam koşu isteyen dosyalar:', ...scope.fullTriggers.map((f) => `- \`${f}\``)]
-      : []),
-    ...(scope.mode === 'affected'
-      ? ['', 'Etkilenen paketler:', ...(packages.length ? packages.map((p) => `- ${p}`) : ['- (yok)'])]
-      : []),
-    '',
-    ...lines.map((line) => `- \`${line}\``),
-  ].join('\n');
+  const summary = formatSummary({ scope, packages, lines });
   if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, `${lines.join('\n')}\n`);
   if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${summary}\n`);
   process.stdout.write(`${summary}\n`);
