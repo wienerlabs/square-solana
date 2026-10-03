@@ -69,6 +69,12 @@ export interface ListFilter {
   withArtifacts?: boolean;
 }
 
+/** Geçmişteki bir mesaj; `pending`, istemcinin devam mesajı henüz işlenmediyse true. */
+export interface StoredMessage {
+  message: Message;
+  pending: boolean;
+}
+
 export interface ListResult {
   tasks: TaskRecord[];
   totalSize: number;
@@ -99,7 +105,7 @@ export interface TaskStore {
   get(agentRecord: string, id: string): Promise<TaskRecord | null>;
   /** Durum zamanına göre azalan; imleç (`after`) ile sayfalanır. */
   list(agentRecord: string, caller: string, filter: ListFilter): Promise<ListResult>;
-  /** Agent'ın SUBMITTED ve WORKING görevleri; yeniden başlatmada agent'a yeniden verilir. */
+  /** Agent'ın terminal olmayan görevleri, artefaktlar olmadan; yeniden başlatmada agent işleri buradan kurulur. */
   active(agentRecord: string): Promise<TaskRecord[]>;
   /**
    * `expectedVersion` güncel değilse `version` hatası verir. `message` verilirse aynı işlemde geçmişe
@@ -114,11 +120,19 @@ export interface TaskStore {
   ): Promise<TaskRecord>;
   /**
    * Mesajı geçmişe ekler; aynı mesaj kimliği zaten varsa false. Geçmişte `maxMessages` mesaj varsa
-   * `message-limit` hatası verir.
+   * `message-limit` hatası verir. `pending` istemcinin devam mesajını işlenene kadar işaretler.
    */
-  appendMessage(taskId: string, message: Message, options?: { maxMessages?: number }): Promise<boolean>;
+  appendMessage(
+    taskId: string,
+    message: Message,
+    options?: { maxMessages?: number; pending?: boolean },
+  ): Promise<boolean>;
   /** Geçmişteki tek mesaj. */
-  message(taskId: string, messageId: string): Promise<Message | null>;
+  message(taskId: string, messageId: string): Promise<StoredMessage | null>;
+  /** İşlenmemiş devam mesajları, eklenme sırasıyla. */
+  pendingMessages(taskId: string): Promise<Message[]>;
+  /** Devam mesajının işlendiğini kaydeder. */
+  markProcessed(taskId: string, messageId: string): Promise<void>;
   /** Geçmiş, eklenme sırasıyla; `limit` en son mesajları sınırlar. */
   history(taskId: string, limit?: number): Promise<Message[]>;
 }

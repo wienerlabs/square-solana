@@ -1,7 +1,7 @@
 // TaskStore'un Postgres uygulaması: a2a_tasks ve a2a_messages (db/prisma/schema.prisma, BE-17). db
 // paketine yalnızca tip olarak bağlıdır; istemci (`createDatabaseClient`) çağırandan gelir.
 import type { A2aTaskModel, Prisma, PrismaClient } from '@squaresdk/solana-db';
-import { TERMINAL_TASK_STATES, type Artifact, type Message, type TaskState } from '@squaresdk/solana-types';
+import { TERMINAL_TASK_STATES, type Artifact, type Message } from '@squaresdk/solana-types';
 import {
   TASK_ID_PATTERN,
   TaskStoreError,
@@ -14,7 +14,8 @@ import {
 } from './store.js';
 
 const TERMINAL = [...TERMINAL_TASK_STATES];
-const RESUMABLE: TaskState[] = ['TASK_STATE_SUBMITTED', 'TASK_STATE_WORKING'];
+/** Tüm işlemler READ COMMITTED: kilit sonrası okuma ve sürüm koşulu veritabanının varsayılanına bırakılmaz. */
+const READ_COMMITTED = { isolationLevel: 'ReadCommitted' } as const;
 
 type TaskRow = Omit<A2aTaskModel, 'artifacts'> & { artifacts?: A2aTaskModel['artifacts'] };
 
@@ -56,7 +57,11 @@ const messageFields = (message: Message) => ({
   content: json(message),
 });
 
-const messageRow = (taskId: string, message: Message) => ({ taskId, ...messageFields(message) });
+const messageRow = (taskId: string, message: Message, pending = false) => ({
+  taskId,
+  ...messageFields(message),
+  pending,
+});
 
 type TaskReader = Pick<PrismaClient, 'a2aTask'>;
 
@@ -83,36 +88,33 @@ export function createPrismaTaskStore(client: PrismaClient): TaskStore {
    * READ COMMITTED'a dayanır; kısmi tekil indeks `a2a_tasks_active_job_key` kilidi almayan yazıcıya karşı korur.
    */
   async function create(task: NewTask) {
-    return client.$transaction(
-      async (tx) => {
-        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`a2a:${task.agentRecord}:${task.job}`}, 0))`;
-        const found = await existing(tx, task);
-        if (found) return found;
-        const active = await tx.a2aTask.findFirst({
-          where: { agentRecord: task.agentRecord, job: task.job, state: { notIn: TERMINAL } },
-          select: { id: true },
-        });
-        if (active) throw new TaskStoreError('active-task', 'job için terminal olmayan bir görev var');
-        const row = await tx.a2aTask.create({
-          data: {
-            agentRecord: task.agentRecord,
-            caller: task.caller,
-            job: task.job,
-            specHash: task.specHash,
-            state: 'TASK_STATE_SUBMITTED',
-            statusAt: task.statusAt,
-            artifacts: json([]),
-            createMessageId: task.message.messageId,
-            createHash: task.createHash,
-            jobStatus: task.jobStatus,
-            jobSlot: task.jobSlot === null ? null : BigInt(task.jobSlot),
-            messages: { create: messageFields(task.message) },
-          },
-        });
-        return { task: toRecord(row), created: true };
-      },
-      { isolationLevel: 'ReadCommitted' },
-    );
+    return client.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`a2a:${task.agentRecord}:${task.job}`}, 0))`;
+      const found = await existing(tx, task);
+      if (found) return found;
+      const active = await tx.a2aTask.findFirst({
+        where: { agentRecord: task.agentRecord, job: task.job, state: { notIn: TERMINAL } },
+        select: { id: true },
+      });
+      if (active) throw new TaskStoreError('active-task', 'job için terminal olmayan bir görev var');
+      const row = await tx.a2aTask.create({
+        data: {
+          agentRecord: task.agentRecord,
+          caller: task.caller,
+          job: task.job,
+          specHash: task.specHash,
+          state: 'TASK_STATE_SUBMITTED',
+          statusAt: task.statusAt,
+          artifacts: json([]),
+          createMessageId: task.message.messageId,
+          createHash: task.createHash,
+          jobStatus: task.jobStatus,
+          jobSlot: task.jobSlot === null ? null : BigInt(task.jobSlot),
+          messages: { create: messageFields(task.message) },
+        },
+      });
+      return { task: toRecord(row), created: true };
+    }, READ_COMMITTED);
   }
 
   async function updateRow(db: TaskReader, agentRecord: string, id: string, expectedVersion: number, patch: TaskPatch) {
@@ -197,10 +199,11 @@ export function createPrismaTaskStore(client: PrismaClient): TaskStore {
 
     async active(agentRecord) {
       const rows = await client.a2aTask.findMany({
-        where: { agentRecord, state: { in: RESUMABLE } },
+        where: { agentRecord, state: { notIn: TERMINAL } },
         orderBy: { createdAt: 'asc' },
+        omit: { artifacts: true },
       });
-      return rows.map(toRecord);
+      return rows.map((row) => toRecord(row));
     },
 
     async update(agentRecord, id, expectedVersion, patch: TaskPatch, message?: Message) {
@@ -211,10 +214,11 @@ export function createPrismaTaskStore(client: PrismaClient): TaskStore {
               const updated = await updateRow(tx, agentRecord, id, expectedVersion, patch);
               await tx.a2aMessage.create({ data: messageRow(id, message) });
               return updated;
-            })
+            }, READ_COMMITTED)
           : await updateRow(client, agentRecord, id, expectedVersion, patch);
         return toRecord(row);
       } catch (error) {
+        if (prismaCode(error) === 'P2034') throw new TaskStoreError('version', 'görev başka bir güncellemeyle değişti');
         if (prismaCode(error) !== 'P2025') throw error;
         const current = await client.a2aTask.findFirst({ where: { id, agentRecord }, select: { id: true } });
         throw current ? new TaskStoreError('version', 'görev başka bir güncellemeyle değişti') : notFound();
@@ -224,9 +228,10 @@ export function createPrismaTaskStore(client: PrismaClient): TaskStore {
     async appendMessage(taskId, message, options) {
       if (!TASK_ID_PATTERN.test(taskId)) throw notFound();
       const max = options?.maxMessages;
+      const pending = options?.pending === true;
       try {
         if (max === undefined) {
-          await client.a2aMessage.create({ data: messageRow(taskId, message) });
+          await client.a2aMessage.create({ data: messageRow(taskId, message, pending) });
           return true;
         }
         return await client.$transaction(async (tx) => {
@@ -238,9 +243,9 @@ export function createPrismaTaskStore(client: PrismaClient): TaskStore {
           if ((await tx.a2aMessage.count({ where: { taskId } })) >= max) {
             throw new TaskStoreError('message-limit', `görevin geçmişi ${max} mesajla dolu`);
           }
-          await tx.a2aMessage.create({ data: messageRow(taskId, message) });
+          await tx.a2aMessage.create({ data: messageRow(taskId, message, pending) });
           return true;
-        });
+        }, READ_COMMITTED);
       } catch (error) {
         if (prismaCode(error) === 'P2002') return false;
         if (prismaCode(error) === 'P2003') throw notFound();
@@ -252,9 +257,24 @@ export function createPrismaTaskStore(client: PrismaClient): TaskStore {
       if (!TASK_ID_PATTERN.test(taskId)) return null;
       const row = await client.a2aMessage.findUnique({
         where: { taskId_messageId: { taskId, messageId } },
+        select: { content: true, pending: true },
+      });
+      return row ? { message: row.content as Message, pending: row.pending } : null;
+    },
+
+    async pendingMessages(taskId) {
+      if (!TASK_ID_PATTERN.test(taskId)) return [];
+      const rows = await client.a2aMessage.findMany({
+        where: { taskId, pending: true },
+        orderBy: { id: 'asc' },
         select: { content: true },
       });
-      return row ? (row.content as Message) : null;
+      return rows.map((row) => row.content as Message);
+    },
+
+    async markProcessed(taskId, messageId) {
+      if (!TASK_ID_PATTERN.test(taskId)) return;
+      await client.a2aMessage.updateMany({ where: { taskId, messageId, pending: true }, data: { pending: false } });
     },
 
     async history(taskId, limit) {

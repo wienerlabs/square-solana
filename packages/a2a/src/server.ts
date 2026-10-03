@@ -26,7 +26,7 @@ import {
 import type { Authenticator, Caller } from './auth.js';
 import { A2aError, errors } from './errors.js';
 import { createTaskEventBus, type TaskEvent, type TaskEventBus } from './events.js';
-import { errorResponse, parseJsonRpc, parseParams, successResponse } from './jsonrpc.js';
+import { errorResponse, jsonViolation, parseJsonRpc, parseParams, successResponse } from './jsonrpc.js';
 import { createSquareTaskGate, messageContentHash, type JobFacts, type JobSource } from './square.js';
 import { openSse, type SseStream } from './sse.js';
 import { cancelable, canTransition, consistentWithJob, isTerminal, reconcile } from './state.js';
@@ -81,7 +81,11 @@ export interface TaskExecutor {
    * aynı görev için yeniden çağrılabilir, bu yüzden tekrar çalıştırılabilir olmalıdır.
    */
   onTask(context: TaskContext): Promise<void>;
-  /** Terminal olmayan göreve gelen ek mesaj; bir görevin işleri sırayla çalışır. Tanımlı değilse desteklenmez. */
+  /**
+   * Terminal olmayan göreve gelen ek mesaj; bir görevin işleri sırayla çalışır. İş kesintisiz bitene
+   * kadar mesaj bekliyor sayılır ve yeniden başlatmada ya da aynı kimlikli tekrar denemede yeniden
+   * iletilir (en az bir kez). Tanımlı değilse devam mesajı desteklenmez.
+   */
   onMessage?(context: TaskContext, message: Message): Promise<void>;
 }
 
@@ -101,9 +105,12 @@ export interface A2aServerOptions {
 
 export interface A2aServer {
   handle(request: IncomingMessage, response: ServerResponse): Promise<void>;
-  /** Yeniden başlatmadan sonra SUBMITTED ve WORKING görevler için `onTask`'ı yeniden çağırır; sayısını döner. */
+  /**
+   * Yeniden başlatmadan sonra agent işlerini kurar: SUBMITTED ve WORKING görevler için `onTask`, işlenmemiş
+   * devam mesajları için `onMessage`. Bu süreçte işi süren göreve dokunmaz; iş kurulan görev sayısını döner.
+   */
   resume(): Promise<number>;
-  /** Yeni istekleri reddeder, akışları kapatır, agent sinyallerini keser ve çalışan agent işlerini bekler. */
+  /** Yeni istekleri ve agent işlerini durdurur, bekleyen istekleri bırakır, akışları kapatır ve çalışan işleri bekler. */
   close(): Promise<void>;
 }
 
@@ -159,6 +166,12 @@ function sendJson(response: ServerResponse, status: number, body: unknown, extra
   response.end(text);
 }
 
+/** Depoya giden zaman 1 ile 9999 yılları arasında olmalı; Postgres daha geniş aralığı kabul etmez. */
+function storable(date: Date): boolean {
+  const year = date.getUTCFullYear();
+  return !Number.isNaN(date.getTime()) && year >= 1 && year <= 9999;
+}
+
 function encodeCursor(cursor: ListCursor): string {
   return Buffer.from(JSON.stringify({ t: cursor.statusAt.toISOString(), i: cursor.id })).toString('base64url');
 }
@@ -167,7 +180,7 @@ function decodeCursor(token: string): ListCursor {
   try {
     const value = JSON.parse(Buffer.from(token, 'base64url').toString('utf8')) as { t?: unknown; i?: unknown };
     const statusAt = new Date(String(value.t));
-    if (typeof value.i !== 'string' || !TASK_ID_PATTERN.test(value.i) || Number.isNaN(statusAt.getTime())) {
+    if (typeof value.i !== 'string' || !TASK_ID_PATTERN.test(value.i) || !storable(statusAt)) {
       throw new Error('imleç');
     }
     return { statusAt, id: value.i };
@@ -199,16 +212,24 @@ function serial<T>(chains: Map<string, Promise<void>>, key: string, work: () => 
 
 const settled = (state: TaskState) => isTerminal(state) || INTERRUPTED_TASK_STATES.has(state);
 
-/** `waitAfter`: bekleyen SendMessage bu sürümden sonraki ilk kesintili ya da terminal durumu bekler; null ise beklemez. */
+/** Görevin bir sonraki kesintili ya da terminal durum olayını bekler; agent işi başlamadan kurulur. */
+interface Waiter {
+  readonly done: Promise<void>;
+  cancel(): void;
+}
+
+/** `waiter` null ise bekleyen SendMessage görevi hemen döner. */
 interface Admitted {
   task: TaskRecord;
-  waitAfter: number | null;
+  waiter: Waiter | null;
 }
 
 interface Observed {
   task: TaskRecord;
   job: JobFacts | null;
 }
+
+type MessageHandler = NonNullable<TaskExecutor['onMessage']>;
 
 export function createA2aServer(options: A2aServerOptions): A2aServer {
   const { agentRecord, store, jobSource, executor, limits } = options;
@@ -226,8 +247,10 @@ export function createA2aServer(options: A2aServerOptions): A2aServer {
   const running = new Set<Promise<void>>();
   const writes = new Map<string, Promise<void>>();
   const queues = new Map<string, Promise<void>>();
+  const inflight = new Set<string>();
   const streams = new Set<SseStream>();
   const streamsByCaller = new Map<string, number>();
+  const shutdown = new AbortController();
   let streamCount = 0;
   let closing = false;
 
@@ -270,6 +293,17 @@ export function createA2aServer(options: A2aServerOptions): A2aServer {
     const task = await store.get(agentRecord, id);
     if (!task || task.caller !== caller) throw errors.taskNotFound();
     return task;
+  }
+
+  function watch(taskId: string): Waiter {
+    let resolveDone: () => void = () => undefined;
+    const done = new Promise<void>((resolve) => {
+      resolveDone = resolve;
+    });
+    const cancel = bus.subscribe(taskId, (event) => {
+      if (event.kind === 'status' && settled(event.task.state)) resolveDone();
+    });
+    return { done, cancel };
   }
 
   /**
@@ -325,8 +359,17 @@ export function createA2aServer(options: A2aServerOptions): A2aServer {
     };
   }
 
+  /** Agent'ın verdiği değer depoya gitmeden I-JSON'a göre denetlenir. */
+  function assertStorable(value: unknown, what: string) {
+    const violation = jsonViolation(value);
+    if (violation) {
+      throw new Error(`${what} I-JSON değil: ${violation.field ? `${violation.field} ` : ''}${violation.description}`);
+    }
+  }
+
   /** Agent kaynaklı durum geçişi: durum makinesi ve zincirdeki job ile tutarlı olmalı. */
-  function transition(taskId: string, target: TaskState, text?: string): Promise<void> {
+  async function transition(taskId: string, target: TaskState, text?: string): Promise<void> {
+    if (text !== undefined) assertStorable(text, 'durum metni');
     return locked(taskId, async () => {
       for (let attempt = 0; attempt < UPDATE_ATTEMPTS; attempt += 1) {
         const current = await store.get(agentRecord, taskId);
@@ -363,8 +406,9 @@ export function createA2aServer(options: A2aServerOptions): A2aServer {
     });
   }
 
-  function addArtifact(taskId: string, input: Artifact, append: boolean, lastChunk: boolean): Promise<void> {
+  async function addArtifact(taskId: string, input: Artifact, append: boolean, lastChunk: boolean): Promise<void> {
     const artifact = ArtifactSchema.parse(input);
+    assertStorable(artifact, 'artefakt');
     return locked(taskId, async () => {
       for (let attempt = 0; attempt < UPDATE_ATTEMPTS; attempt += 1) {
         const current = await store.get(agentRecord, taskId);
@@ -402,26 +446,32 @@ export function createA2aServer(options: A2aServerOptions): A2aServer {
     };
   }
 
-  function track(work: Promise<void>) {
+  function track(work: Promise<void>): Promise<void> {
     running.add(work);
     void work.then(
       () => running.delete(work),
       () => running.delete(work),
     );
+    return work;
   }
 
-  /** Agent işini görevin kuyruğuna ekler; hata fırlatırsa görev (hâlâ uygunsa) FAILED olur. */
-  function run(taskId: string, work: () => Promise<void>, signal: AbortSignal) {
-    track(
+  /**
+   * Agent işini görevin kuyruğuna ekler. Sunucu kapanıyorsa ya da görevin sinyali kesildiyse iş çalışmaz.
+   * Hata fırlatırsa görev (hâlâ uygunsa) FAILED olur. İş kesintisiz biterse `settle` çalışır.
+   */
+  function run(taskId: string, work: () => Promise<void>, signal: AbortSignal, settle?: () => Promise<void>) {
+    return track(
       serial(queues, taskId, async () => {
-        if (signal.aborted) return;
+        if (closing || signal.aborted) return;
         try {
           await work();
         } catch (error) {
           report(error);
-          if (signal.aborted) return;
-          await transition(taskId, 'TASK_STATE_FAILED', 'agent görevi tamamlayamadı').catch(report);
+          if (!signal.aborted) {
+            await transition(taskId, 'TASK_STATE_FAILED', 'agent görevi tamamlayamadı').catch(report);
+          }
         }
+        if (settle && !signal.aborted) await settle().catch(report);
       }),
     );
   }
@@ -435,18 +485,44 @@ export function createA2aServer(options: A2aServerOptions): A2aServer {
   }
 
   function start(task: TaskRecord, job: JobFacts, message: Message) {
+    if (closing) return;
     const { signal } = controllerFor(task.id);
     run(task.id, () => executor.onTask(contextFor(task, job, message, signal)), signal);
   }
 
+  /** Devam mesajını agent'a iletir; iş kesintisiz bitince mesaj işlendi sayılır. Aynı mesaj iki kez kuyruğa girmez. */
+  function deliver(task: TaskRecord, job: JobFacts, opening: Message, message: Message, onMessage: MessageHandler) {
+    const key = `${task.id}:${message.messageId}`;
+    if (closing || inflight.has(key)) return;
+    inflight.add(key);
+    const { signal } = controllerFor(task.id);
+    void run(
+      task.id,
+      () => onMessage(contextFor(task, job, opening, signal), message),
+      signal,
+      () => store.markProcessed(task.id, message.messageId),
+    ).then(() => inflight.delete(key));
+  }
+
   const messageIdConflict = () => new TaskStoreError('message-id', 'aynı mesaj kimliği farklı içerikle kullanıldı');
 
-  async function openTask(caller: Caller, message: Message): Promise<Admitted> {
+  async function openTask(caller: Caller, message: Message, blocking: boolean): Promise<Admitted> {
     const createHash = messageContentHash(message);
     const prior = await store.findCreated(agentRecord, caller.id, message.messageId);
     if (prior) {
       if (prior.createHash !== createHash) throw messageIdConflict();
-      return { task: (await observe(prior.id, true)).task, waitAfter: -1 };
+      const waiter = blocking ? watch(prior.id) : null;
+      try {
+        const { task } = await observe(prior.id, true);
+        if (waiter && settled(task.state)) {
+          waiter.cancel();
+          return { task, waiter: null };
+        }
+        return { task, waiter };
+      } catch (error) {
+        waiter?.cancel();
+        throw error;
+      }
     }
     const decision = await gate.admitCreate(message, caller);
     const { task, created } = await store.create({
@@ -460,12 +536,21 @@ export function createA2aServer(options: A2aServerOptions): A2aServer {
       jobStatus: decision.job.status,
       jobSlot: decision.job.slot,
     });
-    if (created) start(task, decision.job, message);
-    return { task, waitAfter: -1 };
+    const waiter = blocking ? watch(task.id) : null;
+    if (created) {
+      start(task, decision.job, message);
+      return { task, waiter };
+    }
+    const latest = (await store.get(agentRecord, task.id)) ?? task;
+    if (waiter && settled(latest.state)) {
+      waiter.cancel();
+      return { task: latest, waiter: null };
+    }
+    return { task: latest, waiter };
   }
 
-  async function continueTask(caller: Caller, message: Message): Promise<Admitted> {
-    const task = await scoped(caller.id, message.taskId!);
+  async function continueTask(caller: Caller, taskId: string, message: Message, blocking: boolean): Promise<Admitted> {
+    const task = await scoped(caller.id, taskId);
     if (message.contextId !== undefined && message.contextId !== task.contextId) {
       throw errors.rejectedParams(
         'CONTEXT_ID_MISMATCH',
@@ -480,56 +565,59 @@ export function createA2aServer(options: A2aServerOptions): A2aServer {
       if (!fresh) throw errors.taskNotFound();
       const known = await store.message(fresh.id, message.messageId);
       if (known) {
-        if (messageContentHash(known) !== messageContentHash(message)) throw messageIdConflict();
-        return { task: fresh, waitAfter: null };
+        if (messageContentHash(known.message) !== messageContentHash(message)) throw messageIdConflict();
+        if (!known.pending || isTerminal(fresh.state)) return { task: fresh, waiter: null };
       }
       const { task: current, job } = await reconcileTask(fresh, false);
-      if (isTerminal(current.state)) throw errors.unsupportedOperation('TASK_TERMINAL', { state: current.state });
-      if (!job) throw errors.rejectedParams('JOB_NOT_FOUND', 'message.taskId', "görevin job'u zincirde yok");
-      if (!(await store.appendMessage(current.id, message, { maxMessages: limits.maxMessagesPerTask }))) {
-        return { task: current, waitAfter: null };
+      if (isTerminal(current.state)) {
+        if (known) return { task: current, waiter: null };
+        throw errors.unsupportedOperation('TASK_TERMINAL', { state: current.state });
       }
-      const opening = (await store.message(current.id, current.createMessageId)) ?? message;
-      const { signal } = controllerFor(current.id);
-      run(current.id, () => onMessage(contextFor(current, job, opening, signal), message), signal);
-      return { task: current, waitAfter: current.version };
+      if (!job) throw errors.rejectedParams('JOB_NOT_FOUND', 'message.taskId', "görevin job'u zincirde yok");
+      if (
+        !known &&
+        !(await store.appendMessage(current.id, message, { maxMessages: limits.maxMessagesPerTask, pending: true }))
+      ) {
+        return { task: current, waiter: null };
+      }
+      const opening = (await store.message(current.id, current.createMessageId))?.message ?? message;
+      const waiter = blocking ? watch(current.id) : null;
+      deliver(current, job, opening, message, onMessage);
+      return { task: current, waiter };
     });
   }
 
-  async function admit(caller: Caller, request: SendMessageRequest): Promise<Admitted> {
+  async function admit(caller: Caller, request: SendMessageRequest, blocking: boolean): Promise<Admitted> {
     if (request.configuration?.taskPushNotificationConfig !== undefined) throw errors.pushNotificationNotSupported();
     if (request.message.role !== 'ROLE_USER') {
       throw errors.invalidParams([{ field: 'message.role', description: 'istemci mesajı ROLE_USER olmalı' }]);
     }
-    return request.message.taskId ? continueTask(caller, request.message) : openTask(caller, request.message);
+    const { taskId } = request.message;
+    return taskId
+      ? continueTask(caller, taskId, request.message, blocking)
+      : openTask(caller, request.message, blocking);
   }
 
-  /** Görev `waitAfter`'dan sonraki ilk kesintili ya da terminal duruma gelene, süre dolana ya da istemci ayrılana kadar bekler. */
+  /** Bekleyici tetiklenene, süre dolana, istemci ayrılana ya da sunucu kapanana kadar bekler; güncel görevi döner. */
   async function waitSettled(admitted: Admitted, abort: AbortSignal): Promise<TaskRecord> {
-    const { task, waitAfter } = admitted;
-    if (waitAfter === null) return task;
-    const done = (candidate: TaskRecord) => candidate.version > waitAfter && settled(candidate.state);
-    if (done(task)) return task;
+    const { task, waiter } = admitted;
+    if (!waiter) return task;
+    const signals = [abort, shutdown.signal];
     await new Promise<void>((resolve) => {
       let stopped = false;
       const timer = setTimeout(stop, limits.blockingTimeoutMs);
-      const unsubscribe = bus.subscribe(task.id, (event) => {
-        if (event.kind === 'status' && done(event.task)) stop();
-      });
-      abort.addEventListener('abort', stop, { once: true });
       function stop() {
         if (stopped) return;
         stopped = true;
         clearTimeout(timer);
-        unsubscribe();
-        abort.removeEventListener('abort', stop);
+        for (const signal of signals) signal.removeEventListener('abort', stop);
         resolve();
       }
-      if (abort.aborted) stop();
-      void store.get(agentRecord, task.id).then((latest) => {
-        if (latest && done(latest)) stop();
-      }, stop);
+      for (const signal of signals) signal.addEventListener('abort', stop, { once: true });
+      if (signals.some((signal) => signal.aborted)) stop();
+      void waiter.done.then(stop);
     });
+    waiter.cancel();
     return (await store.get(agentRecord, task.id)) ?? task;
   }
 
@@ -558,8 +646,8 @@ export function createA2aServer(options: A2aServerOptions): A2aServer {
     const onClose = () => disconnected.abort();
     response.once('close', onClose);
     try {
-      const admitted = await admit(caller, request);
-      const result = blocking ? await waitSettled(admitted, disconnected.signal) : admitted.task;
+      const admitted = await admit(caller, request, blocking);
+      const result = await waitSettled(admitted, disconnected.signal);
       return { task: await wireWithHistory(result, request.configuration?.historyLength) };
     } finally {
       response.off('close', onClose);
@@ -586,22 +674,27 @@ export function createA2aServer(options: A2aServerOptions): A2aServer {
     };
   }
 
-  /** Görev akışı: önce görev, sonra olaylar; görev terminal olunca kapanır (spec §3.1.2). */
+  /**
+   * Görev akışı: önce görev, sonra olaylar; görev terminal olunca kapanır (spec §3.1.2). İlk kare SSE
+   * açılmadan hazırlanır; hazırlanamazsa istemci JSON hata yanıtı alır.
+   */
   async function stream(response: ServerResponse, id: JsonRpcId, taskId: string, historyLength?: number) {
     const pending: TaskEvent[] = [];
     let lastVersion = -1;
     let ready = false;
     let sse: SseStream | null = null;
-    const deliver = (event: TaskEvent) => {
+    const forward = (event: TaskEvent) => {
       if (event.task.version <= lastVersion || !sse) return;
       lastVersion = event.task.version;
       sse.send(successResponse(id, streamEvent(event)));
       if (event.kind === 'status' && isTerminal(event.task.state)) sse.close();
     };
-    const unsubscribe = bus.subscribe(taskId, (event) => (ready ? deliver(event) : pending.push(event)));
+    const unsubscribe = bus.subscribe(taskId, (event) => (ready ? forward(event) : pending.push(event)));
     try {
       const snapshot = await store.get(agentRecord, taskId);
       if (!snapshot) throw errors.taskNotFound();
+      const first = successResponse(id, { task: await wireWithHistory(snapshot, historyLength) });
+      if (response.destroyed) return;
       sse = openSse(response, {
         heartbeatMs: limits.heartbeatMs,
         maxDurationMs: limits.streamMaxDurationMs,
@@ -609,9 +702,9 @@ export function createA2aServer(options: A2aServerOptions): A2aServer {
       });
       streams.add(sse);
       lastVersion = snapshot.version;
-      sse.send(successResponse(id, { task: await wireWithHistory(snapshot, historyLength) }));
+      sse.send(first);
       ready = true;
-      for (const event of pending.splice(0)) deliver(event);
+      for (const event of pending.splice(0)) forward(event);
       if (isTerminal(snapshot.state)) sse.close();
       await sse.closed;
     } finally {
@@ -626,11 +719,17 @@ export function createA2aServer(options: A2aServerOptions): A2aServer {
   async function listTasks(caller: Caller, params: unknown): Promise<ListTasksResponse> {
     const request = parseParams(ListTasksRequestSchema, params);
     const pageSize = request.pageSize ?? DEFAULT_PAGE_SIZE;
+    const statusAfter = request.statusTimestampAfter ? new Date(request.statusTimestampAfter) : undefined;
+    if (statusAfter && !storable(statusAfter)) {
+      throw errors.invalidParams([
+        { field: 'statusTimestampAfter', description: 'zaman 1 ile 9999 yılları arasında olmalı' },
+      ]);
+    }
     const result = await store.list(agentRecord, caller.id, {
       pageSize,
       ...(request.contextId ? { contextId: request.contextId } : {}),
       ...(request.status ? { state: request.status } : {}),
-      ...(request.statusTimestampAfter ? { statusAfter: new Date(request.statusTimestampAfter) } : {}),
+      ...(statusAfter ? { statusAfter } : {}),
       ...(request.pageToken ? { after: decodeCursor(request.pageToken) } : {}),
       withArtifacts: request.includeArtifacts === true,
     });
@@ -718,7 +817,7 @@ export function createA2aServer(options: A2aServerOptions): A2aServer {
         const request = parseParams(SendMessageRequestSchema, params);
         const release = reserveStream(caller.id);
         try {
-          const { task } = await admit(caller, request);
+          const { task } = await admit(caller, request, false);
           return await stream(response, id, task.id, request.configuration?.historyLength);
         } finally {
           release();
@@ -820,15 +919,32 @@ export function createA2aServer(options: A2aServerOptions): A2aServer {
     },
 
     async resume() {
+      const onMessage = executor.onMessage?.bind(executor);
       let resumed = 0;
-      for (const task of await store.active(agentRecord)) {
+      for (const listed of await store.active(agentRecord)) {
         try {
-          const { task: current, job } = await observe(task.id, true);
-          if (!job || (current.state !== 'TASK_STATE_SUBMITTED' && current.state !== 'TASK_STATE_WORKING')) continue;
-          const opening = await store.message(current.id, current.createMessageId);
-          if (!opening) continue;
-          start(current, job, opening);
-          resumed += 1;
+          const started = await locked(listed.id, async () => {
+            if (closing || queues.has(listed.id)) return false;
+            const fresh = await store.get(agentRecord, listed.id);
+            if (!fresh) return false;
+            const { task, job } = await reconcileTask(fresh, true);
+            if (!job || isTerminal(task.state)) return false;
+            const opening = (await store.message(task.id, task.createMessageId))?.message;
+            if (!opening) return false;
+            let any = false;
+            if (task.state === 'TASK_STATE_SUBMITTED' || task.state === 'TASK_STATE_WORKING') {
+              start(task, job, opening);
+              any = true;
+            }
+            if (onMessage) {
+              for (const message of await store.pendingMessages(task.id)) {
+                deliver(task, job, opening, message, onMessage);
+                any = true;
+              }
+            }
+            return any;
+          });
+          if (started) resumed += 1;
         } catch (error) {
           report(error);
         }
@@ -838,6 +954,7 @@ export function createA2aServer(options: A2aServerOptions): A2aServer {
 
     async close() {
       closing = true;
+      shutdown.abort();
       for (const controller of controllers.values()) controller.abort();
       controllers.clear();
       for (const sse of [...streams]) sse.close();

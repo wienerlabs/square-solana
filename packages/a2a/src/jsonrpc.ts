@@ -36,30 +36,56 @@ const LONE_SURROGATE = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[
 const stringProblem = (value: string) =>
   value.includes('\u0000') ? 'NUL karakteri' : LONE_SURROGATE.test(value) ? 'eşleşmemiş UTF-16 surrogate' : null;
 
+interface Node {
+  value: unknown;
+  depth: number;
+  parent: Node | null;
+  key: string | number;
+}
+
+function pathOf(node: Node): string {
+  const keys: (string | number)[] = [];
+  for (let current: Node | null = node; current?.parent; current = current.parent) keys.push(current.key);
+  return keys.reverse().reduce<string>((path, key) => {
+    if (typeof key === 'number') return `${path}[${key}]`;
+    return path ? `${path}.${key}` : key;
+  }, '');
+}
+
 /**
  * I-JSON (RFC 7493) denetimi: NUL, eşleşmemiş surrogate, sonlu olmayan sayı (`1e999`) ve `MAX_DEPTH`'ten
- * derin iç içe değer reddedilir. Postgres JSONB'si ve RFC 8785 kanonikleştirmesi bunları kabul etmez.
+ * derin iç içe değer reddedilir. Postgres JSONB'si ve RFC 8785 kanonikleştirmesi bunları kabul etmez. Alan
+ * yolu yalnızca ihlalde kurulur.
  */
 export function jsonViolation(value: unknown): FieldViolation | null {
-  const stack: { value: unknown; path: string; depth: number }[] = [{ value, path: '', depth: 0 }];
-  for (let item = stack.pop(); item !== undefined; item = stack.pop()) {
-    const { value: current, path, depth } = item;
+  const stack: Node[] = [{ value, depth: 0, parent: null, key: '' }];
+  for (let node = stack.pop(); node !== undefined; node = stack.pop()) {
+    const current = node.value;
     if (typeof current === 'string') {
       const problem = stringProblem(current);
-      if (problem) return { field: path, description: problem };
+      if (problem) return { field: pathOf(node), description: problem };
     } else if (typeof current === 'number') {
-      if (!Number.isFinite(current)) return { field: path, description: 'sonlu olmayan sayı' };
+      if (!Number.isFinite(current)) return { field: pathOf(node), description: 'sonlu olmayan sayı' };
     } else if (typeof current === 'object' && current !== null) {
-      if (depth >= MAX_DEPTH) return { field: path, description: `iç içe derinlik ${MAX_DEPTH} sınırını aşıyor` };
+      if (node.depth >= MAX_DEPTH) {
+        return { field: pathOf(node), description: `iç içe derinlik ${MAX_DEPTH} sınırını aşıyor` };
+      }
       if (Array.isArray(current)) {
-        current.forEach((child, index) => stack.push({ value: child, path: `${path}[${index}]`, depth: depth + 1 }));
+        for (let index = 0; index < current.length; index += 1) {
+          stack.push({ value: current[index], depth: node.depth + 1, parent: node, key: index });
+        }
         continue;
       }
-      for (const [key, child] of Object.entries(current)) {
-        const childPath = path ? `${path}.${key}` : key;
+      for (const key of Object.keys(current)) {
+        const child: Node = {
+          value: (current as Record<string, unknown>)[key],
+          depth: node.depth + 1,
+          parent: node,
+          key,
+        };
         const problem = stringProblem(key);
-        if (problem) return { field: childPath, description: `anahtarda ${problem}` };
-        stack.push({ value: child, path: childPath, depth: depth + 1 });
+        if (problem) return { field: pathOf(child), description: `anahtarda ${problem}` };
+        stack.push(child);
       }
     }
   }

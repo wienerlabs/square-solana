@@ -94,6 +94,23 @@ describe('openSse', () => {
     response.destroy();
   });
 
+  it('istemci akış açılmadan ayrıldıysa akış hemen kapanır', async () => {
+    let stream: SseStream | undefined;
+    server = createServer((req, res) => {
+      req.socket.destroy();
+      setImmediate(() => {
+        stream = openSse(res, OPTIONS);
+      });
+    });
+    await new Promise<void>((resolve) => server!.listen(0, '127.0.0.1', resolve));
+    const port = (server.address() as AddressInfo).port;
+    await connect(port).catch(() => null);
+    for (let i = 0; i < 50 && !stream; i += 1) await new Promise((resolve) => setTimeout(resolve, 10));
+    await stream!.closed;
+    expect(stream!.isClosed()).toBe(true);
+    expect(stream!.send({ a: 1 })).toBe(false);
+  });
+
   it('süre dolduğunda okumayan istemcinin bağlantısı kısa bir süre sonra kesilir', async () => {
     let stream!: SseStream;
     const port = await serve(
@@ -106,7 +123,8 @@ describe('openSse', () => {
     const response = await connect(port);
     response.pause();
     await stream.closed;
-    await new Promise((resolve) => setTimeout(resolve, 300));
+    for (let i = 0; i < 300 && !lastResponse?.destroyed; i += 1)
+      await new Promise((resolve) => setTimeout(resolve, 10));
     expect(lastResponse?.destroyed).toBe(true);
     response.destroy();
   });

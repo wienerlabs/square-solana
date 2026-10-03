@@ -3,7 +3,7 @@ import type { Message } from '@squaresdk/solana-types';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { createPrismaTaskStore } from '../src/prisma-store.js';
 import { TaskStoreError, type NewTask, type TaskStore } from '../src/store.js';
-import { AGENT_RECORD, JOB_A, JOB_B, JOB_C, OTHER_AGENT_RECORD, SPEC_HASH } from './helpers/fixtures.js';
+import { AGENT_RECORD, JOB_A, JOB_B, JOB_C, JOB_D, OTHER_AGENT_RECORD, SPEC_HASH } from './helpers/fixtures.js';
 
 let db: IsolatedDatabase;
 let store: TaskStore;
@@ -251,16 +251,34 @@ describe('list ve history', () => {
     expect(ids(after)).toEqual(['m-4', 'm-3']);
   });
 
-  it("yeniden başlatma için agent'ın SUBMITTED ve WORKING görevleri", async () => {
+  it("yeniden başlatma için agent'ın terminal olmayan görevleri, artefaktsız", async () => {
     const submitted = await store.create(newTask());
     const working = await store.create(newTask({ job: JOB_B, caller: 'kurum-b', message: message('m-2') }));
-    await store.update(AGENT_RECORD, working.task.id, 0, { state: 'TASK_STATE_WORKING', statusAt: new Date() });
+    await store.update(AGENT_RECORD, working.task.id, 0, {
+      state: 'TASK_STATE_WORKING',
+      statusAt: new Date(),
+      artifacts: [{ artifactId: 'a', parts: [{ text: 'b' }] }],
+    });
     const waiting = await store.create(newTask({ job: JOB_C, message: message('m-3') }));
     await store.update(AGENT_RECORD, waiting.task.id, 0, { state: 'TASK_STATE_INPUT_REQUIRED', statusAt: new Date() });
-    expect((await store.active(AGENT_RECORD)).map((t) => t.id).sort()).toEqual(
-      [submitted.task.id, working.task.id].sort(),
-    );
+    const done = await store.create(newTask({ job: JOB_D, message: message('m-4') }));
+    await store.update(AGENT_RECORD, done.task.id, 0, { state: 'TASK_STATE_COMPLETED', statusAt: new Date() });
+    const active = await store.active(AGENT_RECORD);
+    expect(active.map((t) => t.id).sort()).toEqual([submitted.task.id, working.task.id, waiting.task.id].sort());
+    expect(active.every((t) => t.artifacts.length === 0)).toBe(true);
     expect(await store.active(OTHER_AGENT_RECORD)).toEqual([]);
+  });
+
+  it('devam mesajı işlenene kadar bekliyor olarak işaretlidir', async () => {
+    const { task } = await store.create(newTask());
+    expect(await store.appendMessage(task.id, message('m-2'), { pending: true })).toBe(true);
+    expect(await store.appendMessage(task.id, message('m-3'), { pending: true, maxMessages: 10 })).toBe(true);
+    expect(await store.message(task.id, 'm-2')).toEqual({ message: message('m-2'), pending: true });
+    expect((await store.pendingMessages(task.id)).map((m) => m.messageId)).toEqual(['m-2', 'm-3']);
+    await store.markProcessed(task.id, 'm-2');
+    expect((await store.pendingMessages(task.id)).map((m) => m.messageId)).toEqual(['m-3']);
+    expect((await store.message(task.id, 'm-1'))?.pending).toBe(false);
+    expect(await store.pendingMessages('yok')).toEqual([]);
   });
 
   it('mesaj geçmişi sıralı, aynı mesaj ikinci kez eklenmez, sınır uygulanır', async () => {
@@ -270,7 +288,7 @@ describe('list ve history', () => {
     expect((await store.history(task.id)).map((m) => m.messageId)).toEqual(['m-1', 'm-2']);
     expect((await store.history(task.id, 1)).map((m) => m.messageId)).toEqual(['m-2']);
     expect(await store.history(task.id, 0)).toEqual([]);
-    expect(await store.message(task.id, 'm-2')).toEqual(message('m-2', 'ek bilgi'));
+    expect(await store.message(task.id, 'm-2')).toEqual({ message: message('m-2', 'ek bilgi'), pending: false });
     expect(await store.message(task.id, 'yok')).toBeNull();
     expect(await store.message('yok', 'm-1')).toBeNull();
   });

@@ -58,6 +58,7 @@ export function openSse(response: ServerResponse, options: SseOptions): SseStrea
 
   response.on('close', () => close());
   response.on('error', () => close(true));
+  if (response.destroyed || !response.socket || response.socket.destroyed) close(true);
 
   return {
     send(payload) {

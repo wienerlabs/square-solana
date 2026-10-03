@@ -3,6 +3,7 @@ import type { StreamResponse } from '@squaresdk/solana-types';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { A2aError, ERROR_INFO_TYPE } from '../src/errors.js';
 import { createTaskEventBus } from '../src/events.js';
+import type { TaskContext } from '../src/server.js';
 import { TaskStoreError, type TaskStore } from '../src/store.js';
 import { AGENT_RECORD, FOREIGN_PROGRAM, JOB_A, JOB_B, JOB_C, JOB_D, OTHER_AGENT_RECORD } from './helpers/fixtures.js';
 import {
@@ -163,6 +164,13 @@ describe('protokol', () => {
     });
     const token = Buffer.from(JSON.stringify({ t: new Date().toISOString(), i: 'uuid-değil' })).toString('base64url');
     await expect(client.listTasks({ pageToken: token })).rejects.toMatchObject({ code: -32602 });
+    await expect(client.listTasks({ statusTimestampAfter: '0000-01-01T00:00:00Z' })).rejects.toMatchObject({
+      code: -32602,
+    });
+    const ancient = Buffer.from(
+      JSON.stringify({ t: '0000-01-01T00:00:00.000Z', i: '00000000-0000-4000-8000-000000000000' }),
+    ).toString('base64url');
+    await expect(client.listTasks({ pageToken: ancient })).rejects.toMatchObject({ code: -32602 });
     expect(h.errors).toEqual([]);
   });
 });
@@ -546,6 +554,9 @@ describe('agent akışı ve zincir', () => {
       });
     await expect(reply('m-x', { contextId: 'başka' })).rejects.toSatisfy((e) => reason(e) === 'CONTEXT_ID_MISMATCH');
     await reply('m-2');
+    await expect(reply('m-2', { parts: [{ text: 'başka içerik' }] })).rejects.toSatisfy(
+      (e) => reason(e) === 'MESSAGE_ID_CONFLICT',
+    );
     await expect(reply('m-3')).rejects.toSatisfy(
       (e) => (e as A2aError).code === -32004 && reason(e) === 'TASK_MESSAGE_LIMIT',
     );
@@ -602,6 +613,230 @@ describe('agent akışı ve zincir', () => {
     controller.abort();
     await pending;
     await until(() => subscriptions === 0);
+  });
+});
+
+describe('devam mesajlarının teslimi', () => {
+  it('kapanışta yarım kalan devam mesajı yeniden başlatmada resume ile yeniden iletilir', async () => {
+    await h.openJob(JOB_A, 'a');
+    h.scripts.set(JOB_A, async (context) => context.requireInput('teslim tarihi?'));
+    let started = false;
+    h.continuations.set(JOB_A, async (context) => {
+      started = true;
+      await new Promise<void>((resolve) => context.signal.addEventListener('abort', () => resolve(), { once: true }));
+    });
+    const client = h.client();
+    const { task } = await client.sendMessage({ message: openingMessage(JOB_A, 'a') });
+    await client.sendMessage({
+      message: { messageId: 'm-2', role: 'ROLE_USER', taskId: task!.id, parts: [{ text: 'cuma' }] },
+      configuration: { returnImmediately: true },
+    });
+    await until(() => started);
+    await restart({ chain: h.chain });
+    const delivered: string[] = [];
+    h.continuations.set(JOB_A, async (context, message) => {
+      delivered.push(`${context.message.messageId}:${message.messageId}`);
+      await context.reject('tarih uygun değil');
+    });
+    expect(await h.server.resume()).toBe(1);
+    await until(() => delivered.length === 1);
+    expect(delivered).toEqual(['m-a:m-2']);
+    await until(async () => (await h.client().getTask({ id: task!.id })).status.state === 'TASK_STATE_REJECTED');
+    expect(await h.server.resume()).toBe(0);
+  });
+
+  it('kaydedildikten sonra iletilemeyen devam mesajı aynı kimlikle tekrarda iletilir', async () => {
+    let failOpening = false;
+    await restart({
+      wrapStore: (store): TaskStore => ({
+        ...store,
+        message: async (taskId, messageId) => {
+          if (failOpening && messageId === 'm-a') {
+            failOpening = false;
+            throw new Error('geçici depo hatası');
+          }
+          return store.message(taskId, messageId);
+        },
+      }),
+    });
+    await h.openJob(JOB_A, 'a');
+    h.scripts.set(JOB_A, async (context) => context.requireInput('teslim tarihi?'));
+    const delivered: string[] = [];
+    h.continuations.set(JOB_A, async (context, message) => {
+      delivered.push(message.messageId);
+      await context.reject('tarih uygun değil');
+    });
+    const client = h.client();
+    const { task } = await client.sendMessage({ message: openingMessage(JOB_A, 'a') });
+    const reply = () =>
+      client.sendMessage({
+        message: { messageId: 'm-2', role: 'ROLE_USER', taskId: task!.id, parts: [{ text: 'cuma' }] },
+      });
+    failOpening = true;
+    await expect(reply()).rejects.toMatchObject({ code: -32603 });
+    expect(delivered).toEqual([]);
+    expect((await reply()).task?.status.state).toBe('TASK_STATE_REJECTED');
+    expect(delivered).toEqual(['m-2']);
+  });
+
+  it('resume bu süreçte çalışan görevi ikinci kez başlatmaz', async () => {
+    await h.openJob(JOB_A, 'a');
+    let calls = 0;
+    h.scripts.set(JOB_A, async (context) => {
+      calls += 1;
+      await new Promise<void>((resolve) => context.signal.addEventListener('abort', () => resolve(), { once: true }));
+    });
+    await h.client().sendMessage({ message: openingMessage(JOB_A, 'a'), configuration: { returnImmediately: true } });
+    await until(() => calls === 1);
+    expect(await h.server.resume()).toBe(0);
+    expect(calls).toBe(1);
+  });
+
+  it('kapanış bekleyen SendMessage isteğini bırakır', async () => {
+    await restart({ limits: { blockingTimeoutMs: 30_000 } });
+    await h.openJob(JOB_A, 'a');
+    const pending = h.client().sendMessage({ message: openingMessage(JOB_A, 'a') });
+    await until(async () => (await db.client.a2aTask.count()) === 1);
+    const closedAt = Date.now();
+    await h.server.close();
+    const { task } = await pending;
+    expect(task?.status.state).toBe('TASK_STATE_SUBMITTED');
+    expect(Date.now() - closedAt).toBeLessThan(5_000);
+  });
+});
+
+describe('agent girdisi ve akış açılışı', () => {
+  it("agent'ın NUL içeren metni ve artefaktı depoya gitmeden reddedilir", async () => {
+    await h.openJob(JOB_A, 'a');
+    const failures: string[] = [];
+    h.scripts.set(JOB_A, async (context) => {
+      await context.requireInput('a\u0000b').catch((e: unknown) => failures.push(String(e)));
+      await context
+        .addArtifact({ artifactId: 'x', parts: [{ text: 'c\u0000d' }] })
+        .catch((e: unknown) => failures.push(String(e)));
+      await context.reject('geçersiz metin');
+    });
+    const { task } = await h.client().sendMessage({ message: openingMessage(JOB_A, 'a') });
+    expect(task?.status.state).toBe('TASK_STATE_REJECTED');
+    expect(failures).toHaveLength(2);
+    expect(failures.every((f) => f.includes('I-JSON'))).toBe(true);
+    expect(task?.artifacts).toBeUndefined();
+  });
+
+  it('akışın ilk karesi hazırlanamazsa SSE açılmadan hata döner', async () => {
+    let failHistory = false;
+    await restart({
+      wrapStore: (store): TaskStore => ({
+        ...store,
+        history: async (taskId, limit) => {
+          if (failHistory) {
+            failHistory = false;
+            throw new Error('geçmiş okunamadı');
+          }
+          return store.history(taskId, limit);
+        },
+      }),
+    });
+    await h.openJob(JOB_A, 'a');
+    h.scripts.set(JOB_A, async (context) => context.requireInput('?'));
+    const client = h.client();
+    const { task } = await client.sendMessage({ message: openingMessage(JOB_A, 'a') });
+    failHistory = true;
+    await expect(
+      (async () => {
+        for await (const event of client.subscribeToTask({ id: task!.id })) void event;
+      })(),
+    ).rejects.toMatchObject({ code: -32603 });
+  });
+
+  it('akış açılmadan ayrılan istemcinin akış yeri bırakılır', async () => {
+    let gate: Promise<void> | null = null;
+    let reached: () => void = () => undefined;
+    await restart({
+      limits: { maxStreamsPerCaller: 1 },
+      wrapStore: (store): TaskStore => ({
+        ...store,
+        history: async (taskId, limit) => {
+          if (gate) {
+            const waiting = gate;
+            gate = null;
+            reached();
+            await waiting;
+          }
+          return store.history(taskId, limit);
+        },
+      }),
+    });
+    await h.openJob(JOB_A, 'a');
+    h.scripts.set(JOB_A, async (context) => context.requireInput('?'));
+    const client = h.client();
+    const { task } = await client.sendMessage({ message: openingMessage(JOB_A, 'a') });
+    let open: () => void = () => undefined;
+    gate = new Promise<void>((resolve) => (open = resolve));
+    const reachedP = new Promise<void>((resolve) => (reached = resolve));
+    const first = new AbortController();
+    const firstStream = (async () => {
+      for await (const event of client.subscribeToTask({ id: task!.id }, { signal: first.signal })) void event;
+    })().catch(() => null);
+    await reachedP;
+    first.abort();
+    await firstStream;
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    open();
+    await until(async () => {
+      const second = new AbortController();
+      let received = 0;
+      await (async () => {
+        for await (const event of client.subscribeToTask({ id: task!.id }, { signal: second.signal })) {
+          void event;
+          received += 1;
+          second.abort();
+        }
+      })().catch(() => null);
+      return received === 1;
+    }, 3_000);
+  });
+
+  it('akışın anlık görüntüsünden önce yayımlanan olay tekrar gönderilmez', async () => {
+    let hook: { remaining: number; run: () => Promise<void> } | null = null;
+    let fired = false;
+    await restart({
+      wrapStore: (store): TaskStore => ({
+        ...store,
+        get: async (agentRecord, id) => {
+          if (hook) {
+            hook.remaining -= 1;
+            if (hook.remaining === 0) {
+              const { run } = hook;
+              hook = null;
+              fired = true;
+              await run();
+            }
+          }
+          return store.get(agentRecord, id);
+        },
+      }),
+    });
+    await h.openJob(JOB_A, 'a');
+    let captured: TaskContext | null = null;
+    h.scripts.set(JOB_A, async (context) => {
+      captured = context;
+      await context.requireInput('?');
+    });
+    const client = h.client();
+    const { task } = await client.sendMessage({ message: openingMessage(JOB_A, 'a') });
+    await h.chain.setStatus(JOB_A, 'accepted');
+    hook = { remaining: 3, run: () => captured!.working('başladı') };
+    const controller = new AbortController();
+    const states: string[] = [];
+    await (async () => {
+      for await (const event of client.subscribeToTask({ id: task!.id }, { signal: controller.signal })) {
+        states.push(event.task?.status.state ?? event.statusUpdate?.status.state ?? 'yok');
+        setTimeout(() => controller.abort(), 300);
+      }
+    })().catch(() => null);
+    expect(fired).toBe(true);
+    expect(states).toEqual(['TASK_STATE_WORKING']);
   });
 });
 
@@ -688,6 +923,55 @@ describe('eşzamanlılık', () => {
     conflicts = 1;
     expect((await client.cancelTask({ id: task!.id })).status.state).toBe('TASK_STATE_CANCELED');
     expect(conflicts).toBe(0);
+  });
+});
+
+describe('sürüm çakışması', () => {
+  const conflicting =
+    (counter: { value: number }) =>
+    (store: TaskStore): TaskStore => ({
+      ...store,
+      update: async (...args: Parameters<TaskStore['update']>) => {
+        if (counter.value > 0) {
+          counter.value -= 1;
+          throw new TaskStoreError('version', 'başka bir örnek yazdı');
+        }
+        return store.update(...args);
+      },
+    });
+
+  it('uzlaştırma çakışmada kayıttaki görevi döner, sonraki okuma ilerletir', async () => {
+    const conflicts = { value: 0 };
+    await restart({ wrapStore: conflicting(conflicts) });
+    await h.openJob(JOB_A, 'a');
+    const client = h.client();
+    const { task } = await client.sendMessage({
+      message: openingMessage(JOB_A, 'a'),
+      configuration: { returnImmediately: true },
+    });
+    await h.chain.setStatus(JOB_A, 'accepted');
+    conflicts.value = 1;
+    expect((await client.getTask({ id: task!.id })).status.state).toBe('TASK_STATE_SUBMITTED');
+    expect((await client.getTask({ id: task!.id })).status.state).toBe('TASK_STATE_WORKING');
+  });
+
+  it("sürekli çakışmada artefakt eklemesi agent'a hata verir", async () => {
+    const conflicts = { value: 0 };
+    await restart({ wrapStore: conflicting(conflicts) });
+    await h.openJob(JOB_A, 'a');
+    let failure: unknown = null;
+    h.scripts.set(JOB_A, async (context) => {
+      conflicts.value = 10;
+      failure = await context.addArtifact({ artifactId: 'x', parts: [{ text: 'y' }] }).then(
+        () => null,
+        (error: unknown) => error,
+      );
+      conflicts.value = 0;
+      await context.reject('bitti');
+    });
+    const { task } = await h.client().sendMessage({ message: openingMessage(JOB_A, 'a') });
+    expect(String(failure)).toMatch(/eşzamanlı/);
+    expect(task?.status.state).toBe('TASK_STATE_REJECTED');
   });
 });
 

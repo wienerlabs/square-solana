@@ -128,11 +128,11 @@ describe('createA2aClient', () => {
       setTimeout(() => res.write(': ping\r\r'), 100);
       setTimeout(() => res.end(event(2)), 150);
     });
-    const client = createA2aClient({ url, timeoutMs: 250, allowInsecureHttp: true });
+    const client = createA2aClient({ url, timeoutMs: 1_000, allowInsecureHttp: true });
     const ids: string[] = [];
     for await (const event of client.subscribeToTask({ id: 't-1' })) {
       ids.push(event.task!.id);
-      await new Promise((resolve) => setTimeout(resolve, 600));
+      await new Promise((resolve) => setTimeout(resolve, 1_500));
     }
     expect(ids).toEqual(['t-1', 't-2']);
   });
@@ -151,6 +151,66 @@ describe('createA2aClient', () => {
     expect(seen).toEqual([{ task: TASK }]);
   });
 
+  it('yalnız kalp atışı gelen akış signal ile durdurulur', async () => {
+    const url = await fake((_body, res) => {
+      res.writeHead(200, { 'content-type': 'text/event-stream' });
+      const timer = setInterval(() => res.write(': ping\n\n'), 50);
+      res.on('close', () => clearInterval(timer));
+    });
+    const client = createA2aClient({ url, timeoutMs: 200, allowInsecureHttp: true });
+    const started = Date.now();
+    await expect(
+      (async () => {
+        for await (const event of client.subscribeToTask({ id: 't-1' }, { signal: AbortSignal.timeout(400) })) {
+          void event;
+        }
+      })(),
+    ).rejects.toThrow();
+    expect(Date.now() - started).toBeLessThan(2_000);
+  });
+
+  it('signal tek seferlik istekleri de keser', async () => {
+    const url = await fake(() => undefined);
+    const client = createA2aClient({ url, timeoutMs: 5_000, allowInsecureHttp: true });
+    const controller = new AbortController();
+    const started = Date.now();
+    const pending = client.getTask({ id: 't-1' }, { signal: controller.signal });
+    controller.abort();
+    await expect(pending).rejects.toThrow();
+    expect(Date.now() - started).toBeLessThan(1_000);
+  });
+
+  it('verilen fetch kullanılır (SSRF koruması bu noktaya takılır)', async () => {
+    const seen: string[] = [];
+    const guarded: typeof fetch = async (input) => {
+      seen.push(String(input));
+      throw new Error('iç ağ adresi engellendi');
+    };
+    const client = createA2aClient({ url: 'https://agent.example/a2a', timeoutMs: 1_000, fetch: guarded });
+    await expect(client.getTask({ id: 't-1' })).rejects.toThrow('iç ağ adresi engellendi');
+    expect(seen).toEqual(['https://agent.example/a2a']);
+  });
+
+  it('boyut sınırı tek olaya uygulanır: tek parçada gelen küçük olaylar iletilir, büyük olay reddedilir', async () => {
+    let big = false;
+    const url = await fake((body, res) => {
+      res.writeHead(200, { 'content-type': 'text/event-stream' });
+      const frame = (task: object) => `data: ${JSON.stringify({ jsonrpc: '2.0', id: body.id, result: { task } })}\n\n`;
+      if (big) return res.end(frame({ ...TASK, metadata: { blob: 'x'.repeat(2048) } }));
+      res.end(Array.from({ length: 20 }, (_, i) => frame({ ...TASK, id: `t-${i}` })).join(''));
+    });
+    const client = createA2aClient({ url, timeoutMs: 2_000, allowInsecureHttp: true, maxResponseBytes: 512 });
+    const ids: string[] = [];
+    for await (const event of client.subscribeToTask({ id: 't-1' })) ids.push(event.task!.id);
+    expect(ids).toHaveLength(20);
+    big = true;
+    await expect(
+      (async () => {
+        for await (const event of client.subscribeToTask({ id: 't-1' })) void event;
+      })(),
+    ).rejects.toMatchObject({ code: -32006 });
+  });
+
   it('akışta CRLF satır sonlarını ve yorum satırlarını işler; olaylar arası süre dolunca keser', async () => {
     const url = await fake((body, res) => {
       res.writeHead(200, { 'content-type': 'text/event-stream' });
@@ -158,7 +218,7 @@ describe('createA2aClient', () => {
         `: ping\r\n\r\ndata: ${JSON.stringify({ jsonrpc: '2.0', id: body.id, result: { task: TASK } })}\r\n\r\n`,
       );
     });
-    const client = createA2aClient({ url, timeoutMs: 300, allowInsecureHttp: true });
+    const client = createA2aClient({ url, timeoutMs: 1_000, allowInsecureHttp: true });
     const seen: unknown[] = [];
     await expect(
       (async () => {
