@@ -26,5 +26,7 @@ jobs:
         run: pnpm check:names
       - name: ESLint + Prettier
         run: pnpm lint
+      - name: Release devresi (circom 2.2.3; policy ispat testleri wasm ister)
+        run: circuits/payment-compliance/scripts/ci-build.sh
       - name: Derleme, tip kontrolü ve testler
         run: pnpm turbo run build typecheck test

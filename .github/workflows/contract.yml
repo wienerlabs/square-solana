@@ -27,6 +27,8 @@ jobs:
         run: pnpm contract:check
       - name: OpenAPI lint
         run: pnpm openapi:lint
+      - name: Release devresi (circom 2.2.3; policy ispat testleri wasm ister)
+        run: circuits/payment-compliance/scripts/ci-build.sh
       - name: Derleme, tip kontrolü (IDL tip testleri dahil) ve hizalama testleri
         run: >-
           pnpm turbo run build typecheck test
