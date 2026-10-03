@@ -27,10 +27,10 @@ pnpm license:write
 | `sha2` | cargo | MIT OR Apache-2.0 | runtime | `policy-registry` | ✓ |
 | `@anthropic-ai/sdk` | npm | MIT | runtime | `@squaresdk/solana-agent-sdk` | ✓ |
 | `@changesets/cli` | npm | MIT | dev | `@squaresdk/solana-monorepo` | ✓ |
-| `@coral-xyz/anchor` | npm | (MIT OR Apache-2.0) | runtime | `@squaresdk/solana-sdk` | ✓ |
+| `@coral-xyz/anchor` | npm | (MIT OR Apache-2.0) | runtime | `@squaresdk/solana-identity`, `@squaresdk/solana-sdk` | ✓ |
 | `@eslint/js` | npm | MIT | runtime | `@squaresdk/solana-config` | ✓ |
 | `@modelcontextprotocol/sdk` | npm | MIT | runtime | `@squaresdk/solana-mcp` | ✓ |
-| `@noble/hashes` | npm | MIT | runtime | `@squaresdk/solana-sdk` | ✓ |
+| `@noble/hashes` | npm | MIT | runtime | `@squaresdk/solana-identity`, `@squaresdk/solana-sdk` | ✓ |
 | `@prisma/adapter-pg` | npm | Apache-2.0 | runtime | `@squaresdk/solana-db` | ✓ |
 | `@prisma/client` | npm | Apache-2.0 | runtime | `@squaresdk/solana-db` | ✓ |
 | `@redocly/cli` | npm | MIT | dev | `@squaresdk/solana-monorepo` | ✓ |
@@ -44,8 +44,8 @@ pnpm license:write
 | `@types/swagger-jsdoc` | npm | MIT | dev | `@squaresdk/solana-compliance-api` | ✓ |
 | `@types/swagger-ui-express` | npm | MIT | dev | `@squaresdk/solana-compliance-api` | ✓ |
 | `@types/uuid` | npm | MIT | dev | `@squaresdk/solana-compliance-api` | ✓ |
-| `@vitest/coverage-v8` | npm | MIT | dev | `@squaresdk/solana-sdk` | ✓ |
-| `bs58` | npm | MIT | runtime | `@squaresdk/solana-compliance-api`, `@squaresdk/solana-db`, `@squaresdk/solana-prover` | ✓ |
+| `@vitest/coverage-v8` | npm | MIT | dev | `@squaresdk/solana-identity`, `@squaresdk/solana-sdk` | ✓ |
+| `bs58` | npm | MIT | runtime | `@squaresdk/solana-compliance-api`, `@squaresdk/solana-db`, `@squaresdk/solana-identity`, `@squaresdk/solana-prover` | ✓ |
 | `circomlibjs` | npm | GPL-3.0 | runtime | `@squaresdk/solana-compliance-api`, `@squaresdk/solana-prover` | ⚠️ inceleme |
 | `cors` | npm | MIT | runtime | `@squaresdk/solana-compliance-api`, `@squaresdk/solana-prover` | ✓ |
 | `dotenv` | npm | BSD-2-Clause | runtime | `@squaresdk/solana-compliance-api` | ✓ |
@@ -68,7 +68,7 @@ pnpm license:write
 | `typescript` | npm | Apache-2.0 | dev | `@squaresdk/solana-monorepo` | ✓ |
 | `typescript-eslint` | npm | MIT | runtime | `@squaresdk/solana-config` | ✓ |
 | `uuid` | npm | MIT | runtime | `@squaresdk/solana-compliance-api` | ✓ |
-| `vitest` | npm | MIT | dev | `@squaresdk/solana-db`, `@squaresdk/solana-sdk`, `@squaresdk/solana-types` | ✓ |
+| `vitest` | npm | MIT | dev | `@squaresdk/solana-db`, `@squaresdk/solana-identity`, `@squaresdk/solana-sdk`, `@squaresdk/solana-types` | ✓ |
 | `yaml` | npm | ISC | dev | `@squaresdk/solana-sdk`, `@squaresdk/solana-types` | ✓ |
 | `zod` | npm | MIT | runtime | `@squaresdk/solana-compliance-api`, `@squaresdk/solana-mcp`, `@squaresdk/solana-types` | ✓ |
 

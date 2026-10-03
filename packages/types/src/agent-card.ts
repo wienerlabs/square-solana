@@ -1,6 +1,7 @@
-// Agent card: A2A AgentCard çekirdeği + ERC-8004 tarzı `registrations` + Square fiyatlandırması.
-// Zincirde yalnızca `agentCardUri` ve SHA-256 `agentCardHash` durur (BC-44); kart bu şemaya uyar.
-// did:aip v2 Solana profili (BC-14) `registrations[]` biçimini belirler; ayrıntılar BE-07 / BE-09'da.
+// Agent card: tek şema (BE-09). Aynı belge hem ERC-8004 kayıt dosyasıdır (`type`, `services`,
+// `registrations`, `active`; did:aip v2 §5, Solana profili §5.4–§5.6) hem A2A AgentCard'ıdır
+// (`url`, `capabilities`, `skills` …). Zincirde yalnızca `agentCardUri` ve kartın baytlarının
+// SHA-256'sı (`agentCardHash`) durur (BC-44); DID çözücüsü servisleri `services`'ten üretir.
 import { z } from 'zod';
 import { Address, Hex32, U64 } from './primitives.js';
 
@@ -22,6 +23,17 @@ export const AgentRegistrationSchema = z.object({
 });
 export type AgentRegistration = z.infer<typeof AgentRegistrationSchema>;
 
+/** ERC-8004 kayıt dosyası türü. */
+export const AGENT_CARD_TYPE = 'https://eips.ethereum.org/EIPS/eip-8004#registration-v1';
+
+/** Kartın servis girdisi; DID belgesinde `{did}#{name-slug}` olur. `endpoint` bir URL ya da DID. */
+export const AgentServiceSchema = z.object({
+  name: z.string().min(1).max(64),
+  endpoint: z.string().min(1).max(512),
+  version: z.string().min(1).max(32).optional(),
+});
+export type AgentService = z.infer<typeof AgentServiceSchema>;
+
 /** Beceri başına fiyat; tutar settlement mint'in atomik biriminde. */
 export const AgentPricingSchema = z.object({
   skillId: z.string().min(1).max(64),
@@ -30,23 +42,34 @@ export const AgentPricingSchema = z.object({
 });
 export type AgentPricing = z.infer<typeof AgentPricingSchema>;
 
-export const AgentCardSchema = z.object({
-  name: z.string().min(1).max(120),
-  description: z.string().min(1).max(4000),
-  /** A2A JSON-RPC uç noktası. */
-  url: HttpsUrl,
-  version: z.string().min(1).max(32),
-  provider: z.object({ organization: z.string().min(1).max(120), url: HttpsUrl }).optional(),
-  capabilities: z.object({
-    streaming: z.boolean().default(false),
-    pushNotifications: z.boolean().default(false),
-  }),
-  defaultInputModes: z.array(z.string().min(1)).min(1),
-  defaultOutputModes: z.array(z.string().min(1)).min(1),
-  skills: z.array(AgentSkillSchema).min(1).max(50),
-  registrations: z.array(AgentRegistrationSchema).min(1),
-  pricing: z.array(AgentPricingSchema).max(50).optional(),
-});
+export const AgentCardSchema = z
+  .object({
+    type: z.literal(AGENT_CARD_TYPE),
+    name: z.string().min(1).max(120),
+    description: z.string().min(1).max(4000),
+    /** A2A JSON-RPC uç noktası. */
+    url: HttpsUrl,
+    version: z.string().min(1).max(32),
+    provider: z.object({ organization: z.string().min(1).max(120), url: HttpsUrl }).optional(),
+    capabilities: z.object({
+      streaming: z.boolean().default(false),
+      pushNotifications: z.boolean().default(false),
+    }),
+    defaultInputModes: z.array(z.string().min(1)).min(1),
+    defaultOutputModes: z.array(z.string().min(1)).min(1),
+    skills: z.array(AgentSkillSchema).min(1).max(50),
+    /** DID belgesinin servisleri; A2A uç noktası `A2A` adıyla burada da yer alır. */
+    services: z.array(AgentServiceSchema).min(1).max(20),
+    registrations: z.array(AgentRegistrationSchema).min(1),
+    pricing: z.array(AgentPricingSchema).max(50).optional(),
+    /** `false`: sahip ajanı kart üzerinden duraklattı (did:aip Solana §5.6). */
+    active: z.boolean().optional(),
+    x402Support: z.boolean().optional(),
+  })
+  .refine((card) => card.services.some((service) => service.name === 'A2A' && service.endpoint === card.url), {
+    message: "services, endpoint'i url ile aynı bir A2A girdisi içermeli",
+    path: ['services'],
+  });
 export type AgentCard = z.infer<typeof AgentCardSchema>;
 
 /** `PUT /v1/agents/{agentRecord}/card` yanıtı: `update_agent` için URI ve kartın SHA-256'sı. */

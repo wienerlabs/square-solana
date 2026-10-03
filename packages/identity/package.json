@@ -1,7 +1,7 @@
 {
   "name": "@squaresdk/solana-identity",
   "version": "0.1.0",
-  "description": "did:aip çözümleyici (v2 Solana + v1), DID Document ve agent card doğrulama — BE-35 sözleşmesi (uygulama BE-09)",
+  "description": "did:aip çözümleyici (v2 Solana profili + v1), DID belgesi ve agent card doğrulama (BE-09)",
   "license": "Apache-2.0",
   "private": true,
   "type": "module",
@@ -16,14 +16,20 @@
   ],
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run --coverage"
   },
   "dependencies": {
+    "@coral-xyz/anchor": "0.31.1",
+    "@noble/hashes": "^1.8.0",
     "@solana/web3.js": "^1.99.0",
     "@squaresdk/solana-sdk": "workspace:*",
-    "@squaresdk/solana-types": "workspace:*"
+    "@squaresdk/solana-types": "workspace:*",
+    "bs58": "^6.0.0"
   },
   "devDependencies": {
-    "@squaresdk/solana-config": "workspace:*"
+    "@squaresdk/solana-config": "workspace:*",
+    "@vitest/coverage-v8": "^5.0.3",
+    "vitest": "^5.0.3"
   }
 }
