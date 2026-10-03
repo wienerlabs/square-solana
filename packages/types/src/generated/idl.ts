@@ -1265,7 +1265,9 @@ export const SetComplianceProofArgsSchema = z.object({
   proofA: hexBytes(64),
   proofB: hexBytes(128),
   proofC: hexBytes(64),
-  publicInputs: z.array(Hex32).length(10),
+  refusalCode: z.number().int().min(0).max(65535),
+  netAmount: U64,
+  proofTimestamp: I64,
 });
 export type SetComplianceProofArgs = z.infer<typeof SetComplianceProofArgsSchema>;
 

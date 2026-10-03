@@ -1,6 +1,6 @@
 # Program arayüz sözleşmesi
 
-**Sözleşme sürümü:** v0.1.1 (taslak) · **Issue:** BC-44 (#101), BC-47 (#119) · **IDL'ler:** [`idl/`](../../idl/)
+**Sözleşme sürümü:** v0.2.0 (taslak) · **Issue:** BC-44 (#101), BC-47 (#119), BE-10 (#42) · **IDL'ler:** [`idl/`](../../idl/)
 
 Bu doküman Square'in dört Solana programının (`square_registry`, `square_policy`, `square_verifier`, `square_escrow`) dış arayüzünü sabitler: instruction adları ve argümanları, hesap sırası ve imzacılar, account düzenleri, PDA seed'leri, event'ler ve hata kodları. Backend (BE-35 API/SDK sözleşmesi, servisler) ve frontend (FE-24 veri katmanı) bu sözleşmeye göre geliştirir. Gerçek programlar `programs/` altında taşındıkça ve değiştikçe bu arayüze uyar; uyum BC-13 ile CI'da denetlenir.
 
@@ -122,6 +122,21 @@ Her programın kendi seed'leri IDL'de `constants` olarak da yayımlanır.
 
 **Hesap düzeni:** Sabit boyutlu alanlar önce, değişken boyutlu alanlar (`String`, `Option`, veri taşıyan enum) sonda gelir. Böylece indexer ve keeper, sabit önekteki alanlarda `memcmp` filtresi kullanabilir. Örnekler: `Job.status`, `Job.agent_record`, `AgentRecord.wallet` / `status`, `ClaimListing.status`.
 
+### Alıcı listesi Merkle ağacı (`set_buyer_root`, `buy_claim`)
+
+Kurum onaylı alıcıları bir Merkle köküyle taahhüt eder (`Policy.buyer_root`); `buy_claim` alıcının listede olduğunu kanıtla gösterir. Kanıt yalnızca kardeş düğümleri taşıdığı için iç düğümler sıralı çiftle hash'lenir:
+
+| Öğe | Tanım |
+|---|---|
+| Yaprak | `sha256(buyer ‖ leaf_salt)`: alıcının 32 baytlık adresi ve alıcıya özel 32 baytlık salt |
+| İç düğüm | `sha256(min(a, b) ‖ max(a, b))`; `min` / `max` 32 baytın sözlük sırasıyla |
+| Tek kalan düğüm | Bir seviyede eşi olmayan son düğüm üst seviyeye değişmeden taşınır |
+| Kök | Kalan tek düğüm; tek yapraklı ağaçta yaprağın kendisi |
+| Boş liste | Kök 32 sıfır bayt: alım kısıtsızdır (`buy_claim` kanıt istemez) |
+| Kanıt | Yapraktan köke kardeş düğümler, en fazla 16 tane (en çok 65 536 alıcı) |
+
+Salt, listeyi görmeyen birinin bir adresin listede olup olmadığını kökten sınamasını engeller. Yapraklar aynı ağaçta tekrar edemez. Kökü ve kanıtları `@squaresdk/solana-policy` üretir (BE-10); doğrulama `buy_claim`'de (BC-18).
+
 ## 6. Escrow durum makinesi
 
 ```mermaid
@@ -189,7 +204,7 @@ Sözleşme bu konularda bir varsayımla yazıldı. Varsayım, ilgili issue'nun A
 6. **Aktif dispute'ta arbitrator seti değişimi (BC-32):** Dispute, açıldığı andaki `arbitrator_set_version`'ı saklar; oylamanın hangi sete göre yapılacağı issue'da kesinleşir.
 7. **Keeper ücreti üst sınırı (BC-23):** `InvalidKeeperFee` için en yüksek bps değeri belirlenmeli.
 8. **Aynı token hesabının birden çok rolde geçmesi (BC-23):** Örneğin keeper kurumun kendisiyse, `finalize_payment`'te aynı token hesabı iki kez yazılabilir olarak geçebilir. Bunun kullanılan Anchor sürümünde (BC-08) kabul edildiği doğrulanmalı.
-9. **İşlem boyutu (BC-19, BC-21, BC-28):** `set_compliance_proof` 592 bayt instruction verisi taşır; hesaplar, 2 imza ve compute budget instruction'larıyla birlikte işlem yaklaşık 1 176 / 1 232 bayttır. `verify_mpp_payment_proof` Ed25519 instruction'ıyla birlikte sınırı aşar ve ALT gerektirir. Public input'ların bir kısmı zincirde türetilebilir ve sıkıştırılmış G1/G2 noktaları kullanılabilir; bunlar argümanları değiştirir.
+9. **İşlem boyutu (BC-19, BC-21, BC-28):** v0.2.0'dan itibaren `set_compliance_proof` 13 public sinyalin 10'unu hesaplardan kendisi kurar ([release-circuit.md](release-circuit.md) §6, yol A); instruction verisi 8 + 256 + 2 + 8 + 8 = 282 bayttır. `verify_mpp_payment_proof` hâlâ 10 sinyali argüman olarak taşır ve Ed25519 instruction'ıyla birlikte sınırı aşar; 13 sinyale ve aynı yola geçişi BC-37'de.
 10. **`emit!` / `emit_cpi!` (BC-16):** Event'ler sözleşmede `#[event]` olarak tanımlıdır; log kırpılmasına karşı yayım yöntemi BC-16'da seçilir.
 11. **Tek settlement mint'i (BC-22):** v0.1.0 yalnızca `EscrowConfig.settlement_mint` (USDC) ile çalışır. Policy tavanı ve günlük sayaç bu mint'in birimindedir. Çoklu mint ve Token-2022 uzantıları kapsam dışıdır.
 
@@ -296,7 +311,7 @@ IDL'den üretilmiştir; instruction'lar alfabetik sıradadır. "(w)" yazılabili
 |---|---|---|---|---|
 | `init_verifier_config` | `escrow_program: pubkey`, `policy_program: pubkey`, `mpp_authority: pubkey` | `admin` (w) | `config` | — |
 | `record_release` | — | `escrow_authority` | `release_proof`, `operator_state` | — |
-| `set_compliance_proof` | `proof_a: [u8; 64]`, `proof_b: [u8; 128]`, `proof_c: [u8; 64]`, `public_inputs: [[u8; 32]; 10]` | `payer` (w), `authority` | `operator_state`, `release_proof` | — |
+| `set_compliance_proof` | `proof_a: [u8; 64]`, `proof_b: [u8; 128]`, `proof_c: [u8; 64]`, `refusal_code: u16`, `net_amount: u64`, `proof_timestamp: i64` | `payer` (w), `authority` | `operator_state`, `release_proof` | — |
 | `update_mpp_authority` | `mpp_authority: pubkey` | `admin` | `config` | — |
 | `verify_mpp_payment_proof` | `proof_a: [u8; 64]`, `proof_b: [u8; 128]`, `proof_c: [u8; 64]`, `public_inputs: [[u8; 32]; 10]` | `payer` (w), `authority` | `operator_state` | — |
 
@@ -439,4 +454,5 @@ IDL'den üretilmiştir; instruction'lar alfabetik sıradadır. "(w)" yazılabili
 | Sürüm | Değişiklik | Issue / PR |
 |---|---|---|
 | v0.1.0 | İlk taslak: 4 program, 38 instruction, 13 account, 40 event, 75 hata kodu (4'ü stub'a ait `NotImplemented`); M5–M6 taslakları (§7) | BC-44 (#101) |
+| v0.2.0 | `set_compliance_proof` release devresinin 13 sinyaline geçti (yol A, [release-circuit.md](release-circuit.md) §6): `public_inputs: [[u8; 32]; 10]` yerine `refusal_code: u16`, `net_amount: u64`, `proof_timestamp: i64`; diğer 10 sinyali program hesaplardan kurar. Alıcı listesi Merkle ağacının iç düğüm, tek düğüm, boş liste ve kanıt uzunluğu kuralları eklendi | BE-10 (#42) |
 | v0.1.1 | Gövdesiz stub programlar (`interfaces/`) kaldırıldı; sözleşmenin tek kaynağı `idl/*.json` (proje kuralı: placeholder yok). Stub'a ait `NotImplemented` hata girdileri IDL'den çıktı; diğer kodların sırası değişmedi. Toplam: 38 instruction, 13 account, 40 event, 71 hata kodu | BC-47 (#119) |
