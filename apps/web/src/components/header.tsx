@@ -13,7 +13,8 @@ const WalletMultiButton = dynamic(async () => (await import('@solana/wallet-adap
 });
 
 const LINKS = [
-  { href: '/', label: 'Overview' },
+  { href: '/', label: 'Protocol' },
+  { href: '/app', label: 'App' },
   { href: '/design', label: 'Design system' },
 ] as const;
 

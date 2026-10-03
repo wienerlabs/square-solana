@@ -2,6 +2,8 @@
 // sunucuda okunur (`connection()` sonrası); derlemeye gömülmez. Kodda varsayılan ağ ya da RPC adresi yoktur:
 // eksik ya da geçersiz bir değer, uygulama yerine yapılandırma hatası sayfasını gösterir.
 
+import { PublicKey } from '@solana/web3.js';
+
 export const CLUSTERS = ['devnet', 'testnet', 'mainnet-beta', 'localnet'] as const;
 export type Cluster = (typeof CLUSTERS)[number];
 
@@ -10,10 +12,23 @@ export const ENV_VARS = {
   rpcUrl: 'SQUARE_SOLANA_RPC_URL',
 } as const;
 
+export const PROGRAMS = ['registry', 'policy', 'verifier', 'escrow'] as const;
+export type ProgramName = (typeof PROGRAMS)[number];
+
+/** Program kimlikleri db ve SDK'daki gibi ortamdan gelir (BC-09'a kadar henüz atanmadı); IDL'deki adres kullanılmaz. */
+export const PROGRAM_ID_ENV: Readonly<Record<ProgramName, string>> = {
+  registry: 'SQUARE_PROGRAM_ID_REGISTRY',
+  policy: 'SQUARE_PROGRAM_ID_POLICY',
+  verifier: 'SQUARE_PROGRAM_ID_VERIFIER',
+  escrow: 'SQUARE_PROGRAM_ID_ESCROW',
+};
+
 export interface WebConfig {
   cluster: Cluster;
   /** JSON-RPC uç noktası. WebSocket adresi web3.js tarafından bundan türetilir. */
   rpcUrl: string;
+  /** Yapılandırılmış program kimlikleri. Şimdilik isteğe bağlı: tanımlı olmayan program "yapılandırılmamış" görünür. */
+  programIds: Partial<Record<ProgramName, string>>;
 }
 
 export type WebConfigResult = { ok: true; config: WebConfig } | { ok: false; errors: string[] };
@@ -45,8 +60,26 @@ export function parseWebConfig(env: Readonly<Record<string, string | undefined>>
     }
   }
 
+  const programIds: Partial<Record<ProgramName, string>> = {};
+  for (const program of PROGRAMS) {
+    const variable = PROGRAM_ID_ENV[program];
+    const value = env[variable]?.trim();
+    if (!value) continue;
+    if (isAddress(value)) programIds[program] = value;
+    else errors.push(`${variable} is not a Solana address`);
+  }
+
   if (errors.length > 0 || !isCluster(cluster)) return { ok: false, errors };
-  return { ok: true, config: { cluster, rpcUrl } };
+  return { ok: true, config: { cluster, rpcUrl, programIds } };
+}
+
+/** 32 baytlık, kanonik base58 yazılmış bir Solana adresi mi? */
+function isAddress(value: string): boolean {
+  try {
+    return new PublicKey(value).toBase58() === value;
+  } catch {
+    return false;
+  }
 }
 
 /** Ekranda gösterilecek RPC etiketi: yalnızca host. Yol, sorgu ve kimlik bilgisi (ör. API anahtarı) gösterilmez. */
