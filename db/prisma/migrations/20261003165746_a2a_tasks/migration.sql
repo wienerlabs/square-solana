@@ -13,7 +13,7 @@ CREATE TABLE "a2a_tasks" (
     "job" VARCHAR(44) NOT NULL,
     "spec_hash" CHAR(64) NOT NULL,
     "state" "A2aTaskState" NOT NULL,
-    "status_message" JSONB,
+    "status_message" JSONB NOT NULL DEFAULT '{}',
     "status_at" TIMESTAMPTZ(3) NOT NULL,
     "artifacts" JSONB NOT NULL DEFAULT '[]',
     "create_message_id" TEXT NOT NULL,
@@ -29,7 +29,7 @@ CREATE TABLE "a2a_tasks" (
 
 -- CreateTable
 CREATE TABLE "a2a_messages" (
-    "id" UUID NOT NULL,
+    "id" BIGSERIAL NOT NULL,
     "task_id" UUID NOT NULL,
     "message_id" TEXT NOT NULL,
     "role" "A2aRole" NOT NULL,
@@ -52,7 +52,7 @@ CREATE INDEX "a2a_tasks_agent_record_job_idx" ON "a2a_tasks"("agent_record", "jo
 CREATE UNIQUE INDEX "a2a_tasks_agent_record_caller_create_message_id_key" ON "a2a_tasks"("agent_record", "caller", "create_message_id");
 
 -- CreateIndex
-CREATE INDEX "a2a_messages_task_id_created_at_idx" ON "a2a_messages"("task_id", "created_at");
+CREATE INDEX "a2a_messages_task_id_id_idx" ON "a2a_messages"("task_id", "id");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "a2a_messages_task_id_message_id_key" ON "a2a_messages"("task_id", "message_id");

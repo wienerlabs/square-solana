@@ -619,8 +619,8 @@ model A2aTask {
   job             String       @db.VarChar(44)
   specHash        String       @map("spec_hash") @db.Char(64)
   state           A2aTaskState
-  /// Durumla gelen agent mesajı (`TaskStatus.message`).
-  statusMessage   Json?        @map("status_message")
+  /// Durumla gelen agent mesajı (`TaskStatus.message`); mesaj yoksa `{}`.
+  statusMessage   Json         @default("{}") @map("status_message")
   statusAt        DateTime     @map("status_at") @db.Timestamptz(3)
   /// `Artifact[]` JSON'u.
   artifacts       Json         @default("[]")
@@ -645,7 +645,8 @@ model A2aTask {
 
 /// Görevin mesaj geçmişi (`Task.history`).
 model A2aMessage {
-  id        String   @id @default(uuid()) @db.Uuid
+  /// Ekleme sırası; geçmiş bu sırayla döner.
+  id        BigInt   @id @default(autoincrement())
   taskId    String   @map("task_id") @db.Uuid
   messageId String   @map("message_id") @db.Text
   role      A2aRole
@@ -655,6 +656,6 @@ model A2aMessage {
   task      A2aTask  @relation(fields: [taskId], references: [id], onDelete: Cascade)
 
   @@unique([taskId, messageId])
-  @@index([taskId, createdAt])
+  @@index([taskId, id])
   @@map("a2a_messages")
 }
