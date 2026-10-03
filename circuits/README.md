@@ -8,12 +8,15 @@ Circom uyum devresi ve trusted setup belgeleri.
 
 - Devre, release ispatına uyarlanır: payee / net tutar / mint / günlük sayaç / saat / job bağlama
   [BC-19].
-- **Prover artefaktları (`.wasm`, `.zkey`, doğrulama anahtarı) repoya girmez**; geliştirme setup'ı
-  ve artefakt pipeline'ı [BC-20] ile yeniden üretilir.
-- Aperture'dan gelen `payment.zkey` tek katılımcılı, sabit entropy'li bir geliştirme setup'ıdır ve
-  production'a uygun değildir. Kamusal phase-2 ceremony ve doğrulama anahtarı güncellemesi [BC-38].
+- Release artefaktları (`payment.zkey`, doğrulama anahtarı, `manifest.json`)
+  `payment-compliance/artifacts/`'tadır ve artefakt pipeline'ı [BC-20] ile yeniden üretilip denetlenir;
+  `.wasm` repoya girmez, devreden derlenir (sha256'sı manifest'te). Prover servisi bunları kullanır
+  [BE-11].
+- `payment.zkey` tek katılımcılı bir geliştirme setup'ıdır ve production'a uygun değildir. Kamusal
+  phase-2 ceremony ve doğrulama anahtarı güncellemesi [BC-38].
 
 [BC-06]: https://github.com/wienerlabs/square-solana/issues/6
 [BC-19]: https://github.com/wienerlabs/square-solana/issues/27
 [BC-20]: https://github.com/wienerlabs/square-solana/issues/28
 [BC-38]: https://github.com/wienerlabs/square-solana/issues/92
+[BE-11]: https://github.com/wienerlabs/square-solana/issues/44

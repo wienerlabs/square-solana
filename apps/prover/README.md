@@ -1,125 +1,94 @@
-# Aperture Prover Service
+# apps/prover
 
-Node.js HTTP service that wraps [snarkjs](https://github.com/iden3/snarkjs)
-to generate Groth16 proofs for the Aperture payment compliance circuit.
+Square release devresi ([`circuits/payment-compliance`](../../circuits/payment-compliance/),
+[release-circuit.md](../../docs/design/release-circuit.md)) için Groth16 prover servisi (snarkjs).
+Akışın 7. adımında kurumun yerine ispat üretir; çıktı `programs/square-verifier`'ın
+`set_compliance_proof` talimatının beklediği groth16-solana bayt düzenindedir. Aperture
+`prover-service`'ten geçmişiyle taşındı (BE-02), yeni devreye BE-11 ile uyarlandı.
 
-This is the replacement for the archived RISC Zero prover that used to
-live at `_archive/risc0/services/prover-service/`. It speaks the same
-request format so `agent-service` and `compliance-api` do not need
-changes beyond updating `PROVER_SERVICE_URL`.
+## Güven sınırı
 
-## Why this exists
+Witness politikanın kendisidir: limitler, engelli adresler, kategoriler, salt'lar. **Bu servisi işleten
+taraf politikayı görür.** Politikasını kimseye göstermek istemeyen kurum ya kendi prover'ını çalıştırır
+ya da `@squaresdk/solana-policy`'nin `createLocalProver`'ı ile ispatı kendi makinesinde üretir
+([api-sdk-contract.md](../../docs/design/api-sdk-contract.md) §5). Servis witness'ı saklamaz ve log'a
+yazmaz; log'da yalnızca istek kimliği, sonuç, süre ve ret kodu (public sinyal) bulunur.
 
-The Circom pipeline produces standard Groth16 proofs over BN254, which
-`groth16-solana` can verify on-chain within Solana's 1.4M CU limit. The
-old RISC Zero path required Docker-based STARK-to-SNARK compression that
-is incompatible with Railway deployment.
+## Uç noktalar
 
-## Endpoints
+| Yöntem | Yol | Açıklama |
+|---|---|---|
+| POST | `/v1/prove` | `x-api-key` ister. Gövde `ProveRequest`, yanıt `ProveResponse` zarfı (`@squaresdk/solana-types`); API sözleşmesindeki `POST /v1/prove` ile aynı |
+| GET | `/health` | Süreç sağlığı (`Health`, zarfsız) |
+| GET | `/ready` | Kapasite varsa 200, kuyruk doluysa 503 (`Health`, zarfsız) |
+| GET | `/openapi.json` | Servisin OpenAPI 3.1 belgesi (şemalar zod'dan üretilir) |
+| GET | `/metrics` | Prometheus metrikleri; **ayrı portta** (`PROVER_METRICS_PORT`), yalnızca iç ağdan erişilmeli |
 
-### `GET /health`
-Returns service status and the backend in use.
+`/v1/prove` hata kodları:
 
-### `POST /prove`
-Takes the policy, payment, and operator-state fields and returns a proof
-ready for on-chain verification. Every field below is required except
-`stripe_receipt_hash` (zero for the Solana flow):
+| HTTP | `error.code` | Ne zaman |
+|---|---|---|
+| 400 | `invalid_input` | Gövde şemaya uymuyor; witness değeri kanonik ondalık alan elemanı değil; witness devreyi sağlamıyor (eksik / fazla sinyal, aralık denetimi) |
+| 401 | `unauthorized` | `x-api-key` yok ya da kayıtlı değil |
+| 409 | `conflict` | `artifactVersion` yüklü zkey'in SHA-256'sı değil; `details.expected` doğru sürümü verir |
+| 503 | `prover_unavailable` | Eşzamanlılık sınırı ve kuyruk dolu ya da kuyrukta bekleme süresi doldu; `Retry-After` başlığı |
+| 500 | `internal_error` | Beklenmeyen hata; üretilen ispat doğrulama anahtarıyla doğrulanamadı |
 
-```json
-{
-  "max_daily_spend_lamports": 100000000,
-  "max_per_transaction_lamports": 10000000,
-  "allowed_endpoint_categories": ["compute", "storage"],
-  "blocked_addresses": ["4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU"],
-  "token_whitelist": ["EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"],
-  "payment_amount_lamports": 5000000,
-  "payment_token_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
-  "payment_recipient": "CBDjvUkZZ6ucrVGrU3vRraasTytha8oVg2NLCxAHE25b",
-  "payment_endpoint_category": "compute",
-  "policy_id": "9f1c2a4e-5b7d-4c3a-8e2f-1a6b9d0c7e54",
-  "operator_id": "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU",
-  "daily_spent_before_lamports": 50000000,
-  "current_unix_timestamp": 1759449600
-}
-```
+Politika ihlali hata değildir: devre ret kodunu (public sinyal 0) ispatlar ve escrow ödemeyi bu kodla
+reddeder. Örneğin engelli payee için yanıt 200'dür, `publicInputs[0]` 8'dir.
 
-Response:
+## Artefaktlar
 
-```json
-{
-  "is_compliant": true,
-  "journal_digest": "...",
-  "groth16": {
-    "proof_a": "<base64 64 bytes>",
-    "proof_b": "<base64 128 bytes>",
-    "proof_c": "<base64 64 bytes>",
-    "public_inputs": ["<base64 32 bytes>", "… 10 entries, one per public signal"]
-  },
-  "raw_proof": { ... },
-  "raw_public": ["1", "..."],
-  "proving_time_ms": 643
-}
-```
-
-The `groth16` block is pre-formatted for the `groth16-solana` crate used
-by `programs/square-verifier/`. `raw_proof` / `raw_public` are preserved for
-off-chain re-verification and debugging.
-
-## Fixed list sizes
-
-Must match the Circom template parameters in
-the circuit these artifacts were compiled from (see Artifacts):
-
-| Parameter | Value |
+| Dosya | Kaynak |
 |---|---|
-| `MAX_WHITELIST` | 10 |
-| `MAX_BLOCKED` | 10 |
-| `MAX_CATEGORIES` | 8 |
+| `manifest.json` | `circuits/payment-compliance/artifacts/manifest.json` (BC-20) |
+| `payment.zkey` | `circuits/payment-compliance/artifacts/payment.zkey` (BC-20, geliştirme phase-2'si) |
+| `payment.wasm` | devreden derlenir (`circuits/payment-compliance/scripts/build.mjs`, circom 2.2.3) |
 
-Input lists longer than these fail with a 500; lists shorter than the
-max are padded internally with sentinel zeros and a matching mask bit
-so the circuit ignores the unused slots.
+Servis açılışta wasm ve zkey'in SHA-256'sını manifest'le karşılaştırır; uymazsa açılmaz. Artefakt
+sürümü zkey'in SHA-256'sıdır. Doğrulama anahtarı zkey'den çıkarılır ve her ispat dönmeden önce onunla
+doğrulanır. zkey tek katılımcılı bir geliştirme setup'ıdır; mainnet öncesi kamusal ceremony BC-38'de.
 
-## Artifacts
+## Yapılandırma
 
-`artifacts/` contains the compiled Circom outputs the service needs at
-runtime:
+Tüm değişkenler zorunludur; eksik ya da geçersiz değerde servis açılmaz.
 
-- `payment.wasm` — witness calculator compiled from `payment.circom`
-- `payment.zkey` — proving key from the (currently development-only)
-  trusted setup ceremony
-- `payment_vk.json` — verification key in snarkjs format; the Solana
-  verifier's hardcoded `Groth16Verifyingkey` must match this file
-
-These ship inside the Docker image. Replace them with production
-ceremony output before mainnet.
-
-## Configuration
-
-Both variables are required; the service refuses to start without them.
-
-| Variable | Description |
+| Değişken | Açıklama |
 |---|---|
-| `PROVER_SERVICE_PORT` | HTTP port |
-| `CORS_ORIGINS` | Comma-separated allowed origin URLs |
+| `PROVER_SERVICE_PORT` | HTTP portu |
+| `PROVER_METRICS_PORT` | `/metrics` portu (servis portundan farklı, iç ağ) |
+| `CORS_ORIGINS` | Virgülle ayrılmış izinli origin URL'leri |
+| `PROVER_API_KEY_SHA256` | İzinli API anahtarlarının SHA-256'sı (64 küçük harf hex, virgülle); anahtarın kendisi ortamda tutulmaz. Rotasyonda eski ve yeni özet birlikte verilir |
+| `PROVER_MAX_CONCURRENT` | Aynı anda üretilen en fazla ispat |
+| `PROVER_MAX_QUEUE` | Sırada bekleyebilecek en fazla istek |
+| `PROVER_QUEUE_TIMEOUT_MS` | Sırada bekleme sınırı; `Retry-After` bundan türetilir |
+| `PROVER_MANIFEST_PATH` | `manifest.json` yolu |
+| `PROVER_WASM_PATH` | `payment.wasm` yolu |
+| `PROVER_ZKEY_PATH` | `payment.zkey` yolu |
 
-## Local development
+Docker imajı artefakt yollarını kendisi verir; diğerleri dağıtımda tanımlanır. Anahtar özeti:
+`printf %s "$ANAHTAR" | shasum -a 256`.
+
+## Geliştirme
 
 ```bash
-pnpm install
-PROVER_SERVICE_PORT=<port> CORS_ORIGINS=<origin> pnpm --filter @squaresdk/solana-prover dev
-
-# In another terminal, against the running service:
-PROVER_BASE_URL=http://<host>:<port> node apps/prover/scripts/integration-test.mjs
-PROVER_BASE_URL=http://<host>:<port> node apps/prover/scripts/tamper-test.mjs
+node circuits/payment-compliance/scripts/build.mjs        # wasm (circom 2.2.3 gerekir)
+pnpm --filter @squaresdk/solana-prover... build
+pnpm --filter @squaresdk/solana-prover test               # gerçek artefaktlarla ispat, tamper, HTTP
 ```
 
-## Regenerate artifacts
+Testler devrenin `test-inputs/` senaryolarının (14) hepsinin ispatını üretir, sinyalleri beklenen
+değerlerle karşılaştırır ve ispatı depodaki doğrulama anahtarıyla bağımsız doğrular. Tamper testleri:
+ispatın ya da bir public sinyalin tek değişikliği doğrulamayı düşürür; tek baytı değişmiş zkey ya da
+wasm ile servis açılmaz.
 
-The artifacts here were compiled from Aperture's 10-output circuit and match
-the verification key in `programs/square-verifier/src/groth16_vk.rs`. The
-Square release circuit (`circuits/payment-compliance/`, 13 outputs) has its own
-artifact pipeline (BC-20): `circuits/payment-compliance/scripts/release-artifacts.mjs`
-produces and checks the release zkey, its verification key and
-`programs/square-verifier/src/release_vk.rs`. Moving this service to those
-artifacts is BE-11.
+Docker imajı (circom ikilisi linux-amd64 olduğu için `--platform linux/amd64`):
+
+```bash
+docker build --platform linux/amd64 -f apps/prover/Dockerfile .
+```
+
+## Lisans
+
+Aperture'dan taşınan dizin: [`LICENSE`](LICENSE) (MIT). snarkjs GPL-3.0'dır; servis imajı
+dağıtılmadan önceki hukuki inceleme [`docs/THIRD_PARTY_LICENSES.md`](../../docs/THIRD_PARTY_LICENSES.md)'de.
