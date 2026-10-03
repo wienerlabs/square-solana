@@ -1,0 +1,171 @@
+// BE-03: paket kurulum smoke'u. Yayınlanabilir paketler derlenir ve pack edilir; checkout dışındaki boş bir
+// projeye yalnızca bu tarball'larla kurulur (registry'den birinci taraf paket çözülemez) ve her `exports`
+// yolu düz Node ile import edilir. Paketler ADR 0001'e göre henüz npm'de değil; liste bu yüzden açık
+// tutulur ve her workspace paketi ya listede ya da gerekçeli dışlamadadır.
+import { execFileSync } from 'node:child_process';
+import { existsSync, mkdtempSync, readFileSync, readdirSync, writeFileSync, mkdirSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+
+export const PUBLISHABLE = [
+  '@squaresdk/solana-types',
+  '@squaresdk/solana-sdk',
+  '@squaresdk/solana-identity',
+  '@squaresdk/solana-policy',
+];
+
+export const EXCLUDED = {
+  '@squaresdk/solana-config': 'yalnızca geliştirme araçlarının ortak ayarları (tsconfig, ESLint, Prettier)',
+  '@squaresdk/solana-db': "servislerin iç paketi: tek veritabanının şeması, migration'ları ve istemcisi",
+  '@squaresdk/solana-agent-sdk': "kaynaktan taşındı, Square'e uyarlanması BE-19 (#52)",
+  '@squaresdk/solana-mcp': "kaynaktan taşındı, Square'e uyarlanması BE-28 (#87)",
+};
+
+const ROOT = fileURLToPath(new URL('../..', import.meta.url));
+
+export function checkClassification(found, publishable, excluded) {
+  const errors = [];
+  for (const name of found) {
+    if (!publishable.includes(name) && !(name in excluded)) {
+      errors.push(
+        `${name} sınıflandırılmamış: scripts/ci/pack-smoke.mjs içinde PUBLISHABLE ya da EXCLUDED listesine ekleyin`,
+      );
+    }
+  }
+  for (const name of publishable)
+    if (!found.includes(name)) errors.push(`${name} PUBLISHABLE listesinde ama repoda yok`);
+  for (const name of Object.keys(excluded))
+    if (!found.includes(name)) errors.push(`${name} EXCLUDED listesinde ama repoda yok`);
+  return errors;
+}
+
+const isSubpathMap = (exportsField) =>
+  typeof exportsField === 'object' &&
+  exportsField !== null &&
+  Object.keys(exportsField).some((key) => key.startsWith('.'));
+
+export function exportSpecifiers(name, exportsField) {
+  if (!isSubpathMap(exportsField)) return [name];
+  return Object.keys(exportsField)
+    .filter((key) => !key.includes('*') && !key.endsWith('.json'))
+    .map((key) => (key === '.' ? name : `${name}/${key.slice(2)}`));
+}
+
+function collectTargets(value, out) {
+  if (typeof value === 'string') out.push(value);
+  else if (value && typeof value === 'object') for (const nested of Object.values(value)) collectTargets(nested, out);
+  return out;
+}
+
+export function exportTargets(exportsField) {
+  return collectTargets(exportsField, []).filter((target) => !target.includes('*'));
+}
+
+export function consumerManifest(tarballs) {
+  const dependencies = Object.fromEntries(Object.entries(tarballs).map(([name, path]) => [name, `file:${path}`]));
+  return {
+    name: 'square-pack-smoke-consumer',
+    private: true,
+    type: 'module',
+    dependencies,
+    overrides: { ...dependencies },
+  };
+}
+
+export function unresolvedFromLock(lock, names) {
+  const errors = [];
+  for (const name of names) {
+    const entry = lock.packages?.[`node_modules/${name}`];
+    if (!entry) errors.push(`${name} lockfile'da yok`);
+    else if (!String(entry.resolved ?? '').startsWith('file:')) {
+      errors.push(`${name} yerel tarball yerine ${entry.resolved} adresinden çözüldü`);
+    }
+  }
+  return errors;
+}
+
+function workspacePackageNames() {
+  const manifests = readdirSync(join(ROOT, 'packages'), { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => join(ROOT, 'packages', entry.name, 'package.json'))
+    .concat(join(ROOT, 'db', 'package.json'))
+    .filter((path) => existsSync(path));
+  return manifests.map((path) => JSON.parse(readFileSync(path, 'utf8')).name);
+}
+
+function run(command, args, options = {}) {
+  return execFileSync(command, args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'inherit'], ...options });
+}
+
+function main() {
+  const classification = checkClassification(workspacePackageNames(), PUBLISHABLE, EXCLUDED);
+  if (classification.length) {
+    for (const error of classification) console.error(`HATA: ${error}`);
+    process.exit(1);
+  }
+
+  run('pnpm', ['turbo', 'run', 'build', ...PUBLISHABLE.map((name) => `--filter=${name}`)], {
+    cwd: ROOT,
+    stdio: 'inherit',
+  });
+
+  const work = mkdtempSync(join(tmpdir(), 'square-pack-smoke-'));
+  const tarballDir = join(work, 'tarballs');
+  mkdirSync(tarballDir);
+  const tarballs = {};
+  for (const name of PUBLISHABLE) {
+    const out = run('pnpm', ['--filter', name, 'pack', '--json', '--pack-destination', tarballDir], { cwd: ROOT });
+    const packed = JSON.parse(out.slice(out.indexOf('{')));
+    tarballs[name] = resolve(tarballDir, packed.filename);
+    console.log(`pack: ${name} → ${packed.filename} (${packed.files.length} dosya)`);
+  }
+
+  const consumer = join(work, 'consumer');
+  mkdirSync(consumer);
+  writeFileSync(join(consumer, 'package.json'), `${JSON.stringify(consumerManifest(tarballs), null, 2)}\n`);
+  run('npm', ['install', '--no-audit', '--no-fund', '--ignore-scripts', '--loglevel=error'], {
+    cwd: consumer,
+    stdio: 'inherit',
+  });
+
+  const errors = unresolvedFromLock(JSON.parse(readFileSync(join(consumer, 'package-lock.json'), 'utf8')), PUBLISHABLE);
+  for (const name of PUBLISHABLE) {
+    const installed = join(consumer, 'node_modules', ...name.split('/'));
+    const manifest = JSON.parse(readFileSync(join(installed, 'package.json'), 'utf8'));
+    for (const target of exportTargets(manifest.exports)) {
+      if (!existsSync(join(installed, target))) errors.push(`${name}: exports hedefi tarball'da yok: ${target}`);
+    }
+    for (const specifier of exportSpecifiers(name, manifest.exports)) {
+      try {
+        const keys = run(
+          process.execPath,
+          [
+            '--input-type=module',
+            '-e',
+            'const m = await import(process.env.SPEC); console.log(Object.keys(m).length);',
+          ],
+          { cwd: consumer, env: { ...process.env, SPEC: specifier }, stdio: ['ignore', 'pipe', 'pipe'] },
+        ).trim();
+        if (Number(keys) === 0) errors.push(`${specifier}: modül hiçbir şey dışa aktarmıyor`);
+        else console.log(`import: ${specifier} (${keys} dışa aktarım)`);
+      } catch (error) {
+        errors.push(
+          `${specifier}: düz Node ile import edilemedi: ${String(error.stderr ?? error.message)
+            .trim()
+            .split('\n')
+            .slice(0, 6)
+            .join(' | ')}`,
+        );
+      }
+    }
+  }
+
+  if (errors.length) {
+    for (const error of errors) console.error(`HATA: ${error}`);
+    process.exit(1);
+  }
+  console.log(`smoke yeşil: ${PUBLISHABLE.length} paket, Node ${process.version}`);
+}
+
+if (import.meta.url === pathToFileURL(process.argv[1]).href) main();
