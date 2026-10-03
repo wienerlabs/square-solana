@@ -81,7 +81,7 @@ prover, screener), `@squaresdk/solana-*` paketleri ve Next.js web uygulaması.
 | [`db/`](db/) | Tek veritabanı şeması ve migration'lar |
 | [`tests/`](tests/) | Program entegrasyon testleri ve uçtan uca testler |
 | [`scripts/`](scripts/) | Deploy, init ve bakım script'leri |
-| [`docs/`](docs/) | Analiz, kararlar (ADR), spec'ler, tasarım belgeleri |
+| [`docs/`](docs/) | Analiz, [kararlar (ADR)](docs/decisions/), spec'ler, tasarım belgeleri |
 
 Yapının gerekçesi: [§9](docs/analysis/square-solana-analysis.md#9-%C3%B6nerilen-monorepo-yap%C4%B1s%C4%B1).
 
@@ -91,9 +91,9 @@ Yapının gerekçesi: [§9](docs/analysis/square-solana-analysis.md#9-%C3%B6neri
 |---|---|---|
 | Rust (host) | 1.94.1 | [`rust-toolchain.toml`](rust-toolchain.toml) |
 | Solana CLI | 2.x (platform-tools rustc 1.84 ile SBF derlemesi) | [`.cargo/config.toml`](.cargo/config.toml) |
-| Anchor CLI | BC-08 ile sabitlenecek | — |
+| Anchor CLI | BC-08 ile sabitlenecek | [ADR 0007](docs/decisions/0007-anchor-surumu.md) |
 | Node.js | 24 (LTS) | [`.nvmrc`](.nvmrc) |
-| pnpm | 10.34.6 | `package.json` → `packageManager` |
+| pnpm | 10.34.6 | `package.json` → `packageManager`, [ADR 0011](docs/decisions/0011-monorepo-araclari-pnpm-ve-turborepo.md) |
 
 ```bash
 pnpm install
@@ -126,13 +126,16 @@ Editör ayarları [`.editorconfig`](.editorconfig) ile paylaşılır.
   riskler.
 - [Kararlar (§12)](docs/analysis/square-solana-analysis.md#12-kararlar): mimari, kapsam,
   varsayılanlar, lisans, proje yönetimi. §12 ile çelişen her şeyde §12 geçerlidir.
+- [Mimari karar kayıtları (ADR)](docs/decisions/): §12 kararlarının kalıcı kaydı (0001-0011) ve
+  [ADR şablonu](docs/decisions/sablon.md).
 - [Milestone'lar](https://github.com/wienerlabs/square-solana/milestones) ve
   [issue'lar](https://github.com/wienerlabs/square-solana/issues): her iş bir issue'ya bağlıdır
   (`BC-` blockchain, `BE-` backend, `FE-` frontend).
 
 ## Lisans
 
-[Apache-2.0](LICENSE) ([§12.5](docs/analysis/square-solana-analysis.md#125-lisans)). Kaynak
+[Apache-2.0](LICENSE) ([§12.5](docs/analysis/square-solana-analysis.md#125-lisans),
+[ADR 0005](docs/decisions/0005-lisans-apache-2-0-ve-notice.md)). Kaynak
 projelerin kökenleri ve orijinal lisansları [`NOTICE`](NOTICE)'tedir. Taşınan kod ve bağımlılık
 lisansı kuralları [`docs/licensing.md`](docs/licensing.md)'de, üçüncü taraf envanteri
 [`docs/THIRD_PARTY_LICENSES.md`](docs/THIRD_PARTY_LICENSES.md)'dedir.
