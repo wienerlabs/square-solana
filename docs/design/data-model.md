@@ -69,9 +69,9 @@ Notlar:
 | `cctp_transfers` | CCTP mesajı (kaynak domain + nonce), Circle attestation'ı, Solana'da receive ve fund imzaları | CCTP relayer | BE-26 |
 | `travel_rule_records` | Şifreli Travel Rule verisi; zincirdeki commitment ile bağlı | API | BE-23 |
 | `a2a_tasks` | A2A görevi: agent, çağıran, bağlı job ve spec hash'i (görevin A2A bağlamı job adresidir), görev durumu, durum mesajı, artefaktlar, iyimser `version`. `job_status` ve `job_slot` sunucunun zincirde son gördüğü değerlerdir, ayna veri değildir. `(agent_record, caller, create_message_id)` tekil; kısmi tekil indeks job başına tek terminal olmayan görev | agent'ın A2A sunucusu ([a2a.md](a2a.md) §7) | BE-17 |
-| `a2a_messages` | Görev geçmişi: istemci ve agent mesajları, ekleme sırasıyla; `(task_id, message_id)` tekil, görev silinince silinir | agent'ın A2A sunucusu | BE-17 |
+| `a2a_messages` | Görev geçmişi: istemci ve agent mesajları, ekleme sırasıyla; `pending` istemcinin devam mesajı agent'a iletilip işlenene kadar true. `(task_id, message_id)` tekil, görev silinince silinir | agent'ın A2A sunucusu | BE-17 |
 
-A2A tablolarındaki mesaj ve artefakt içerikleri JSONB olarak düz metindir (Travel Rule ya da kişisel veri taşımaz); saklama ve silme kuralı henüz yoktur ([a2a.md](a2a.md) §10).
+A2A tablolarındaki mesaj ve artefakt içerikleri JSONB olarak düz metindir. Travel Rule ya da kişisel veri bu tablolara yazılmamalıdır; bunu agent kodu sağlar, depo zorlamaz. Saklama ve silme kuralı henüz yoktur ([a2a.md](a2a.md) §10).
 
 Agent card kayıttan önce yüklenebilir: 8 adımın 2.sinde önce `putAgentCard`, sonra `registerAgent` gelir. Bu yüzden zincir dışı tablolardan ayna tablolara yabancı anahtar yoktur.
 
