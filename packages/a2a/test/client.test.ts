@@ -100,6 +100,57 @@ describe('createA2aClient', () => {
     ).rejects.toMatchObject({ code: -32004 });
   });
 
+  it('başarılı yanıtta kimlik null olamaz; hata mesajı kısaltılır, geçersiz ayrıntılar atılır', async () => {
+    let mode = 'null-id';
+    const url = await fake((body, res) => {
+      if (mode === 'null-id') return json(res, { jsonrpc: '2.0', id: null, result: TASK });
+      return json(res, {
+        jsonrpc: '2.0',
+        id: body.id,
+        error: { code: -32001, message: 'x'.repeat(5000), data: [null, 5, { '@type': 'tip' }] },
+      });
+    });
+    const client = createA2aClient({ url, timeoutMs: 2000, allowInsecureHttp: true });
+    await expect(client.getTask({ id: 't-1' })).rejects.toMatchObject({ code: -32006 });
+    mode = 'error';
+    const error = (await client.getTask({ id: 't-1' }).catch((e: unknown) => e)) as A2aError;
+    expect(error.code).toBe(-32001);
+    expect(error.message.length).toBeLessThanOrEqual(1024);
+    expect(error.data).toEqual([{ '@type': 'tip' }]);
+  });
+
+  it('yavaş tüketici akışı zaman aşımına düşürmez; yalnız CR satır sonları da olay ayırır', async () => {
+    const url = await fake((body, res) => {
+      res.writeHead(200, { 'content-type': 'text/event-stream' });
+      const event = (n: number) =>
+        `data: ${JSON.stringify({ jsonrpc: '2.0', id: body.id, result: { task: { ...TASK, id: `t-${n}` } } })}\r\r`;
+      res.write(event(1));
+      setTimeout(() => res.write(': ping\r\r'), 100);
+      setTimeout(() => res.end(event(2)), 150);
+    });
+    const client = createA2aClient({ url, timeoutMs: 250, allowInsecureHttp: true });
+    const ids: string[] = [];
+    for await (const event of client.subscribeToTask({ id: 't-1' })) {
+      ids.push(event.task!.id);
+      await new Promise((resolve) => setTimeout(resolve, 600));
+    }
+    expect(ids).toEqual(['t-1', 't-2']);
+  });
+
+  it('CRLF bölünse de olay doğru ayrılır', async () => {
+    const url = await fake((body, res) => {
+      res.writeHead(200, { 'content-type': 'text/event-stream' });
+      const frame = `data: ${JSON.stringify({ jsonrpc: '2.0', id: body.id, result: { task: TASK } })}\r\n\r\n`;
+      const cut = frame.length - 3;
+      res.write(frame.slice(0, cut));
+      setTimeout(() => res.end(frame.slice(cut)), 30);
+    });
+    const client = createA2aClient({ url, timeoutMs: 2000, allowInsecureHttp: true });
+    const seen: unknown[] = [];
+    for await (const event of client.subscribeToTask({ id: 't-1' })) seen.push(event);
+    expect(seen).toEqual([{ task: TASK }]);
+  });
+
   it('akışta CRLF satır sonlarını ve yorum satırlarını işler; olaylar arası süre dolunca keser', async () => {
     const url = await fake((body, res) => {
       res.writeHead(200, { 'content-type': 'text/event-stream' });

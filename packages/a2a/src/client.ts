@@ -24,7 +24,10 @@ import { A2aError, type ErrorDetail } from './errors.js';
 export interface A2aClientOptions {
   /** Agent kartındaki A2A uç noktası. */
   url: string;
-  /** İstek süresi; akışlarda olaylar arası en uzun bekleme. */
+  /**
+   * İstek süresi. Akışta sunucudan veri (olay ya da kalp atışı) gelmeden geçebilecek en uzun süredir;
+   * tüketicinin olayı işleme süresi sayılmaz. Akışın toplam süresini tüketici, döngüden çıkarak sınırlar.
+   */
   timeoutMs: number;
   /** Her isteğe eklenen başlıklar (ör. kimlik doğrulama). */
   headers?: Readonly<Record<string, string>> | (() => Promise<Readonly<Record<string, string>>>);
@@ -32,6 +35,10 @@ export interface A2aClientOptions {
   allowInsecureHttp?: boolean;
   /** Bir yanıtın ya da tek bir akış olayının en büyük boyutu (bayt). */
   maxResponseBytes?: number;
+  /**
+   * Ağ katmanı. Uç nokta güvenilmeyen bir agent kartından geliyorsa iç ağ ve meta veri adreslerini
+   * engelleyen (SSRF korumalı) bir fetch verilmelidir (BE-13); varsayılan fetch adresi denetlemez.
+   */
   fetch?: typeof fetch;
 }
 
@@ -46,6 +53,7 @@ export interface A2aClient {
 
 const DEFAULT_MAX_RESPONSE_BYTES = 4 * 1024 * 1024;
 const INVALID_RESPONSE = -32006;
+const MAX_ERROR_MESSAGE = 1024;
 
 const invalid = (detail: string) => new A2aError(INVALID_RESPONSE, `Invalid agent response: ${detail}`);
 
@@ -67,6 +75,19 @@ async function readLimited(response: Response, maxBytes: number): Promise<string
   return Buffer.concat(chunks).toString('utf8');
 }
 
+/** Sunucunun hata ayrıntılarından yalnızca `@type` taşıyan nesneler alınır. */
+function errorDetails(data: unknown): ErrorDetail[] | undefined {
+  if (!Array.isArray(data)) return undefined;
+  const details = data.filter(
+    (item): item is ErrorDetail =>
+      typeof item === 'object' &&
+      item !== null &&
+      !Array.isArray(item) &&
+      typeof (item as { '@type'?: unknown })['@type'] === 'string',
+  );
+  return details.length > 0 ? details : undefined;
+}
+
 function unwrap<T>(text: string, id: string, schema: z.ZodType<T>): T {
   let value: unknown;
   try {
@@ -76,10 +97,13 @@ function unwrap<T>(text: string, id: string, schema: z.ZodType<T>): T {
   }
   const envelope = JsonRpcResponseSchema.safeParse(value);
   if (!envelope.success) throw invalid('JSON-RPC yanıtı değil');
-  if (envelope.data.id !== id && envelope.data.id !== null) throw invalid('yanıt kimliği istekle eşleşmiyor');
+  const isError = 'error' in envelope.data;
+  if (envelope.data.id !== id && !(isError && envelope.data.id === null)) {
+    throw invalid('yanıt kimliği istekle eşleşmiyor');
+  }
   if ('error' in envelope.data) {
     const { code, message, data } = envelope.data.error;
-    throw new A2aError(code, message, Array.isArray(data) ? (data as ErrorDetail[]) : undefined);
+    throw new A2aError(code, message.slice(0, MAX_ERROR_MESSAGE), errorDetails(data));
   }
   const result = schema.safeParse(envelope.data.result);
   if (!result.success) throw invalid(result.error.issues[0]?.message ?? 'şema');
@@ -134,11 +158,15 @@ export function createA2aClient(options: A2aClientOptions): A2aClient {
       if (!response.body) throw invalid('boş akış');
       const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
       let buffer = '';
+      let carriage = false;
       for (;;) {
-        const { done, value } = await reader.read();
-        if (done) return;
         arm();
-        buffer = (buffer + value).replaceAll('\r\n', '\n');
+        const { done, value } = await reader.read();
+        clearTimeout(idle);
+        if (done) return;
+        const text: string = carriage && value.startsWith('\n') ? value.slice(1) : value;
+        carriage = text.endsWith('\r');
+        buffer += text.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
         if (buffer.length > maxBytes) throw invalid('akış olayı boyut sınırını aşıyor');
         let boundary = buffer.indexOf('\n\n');
         while (boundary !== -1) {

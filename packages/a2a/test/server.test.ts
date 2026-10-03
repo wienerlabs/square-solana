@@ -2,8 +2,22 @@ import { startIsolatedDatabase, type IsolatedDatabase } from '@squaresdk/solana-
 import type { StreamResponse } from '@squaresdk/solana-types';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { A2aError, ERROR_INFO_TYPE } from '../src/errors.js';
-import { JOB_A, JOB_B, JOB_C, JOB_D, OTHER_AGENT_RECORD } from './helpers/fixtures.js';
-import { Harness, KEY_A, KEY_B, LIMITS, openingMessage, until } from './helpers/harness.js';
+import { createTaskEventBus } from '../src/events.js';
+import { TaskStoreError, type TaskStore } from '../src/store.js';
+import { AGENT_RECORD, FOREIGN_PROGRAM, JOB_A, JOB_B, JOB_C, JOB_D, OTHER_AGENT_RECORD } from './helpers/fixtures.js';
+import {
+  callerOf,
+  Harness,
+  KEY_A,
+  KEY_A2,
+  KEY_B,
+  LIMITS,
+  openingMessage,
+  spec,
+  specHashOf,
+  until,
+  type HarnessOptions,
+} from './helpers/harness.js';
 
 let db: IsolatedDatabase;
 let h: Harness;
@@ -28,6 +42,14 @@ afterEach(async () => {
 
 const reason = (error: unknown) =>
   ((error as A2aError).data?.find((d) => d['@type'] === ERROR_INFO_TYPE) as { reason?: string } | undefined)?.reason;
+
+async function restart(options: HarnessOptions) {
+  await h.stop();
+  h = new Harness(db, options);
+  await h.start();
+}
+
+const versionOf = async (id: string) => (await db.client.a2aTask.findUniqueOrThrow({ where: { id } })).version;
 
 async function rpc(body: unknown, headers: Record<string, string> = {}) {
   const response = await fetch(h.url, {
@@ -56,13 +78,30 @@ describe('protokol', () => {
     expect(((await response.json()) as { error: { code: number } }).error.code).toBe(-32001);
   });
 
-  it('kimlik yoksa 401', async () => {
+  it('kimlik yoksa 401; kimlik gövde okunmadan denetlenir', async () => {
     const { status, json } = await rpc(
       { jsonrpc: '2.0', id: 1, method: 'GetTask', params: { id: 'x' } },
       { 'x-api-key': '' },
     );
     expect(status).toBe(401);
     expect(json.error?.code).toBe(-32000);
+    expect((await rpc('{', { 'x-api-key': 'gecersiz-anahtar' })).status).toBe(401);
+  });
+
+  it('kapanan sunucu yeni isteği 503 ile reddeder', async () => {
+    await h.server.close();
+    const { status, json } = await rpc({ jsonrpc: '2.0', id: 1, method: 'GetTask', params: { id: 'x' } });
+    expect(status).toBe(503);
+    expect(json.error?.code).toBe(-32000);
+  });
+
+  it('sürüm başlığındaki biçimsiz değer hata ayrıntısına yansımaz', async () => {
+    const { json } = await rpc(
+      { jsonrpc: '2.0', id: 1, method: 'GetTask', params: { id: 'x' } },
+      { 'a2a-version': '<script>' },
+    );
+    expect(json.error?.code).toBe(-32009);
+    expect(JSON.stringify(json)).not.toContain('script');
   });
 
   it('bilinmeyen yöntem, push yapılandırması ve genişletilmiş kart', async () => {
@@ -95,6 +134,37 @@ describe('protokol', () => {
   it('geçersiz parametre -32602', async () => {
     await expect(h.client().getTask({ id: '' })).rejects.toMatchObject({ code: -32602 });
   });
+
+  it('I-JSON dışı değerler (NUL, eşleşmemiş surrogate, sonlu olmayan sayı, aşırı derinlik) -32602; iç hata yok', async () => {
+    await h.openJob(JOB_A, 'a');
+    const base = openingMessage(JOB_A, 'a');
+    const client = h.client();
+    await expect(client.sendMessage({ message: { ...base, parts: [{ text: 'a\u0000b' }] } })).rejects.toMatchObject({
+      code: -32602,
+    });
+    await expect(client.sendMessage({ message: { ...base, messageId: 'm\u0000' } })).rejects.toMatchObject({
+      code: -32602,
+    });
+    await expect(
+      client.sendMessage({ message: { ...base, parts: [{ data: { x: '\ud800' } }] } }),
+    ).rejects.toMatchObject({ code: -32602 });
+    const infinite = JSON.stringify({
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'SendMessage',
+      params: { message: base },
+    }).replace('"metadata":{', '"metadata":{"n":1e999,');
+    expect((await rpc(infinite)).json.error?.code).toBe(-32602);
+    type Nested = string | Nested[];
+    let deep: Nested = 'dip';
+    for (let i = 0; i < 100; i += 1) deep = [deep];
+    await expect(client.sendMessage({ message: { ...base, parts: [{ data: deep }] } })).rejects.toMatchObject({
+      code: -32602,
+    });
+    const token = Buffer.from(JSON.stringify({ t: new Date().toISOString(), i: 'uuid-değil' })).toString('base64url');
+    await expect(client.listTasks({ pageToken: token })).rejects.toMatchObject({ code: -32602 });
+    expect(h.errors).toEqual([]);
+  });
 });
 
 describe('görev açma', () => {
@@ -104,7 +174,7 @@ describe('görev açma', () => {
       .client()
       .sendMessage({ message: openingMessage(JOB_A, 'a'), configuration: { returnImmediately: true } });
     expect(task).toMatchObject({ contextId: JOB_A, status: { state: 'TASK_STATE_SUBMITTED' } });
-    expect(task?.metadata?.square).toMatchObject({ job: JOB_A, jobStatus: 'funded', slot: 1 });
+    expect(task?.metadata?.square).toMatchObject({ job: JOB_A, jobStatus: 'funded', slot: expect.any(Number) });
     const fetched = await h.client().getTask({ id: task!.id });
     expect(fetched.id).toBe(task!.id);
     expect(fetched.history?.map((m) => m.messageId)).toEqual(['m-a']);
@@ -126,14 +196,56 @@ describe('görev açma', () => {
     ).rejects.toSatisfy((e) => reason(e) === 'MESSAGE_ID_CONFLICT');
   });
 
-  it("job'un etkin görevi varken ikinci görev açılmaz", async () => {
+  it('aynı mesajın tekrarı job kabul edildikten sonra da aynı görevi döner', async () => {
+    await h.openJob(JOB_A, 'a');
+    const client = h.client();
+    const first = await client.sendMessage({
+      message: openingMessage(JOB_A, 'a'),
+      configuration: { returnImmediately: true },
+    });
+    await h.chain.setStatus(JOB_A, 'accepted');
+    const again = await client.sendMessage({
+      message: openingMessage(JOB_A, 'a'),
+      configuration: { returnImmediately: true },
+    });
+    expect(again.task?.id).toBe(first.task?.id);
+    expect(again.task?.status.state).toBe('TASK_STATE_WORKING');
+    const conflicting = { ...openingMessage(JOB_A, 'a'), parts: [{ text: 'başka içerik' }] };
+    await expect(
+      client.sendMessage({ message: conflicting, configuration: { returnImmediately: true } }),
+    ).rejects.toSatisfy((e) => reason(e) === 'MESSAGE_ID_CONFLICT');
+  });
+
+  it("job'un etkin görevi varken aynı kurumun başka anahtarı ikinci görev açamaz", async () => {
     await h.openJob(JOB_A, 'a');
     await h.client().sendMessage({ message: openingMessage(JOB_A, 'a'), configuration: { returnImmediately: true } });
     await expect(
       h
-        .client(KEY_B)
-        .sendMessage({ message: openingMessage(JOB_A, 'a', 'm-b'), configuration: { returnImmediately: true } }),
+        .client(KEY_A2)
+        .sendMessage({ message: openingMessage(JOB_A, 'a', 'm-a2'), configuration: { returnImmediately: true } }),
     ).rejects.toSatisfy((e) => reason(e) === 'JOB_HAS_ACTIVE_TASK');
+  });
+
+  it("job'un kurumuna bağlı olmayan çağıran görev açamaz ve etkin görevin varlığını öğrenemez", async () => {
+    await h.openJob(JOB_A, 'a');
+    const stranger = h.client(KEY_B);
+    const attempt = () =>
+      stranger.sendMessage({ message: openingMessage(JOB_A, 'a', 'm-b'), configuration: { returnImmediately: true } });
+    await expect(attempt()).rejects.toSatisfy((e) => reason(e) === 'JOB_NOT_FOR_CALLER');
+    await h.client().sendMessage({ message: openingMessage(JOB_A, 'a'), configuration: { returnImmediately: true } });
+    await expect(attempt()).rejects.toSatisfy((e) => reason(e) === 'JOB_NOT_FOR_CALLER');
+  });
+
+  it('escrow programına ait olmayan sahte job hesabıyla görev açılmaz', async () => {
+    await h.chain.setJob(JOB_A, {
+      status: 'funded',
+      agentRecord: AGENT_RECORD,
+      specHash: specHashOf(spec('a')),
+      owner: FOREIGN_PROGRAM,
+    });
+    await expect(
+      h.client().sendMessage({ message: openingMessage(JOB_A, 'a'), configuration: { returnImmediately: true } }),
+    ).rejects.toSatisfy((e) => reason(e) === 'JOB_NOT_FOUND');
   });
 
   it("başka agent'ın job'u ve push yapılandırması reddedilir", async () => {
@@ -163,16 +275,20 @@ describe('görev açma', () => {
     const { task } = await h
       .client()
       .sendMessage({ message: openingMessage(JOB_A, 'a'), configuration: { returnImmediately: true } });
-    await expect(h.client(KEY_B).getTask({ id: task!.id })).rejects.toMatchObject({ code: -32001 });
-    await expect(h.client(KEY_B).cancelTask({ id: task!.id })).rejects.toMatchObject({ code: -32001 });
-    expect((await h.client(KEY_B).listTasks({})).tasks).toEqual([]);
+    for (const key of [KEY_B, KEY_A2]) {
+      await expect(h.client(key).getTask({ id: task!.id })).rejects.toMatchObject({ code: -32001 });
+      await expect(h.client(key).cancelTask({ id: task!.id })).rejects.toMatchObject({ code: -32001 });
+      expect((await h.client(key).listTasks({})).tasks).toEqual([]);
+    }
   });
 });
 
 describe('agent akışı ve zincir', () => {
   it('bloklayan SendMessage görev bitince döner; artefakt ve geçmiş', async () => {
     await h.openJob(JOB_A, 'a');
+    let caller = '';
     h.scripts.set(JOB_A, async (context) => {
+      caller = context.caller;
       await h.chain.setStatus(JOB_A, 'accepted');
       await context.working('iş kabul edildi');
       await context.addArtifact({
@@ -188,6 +304,121 @@ describe('agent akışı ve zincir', () => {
     expect(task?.artifacts?.map((a) => a.artifactId)).toEqual(['rapor']);
     expect(task?.history?.map((m) => m.role)).toEqual(['ROLE_USER', 'ROLE_AGENT', 'ROLE_AGENT']);
     expect(task?.metadata?.square).toMatchObject({ jobStatus: 'delivered' });
+    expect(caller).toBe(callerOf(KEY_A));
+  });
+
+  it('okumalar görevi yazmaz; slot yanıtta günceldir', async () => {
+    await h.openJob(JOB_A, 'a');
+    const client = h.client();
+    const { task } = await client.sendMessage({
+      message: openingMessage(JOB_A, 'a'),
+      configuration: { returnImmediately: true },
+    });
+    const slots: number[] = [];
+    for (let i = 0; i < 4; i += 1) {
+      slots.push(((await client.getTask({ id: task!.id })).metadata?.square as { slot: number }).slot);
+    }
+    expect(new Set(slots).size).toBe(4);
+    expect(await versionOf(task!.id)).toBe(0);
+  });
+
+  it('okumalarla yarışan eşzamanlı agent yazmaları kaybolmaz', async () => {
+    await h.openJob(JOB_A, 'a');
+    let failure: unknown = null;
+    h.scripts.set(JOB_A, async (context) => {
+      await h.chain.setStatus(JOB_A, 'accepted');
+      await context.working();
+      await Promise.all(
+        Array.from({ length: 8 }, (_, i) =>
+          context.addArtifact({ artifactId: `p-${i}`, parts: [{ text: `parça ${i}` }] }),
+        ),
+      ).catch((error: unknown) => (failure = error));
+      await h.chain.setStatus(JOB_A, 'delivered');
+      await context.complete();
+    });
+    const client = h.client();
+    const { task } = await client.sendMessage({
+      message: openingMessage(JOB_A, 'a'),
+      configuration: { returnImmediately: true },
+    });
+    const polling = (async () => {
+      for (let i = 0; i < 20; i += 1) await client.getTask({ id: task!.id });
+    })();
+    await until(async () => (await client.getTask({ id: task!.id })).status.state === 'TASK_STATE_COMPLETED');
+    await polling;
+    expect(failure).toBeNull();
+    expect((await client.getTask({ id: task!.id })).artifacts).toHaveLength(8);
+  });
+
+  it("zincir görevi önce tamamlarsa agent'ın complete çağrısı hata vermez, metni geçmişe eklenir", async () => {
+    await h.openJob(JOB_A, 'a');
+    let delivered!: () => void;
+    let proceed!: () => void;
+    const deliveredP = new Promise<void>((resolve) => (delivered = resolve));
+    const proceedP = new Promise<void>((resolve) => (proceed = resolve));
+    let outcome: unknown = 'bekliyor';
+    h.scripts.set(JOB_A, async (context) => {
+      await h.chain.setStatus(JOB_A, 'accepted');
+      await context.working();
+      await h.chain.setStatus(JOB_A, 'delivered');
+      delivered();
+      await proceedP;
+      outcome = await context.complete('teslim edildi').then(
+        () => null,
+        (error: unknown) => error,
+      );
+    });
+    const client = h.client();
+    const { task } = await client.sendMessage({
+      message: openingMessage(JOB_A, 'a'),
+      configuration: { returnImmediately: true },
+    });
+    await deliveredP;
+    expect((await client.getTask({ id: task!.id })).status.state).toBe('TASK_STATE_COMPLETED');
+    proceed();
+    await until(() => outcome !== 'bekliyor');
+    expect(outcome).toBeNull();
+    const final = await client.getTask({ id: task!.id });
+    expect(final.status.state).toBe('TASK_STATE_COMPLETED');
+    expect(final.history?.at(-1)?.parts).toEqual([{ text: 'teslim edildi' }]);
+  });
+
+  it("artefakt boyut sınırını aşan ekleme agent'a hata verir, görev değişmez", async () => {
+    await restart({ limits: { maxArtifactBytes: 1024 } });
+    await h.openJob(JOB_A, 'a');
+    let caught: unknown;
+    h.scripts.set(JOB_A, async (context) => {
+      await context.addArtifact({ artifactId: 'küçük', parts: [{ text: 'tamam' }] });
+      await context.addArtifact({ artifactId: 'büyük', parts: [{ text: 'x'.repeat(2048) }] }).catch((e: unknown) => {
+        caught = e;
+      });
+      await context.reject('sınır');
+    });
+    const { task } = await h.client().sendMessage({ message: openingMessage(JOB_A, 'a') });
+    expect(String(caught)).toMatch(/1024/);
+    expect(task?.artifacts?.map((a) => a.artifactId)).toEqual(['küçük']);
+  });
+
+  it("zincir okunamazsa GetTask kayıttaki görevi döner, iptal iç hata verir; hata onError'a gider", async () => {
+    let failing = false;
+    await restart({
+      wrapJobSource: (source) => ({
+        getJob: async (address) => {
+          if (failing) throw new Error('rpc düştü');
+          return source.getJob(address);
+        },
+      }),
+    });
+    await h.openJob(JOB_A, 'a');
+    const client = h.client();
+    const { task } = await client.sendMessage({
+      message: openingMessage(JOB_A, 'a'),
+      configuration: { returnImmediately: true },
+    });
+    failing = true;
+    expect((await client.getTask({ id: task!.id })).status.state).toBe('TASK_STATE_SUBMITTED');
+    await expect(client.cancelTask({ id: task!.id })).rejects.toMatchObject({ code: -32603 });
+    expect(h.errors.map(String)).toEqual(['Error: rpc düştü', 'Error: rpc düştü']);
   });
 
   it("zincirle tutarsız geçiş agent'a hata verir", async () => {
@@ -234,9 +465,7 @@ describe('agent akışı ve zincir', () => {
   });
 
   it('bloklayan SendMessage süre dolunca güncel görevi döner', async () => {
-    await h.stop();
-    h = new Harness(db, { ...LIMITS, blockingTimeoutMs: 200 });
-    await h.start();
+    await restart({ limits: { blockingTimeoutMs: 200 } });
     await h.openJob(JOB_A, 'a');
     const { task } = await h.client().sendMessage({ message: openingMessage(JOB_A, 'a') });
     expect(task?.status.state).toBe('TASK_STATE_SUBMITTED');
@@ -265,6 +494,200 @@ describe('agent akışı ve zincir', () => {
     await expect(
       client.sendMessage({ message: { messageId: 'm-4', role: 'ROLE_USER', taskId: 'yok', parts: [{ text: 'x' }] } }),
     ).rejects.toMatchObject({ code: -32001 });
+  });
+
+  it('bloklayan devam mesajı agent yanıt verene kadar bekler; agent mesajları sırayla işler', async () => {
+    await h.openJob(JOB_A, 'a');
+    h.scripts.set(JOB_A, async (context) => context.requireInput('teslim tarihi nedir?'));
+    let active = 0;
+    let overlap = false;
+    let handled = 0;
+    h.continuations.set(JOB_A, async (context, message) => {
+      active += 1;
+      if (active > 1) overlap = true;
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      active -= 1;
+      if (message.messageId === 'm-son') await context.reject('tarih uygun değil');
+      else await context.requireInput('başka bir tarih?');
+      handled += 1;
+    });
+    const client = h.client();
+    const { task } = await client.sendMessage({ message: openingMessage(JOB_A, 'a') });
+    expect(task?.status.state).toBe('TASK_STATE_INPUT_REQUIRED');
+    const reply = (messageId: string, text: string) =>
+      client.sendMessage({ message: { messageId, role: 'ROLE_USER', taskId: task!.id, parts: [{ text }] } });
+    const [first, second] = await Promise.all([reply('m-2', 'cuma'), reply('m-3', 'cumartesi')]);
+    expect(first.task?.status.state).toBe('TASK_STATE_INPUT_REQUIRED');
+    expect(second.task?.status.state).toBe('TASK_STATE_INPUT_REQUIRED');
+    await until(() => handled === 2);
+    expect(overlap).toBe(false);
+    const last = await reply('m-son', 'pazar');
+    expect(last.task?.status.state).toBe('TASK_STATE_REJECTED');
+    const again = await client.sendMessage({
+      message: { messageId: 'm-2', role: 'ROLE_USER', taskId: task!.id, parts: [{ text: 'cuma' }] },
+    });
+    expect(again.task?.status.state).toBe('TASK_STATE_REJECTED');
+  });
+
+  it('devam mesajı: bağlam uyuşmazlığı, mesaj sınırı ve zincirde iptal edilmiş görev', async () => {
+    await restart({ limits: { maxMessagesPerTask: 3 } });
+    await h.openJob(JOB_A, 'a');
+    h.scripts.set(JOB_A, async (context) => context.requireInput('ayrıntı?'));
+    let calls = 0;
+    h.continuations.set(JOB_A, async (context) => {
+      calls += 1;
+      await context.requireInput('başka ayrıntı?');
+    });
+    const client = h.client();
+    const { task } = await client.sendMessage({ message: openingMessage(JOB_A, 'a') });
+    const reply = (messageId: string, extra: Record<string, unknown> = {}) =>
+      client.sendMessage({
+        message: { messageId, role: 'ROLE_USER', taskId: task!.id, parts: [{ text: messageId }], ...extra },
+      });
+    await expect(reply('m-x', { contextId: 'başka' })).rejects.toSatisfy((e) => reason(e) === 'CONTEXT_ID_MISMATCH');
+    await reply('m-2');
+    await expect(reply('m-3')).rejects.toSatisfy(
+      (e) => (e as A2aError).code === -32004 && reason(e) === 'TASK_MESSAGE_LIMIT',
+    );
+    await h.chain.setStatus(JOB_A, 'cancelled');
+    await expect(reply('m-4')).rejects.toSatisfy((e) => reason(e) === 'TASK_TERMINAL');
+    expect((await client.getTask({ id: task!.id })).status.state).toBe('TASK_STATE_CANCELED');
+    expect(calls).toBe(1);
+  });
+
+  it('devam mesajı desteklemeyen agent -32004 döner', async () => {
+    await restart({ continuations: false });
+    await h.openJob(JOB_A, 'a');
+    h.scripts.set(JOB_A, async (context) => context.requireInput('ayrıntı?'));
+    const client = h.client();
+    const { task } = await client.sendMessage({ message: openingMessage(JOB_A, 'a') });
+    await expect(
+      client.sendMessage({
+        message: { messageId: 'm-2', role: 'ROLE_USER', taskId: task!.id, parts: [{ text: 'x' }] },
+      }),
+    ).rejects.toSatisfy((e) => reason(e) === 'CONTINUATION_NOT_SUPPORTED');
+  });
+
+  it('istemci ayrılınca bloklayan SendMessage beklemeyi bırakır', async () => {
+    const bus = createTaskEventBus();
+    let subscriptions = 0;
+    await restart({
+      limits: { blockingTimeoutMs: 30_000 },
+      bus: {
+        publish: bus.publish,
+        subscribe: (taskId, listener) => {
+          subscriptions += 1;
+          const unsubscribe = bus.subscribe(taskId, listener);
+          return () => {
+            subscriptions -= 1;
+            unsubscribe();
+          };
+        },
+      },
+    });
+    await h.openJob(JOB_A, 'a');
+    const controller = new AbortController();
+    const pending = fetch(h.url, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'a2a-version': '1.0', 'x-api-key': KEY_A },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'SendMessage',
+        params: { message: openingMessage(JOB_A, 'a') },
+      }),
+      signal: controller.signal,
+    }).catch(() => null);
+    await until(() => subscriptions === 1);
+    controller.abort();
+    await pending;
+    await until(() => subscriptions === 0);
+  });
+});
+
+describe('yeniden başlatma', () => {
+  it("resume SUBMITTED ve WORKING görevleri agent'a yeniden verir; bekleyen ve terminal görevler verilmez", async () => {
+    for (const [job, title] of [
+      [JOB_A, 'a'],
+      [JOB_B, 'b'],
+      [JOB_C, 'c'],
+      [JOB_D, 'd'],
+    ] as const) {
+      await h.openJob(job, title);
+    }
+    const hang = (context: { signal: AbortSignal }) =>
+      new Promise<void>((resolve) => context.signal.addEventListener('abort', () => resolve(), { once: true }));
+    h.scripts.set(JOB_A, hang);
+    h.scripts.set(JOB_B, async (context) => context.requireInput('ayrıntı?'));
+    h.scripts.set(JOB_C, async (context) => {
+      await h.chain.setStatus(JOB_C, 'accepted');
+      await context.working();
+      await hang(context);
+    });
+    h.scripts.set(JOB_D, async (context) => context.reject('hayır'));
+    const client = h.client();
+    const ids: Record<string, string> = {};
+    for (const [job, title] of [
+      [JOB_A, 'a'],
+      [JOB_B, 'b'],
+      [JOB_C, 'c'],
+      [JOB_D, 'd'],
+    ] as const) {
+      const { task } = await client.sendMessage({
+        message: openingMessage(job, title),
+        configuration: { returnImmediately: true },
+      });
+      ids[job] = task!.id;
+    }
+    await until(async () => (await client.getTask({ id: ids[JOB_C]! })).status.state === 'TASK_STATE_WORKING');
+    await until(async () => (await client.getTask({ id: ids[JOB_D]! })).status.state === 'TASK_STATE_REJECTED');
+    await until(async () => (await client.getTask({ id: ids[JOB_B]! })).status.state === 'TASK_STATE_INPUT_REQUIRED');
+
+    const chain = h.chain;
+    await restart({ chain });
+    const resumed: string[] = [];
+    h.scripts.set(JOB_A, async (context) => {
+      resumed.push(context.message.messageId);
+      await context.reject('yeniden başladı');
+    });
+    h.scripts.set(JOB_C, async (context) => {
+      resumed.push(context.message.messageId);
+      await h.chain.setStatus(JOB_C, 'delivered');
+      await context.complete('tamamlandı');
+    });
+    expect(await h.server.resume()).toBe(2);
+    await until(() => resumed.length === 2);
+    expect(resumed.sort()).toEqual(['m-a', 'm-c']);
+    const fresh = h.client();
+    await until(async () => (await fresh.getTask({ id: ids[JOB_C]! })).status.state === 'TASK_STATE_COMPLETED');
+    expect((await fresh.getTask({ id: ids[JOB_A]! })).status.state).toBe('TASK_STATE_REJECTED');
+    expect((await fresh.getTask({ id: ids[JOB_B]! })).status.state).toBe('TASK_STATE_INPUT_REQUIRED');
+  });
+});
+
+describe('eşzamanlılık', () => {
+  it('başka bir yazıcıyla sürüm çakışmasında geçiş ve iptal yeniden dener', async () => {
+    let conflicts = 2;
+    await restart({
+      wrapStore: (store): TaskStore => ({
+        ...store,
+        update: async (...args: Parameters<TaskStore['update']>) => {
+          if (conflicts > 0) {
+            conflicts -= 1;
+            throw new TaskStoreError('version', 'başka bir örnek yazdı');
+          }
+          return store.update(...args);
+        },
+      }),
+    });
+    await h.openJob(JOB_A, 'a');
+    h.scripts.set(JOB_A, async (context) => context.requireInput('ayrıntı?'));
+    const client = h.client();
+    const { task } = await client.sendMessage({ message: openingMessage(JOB_A, 'a') });
+    expect(task?.status.state).toBe('TASK_STATE_INPUT_REQUIRED');
+    conflicts = 1;
+    expect((await client.cancelTask({ id: task!.id })).status.state).toBe('TASK_STATE_CANCELED');
+    expect(conflicts).toBe(0);
   });
 });
 

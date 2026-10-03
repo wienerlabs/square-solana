@@ -1,16 +1,27 @@
 import { createHash } from 'node:crypto';
 import type { IncomingMessage } from 'node:http';
+import { PublicKey } from '@solana/web3.js';
 import { specHashing } from '@squaresdk/solana-sdk';
 import type { Message } from '@squaresdk/solana-types';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { createApiKeyAuthenticator } from '../src/auth.js';
+import { createApiKeyAuthenticator, type Caller } from '../src/auth.js';
 import { A2aError, ERROR_INFO_TYPE } from '../src/errors.js';
 import { createChainJobSource, createSquareTaskGate, messageContentHash } from '../src/square.js';
-import { AGENT_RECORD, INSTITUTION, JOB_A, JOB_B, OTHER_AGENT_RECORD } from './helpers/fixtures.js';
+import {
+  AGENT_RECORD,
+  FOREIGN_PROGRAM,
+  INSTITUTION,
+  JOB_A,
+  JOB_B,
+  JOB_C,
+  OTHER_AGENT_RECORD,
+  OTHER_INSTITUTION,
+} from './helpers/fixtures.js';
 import { JobChain } from './helpers/jobs.js';
 
 const SPEC = { title: 'pazar araştırması', deliverable: 'rapor', pages: 12 };
 const SPEC_HASH = Buffer.from(specHashing.specHash(SPEC)).toString('hex');
+const CALLER: Caller = { id: 'api-key:test', institutions: new Set([INSTITUTION]) };
 
 const open = (overrides: Partial<Message> = {}): Message => ({
   messageId: 'm-1',
@@ -43,7 +54,7 @@ describe('createChainJobSource', () => {
       agentRecord: AGENT_RECORD,
       institution: INSTITUTION,
       specHash: SPEC_HASH,
-      slot: 1,
+      slot: expect.any(Number),
     });
   });
 
@@ -52,10 +63,26 @@ describe('createChainJobSource', () => {
     expect(await source.getJob(JOB_B)).toBeNull();
     expect(await source.getJob('geçersiz')).toBeNull();
   });
+
+  it('escrow programına ait olmayan ya da Job olarak çözülemeyen hesap job değildir', async () => {
+    const source = createChainJobSource(chain.client);
+    await chain.setJob(JOB_B, {
+      status: 'funded',
+      agentRecord: AGENT_RECORD,
+      specHash: SPEC_HASH,
+      owner: FOREIGN_PROGRAM,
+    });
+    expect(await source.getJob(JOB_B)).toBeNull();
+    chain.chain.setAccount(new PublicKey(JOB_C), chain.client.programIds.escrow, Buffer.alloc(64, 7));
+    expect(await source.getJob(JOB_C)).toBeNull();
+  });
 });
 
 describe('createSquareTaskGate', () => {
-  const gate = () => createSquareTaskGate({ agentRecord: AGENT_RECORD, jobSource: createChainJobSource(chain.client) });
+  const gate = () => {
+    const inner = createSquareTaskGate({ agentRecord: AGENT_RECORD, jobSource: createChainJobSource(chain.client) });
+    return { admitCreate: (message: Message, caller: Caller = CALLER) => inner.admitCreate(message, caller) };
+  };
 
   it('açık job için görevi kabul eder; bağlam job adresidir', async () => {
     const decision = await gate().admitCreate(open());
@@ -88,6 +115,13 @@ describe('createSquareTaskGate', () => {
     ).rejects.toSatisfy((e) => reasonOf(e) === 'SPEC_HASH_MISMATCH');
   });
 
+  it("çağıranın kurumuna ait olmayan job'u reddeder", async () => {
+    const other: Caller = { id: 'api-key:b', institutions: new Set([OTHER_INSTITUTION]) };
+    await expect(gate().admitCreate(open(), other)).rejects.toSatisfy((e) => reasonOf(e) === 'JOB_NOT_FOR_CALLER');
+    await chain.setJob(JOB_A, { status: 'accepted', agentRecord: AGENT_RECORD, specHash: SPEC_HASH });
+    await expect(gate().admitCreate(open(), other)).rejects.toSatisfy((e) => reasonOf(e) === 'JOB_NOT_FOR_CALLER');
+  });
+
   it('spec parçası olmadan da kabul eder; farklı bağlam kimliğini reddeder', async () => {
     await expect(gate().admitCreate(open({ parts: [{ text: 'spec ayrıca iletildi' }] }))).resolves.toBeTruthy();
     await expect(gate().admitCreate(open({ contextId: 'baska-baglam' }))).rejects.toSatisfy(
@@ -110,9 +144,16 @@ describe('createApiKeyAuthenticator', () => {
   const sha = createHash('sha256').update(key).digest('hex');
   const request = (headers: Record<string, string | string[]>) => ({ headers }) as unknown as IncomingMessage;
 
-  it("izinli anahtarın hash'iyle çağıranı döner, diğerlerinde null", () => {
-    const auth = createApiKeyAuthenticator({ keySha256: [sha, 'ef'.repeat(32)] });
-    expect(auth(request({ 'x-api-key': key }))).toBe(`api-key:${sha}`);
+  it("izinli anahtarın hash'iyle çağıranı ve kurumlarını döner, diğerlerinde null", () => {
+    const auth = createApiKeyAuthenticator({
+      keys: [
+        { keySha256: sha, institutions: [INSTITUTION] },
+        { keySha256: 'ef'.repeat(32), institutions: [OTHER_INSTITUTION] },
+      ],
+    });
+    const caller = auth(request({ 'x-api-key': key })) as Caller;
+    expect(caller.id).toBe(`api-key:${sha}`);
+    expect([...caller.institutions]).toEqual([INSTITUTION]);
     expect(auth(request({ 'x-api-key': 'yanlış' }))).toBeNull();
     expect(auth(request({}))).toBeNull();
     expect(auth(request({ 'x-api-key': ['a', 'b'] }))).toBeNull();
@@ -120,7 +161,11 @@ describe('createApiKeyAuthenticator', () => {
   });
 
   it('geçersiz yapılandırmayı reddeder', () => {
-    expect(() => createApiKeyAuthenticator({ keySha256: [] })).toThrow();
-    expect(() => createApiKeyAuthenticator({ keySha256: ['ABC'] })).toThrow();
+    const grant = { keySha256: sha, institutions: [INSTITUTION] };
+    expect(() => createApiKeyAuthenticator({ keys: [] })).toThrow();
+    expect(() => createApiKeyAuthenticator({ keys: [{ ...grant, keySha256: 'ABC' }] })).toThrow();
+    expect(() => createApiKeyAuthenticator({ keys: [grant, grant] })).toThrow();
+    expect(() => createApiKeyAuthenticator({ keys: [{ ...grant, institutions: [] }] })).toThrow();
+    expect(() => createApiKeyAuthenticator({ keys: [{ ...grant, institutions: ['kurum'] }] })).toThrow();
   });
 });

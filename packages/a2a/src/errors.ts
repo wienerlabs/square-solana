@@ -72,11 +72,16 @@ export const errors = {
     new A2aError(C.unsupportedOperation, 'This operation is not supported', [errorInfo(reason, metadata)]),
   extendedAgentCardNotConfigured: () =>
     new A2aError(C.extendedAgentCardNotConfigured, 'Extended Agent Card not configured'),
-  versionNotSupported: (requested: string) =>
+  /** `requested` yalnızca `MAJOR.MINOR` biçimindeyse yansıtılır. */
+  versionNotSupported: (requested: string | null) =>
     new A2aError(C.versionNotSupported, 'Protocol version not supported', [
-      errorInfo('VERSION_NOT_SUPPORTED', { requested, supported: A2A_PROTOCOL_VERSION }),
+      errorInfo('VERSION_NOT_SUPPORTED', {
+        ...(requested ? { requested } : {}),
+        supported: A2A_PROTOCOL_VERSION,
+      }),
     ]),
   unauthenticated: () => new A2aError(SERVER_ERROR, 'Unauthenticated', [errorInfo('UNAUTHENTICATED')], 401),
   tooManyStreams: () =>
     new A2aError(SERVER_ERROR, 'Too many concurrent streams', [errorInfo('RESOURCE_EXHAUSTED')], 429),
+  unavailable: () => new A2aError(SERVER_ERROR, 'Service unavailable', [errorInfo('SHUTTING_DOWN')], 503),
 } as const;

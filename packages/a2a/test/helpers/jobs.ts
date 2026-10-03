@@ -20,6 +20,8 @@ export interface JobFields {
   agentRecord: string;
   specHash: string;
   institution?: string;
+  /** Hesabın sahibi; verilmezse escrow programı. */
+  owner?: string;
 }
 
 export class JobChain {
@@ -43,7 +45,8 @@ export class JobChain {
       status: { [fields.status]: {} },
       dispute: { ...(sample.dispute as object), bond: new BN(0) },
     };
-    this.chain.setAccount(new PublicKey(address), program.programId, await program.coder.accounts.encode('job', data));
+    const owner = fields.owner ? new PublicKey(fields.owner) : program.programId;
+    this.chain.setAccount(new PublicKey(address), owner, await program.coder.accounts.encode('job', data));
   }
 
   async setStatus(address: string, status: JobStatus): Promise<void> {

@@ -1,4 +1,4 @@
-import { createServer, type IncomingMessage, type Server } from 'node:http';
+import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { request } from 'node:http';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -12,8 +12,13 @@ afterEach(async () => {
   server = undefined;
 });
 
+let lastResponse: ServerResponse | undefined;
+
 async function serve(options: SseOptions, onOpen: (stream: SseStream) => void): Promise<number> {
-  server = createServer((_req, res) => onOpen(openSse(res, options)));
+  server = createServer((_req, res) => {
+    lastResponse = res;
+    onOpen(openSse(res, options));
+  });
   await new Promise<void>((resolve) => server!.listen(0, '127.0.0.1', resolve));
   return (server.address() as AddressInfo).port;
 }
@@ -85,6 +90,24 @@ describe('openSse', () => {
     while (stream.send(payload) && accepted < 10_000) accepted += 1;
     expect(stream.isClosed()).toBe(true);
     expect(accepted).toBeLessThan(10_000);
+    expect(lastResponse?.destroyed).toBe(true);
+    response.destroy();
+  });
+
+  it('süre dolduğunda okumayan istemcinin bağlantısı kısa bir süre sonra kesilir', async () => {
+    let stream!: SseStream;
+    const port = await serve(
+      { ...OPTIONS, heartbeatMs: 50, maxDurationMs: 100, maxBufferedBytes: 64 * 1024 * 1024 },
+      (s) => {
+        stream = s;
+        for (let i = 0; i < 64; i += 1) s.send({ blob: 'x'.repeat(64 * 1024) });
+      },
+    );
+    const response = await connect(port);
+    response.pause();
+    await stream.closed;
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    expect(lastResponse?.destroyed).toBe(true);
     response.destroy();
   });
 });

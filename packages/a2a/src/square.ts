@@ -1,9 +1,10 @@
 // Square bağlaması (docs/design/a2a.md §4): görevi açan mesaj zincirdeki bir job'a bağlanır. Job bu
-// agent'a ait, açık ya da fonlanmış olmalı ve mesajdaki spec hash'i job'unkiyle eşleşmeli. Zincir
-// okuması `JobSource` üzerindendir; ürün uygulaması SDK ile escrow `Job` hesabını okur.
+// agent'a ve çağıranın kurumuna ait, açık ya da fonlanmış olmalı ve mesajdaki spec hash'i job'unkiyle
+// eşleşmeli. Zincir okuması `JobSource` üzerindendir; ürün uygulaması escrow `Job` hesabını okur.
 import { PublicKey } from '@solana/web3.js';
 import { specHashing, type SquareClient } from '@squaresdk/solana-sdk';
-import { SquareTaskMetadataSchema, type JobStatus, type Message } from '@squaresdk/solana-types';
+import { JobStatusSchema, SquareTaskMetadataSchema, type JobStatus, type Message } from '@squaresdk/solana-types';
+import type { Caller } from './auth.js';
 import { errors } from './errors.js';
 
 export interface JobFacts {
@@ -27,15 +28,17 @@ interface JobAccount {
   status: Record<string, unknown>;
 }
 
-interface JobNamespace {
-  fetchNullableAndContext(address: PublicKey): Promise<{ data: JobAccount | null; context: { slot: number } }>;
-}
-
 const hex = (bytes: Uint8Array | readonly number[]) => Buffer.from(bytes).toString('hex');
 
-/** Escrow `Job` hesabını SDK'nın programı üzerinden okur. */
+/**
+ * Escrow `Job` hesabını okur. Hesabın sahibi escrow programı olmalıdır: Anchor'ın çözücüsü yalnızca
+ * 8 baytlık ayırıcıya bakar, başka programın aynı düzende yazdığı hesap job sayılmaz. Job olarak
+ * çözülemeyen hesap da job değildir.
+ */
 export function createChainJobSource(client: SquareClient): JobSource {
-  const jobs = (client.escrow.program.account as unknown as { job: JobNamespace }).job;
+  const { program } = client.escrow;
+  const { connection } = program.provider;
+  const owner = client.programIds.escrow;
   return {
     async getJob(address) {
       let key: PublicKey;
@@ -44,12 +47,19 @@ export function createChainJobSource(client: SquareClient): JobSource {
       } catch {
         return null;
       }
-      const { data, context } = await jobs.fetchNullableAndContext(key);
-      if (!data) return null;
-      const [status] = Object.keys(data.status);
+      const { value, context } = await connection.getAccountInfoAndContext(key);
+      if (!value || !value.owner.equals(owner)) return null;
+      let data: JobAccount;
+      try {
+        data = program.coder.accounts.decode<JobAccount>('job', value.data);
+      } catch {
+        return null;
+      }
+      const status = JobStatusSchema.safeParse(Object.keys(data.status)[0]);
+      if (!status.success) return null;
       return {
         address: key.toBase58(),
-        status: status as JobStatus,
+        status: status.data,
         agentRecord: data.agentRecord.toBase58(),
         institution: data.institution.toBase58(),
         specHash: hex(data.specHash),
@@ -80,7 +90,7 @@ export interface CreateDecision {
 }
 
 export interface TaskGate {
-  admitCreate(message: Message): Promise<CreateDecision>;
+  admitCreate(message: Message, caller: Caller): Promise<CreateDecision>;
 }
 
 const OPEN_FOR_TASKS: ReadonlySet<JobStatus> = new Set(['open', 'funded']);
@@ -92,7 +102,7 @@ const SquareRefSchema = SquareTaskMetadataSchema.pick({ job: true, specHash: tru
  */
 export function createSquareTaskGate(options: { agentRecord: string; jobSource: JobSource }): TaskGate {
   return {
-    async admitCreate(message) {
+    async admitCreate(message, caller) {
       const ref = SquareRefSchema.safeParse(message.metadata?.square);
       if (!ref.success) {
         throw errors.rejectedParams(
@@ -108,6 +118,13 @@ export function createSquareTaskGate(options: { agentRecord: string; jobSource: 
           'JOB_NOT_FOR_AGENT',
           'message.metadata.square.job',
           'job bu agent kaydına bağlı değil',
+        );
+      }
+      if (!caller.institutions.has(job.institution)) {
+        throw errors.rejectedParams(
+          'JOB_NOT_FOR_CALLER',
+          'message.metadata.square.job',
+          'job çağıranın kurumuna ait değil',
         );
       }
       if (!OPEN_FOR_TASKS.has(job.status)) {

@@ -10,4 +10,6 @@ export const JOB_A = address(4);
 export const JOB_B = address(5);
 export const JOB_C = address(6);
 export const JOB_D = address(7);
+export const OTHER_INSTITUTION = address(8);
+export const FOREIGN_PROGRAM = address(9);
 export const SPEC_HASH = 'ab'.repeat(32);

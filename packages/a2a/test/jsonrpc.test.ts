@@ -1,7 +1,7 @@
 import { GetTaskRequestSchema } from '@squaresdk/solana-types';
 import { describe, expect, it } from 'vitest';
 import { A2aError, BAD_REQUEST_TYPE, ERROR_INFO_TYPE, errors } from '../src/errors.js';
-import { errorResponse, parseJsonRpc, parseParams, successResponse } from '../src/jsonrpc.js';
+import { errorResponse, jsonViolation, parseJsonRpc, parseParams, successResponse } from '../src/jsonrpc.js';
 
 describe('parseJsonRpc', () => {
   it('geçerli isteği ayrıştırır', () => {
@@ -85,5 +85,34 @@ describe('yanıtlar', () => {
       id: null,
       error: { code: -32603, message: 'Internal error' },
     });
+  });
+});
+
+describe('jsonViolation (I-JSON, RFC 7493)', () => {
+  it('geçerli değerde ihlal yok', () => {
+    expect(jsonViolation({ a: [1, 'iki', { c: null, d: true }], ğ: 'ü😀' })).toBeNull();
+  });
+
+  it('NUL, eşleşmemiş surrogate, sonlu olmayan sayı ve aşırı derinlik alan yoluyla döner', () => {
+    expect(jsonViolation({ message: { parts: [{ text: 'a\u0000' }] } })?.field).toBe('message.parts[0].text');
+    expect(jsonViolation({ x: ['\udc00'] })?.field).toBe('x[0]');
+    expect(jsonViolation({ ['k\u0000']: 1 })?.field).toBe('k\u0000');
+    expect(jsonViolation({ n: Number.POSITIVE_INFINITY })?.field).toBe('n');
+    expect(jsonViolation({ n: Number.NaN })).not.toBeNull();
+    let deep: unknown = 0;
+    for (let i = 0; i < 65; i += 1) deep = [deep];
+    expect(jsonViolation({ deep })?.description).toMatch(/derinlik/);
+  });
+
+  it('parseParams ihlali -32602 olarak döner', () => {
+    const error = (() => {
+      try {
+        parseParams(GetTaskRequestSchema, { id: 'a\u0000' });
+      } catch (e) {
+        return e as A2aError;
+      }
+      return null;
+    })();
+    expect(error?.code).toBe(-32602);
   });
 });

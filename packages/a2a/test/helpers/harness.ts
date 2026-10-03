@@ -8,15 +8,20 @@ import type { IsolatedDatabase } from '@squaresdk/solana-db/testing';
 import type { Message } from '@squaresdk/solana-types';
 import { createApiKeyAuthenticator } from '../../src/auth.js';
 import { createA2aClient, type A2aClient } from '../../src/client.js';
+import type { TaskEventBus } from '../../src/events.js';
 import { createPrismaTaskStore } from '../../src/prisma-store.js';
 import { createA2aServer, type A2aServer, type A2aServerLimits, type TaskContext } from '../../src/server.js';
-import { createChainJobSource } from '../../src/square.js';
-import { AGENT_RECORD } from './fixtures.js';
+import { createChainJobSource, type JobSource } from '../../src/square.js';
+import type { TaskStore } from '../../src/store.js';
+import { AGENT_RECORD, INSTITUTION, OTHER_INSTITUTION } from './fixtures.js';
 import { JobChain } from './jobs.js';
 
+/** A ve A2 aynı kurumun iki anahtarı, B başka bir kurumun. */
 export const KEY_A = 'kurum-a-anahtari';
+export const KEY_A2 = 'kurum-a-ikinci-anahtari';
 export const KEY_B = 'kurum-b-anahtari';
-const sha = (value: string) => createHash('sha256').update(value).digest('hex');
+export const sha = (value: string) => createHash('sha256').update(value).digest('hex');
+export const callerOf = (key: string) => `api-key:${sha(key)}`;
 
 export const LIMITS: A2aServerLimits = {
   maxBodyBytes: 64 * 1024,
@@ -26,9 +31,22 @@ export const LIMITS: A2aServerLimits = {
   streamMaxDurationMs: 30_000,
   blockingTimeoutMs: 5_000,
   maxHistory: 50,
+  maxMessagesPerTask: 20,
+  maxArtifactBytes: 256 * 1024,
 };
 
 export type Script = (context: TaskContext) => Promise<void>;
+
+export interface HarnessOptions {
+  limits?: Partial<A2aServerLimits>;
+  /** Yeniden başlatma testlerinde önceki sunucunun zinciri. */
+  chain?: JobChain;
+  wrapStore?: (store: TaskStore) => TaskStore;
+  wrapJobSource?: (source: JobSource) => JobSource;
+  bus?: TaskEventBus;
+  /** false ise agent devam mesajı desteklemez. */
+  continuations?: boolean;
+}
 
 export const spec = (title: string) => ({ title, deliverable: 'rapor' });
 export const specHashOf = (value: unknown) => Buffer.from(specHashing.specHash(value)).toString('hex');
@@ -44,7 +62,8 @@ export function openingMessage(job: string, title: string, messageId = `m-${titl
 }
 
 export class Harness {
-  readonly chain = new JobChain();
+  readonly chain: JobChain;
+  readonly limits: A2aServerLimits;
   readonly scripts = new Map<string, Script>();
   readonly continuations = new Map<string, (context: TaskContext, message: Message) => Promise<void>>();
   readonly errors: unknown[] = [];
@@ -54,20 +73,34 @@ export class Harness {
 
   constructor(
     readonly db: IsolatedDatabase,
-    readonly limits: A2aServerLimits = LIMITS,
-  ) {}
+    readonly options: HarnessOptions = {},
+  ) {
+    this.chain = options.chain ?? new JobChain();
+    this.limits = { ...LIMITS, ...options.limits };
+  }
 
   async start(): Promise<void> {
+    const store = createPrismaTaskStore(this.db.client);
+    const jobSource = createChainJobSource(this.chain.client);
+    const onMessage = async (context: TaskContext, message: Message) =>
+      this.continuations.get(context.job.address)?.(context, message);
     this.server = createA2aServer({
       agentRecord: AGENT_RECORD,
-      store: createPrismaTaskStore(this.db.client),
-      jobSource: createChainJobSource(this.chain.client),
-      authenticate: createApiKeyAuthenticator({ keySha256: [sha(KEY_A), sha(KEY_B)] }),
+      store: this.options.wrapStore?.(store) ?? store,
+      jobSource: this.options.wrapJobSource?.(jobSource) ?? jobSource,
+      authenticate: createApiKeyAuthenticator({
+        keys: [
+          { keySha256: sha(KEY_A), institutions: [INSTITUTION] },
+          { keySha256: sha(KEY_A2), institutions: [INSTITUTION] },
+          { keySha256: sha(KEY_B), institutions: [OTHER_INSTITUTION] },
+        ],
+      }),
       executor: {
         onTask: async (context) => this.scripts.get(context.job.address)?.(context),
-        onMessage: async (context, message) => this.continuations.get(context.job.address)?.(context, message),
+        ...(this.options.continuations === false ? {} : { onMessage }),
       },
       limits: this.limits,
+      bus: this.options.bus,
       onError: (error) => this.errors.push(error),
     });
     this.http = createServer((request, response) => void this.server.handle(request, response));
@@ -84,8 +117,8 @@ export class Harness {
     });
   }
 
-  async openJob(job: string, title: string, agentRecord = AGENT_RECORD): Promise<void> {
-    await this.chain.setJob(job, { status: 'funded', agentRecord, specHash: specHashOf(spec(title)) });
+  async openJob(job: string, title: string, agentRecord = AGENT_RECORD, institution = INSTITUTION): Promise<void> {
+    await this.chain.setJob(job, { status: 'funded', agentRecord, specHash: specHashOf(spec(title)), institution });
   }
 
   async stop(): Promise<void> {

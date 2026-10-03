@@ -1,6 +1,6 @@
 // @squaresdk/solana-a2a: A2A v1.0 görev protokolü (JSON-RPC 2.0 + SSE), Square job'larına bağlı
 // (BE-17, docs/design/a2a.md). Postgres görev deposu ayrı alt yoldadır: `@squaresdk/solana-a2a/prisma`.
-export { createApiKeyAuthenticator, type Authenticator } from './auth.js';
+export { createApiKeyAuthenticator, type ApiKeyGrant, type Authenticator, type Caller } from './auth.js';
 export { createA2aClient, type A2aClient, type A2aClientOptions } from './client.js';
 export {
   A2aError,

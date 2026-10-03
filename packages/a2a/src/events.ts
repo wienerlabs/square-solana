@@ -25,9 +25,12 @@ export function createTaskEventBus(): TaskEventBus {
       const set = listeners.get(taskId) ?? new Set();
       set.add(listener);
       listeners.set(taskId, set);
+      let subscribed = true;
       return () => {
+        if (!subscribed) return;
+        subscribed = false;
         set.delete(listener);
-        if (set.size === 0) listeners.delete(taskId);
+        if (set.size === 0 && listeners.get(taskId) === set) listeners.delete(taskId);
       };
     },
   };

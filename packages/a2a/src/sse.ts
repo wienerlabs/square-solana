@@ -1,5 +1,6 @@
 // Server-Sent Events yazıcısı (spec §9.4.2): her olay bir `data:` satırında JSON-RPC yanıtıdır. Kalp
-// atışı yorum satırıdır; yavaş tüketici (tampon sınırı aşılınca) ve azami süre akışı kapatır.
+// atışı yorum satırıdır; yavaş tüketici (tampon sınırı aşılınca) ve azami süre akışı kapatır. Yavaş
+// tüketicinin bağlantısı hemen, kapanışta boşaltılamayan bağlantı bir kalp atışı süresi sonra kesilir.
 import type { ServerResponse } from 'node:http';
 
 export interface SseOptions {
@@ -35,28 +36,40 @@ export function openSse(response: ServerResponse, options: SseOptions): SseStrea
   }, options.heartbeatMs);
   const deadline = setTimeout(() => close(), options.maxDurationMs);
 
-  function close() {
+  function close(force = false) {
     if (!open) return;
     open = false;
     clearInterval(heartbeat);
     clearTimeout(deadline);
-    response.end();
+    if (force) {
+      response.destroy();
+    } else {
+      response.end();
+      if (!response.writableFinished) {
+        const grace = setTimeout(() => response.destroy(), options.heartbeatMs);
+        grace.unref();
+        const settle = () => clearTimeout(grace);
+        response.once('finish', settle);
+        response.once('close', settle);
+      }
+    }
     resolveClosed();
   }
 
-  response.on('close', close);
+  response.on('close', () => close());
+  response.on('error', () => close(true));
 
   return {
     send(payload) {
       if (!open) return false;
       if (response.writableLength > options.maxBufferedBytes) {
-        close();
+        close(true);
         return false;
       }
       response.write(`data: ${JSON.stringify(payload)}\n\n`);
       return true;
     },
-    close,
+    close: () => close(),
     closed,
     isClosed: () => !open,
   };
