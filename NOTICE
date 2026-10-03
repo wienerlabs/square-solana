@@ -18,6 +18,10 @@ MIT License (full text below)
            programs/policy-registry  -> programs/square-policy
            programs/verifier         -> programs/square-verifier
            circuits/payment-prover   -> circuits/payment-compliance
+  Imported at f5eaba9 (docs/provenance/BE-02.md):
+           services/prover-service   -> apps/prover
+           services/compliance-api   -> apps/compliance-api
+           shared/types/src/{api,attestation}.ts -> apps/compliance-api/src/types/
 
 --------------------------------------------------------------------------------
 dr-wilson-empty/aip-beta (AIP, Agent Internet Protocol)
@@ -26,6 +30,8 @@ MIT License (full text below)
 
   Imported at 5a36fe0 (docs/provenance/BC-07.md):
            programs/aip-escrow/programs/aip-registry -> programs/square-registry
+  Imported at 5a36fe0 (docs/provenance/BE-02.md):
+           packages/agent-sdk        -> packages/agent-sdk
 
 --------------------------------------------------------------------------------
 wienerlabs/covenant
@@ -34,10 +40,10 @@ Copyright the Covenant contributors
   Original licenses: LGPL-2.1 for the root LICENSE and app/ (app/package.json
   declares LGPL-2.1-only); Apache-2.0 for the root package.json, sdk/ and mcp/.
 
-  Imported paths: none yet.
+  Imported at 9894a41 (docs/provenance/BE-02.md):
+           mcp/              -> packages/mcp   (Apache-2.0; the source directory has
+                                                no LICENSE file of its own)
   Planned: programs/covenant -> programs/square-escrow
-           sdk/              -> packages/sdk
-           mcp/              -> packages/mcp
 
 --------------------------------------------------------------------------------
 MIT License
