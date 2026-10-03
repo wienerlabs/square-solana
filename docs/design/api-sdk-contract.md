@@ -1,6 +1,6 @@
 # API ve SDK sözleşmesi
 
-**Sözleşme sürümü:** v0.5.0 (taslak) · **Issue:** BE-35 (#102), BC-47 (#119), BE-07 (#39), BE-08 (#40), BE-09 (#41), BE-10 (#42) · **Dayandığı program sözleşmesi:** BC-44 v0.2.0 ([program-interface.md](program-interface.md))
+**Sözleşme sürümü:** v0.5.1 (taslak) · **Issue:** BE-35 (#102), BC-47 (#119), BE-07 (#39), BE-08 (#40), BE-09 (#41), BE-10 (#42), BE-11 (#44) · **Dayandığı program sözleşmesi:** BC-44 v0.2.0 ([program-interface.md](program-interface.md))
 
 Bu doküman Square'in HTTP API'sini ve TypeScript paketlerinin dış yüzeyini sabitler. Frontend (FE-24 veri katmanı) ve servisler (BE-18 API, BE-14 indexer, BE-15 keeper, BE-11 prover) bu sözleşmeye göre geliştirir. `@squaresdk/solana-sdk`'nin zincir tarafı BE-08, `@squaresdk/solana-identity` BE-09, `@squaresdk/solana-policy` BE-10 ile uygulandı; REST client'ın uygulaması BE-18'de. Paketlerde mock, placeholder gövde ya da sabit adres yoktur (proje kuralı).
 
@@ -120,7 +120,7 @@ Tüm `/v1` yanıtları `{ success, data, error, meta }` biçimindedir. `meta.req
 2. **Agent card (BC-14, BE-09):** Tek şema v0.3.0'da kesinleşti: kart hem ERC-8004 kayıt dosyası (`type`, `services`, `registrations`, `active`) hem A2A AgentCard'ıdır; DID çözücüsü servisleri `services`'ten üretir ([did:aip Solana profili](../did-aip/method-spec-v2-solana.md) §5.4–§5.5). Devirde cüzdanın yeni sahibe sıfırlanması kuralı program sözleşmesine BC-15 ile eklenecek.
 3. **Policy dokümanı (BE-10):** `PolicyDocument` v0.2.0'da release devresinin politika girdilerine hizalandı (BE-07, [release-circuit.md](release-circuit.md) §4–§5): yuva sınırları `POLICY_CIRCUIT_LIMITS`, tek UTC penceresi, gün adları devrenin maske sırasıyla. Alanların alan elemanlarına çevrilmesi ve commitment `normalizePolicy` / `computePolicyCommitment`'tadır (BE-10); `circuits/payment-compliance/scripts/release-input.mjs`'in 14 senaryosuyla bayt bayt aynı olduğu CI'da denetlenir.
 4. **Auth (BE-18):** İmzalanan mesajın metni (alan adı ve süre) ve oturum belirteci biçimi BE-18'de belirlenir. Sözleşme yalnızca alanları sabitler.
-5. **Prover servisi (BE-11):** `apps/prover`'ın kendi OpenAPI'si olacak. `/v1/prove` API'de vekil olarak kalır mı, BE-11 ile BE-18 birlikte karar verir.
+5. **Prover servisi (BE-11):** `apps/prover` `POST /v1/prove`'u bu sözleşmedeki istek, yanıt, zarf ve `x-api-key` ile birebir sunar; kendi OpenAPI'si `GET /openapi.json`'dadır ([apps/prover/README.md](../../apps/prover/README.md)). `createRemoteProver` doğrudan servise ya da API'ye bağlanabilir. API'nin `/v1/prove`'u servise vekil mi olacak, ayrı mı kalkacak: BE-18'in kararı.
 6. **Tx boyutu (BC-28):** `setComplianceProof` için ALT gerekebilir (program sözleşmesi §8.9); `UnsignedTx.addressLookupTables` bunun için var.
 
 ## 9. Sözleşme değişiklik kaydı
@@ -130,6 +130,7 @@ Tüm `/v1` yanıtları `{ success, data, error, meta }` biçimindedir. `meta.req
 | Sürüm | Değişiklik | Issue / PR |
 |---|---|---|
 | v0.1.0 | İlk taslak: 28 operasyonluk OpenAPI 3.1 spec; IDL'den üretilen zod ve JSON Schema'lar; 4 paketin gövdesiz imzaları; hizalama testleri ve CI | BE-35 (#102) |
+| v0.5.1 | `POST /v1/prove` 409 `conflict` döner: `artifactVersion` prover'da yüklü zkey'in SHA-256'sı değilse (`details.expected` doğru sürüm). Yanıt bileşeni `Conflict`. Prover servisi (`apps/prover`) aynı uç noktayı sunar | BE-11 (#44) |
 | v0.5.0 | `@squaresdk/solana-policy` uygulandı (BE-10); `SquarePolicyKit` arayüzü yerine fonksiyonlar dışa aktarılır. Değişen imzalar: `generatePolicySalt` → `generatePolicySecret` + `derivePolicySalts` (yaprak başına 8 salt, `PolicySalts`); `computePolicyCommitment(policy, salts)`; `buildReleaseWitness` `connection` yerine client'ın bağlantısını kullanır, `salts` ve `paymentCategory` alır; `createLocalProver` `groth16` backend'ini, `createRemoteProver` beklenen `artifactVersion`'ı alır; `watchJobProof` `paymentCategory`, `authority`, `buildOptions`, `intervalMs`, `refreshBeforeSecs` alır ve `onError` zorunlu. `NormalizedPolicy` devrenin politika girdileridir. HTTP yüzeyi değişmedi | BE-10 (#42) |
 | v0.4.0 | Program sözleşmesi v0.2.0'a dayanır (`set_compliance_proof` yol A, alıcı Merkle kuralı). `ProveResponse.publicInputs` 10 yerine release devresinin 13 sinyali | BE-10 (#42) |
 | v0.3.0 | `AgentCard` tek şema: ERC-8004 kayıt dosyası alanları eklendi (`type` zorunlu, `services` zorunlu ve `url` ile aynı uç noktalı bir `A2A` girdisi içerir, `active`, `x402Support`), `AgentService` bileşeni. `@squaresdk/solana-identity` arayüzü did:aip Solana profiline hizalandı: `ParsedDidAip` v2 Solana / v2 EVM / v1 birleşimi, `DidDocument.capabilityInvocation`, spesifikasyonun çözüm metadata'sı (`versionId`, `agentStatus`, `deactivation`, `agentCard`, `crossRegistrations`, v1 `deprecated` …), hata kodları ve uyarılar, `ResolverOptions.connections` / `card` / `crossRegistrationLimit`; uygulama `squareIdentity` | BE-09 (#41) |
