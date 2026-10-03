@@ -48,6 +48,10 @@ test('listede olmayan her yol tam koşu ister', () => {
   assert.equal(classifyChanges(['docs/api']).mode, 'full');
 });
 
+test('paket ve uygulama dizinlerinin README dosyaları tam koşu istemez', () => {
+  assert.equal(classifyChanges(['packages/README.md', 'apps/README.md']).mode, 'affected');
+});
+
 test('Rust tarafı TS kapsamını genişletmez', () => {
   assert.equal(
     classifyChanges(['programs/square-registry/src/lib.rs', 'crates/square-common/src/lib.rs', 'Cargo.lock']).mode,

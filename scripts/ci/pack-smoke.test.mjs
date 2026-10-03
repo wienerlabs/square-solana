@@ -4,6 +4,7 @@ import {
   EXCLUDED,
   PUBLISHABLE,
   checkClassification,
+  npmInstallArgs,
   consumerManifest,
   exportSpecifiers,
   exportTargets,
@@ -74,4 +75,10 @@ test("lockfile'da registry'den çözülen birinci taraf paket yakalanır", () =>
     '@a/y yerel tarball yerine https://registry.npmjs.org/@a/y/-/y-0.1.0.tgz adresinden çözüldü',
     "@a/z lockfile'da yok",
   ]);
+});
+
+test('tüketici kurulumu iç içe yapılır: başka paketin hoist ettiği bağımlılık eksik bağımlılığı gizleyemez', () => {
+  const args = npmInstallArgs();
+  assert.ok(args.includes('--install-strategy=nested'));
+  assert.ok(args.includes('--ignore-scripts'));
 });

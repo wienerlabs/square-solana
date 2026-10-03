@@ -1,7 +1,8 @@
 # BE-01, BE-03: TS paketlerinin ad kuralı, lint / biçim, derleme-test, paket kurulum smoke'u ve migration
 # kontrolü. PR'da derleme ve testler yalnızca etkilenen paketlerde koşar; paket dışı bir girdi değiştiyse
 # (kök yapılandırma, lockfile, IDL, API şeması, devre, workflow'lar) ve main'de hepsi koşar
-# (scripts/ci/turbo-scope.mjs). `ci-ok` tüm işlerin tek sonucu: zorunlu kontrol olarak bu ad kullanılır.
+# (scripts/ci/turbo-scope.mjs). `ci-ok` tüm işlerin tek sonucudur; branch protection açıldığında zorunlu
+# kontrol olarak bu ad seçilir (GitHub Free planında private repoda bugün açılamıyor, #17).
 name: packages
 
 on:
@@ -13,7 +14,8 @@ permissions:
   contents: read
 
 concurrency:
-  group: packages-${{ github.event.pull_request.number || github.ref }}
+  # PR'da yeni push eski koşuyu iptal eder; main'de her commit kendi grubundadır, hiçbiri iptal edilmez.
+  group: packages-${{ github.event.pull_request.number || github.sha }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
@@ -47,6 +49,8 @@ jobs:
         run: pnpm lint
       - name: CI betiklerinin testleri
         run: node --test "scripts/ci/*.test.mjs"
+      - name: Her workspace paketi yayınlanabilir ya da gerekçeli dışlanmış
+        run: node scripts/ci/pack-smoke.mjs --classify-only
       - name: Kapsam (PR'da etkilenen paketler, main'de hepsi)
         id: scope
         env:

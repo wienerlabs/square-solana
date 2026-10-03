@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { checkMigrationChanges, parseNameStatus } from './migrations-guard.mjs';
+import { checkMigrationChanges, parseNameStatus, pickBaseline } from './migrations-guard.mjs';
 
 const base = ['20261003003609_init'];
 
@@ -41,4 +41,12 @@ test("main'deki son migration'dan eski yeni migration reddedilir", () => {
 test('migration dizini dışındaki dosyalar dikkate alınmaz', () => {
   const changes = parseNameStatus('M\tdb/prisma/schema.prisma\nM\tdb/src/index.ts');
   assert.deepEqual(checkMigrationChanges({ changes, baseMigrations: base }), []);
+});
+
+test("PR merge commit'inde taban, merge commit'in ilk ebeveynidir", () => {
+  assert.equal(pickBaseline({ headParents: ['merge', 'tabanucu', 'pr'], baseSha: 'eskitaban' }), 'tabanucu');
+});
+
+test('merge commit değilse olaydaki taban kullanılır', () => {
+  assert.equal(pickBaseline({ headParents: ['tek', 'ebeveyn'], baseSha: 'taban' }), 'taban');
 });

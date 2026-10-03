@@ -3,14 +3,15 @@
 // push, elle tetikleme) her zaman tam koşu. Turbo, paket dışı bir dosyayı yalnızca kök pakete bağlar;
 // kök girdiler (lockfile, IDL, API şeması, devre ...) bu yüzden tam koşu ister.
 import { execFileSync } from 'node:child_process';
-import { appendFileSync } from 'node:fs';
-import { pathToFileURL } from 'node:url';
+import { appendFileSync, realpathSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { PUBLISHABLE } from './pack-smoke.mjs';
 
 /** Değişmesi `--affected` seçimini eksik bırakmayan yollar. Listede olmayan her yol tam koşu ister. */
 const AFFECTED_SAFE = [
   /^packages\/[^/]+\//,
   /^apps\/[^/]+\//,
+  /^(packages|apps)\/README\.md$/,
   /^db\//,
   /^\.changeset\//,
   /^docs\/(?!(api|did-aip)(\/|$))[^/]+/,
@@ -58,7 +59,10 @@ export function formatOutputs({ mode, baseSha, packages, publishable }) {
 
 function changedFilesSince(baseSha) {
   try {
-    const out = execFileSync('git', ['diff', '--name-only', `${baseSha}...HEAD`], { encoding: 'utf8' });
+    // Yeniden adlandırmada eski yol da listelenmeli (taşınan bir test girdisi tam koşu ister).
+    const out = execFileSync('git', ['diff', '--name-only', '--no-renames', `${baseSha}...HEAD`], {
+      encoding: 'utf8',
+    });
     return out.split('\n').filter(Boolean);
   } catch {
     return null;
@@ -105,4 +109,4 @@ function main() {
   process.stdout.write(`${summary}\n`);
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1]).href) main();
+if (process.argv[1] && realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)) main();

@@ -2,7 +2,8 @@
 // değiştirilemez, silinemez, yeniden adlandırılamaz, dizinine dosya eklenemez. Prisma migration'ları dizin
 // adına göre sırayla uyguladığı için yeni bir migration main'deki son migration'dan sonra sıralanmalıdır.
 import { execFileSync } from 'node:child_process';
-import { pathToFileURL } from 'node:url';
+import { realpathSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 
 const MIGRATIONS_DIR = 'db/prisma/migrations/';
 const MIGRATION_NAME = /^\d{14}_[a-z0-9_]+$/;
@@ -15,6 +16,11 @@ export function parseNameStatus(text) {
       const [status, ...paths] = line.split('\t');
       return { status, path: paths[0] };
     });
+}
+
+/** PR'ın merge commit'inde main'in o anki ucu ilk ebeveyndir; olaydaki taban daha eski olabilir. */
+export function pickBaseline({ headParents, baseSha }) {
+  return headParents.length === 3 ? headParents[1] : baseSha;
 }
 
 export function checkMigrationChanges({ changes, baseMigrations }) {
@@ -45,8 +51,12 @@ function main() {
     process.exit(1);
   }
   const git = (args) => execFileSync('git', args, { encoding: 'utf8' });
-  const changes = parseNameStatus(git(['diff', '--name-status', `${baseSha}...HEAD`, '--', MIGRATIONS_DIR]));
-  const mergeBase = git(['merge-base', baseSha, 'HEAD']).trim();
+  const baseline = pickBaseline({
+    headParents: git(['rev-list', '--parents', '-n', '1', 'HEAD']).trim().split(' '),
+    baseSha,
+  });
+  const changes = parseNameStatus(git(['diff', '--name-status', `${baseline}...HEAD`, '--', MIGRATIONS_DIR]));
+  const mergeBase = git(['merge-base', baseline, 'HEAD']).trim();
   const baseMigrations = git(['ls-tree', '--name-only', `${mergeBase}:${MIGRATIONS_DIR.slice(0, -1)}`])
     .split('\n')
     .filter((name) => MIGRATION_NAME.test(name));
@@ -60,4 +70,4 @@ function main() {
   );
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1]).href) main();
+if (process.argv[1] && realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)) main();

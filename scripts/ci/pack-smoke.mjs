@@ -3,10 +3,19 @@
 // yolu düz Node ile import edilir. Paketler ADR 0001'e göre henüz npm'de değil; liste bu yüzden açık
 // tutulur ve her workspace paketi ya listede ya da gerekçeli dışlamadadır.
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, readdirSync, writeFileSync, mkdirSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
 
 export const PUBLISHABLE = [
   '@squaresdk/solana-types',
@@ -62,6 +71,11 @@ export function exportTargets(exportsField) {
   return collectTargets(exportsField, []).filter((target) => !target.includes('*'));
 }
 
+/** İç içe kurulum: başka bir paketin hoist ettiği kopya, tarball'ın bildirmediği bağımlılığı gizleyemez. */
+export function npmInstallArgs() {
+  return ['install', '--install-strategy=nested', '--no-audit', '--no-fund', '--ignore-scripts', '--loglevel=error'];
+}
+
 export function consumerManifest(tarballs) {
   const dependencies = Object.fromEntries(Object.entries(tarballs).map(([name, path]) => [name, `file:${path}`]));
   return {
@@ -98,19 +112,18 @@ function run(command, args, options = {}) {
   return execFileSync(command, args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'inherit'], ...options });
 }
 
-function main() {
-  const classification = checkClassification(workspacePackageNames(), PUBLISHABLE, EXCLUDED);
-  if (classification.length) {
-    for (const error of classification) console.error(`HATA: ${error}`);
-    process.exit(1);
-  }
+function classify() {
+  const errors = checkClassification(workspacePackageNames(), PUBLISHABLE, EXCLUDED);
+  for (const error of errors) console.error(`HATA: ${error}`);
+  return errors.length === 0;
+}
 
+function smoke(work) {
   run('pnpm', ['turbo', 'run', 'build', ...PUBLISHABLE.map((name) => `--filter=${name}`)], {
     cwd: ROOT,
     stdio: 'inherit',
   });
 
-  const work = mkdtempSync(join(tmpdir(), 'square-pack-smoke-'));
   const tarballDir = join(work, 'tarballs');
   mkdirSync(tarballDir);
   const tarballs = {};
@@ -124,10 +137,7 @@ function main() {
   const consumer = join(work, 'consumer');
   mkdirSync(consumer);
   writeFileSync(join(consumer, 'package.json'), `${JSON.stringify(consumerManifest(tarballs), null, 2)}\n`);
-  run('npm', ['install', '--no-audit', '--no-fund', '--ignore-scripts', '--loglevel=error'], {
-    cwd: consumer,
-    stdio: 'inherit',
-  });
+  run('npm', npmInstallArgs(), { cwd: consumer, stdio: 'inherit' });
 
   const errors = unresolvedFromLock(JSON.parse(readFileSync(join(consumer, 'package-lock.json'), 'utf8')), PUBLISHABLE);
   for (const name of PUBLISHABLE) {
@@ -150,22 +160,36 @@ function main() {
         if (Number(keys) === 0) errors.push(`${specifier}: modül hiçbir şey dışa aktarmıyor`);
         else console.log(`import: ${specifier} (${keys} dışa aktarım)`);
       } catch (error) {
-        errors.push(
-          `${specifier}: düz Node ile import edilemedi: ${String(error.stderr ?? error.message)
-            .trim()
-            .split('\n')
-            .slice(0, 6)
-            .join(' | ')}`,
-        );
+        const detail = String(error.stderr ?? error.message)
+          .trim()
+          .split('\n')
+          .slice(0, 6)
+          .join(' | ');
+        errors.push(`${specifier}: düz Node ile import edilemedi: ${detail}`);
       }
     }
   }
+  for (const error of errors) console.error(`HATA: ${error}`);
+  return errors.length === 0;
+}
 
-  if (errors.length) {
-    for (const error of errors) console.error(`HATA: ${error}`);
-    process.exit(1);
+function main() {
+  if (!classify()) process.exit(1);
+  if (process.argv.includes('--classify-only')) {
+    console.log(
+      `sınıflandırma yeşil: ${PUBLISHABLE.length} yayınlanabilir, ${Object.keys(EXCLUDED).length} dışlanan paket`,
+    );
+    return;
   }
+  const work = mkdtempSync(join(tmpdir(), 'square-pack-smoke-'));
+  let ok;
+  try {
+    ok = smoke(work);
+  } finally {
+    rmSync(work, { recursive: true, force: true });
+  }
+  if (!ok) process.exit(1);
   console.log(`smoke yeşil: ${PUBLISHABLE.length} paket, Node ${process.version}`);
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1]).href) main();
+if (process.argv[1] && realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)) main();
