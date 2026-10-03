@@ -8,7 +8,9 @@
     "fetch-ptau": "node scripts/fetch-ptau.mjs",
     "inputs": "node scripts/generate_test_inputs.mjs",
     "inputs:check": "node scripts/generate_test_inputs.mjs --check",
-    "test": "node --test \"test/*.test.mjs\""
+    "test": "node --test \"test/*.test.mjs\"",
+    "artifacts:check": "node scripts/release-artifacts.mjs check",
+    "artifacts:setup": "node scripts/release-artifacts.mjs setup"
   },
   "keywords": [],
   "author": "",
