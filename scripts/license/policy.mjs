@@ -45,9 +45,9 @@ export const ASSESSED = {
   'npm:snarkjs': {
     status: 'review',
     note:
-      'GPL-3.0. Groth16 ispatı üretimi; yalnızca apps/prover (BE-02, Aperture prover-service). ' +
-      'Yayınlanan bir pakette yok. Servis imajı dağıtılmadan ya da yayınlanan bir paket ' +
-      '(ör. BE-10 createLocalProver) buna bağlanmadan önce hukuki onay gerekir.',
+      'GPL-3.0. Groth16 ispatı üretimi; çalışma zamanında yalnızca apps/prover (BE-02, Aperture prover-service). ' +
+      '@squaresdk/solana-policy (BE-10) yalnızca testlerde kullanır: createLocalProver snarkjs içermez, çağıranın ' +
+      'kurduğu groth16 nesnesini alır. Servis imajı dağıtılmadan önce hukuki onay gerekir.',
   },
   'npm:circomlibjs': {
     status: 'review',
