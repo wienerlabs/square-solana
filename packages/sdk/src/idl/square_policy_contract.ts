@@ -58,7 +58,7 @@ export type SquarePolicyContract = {
               },
               {
                 "kind": "account",
-                "path": "institution.owner_key",
+                "path": "institution.ownerKey",
                 "account": "institution"
               }
             ]
@@ -89,7 +89,7 @@ export type SquarePolicyContract = {
               },
               {
                 "kind": "account",
-                "path": "policy.policy_id",
+                "path": "policy.policyId",
                 "account": "policy"
               }
             ]
@@ -213,7 +213,7 @@ export type SquarePolicyContract = {
               },
               {
                 "kind": "account",
-                "path": "institution.owner_key",
+                "path": "institution.ownerKey",
                 "account": "institution"
               }
             ]
@@ -244,7 +244,7 @@ export type SquarePolicyContract = {
               },
               {
                 "kind": "account",
-                "path": "policy.policy_id",
+                "path": "policy.policyId",
                 "account": "policy"
               }
             ]
@@ -310,7 +310,7 @@ export type SquarePolicyContract = {
               },
               {
                 "kind": "account",
-                "path": "institution.owner_key",
+                "path": "institution.ownerKey",
                 "account": "institution"
               }
             ]
@@ -380,7 +380,7 @@ export type SquarePolicyContract = {
               },
               {
                 "kind": "account",
-                "path": "institution.owner_key",
+                "path": "institution.ownerKey",
                 "account": "institution"
               }
             ]
@@ -489,7 +489,7 @@ export type SquarePolicyContract = {
               },
               {
                 "kind": "account",
-                "path": "institution.owner_key",
+                "path": "institution.ownerKey",
                 "account": "institution"
               }
             ]
@@ -520,7 +520,7 @@ export type SquarePolicyContract = {
               },
               {
                 "kind": "account",
-                "path": "policy.policy_id",
+                "path": "policy.policyId",
                 "account": "policy"
               }
             ]

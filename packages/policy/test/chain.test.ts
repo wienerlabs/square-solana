@@ -1,5 +1,5 @@
 // Zincirden witness, set_compliance_proof tx'i, uzak prover ve ispat tazeleme izleyicisi.
-import { BN, type BorshInstructionCoder } from '@coral-xyz/anchor';
+import { BN, type BorshInstructionCoder } from '@anchor-lang/core';
 import { Keypair } from '@solana/web3.js';
 import type { BuiltTx } from '@squaresdk/solana-sdk';
 import type { ProveResponse } from '@squaresdk/solana-types';

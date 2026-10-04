@@ -1,6 +1,6 @@
 // Gönderim / simülasyon hatası → (program, kod, ad). Program hata kodları her programda 6000'den
 // başladığından eşleme her zaman (program, kod) çiftiyle yapılır (api-sdk-contract.md §4).
-import type { Idl } from '@coral-xyz/anchor';
+import type { Idl } from '@anchor-lang/core';
 import type { ProgramErrorRef } from '@squaresdk/solana-types';
 import type { SquareProgramName } from './programs.js';
 

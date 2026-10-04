@@ -1,4 +1,5 @@
 use anchor_lang::prelude::*;
+use crate::errors::PolicyRegistryError;
 use crate::state::{OperatorAccount, PolicyAccount};
 
 #[derive(Accounts)]
@@ -38,8 +39,3 @@ pub fn handler(
     Ok(())
 }
 
-#[error_code]
-pub enum PolicyRegistryError {
-    #[msg("Policy is inactive and cannot be updated")]
-    PolicyInactive,
-}

@@ -1,6 +1,6 @@
 // Test fixture: escrow `Job` hesaplarını IDL coder'ıyla kodlayıp test zincirine koyar; testler job
 // durumunu değiştirerek agent'ın kabul ve teslim tx'lerinin zincirdeki etkisini taklit eder.
-import { BN, type Idl, type Program } from '@coral-xyz/anchor';
+import { BN, type Idl, type Program } from '@anchor-lang/core';
 import { PublicKey } from '@solana/web3.js';
 import { createSquareClient, SQUARE_IDLS, type SquareClient, type SquareProgramIds } from '@squaresdk/solana-sdk';
 import type { JobStatus } from '@squaresdk/solana-types';

@@ -2,7 +2,7 @@
 name = "verifier"
 version = "0.1.0"
 edition = "2021"
-rust-version = "1.84"
+rust-version = "1.89"
 
 [lib]
 crate-type = ["cdylib", "lib"]
@@ -16,8 +16,11 @@ default = []
 idl-build = ["anchor-lang/idl-build"]
 
 [dependencies]
-anchor-lang = { version = "0.31.1", features = ["init-if-needed"] }
+anchor-lang = { version = "1.2.0", features = ["init-if-needed"] }
 groth16-solana = "0.2"
+# Anchor 1.x `solana_program` yerine ayrık Solana crate'leri (MPP yolu: ed25519 ön derlemesi, talimat sysvar'ı).
+solana-instructions-sysvar = "3"
+solana-sdk-ids = "3"
 # Cross-program: lets verify_payment_proof_v2 deserialize the PolicyAccount
 # written by the policy-registry program so it can byte-check policy_data_hash
 # against the proof's public_inputs[1]. cpi feature is on so we link the

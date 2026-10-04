@@ -21,7 +21,7 @@ use state::{ARBITRATOR_COUNT, DisputeResolution};
 declare_id!("5hstj5grBUL1BeSaPLYpgkD6n3ALasmbseRvKRFfCVNT");
 
 #[program]
-pub mod covenant {
+pub mod square_escrow {
     use super::*;
 
     // ---- Protocol config ----

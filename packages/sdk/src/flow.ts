@@ -2,7 +2,7 @@
 // `SquarePda`'dan, payee / mint / rent ödeyicisi zincirdeki job ve alacak kaydından, token programı
 // mint hesabının sahibinden. Token hesabı gereken alıcı tarafların ATA'sı aynı tx'te idempotent
 // olarak açılır. Program adresleri yapılandırmadan gelir (BC-09).
-import type { Program } from '@coral-xyz/anchor';
+import type { Program } from '@anchor-lang/core';
 import {
   createAssociatedTokenAccountIdempotentInstruction,
   getAssociatedTokenAddressSync,

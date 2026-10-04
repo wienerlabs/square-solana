@@ -1,5 +1,5 @@
 use anchor_lang::prelude::*;
-use anchor_spl::token::{self, Token, TokenAccount, Transfer};
+use anchor_spl::token_interface::{self, Mint, TokenAccount, TokenInterface, TransferChecked};
 
 use crate::errors::CovError;
 use crate::state::{ClaimListing, ClaimStatus, JobEscrow, JobStatus};
@@ -45,16 +45,18 @@ pub struct BuyClaim<'info> {
         constraint = buyer_token_account.owner == buyer.key(),
         constraint = buyer_token_account.mint == job_escrow.token_mint @ CovError::MintMismatch,
     )]
-    pub buyer_token_account: Box<Account<'info, TokenAccount>>,
+    pub buyer_token_account: Box<InterfaceAccount<'info, TokenAccount>>,
 
     #[account(
         mut,
         constraint = seller_token_account.owner == claim_listing.seller @ CovError::Unauthorized,
         constraint = seller_token_account.mint == job_escrow.token_mint @ CovError::MintMismatch,
     )]
-    pub seller_token_account: Box<Account<'info, TokenAccount>>,
+    pub seller_token_account: Box<InterfaceAccount<'info, TokenAccount>>,
 
-    pub token_program: Program<'info, Token>,
+    #[account(address = job_escrow.token_mint @ CovError::MintMismatch)]
+    pub token_mint: Box<InterfaceAccount<'info, Mint>>,
+    pub token_program: Interface<'info, TokenInterface>,
 }
 
 pub fn handler(ctx: Context<BuyClaim>) -> Result<()> {
@@ -79,14 +81,15 @@ pub fn handler(ctx: Context<BuyClaim>) -> Result<()> {
 
     // 1. Transfer price from buyer → seller (atomic payment).
     let transfer_ctx = CpiContext::new(
-        ctx.accounts.token_program.to_account_info(),
-        Transfer {
+        ctx.accounts.token_program.key(),
+        TransferChecked {
             from: ctx.accounts.buyer_token_account.to_account_info(),
+            mint: ctx.accounts.token_mint.to_account_info(),
             to: ctx.accounts.seller_token_account.to_account_info(),
             authority: ctx.accounts.buyer.to_account_info(),
         },
     );
-    token::transfer(transfer_ctx, price)?;
+    token_interface::transfer_checked(transfer_ctx, price, ctx.accounts.token_mint.decimals)?;
 
     // 2. Record buyer + transition to Bought.
     let listing = &mut ctx.accounts.claim_listing;

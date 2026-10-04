@@ -54,12 +54,12 @@ export type SquareRegistryContract = {
               },
               {
                 "kind": "account",
-                "path": "agent_record.creator",
+                "path": "agentRecord.creator",
                 "account": "agentRecord"
               },
               {
                 "kind": "account",
-                "path": "agent_record.agent_id",
+                "path": "agentRecord.agentId",
                 "account": "agentRecord"
               }
             ]
@@ -384,12 +384,12 @@ export type SquareRegistryContract = {
               },
               {
                 "kind": "account",
-                "path": "agent_record.creator",
+                "path": "agentRecord.creator",
                 "account": "agentRecord"
               },
               {
                 "kind": "account",
-                "path": "agent_record.agent_id",
+                "path": "agentRecord.agentId",
                 "account": "agentRecord"
               }
             ]
@@ -447,12 +447,12 @@ export type SquareRegistryContract = {
               },
               {
                 "kind": "account",
-                "path": "agent_record.creator",
+                "path": "agentRecord.creator",
                 "account": "agentRecord"
               },
               {
                 "kind": "account",
-                "path": "agent_record.agent_id",
+                "path": "agentRecord.agentId",
                 "account": "agentRecord"
               }
             ]
@@ -507,12 +507,12 @@ export type SquareRegistryContract = {
               },
               {
                 "kind": "account",
-                "path": "agent_record.creator",
+                "path": "agentRecord.creator",
                 "account": "agentRecord"
               },
               {
                 "kind": "account",
-                "path": "agent_record.agent_id",
+                "path": "agentRecord.agentId",
                 "account": "agentRecord"
               }
             ]

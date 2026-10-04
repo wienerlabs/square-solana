@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import { BN, type BorshInstructionCoder, type Idl, type Program } from '@coral-xyz/anchor';
+import { BN, type BorshInstructionCoder, type Idl, type Program } from '@anchor-lang/core';
 import { getAssociatedTokenAddressSync, TOKEN_2022_PROGRAM_ID, TOKEN_PROGRAM_ID } from '@solana/spl-token';
 import { ComputeBudgetProgram, Connection, Keypair, PublicKey, SystemProgram } from '@solana/web3.js';
 import { beforeEach, describe, expect, it } from 'vitest';

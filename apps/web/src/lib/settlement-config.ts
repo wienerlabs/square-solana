@@ -1,7 +1,7 @@
 // Settlement mint'i zincirden: escrow'un EscrowConfig hesabındaki `settlement_mint`, işlerin
 // kullanabildiği tek mint'tir (BC-44 IDL). Ortamda zincirdekinden ayrışabilecek ikinci bir kopya
 // tutulmaz. Anchor'a bağlı olduğu için yalnızca gerektiğinde yüklenir (use-settlement.ts).
-import { Program, type Idl } from '@coral-xyz/anchor';
+import { Program, type Idl } from '@anchor-lang/core';
 import { TOKEN_2022_PROGRAM_ID, TOKEN_PROGRAM_ID, unpackMint } from '@solana/spl-token';
 import { PublicKey, type Connection } from '@solana/web3.js';
 import { SQUARE_IDLS, type SquareEscrowContract } from '@squaresdk/solana-sdk';

@@ -1,6 +1,7 @@
-import * as anchor from "@coral-xyz/anchor";
-import { Program, BN } from "@coral-xyz/anchor";
+import * as anchor from "@anchor-lang/core";
+import { Program, BN } from "@anchor-lang/core";
 import {
+  createAccount,
   createMint,
   createAssociatedTokenAccount,
   mintTo,
@@ -46,7 +47,7 @@ function escrowTokenPda(jobPda: PublicKey, programId: PublicKey): PublicKey {
  */
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const covenant: any = (anchor as any).workspace?.Covenant;
+const covenant: any = (anchor as any).workspace?.SquareEscrow;
 
 describe("covenant — optimistic settlement", () => {
   const provider = anchor.AnchorProvider.env();
@@ -226,6 +227,7 @@ describe("covenant — optimistic settlement", () => {
       await program.methods
         .finalizePayment()
         .accounts({
+          tokenMint: mint,
           crank: crank.publicKey,
           jobEscrow: happyJobPda,
           poster: poster.publicKey,
@@ -349,6 +351,7 @@ describe("covenant — optimistic settlement", () => {
     await program.methods
       .resolveDispute({ favorPoster: {} })
       .accounts({
+        tokenMint: mint,
         arbitrator: arb1.publicKey,
         config: configPda,
         jobEscrow: disputeJobPda,
@@ -388,6 +391,7 @@ describe("covenant — optimistic settlement", () => {
     await program.methods
       .resolveDispute({ favorPoster: {} })
       .accounts({
+        tokenMint: mint,
         arbitrator: arb2.publicKey,
         config: configPda,
         jobEscrow: disputeJobPda,
@@ -434,7 +438,7 @@ describe("covenant — negative paths (M-06)", () => {
   const provider = anchor.AnchorProvider.env();
   anchor.setProvider(provider);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const program = (anchor as any).workspace?.Covenant as Program<any>;
+  const program = (anchor as any).workspace?.SquareEscrow as Program<any>;
   const admin = provider.wallet as anchor.Wallet;
 
   const poster = Keypair.generate();
@@ -682,11 +686,13 @@ describe("covenant — negative paths (M-06)", () => {
     await program.methods
       .resolveDispute({ favorPoster: {} })
       .accounts({
+        tokenMint: mint,
         arbitrator: arb1.publicKey,
         config: configPda,
         jobEscrow: jobPda,
         poster: poster.publicKey,
-        escrowTokenAccount: bondPda, // intentionally wrong below — first call only updates state
+        // Anchor 1.x aynı yazılabilir hesabın iki kez geçmesini erkenden reddeder (2040); gerçek escrow hesabı.
+        escrowTokenAccount: escrowTokenPda(jobPda, program.programId),
         bondTokenAccount: bondPda,
         posterTokenAccount: posterAta,
         takerTokenAccount: takerAta,
@@ -714,11 +720,12 @@ describe("covenant — negative paths (M-06)", () => {
       await program.methods
         .resolveDispute({ favorPoster: {} })
         .accounts({
+          tokenMint: mint,
           arbitrator: arb1.publicKey,
           config: configPda,
           jobEscrow: jobPda,
           poster: poster.publicKey,
-          escrowTokenAccount: bondPda,
+          escrowTokenAccount: escrowTokenPda(jobPda, program.programId),
           bondTokenAccount: bondPda,
           posterTokenAccount: posterAta,
           takerTokenAccount: takerAta,
@@ -793,11 +800,12 @@ describe("covenant — negative paths (M-06)", () => {
       await program.methods
         .resolveDispute({ favorPoster: {} })
         .accounts({
+          tokenMint: mint,
           arbitrator: intruder.publicKey,
           config: configPda,
           jobEscrow: jobPda,
           poster: poster.publicKey,
-          escrowTokenAccount: bondPda,
+          escrowTokenAccount: escrowTokenPda(jobPda, program.programId),
           bondTokenAccount: bondPda,
           posterTokenAccount: posterAta,
           takerTokenAccount: takerAta,
@@ -916,7 +924,7 @@ describe("covenant — credit marketplace (BNPL)", () => {
   const provider = anchor.AnchorProvider.env();
   anchor.setProvider(provider);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const program = (anchor as any).workspace?.Covenant as Program<any>;
+  const program = (anchor as any).workspace?.SquareEscrow as Program<any>;
   const admin = provider.wallet as anchor.Wallet;
 
   const poster = Keypair.generate();
@@ -1140,6 +1148,7 @@ describe("covenant — credit marketplace (BNPL)", () => {
     await program.methods
       .buyClaim()
       .accounts({
+        tokenMint: mint,
         buyer: buyer.publicKey,
         jobEscrow: jobPda,
         poster: poster.publicKey,
@@ -1175,15 +1184,25 @@ describe("covenant — credit marketplace (BNPL)", () => {
       .signers([taker])
       .rpc();
 
+    // Anchor 1.x aynı yazılabilir hesabın iki kez geçmesini erkenden reddeder (2040); programın
+    // BuyerIsSeller kontrolüne ulaşmak için satıcının ikinci (ATA olmayan) token hesabı kullanılır.
+    const takerSecondAccount = await createAccount(
+      provider.connection,
+      (admin as anchor.Wallet).payer,
+      mint,
+      taker.publicKey,
+      Keypair.generate(),
+    );
     try {
       await program.methods
         .buyClaim()
         .accounts({
+          tokenMint: mint,
           buyer: taker.publicKey,
           jobEscrow: jobPda,
           poster: poster.publicKey,
           claimListing: claimPda,
-          buyerTokenAccount: takerAta,
+          buyerTokenAccount: takerSecondAccount,
           sellerTokenAccount: takerAta,
           tokenProgram: TOKEN_PROGRAM_ID,
         })
@@ -1245,6 +1264,7 @@ describe("covenant — credit marketplace (BNPL)", () => {
     await program.methods
       .buyClaim()
       .accounts({
+        tokenMint: mint,
         buyer: buyer.publicKey,
         jobEscrow: jobPda,
         poster: poster.publicKey,
@@ -1301,6 +1321,7 @@ describe("covenant — credit marketplace (BNPL)", () => {
     await program.methods
       .buyClaim()
       .accounts({
+        tokenMint: mint,
         buyer: buyer.publicKey,
         jobEscrow: jobPda,
         poster: poster.publicKey,
@@ -1323,6 +1344,7 @@ describe("covenant — credit marketplace (BNPL)", () => {
     await program.methods
       .finalizePayment()
       .accounts({
+        tokenMint: mint,
         crank: crank.publicKey,
         jobEscrow: jobPda,
         poster: poster.publicKey,

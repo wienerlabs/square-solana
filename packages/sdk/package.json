@@ -24,7 +24,7 @@
     "gen:check": "node scripts/gen-idl-types.mjs --check"
   },
   "dependencies": {
-    "@coral-xyz/anchor": "0.31.1",
+    "@anchor-lang/core": "1.2.0",
     "@noble/hashes": "^1.8.0",
     "@solana/spl-token": "^0.4.15",
     "@solana/web3.js": "^1.99.0",

@@ -1,6 +1,6 @@
 # API ve SDK sözleşmesi
 
-**Sözleşme sürümü:** v0.6.0 (taslak) · **Issue:** BE-35 (#102), BC-47 (#119), BE-07 (#39), BE-08 (#40), BE-09 (#41), BE-10 (#42), BE-11 (#44), BC-02 (#2), BE-17 (#50) · **Dayandığı program sözleşmesi:** BC-44 v0.2.0 ([program-interface.md](program-interface.md))
+**Sözleşme sürümü:** v0.7.0 (taslak) · **Issue:** BE-35 (#102), BC-47 (#119), BE-07 (#39), BE-08 (#40), BE-09 (#41), BE-10 (#42), BE-11 (#44), BC-02 (#2), BE-17 (#50), BC-08 (#8) · **Dayandığı program sözleşmesi:** BC-44 v0.2.0 ([program-interface.md](program-interface.md))
 
 Bu doküman Square'in HTTP API'sini ve TypeScript paketlerinin dış yüzeyini sabitler. Frontend (FE-24 veri katmanı) ve servisler (BE-18 API, BE-14 indexer, BE-15 keeper, BE-11 prover) bu sözleşmeye göre geliştirir. `@squaresdk/solana-sdk`'nin zincir tarafı BE-08, `@squaresdk/solana-identity` BE-09, `@squaresdk/solana-policy` BE-10 ile uygulandı; REST client'ın uygulaması BE-18'de. Paketlerde mock, placeholder gövde ya da sabit adres yoktur (proje kuralı).
 
@@ -103,7 +103,7 @@ Tüm `/v1` yanıtları `{ success, data, error, meta }` biçimindedir. `meta.req
 | TypeScript | `~5.9.3` | Solana paketleri (`@solana/errors` vb.) peer olarak `typescript ^5` bekliyor; 6.x uyarı veriyor, 7.x yeni Go derleyicisi. `tsconfig.base.json` `types: ["node"]` ile TS 6'ya da hazır |
 | Şema kütüphanesi | zod 4 | Aperture `@aperture/types` zod kullanıyor (BE-07 birleştirmesi) |
 | OpenAPI aracı | `@redocly/cli` 2 | 3.1 lint + tek dosya HTML; `redocly.yaml`, istisnalar `.redocly.lint-ignore.yaml`'da gerekçesiyle |
-| Anchor TS / web3.js | `@coral-xyz/anchor` 0.31.1, `@solana/web3.js` 1.x | Anchor CLI 0.31.1 ile aynı hat; sürüm birleştirme BC-08'de, `@solana/kit` geçişi BE-08'in kararı |
+| Anchor TS / web3.js | `@anchor-lang/core` 1.2.0, `@solana/web3.js` 1.x | Programlar ve CLI ile aynı Anchor sürümü (BC-08, ADR 0007); `@solana/kit` geçişi ayrı karar |
 | Native hızlandırıcılar | `bufferutil`, `utf-8-validate` kurulum script'leri çalıştırılmaz (`pnpm-workspace.yaml`) | İsteğe bağlı; JS yedekleri var. Kalan `utf-8-validate` peer uyarısı ve `uuid@8` deprecation'ı web3.js 1.x'in dolaylı bağımlılıklarından |
 | Node | `engines.node >= 24` | Node 24 LTS hattı (BC-43 `.nvmrc` ile aynı) |
 | Testler | vitest; YAML ayrıştırma için yalnızca test bağımlılığı `yaml`. SDK'da kapsama eşiği %80 (`vitest run --coverage`) | BE-08 kabul kriteri; eşik altı CI'ı kırar |
@@ -131,6 +131,7 @@ Tüm `/v1` yanıtları `{ success, data, error, meta }` biçimindedir. `meta.req
 | Sürüm | Değişiklik | Issue / PR |
 |---|---|---|
 | v0.1.0 | İlk taslak: 28 operasyonluk OpenAPI 3.1 spec; IDL'den üretilen zod ve JSON Schema'lar; 4 paketin gövdesiz imzaları; hizalama testleri ve CI | BE-35 (#102) |
+| v0.7.0 | Tek Anchor sürümü 1.2.0 (BC-08, ADR 0007): sdk, identity, policy ve a2a `@coral-xyz/anchor` 0.31.1 yerine `@anchor-lang/core` 1.2.0'a bağlı; SDK'nın dışa verdiği Anchor tipleri (`Program`, `Idl`, IDL'den türetilen tipler) bu paketten. SDK'nın IDL tiplerinde noktalı `path`'ler Anchor 1.2.0 gibi parça parça camelCase (`release_proof.job` → `releaseProof.job`). HTTP yüzeyi değişmedi | BC-08 (#8) |
 | v0.6.0 | A2A görev şemaları A2A v1.0'a (a2aproject/A2A v1.0.1, JSON-RPC bağlaması) hizalandı, geriye uyumsuz: `TaskStateSchema` değerleri ProtoJSON adlarıdır (`TASK_STATE_SUBMITTED` …; `unknown` çıktı), `TaskSchema` v1.0 görevidir (`status: TaskStatus`; `status.message` metin yerine `Message`, `status.timestamp` isteğe bağlı; `artifacts`, `history` eklendi; `contextId` ve `metadata` isteğe bağlı, Square bağı `metadata.square` içinde `SquareTaskMetadataSchema`). Eklenenler: `Message`, `Part`, `Artifact`, `TaskStatus`, akış olayları, `StreamResponse`, yöntem istek ve yanıtları, JSON-RPC zarfı, `A2A_METHODS`, `A2A_ERROR_CODES`, `A2A_PROTOCOL_VERSION`, `TERMINAL_TASK_STATES`, `INTERRUPTED_TASK_STATES`. `JOB_STATUS_TO_TASK_STATE` kesinleşti: teslimden sonraki job durumları `COMPLETED` kalır (`disputed` artık `input-required`, `refunded` artık `failed` değil; [a2a.md](a2a.md) §3). Yeni paket `@squaresdk/solana-a2a`. HTTP yüzeyi değişmedi | BE-17 (#50) |
 | v0.5.2 | OpenAPI `info.license` repo lisansına (`LICENSE`, `NOTICE`) hizalandı: `MIT` yerine `Apache-2.0`, `name` ve SPDX `identifier` aynı değer. Yalnızca spec metadata'sı; HTTP yüzeyi, şemalar ve imzalar değişmedi. `openapi-alignment.test.mjs` artık `info.version`'ı `API_CONTRACT_VERSION` ile, `info.license`'ı kök `package.json` lisansıyla karşılaştırır | BC-02 (#2) |
 | v0.5.1 | `POST /v1/prove` 409 `conflict` döner: `artifactVersion` prover'da yüklü zkey'in SHA-256'sı değilse (`details.expected` doğru sürüm). Yanıt bileşeni `Conflict`. Prover servisi (`apps/prover`) aynı uç noktayı sunar | BE-11 (#44) |

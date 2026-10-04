@@ -1,3 +1,8 @@
+[toolchain]
+# Tek Anchor sürümü (BC-08, ADR 0007); Solana/Agave CLI Anchor 1.2.0'ın önerdiği sürüm.
+anchor_version = "1.2.0"
+solana_version = "4.1.2"
+
 [features]
 resolution = true
 skip-lint = false
@@ -8,9 +13,6 @@ policy_registry = "FXD7ycSguBQw7o3DXqq4VUBHtdx5ZQpu9P2zb4KG4ZEU"
 verifier = "AzKirEv7h5PstLNYNqLj7fCXU9EFA6nSnuoed3QkmUfU"
 aip_registry = "CgchXu2dRV3r9E1YjRhp4kbeLLtv1Xz61yoerJzp1Vbc"
 square_escrow = "5hstj5grBUL1BeSaPLYpgkD6n3ALasmbseRvKRFfCVNT"
-
-[registry]
-url = "https://api.apr.dev"
 
 [provider]
 cluster = "localnet"

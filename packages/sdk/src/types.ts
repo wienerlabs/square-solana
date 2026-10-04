@@ -1,6 +1,6 @@
 // IDL'den türetilen tipler: instruction argümanları, hesaplar ve zincir hesap tipleri. Elle yazılmaz;
 // IDL değişince (interfaces/build-idl.sh) bu tipler ve onları kullanan imzalar birlikte değişir.
-import type { Idl, IdlAccounts, IdlEvents, IdlTypes, Program } from '@coral-xyz/anchor';
+import type { Idl, IdlAccounts, IdlEvents, IdlTypes, Program } from '@anchor-lang/core';
 import type { PublicKey, TransactionInstruction, VersionedTransaction } from '@solana/web3.js';
 import type { SquareIdls } from './programs.js';
 
