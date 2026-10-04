@@ -1,5 +1,5 @@
 use anchor_lang::prelude::*;
-use anchor_spl::token::{self, Mint, Token, TokenAccount, Transfer};
+use anchor_spl::token_interface::{self, Mint, TokenAccount, TokenInterface, TransferChecked};
 
 use crate::errors::CovError;
 use crate::state::{DisputeInfo, DisputeResolution, JobEscrow, JobStatus, ProtocolConfig};
@@ -29,23 +29,24 @@ pub struct RaiseDispute<'info> {
         payer = poster,
         token::mint = token_mint,
         token::authority = job_escrow,
+        token::token_program = token_program,
         seeds = [b"bond", job_escrow.key().as_ref()],
         bump,
     )]
-    pub bond_token_account: Box<Account<'info, TokenAccount>>,
+    pub bond_token_account: Box<InterfaceAccount<'info, TokenAccount>>,
 
     #[account(
         mut,
         constraint = poster_token_account.owner == poster.key(),
         constraint = poster_token_account.mint == token_mint.key(),
     )]
-    pub poster_token_account: Box<Account<'info, TokenAccount>>,
+    pub poster_token_account: Box<InterfaceAccount<'info, TokenAccount>>,
 
     #[account(
         constraint = token_mint.key() == job_escrow.token_mint @ CovError::MintMismatch,
     )]
-    pub token_mint: Box<Account<'info, Mint>>,
-    pub token_program: Program<'info, Token>,
+    pub token_mint: Box<InterfaceAccount<'info, Mint>>,
+    pub token_program: Interface<'info, TokenInterface>,
     pub system_program: Program<'info, System>,
     pub rent: Sysvar<'info, Rent>,
 }
@@ -79,14 +80,15 @@ pub fn handler(
 
     // Transfer bond from poster to bond escrow
     let transfer_ctx = CpiContext::new(
-        ctx.accounts.token_program.to_account_info(),
-        Transfer {
+        ctx.accounts.token_program.key(),
+        TransferChecked {
             from: ctx.accounts.poster_token_account.to_account_info(),
+            mint: ctx.accounts.token_mint.to_account_info(),
             to: ctx.accounts.bond_token_account.to_account_info(),
             authority: ctx.accounts.poster.to_account_info(),
         },
     );
-    token::transfer(transfer_ctx, bond)?;
+    token_interface::transfer_checked(transfer_ctx, bond, ctx.accounts.token_mint.decimals)?;
 
     // Update job state
     let job = &mut ctx.accounts.job_escrow;

@@ -1,5 +1,5 @@
 use anchor_lang::prelude::*;
-use anchor_spl::token::{self, CloseAccount, Token, TokenAccount, Transfer};
+use anchor_spl::token_interface::{self, CloseAccount, Mint, TokenAccount, TokenInterface, TransferChecked};
 
 use crate::errors::CovError;
 use crate::state::{AgentReputation, JobEscrow, JobStatus};
@@ -44,14 +44,14 @@ pub struct CancelJob<'info> {
         constraint = escrow_token_account.owner == job_escrow.key(),
         constraint = escrow_token_account.mint == job_escrow.token_mint @ CovError::MintMismatch,
     )]
-    pub escrow_token_account: Box<Account<'info, TokenAccount>>,
+    pub escrow_token_account: Box<InterfaceAccount<'info, TokenAccount>>,
 
     #[account(
         mut,
         constraint = poster_token_account.owner == poster.key(),
         constraint = poster_token_account.mint == escrow_token_account.mint,
     )]
-    pub poster_token_account: Box<Account<'info, TokenAccount>>,
+    pub poster_token_account: Box<InterfaceAccount<'info, TokenAccount>>,
 
     #[account(
         init_if_needed,
@@ -62,7 +62,9 @@ pub struct CancelJob<'info> {
     )]
     pub taker_reputation: Box<Account<'info, AgentReputation>>,
 
-    pub token_program: Program<'info, Token>,
+    #[account(address = job_escrow.token_mint @ CovError::MintMismatch)]
+    pub token_mint: Box<InterfaceAccount<'info, Mint>>,
+    pub token_program: Interface<'info, TokenInterface>,
     pub system_program: Program<'info, System>,
 }
 
@@ -104,20 +106,21 @@ pub fn handler(ctx: Context<CancelJob>) -> Result<()> {
     let escrow_balance = ctx.accounts.escrow_token_account.amount;
     if escrow_balance > 0 {
         let transfer_ctx = CpiContext::new_with_signer(
-            ctx.accounts.token_program.to_account_info(),
-            Transfer {
+            ctx.accounts.token_program.key(),
+            TransferChecked {
                 from: ctx.accounts.escrow_token_account.to_account_info(),
+                mint: ctx.accounts.token_mint.to_account_info(),
                 to: ctx.accounts.poster_token_account.to_account_info(),
                 authority: ctx.accounts.job_escrow.to_account_info(),
             },
             signer_seeds,
         );
-        token::transfer(transfer_ctx, escrow_balance)?;
+        token_interface::transfer_checked(transfer_ctx, escrow_balance, ctx.accounts.token_mint.decimals)?;
     }
 
     // 2. Close escrow token account, rent refund to poster
     let close_ctx = CpiContext::new_with_signer(
-        ctx.accounts.token_program.to_account_info(),
+        ctx.accounts.token_program.key(),
         CloseAccount {
             account: ctx.accounts.escrow_token_account.to_account_info(),
             destination: ctx.accounts.poster.to_account_info(),
@@ -125,7 +128,7 @@ pub fn handler(ctx: Context<CancelJob>) -> Result<()> {
         },
         signer_seeds,
     );
-    token::close_account(close_ctx)?;
+    token_interface::close_account(close_ctx)?;
 
     // 3. Path B: mark taker as failed
     if path_b {

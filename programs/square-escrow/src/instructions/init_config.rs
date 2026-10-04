@@ -23,7 +23,7 @@ pub struct InitConfig<'info> {
         constraint = program.programdata_address()? == Some(program_data.key())
             @ CovError::Unauthorized,
     )]
-    pub program: Program<'info, crate::program::Covenant>,
+    pub program: Program<'info, crate::program::SquareEscrow>,
 
     /// The program's ProgramData account. Only the program's upgrade
     /// authority (the deployer) may initialize the protocol config. Without

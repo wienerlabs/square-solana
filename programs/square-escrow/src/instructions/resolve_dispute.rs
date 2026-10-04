@@ -1,5 +1,5 @@
 use anchor_lang::prelude::*;
-use anchor_spl::token::{self, CloseAccount, Token, TokenAccount, Transfer};
+use anchor_spl::token_interface::{self, CloseAccount, Mint, TokenAccount, TokenInterface, TransferChecked};
 
 use crate::errors::CovError;
 use crate::state::{
@@ -51,21 +51,21 @@ pub struct ResolveDispute<'info> {
         constraint = escrow_token_account.owner == job_escrow.key(),
         constraint = escrow_token_account.mint == job_escrow.token_mint @ CovError::MintMismatch,
     )]
-    pub escrow_token_account: Box<Account<'info, TokenAccount>>,
+    pub escrow_token_account: Box<InterfaceAccount<'info, TokenAccount>>,
 
     #[account(
         mut,
         seeds = [b"bond", job_escrow.key().as_ref()],
         bump,
     )]
-    pub bond_token_account: Box<Account<'info, TokenAccount>>,
+    pub bond_token_account: Box<InterfaceAccount<'info, TokenAccount>>,
 
     #[account(
         mut,
         constraint = poster_token_account.owner == poster.key(),
         constraint = poster_token_account.mint == escrow_token_account.mint,
     )]
-    pub poster_token_account: Box<Account<'info, TokenAccount>>,
+    pub poster_token_account: Box<InterfaceAccount<'info, TokenAccount>>,
 
     /// Payment beneficiary token account on the taker/buyer side.
     /// Owner validated in the handler against the routed destination
@@ -75,7 +75,7 @@ pub struct ResolveDispute<'info> {
         mut,
         constraint = taker_token_account.mint == escrow_token_account.mint @ CovError::MintMismatch,
     )]
-    pub taker_token_account: Box<Account<'info, TokenAccount>>,
+    pub taker_token_account: Box<InterfaceAccount<'info, TokenAccount>>,
 
     /// CHECK: must match job_escrow.taker; used only for rent reclamation
     #[account(
@@ -104,7 +104,9 @@ pub struct ResolveDispute<'info> {
     )]
     pub claim_listing: UncheckedAccount<'info>,
 
-    pub token_program: Program<'info, Token>,
+    #[account(address = job_escrow.token_mint @ CovError::MintMismatch)]
+    pub token_mint: Box<InterfaceAccount<'info, Mint>>,
+    pub token_program: Interface<'info, TokenInterface>,
     pub system_program: Program<'info, System>,
 }
 
@@ -231,27 +233,29 @@ pub fn handler(ctx: Context<ResolveDispute>, resolution: DisputeResolution) -> R
     // Transfer from escrow token account (main)
     if escrow_to_taker > 0 {
         let ctx_x = CpiContext::new_with_signer(
-            ctx.accounts.token_program.to_account_info(),
-            Transfer {
+            ctx.accounts.token_program.key(),
+            TransferChecked {
                 from: ctx.accounts.escrow_token_account.to_account_info(),
+                mint: ctx.accounts.token_mint.to_account_info(),
                 to: ctx.accounts.taker_token_account.to_account_info(),
                 authority: ctx.accounts.job_escrow.to_account_info(),
             },
             signer_seeds,
         );
-        token::transfer(ctx_x, escrow_to_taker)?;
+        token_interface::transfer_checked(ctx_x, escrow_to_taker, ctx.accounts.token_mint.decimals)?;
     }
     if escrow_to_poster > 0 {
         let ctx_x = CpiContext::new_with_signer(
-            ctx.accounts.token_program.to_account_info(),
-            Transfer {
+            ctx.accounts.token_program.key(),
+            TransferChecked {
                 from: ctx.accounts.escrow_token_account.to_account_info(),
+                mint: ctx.accounts.token_mint.to_account_info(),
                 to: ctx.accounts.poster_token_account.to_account_info(),
                 authority: ctx.accounts.job_escrow.to_account_info(),
             },
             signer_seeds,
         );
-        token::transfer(ctx_x, escrow_to_poster)?;
+        token_interface::transfer_checked(ctx_x, escrow_to_poster, ctx.accounts.token_mint.decimals)?;
     }
 
     // Distribute bond
@@ -270,21 +274,22 @@ pub fn handler(ctx: Context<ResolveDispute>, resolution: DisputeResolution) -> R
         let _ = bond_to_taker;
 
         let ctx_x = CpiContext::new_with_signer(
-            ctx.accounts.token_program.to_account_info(),
-            Transfer {
+            ctx.accounts.token_program.key(),
+            TransferChecked {
                 from: ctx.accounts.bond_token_account.to_account_info(),
+                mint: ctx.accounts.token_mint.to_account_info(),
                 to: bond_destination.clone(),
                 authority: ctx.accounts.job_escrow.to_account_info(),
             },
             signer_seeds,
         );
-        token::transfer(ctx_x, bond_amount_move)?;
+        token_interface::transfer_checked(ctx_x, bond_amount_move, ctx.accounts.token_mint.decimals)?;
     }
 
     // Close bond token account; rent refund to poster
     {
         let close_ctx = CpiContext::new_with_signer(
-            ctx.accounts.token_program.to_account_info(),
+            ctx.accounts.token_program.key(),
             CloseAccount {
                 account: ctx.accounts.bond_token_account.to_account_info(),
                 destination: ctx.accounts.poster.to_account_info(),
@@ -292,13 +297,13 @@ pub fn handler(ctx: Context<ResolveDispute>, resolution: DisputeResolution) -> R
             },
             signer_seeds,
         );
-        token::close_account(close_ctx)?;
+        token_interface::close_account(close_ctx)?;
     }
 
     // Close escrow token account; rent refund to poster
     {
         let close_ctx = CpiContext::new_with_signer(
-            ctx.accounts.token_program.to_account_info(),
+            ctx.accounts.token_program.key(),
             CloseAccount {
                 account: ctx.accounts.escrow_token_account.to_account_info(),
                 destination: ctx.accounts.poster.to_account_info(),
@@ -306,7 +311,7 @@ pub fn handler(ctx: Context<ResolveDispute>, resolution: DisputeResolution) -> R
             },
             signer_seeds,
         );
-        token::close_account(close_ctx)?;
+        token_interface::close_account(close_ctx)?;
     }
 
     // 3. Update reputation

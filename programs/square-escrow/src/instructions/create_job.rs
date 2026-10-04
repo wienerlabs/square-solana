@@ -1,5 +1,5 @@
 use anchor_lang::prelude::*;
-use anchor_spl::token::{self, Mint, Token, TokenAccount, Transfer};
+use anchor_spl::token_interface::{self, Mint, TokenAccount, TokenInterface, TransferChecked};
 
 use crate::errors::CovError;
 use crate::state::{JobEscrow, JobStatus, ProtocolConfig, DisputeInfo};
@@ -45,18 +45,19 @@ pub struct CreateJob<'info> {
         bump,
         token::mint = token_mint,
         token::authority = job_escrow,
+        token::token_program = token_program,
     )]
-    pub escrow_token_account: Box<Account<'info, TokenAccount>>,
+    pub escrow_token_account: Box<InterfaceAccount<'info, TokenAccount>>,
 
     #[account(
         mut,
         constraint = poster_token_account.owner == poster.key(),
         constraint = poster_token_account.mint == token_mint.key(),
     )]
-    pub poster_token_account: Box<Account<'info, TokenAccount>>,
+    pub poster_token_account: Box<InterfaceAccount<'info, TokenAccount>>,
 
-    pub token_mint: Box<Account<'info, Mint>>,
-    pub token_program: Program<'info, Token>,
+    pub token_mint: Box<InterfaceAccount<'info, Mint>>,
+    pub token_program: Interface<'info, TokenInterface>,
     pub system_program: Program<'info, System>,
     pub rent: Sysvar<'info, Rent>,
 }
@@ -81,14 +82,15 @@ pub fn handler(
 
     // Transfer tokens from poster to escrow token account
     let transfer_ctx = CpiContext::new(
-        ctx.accounts.token_program.to_account_info(),
-        Transfer {
+        ctx.accounts.token_program.key(),
+        TransferChecked {
             from: ctx.accounts.poster_token_account.to_account_info(),
+            mint: ctx.accounts.token_mint.to_account_info(),
             to: ctx.accounts.escrow_token_account.to_account_info(),
             authority: ctx.accounts.poster.to_account_info(),
         },
     );
-    token::transfer(transfer_ctx, amount)?;
+    token_interface::transfer_checked(transfer_ctx, amount, ctx.accounts.token_mint.decimals)?;
 
     let job = &mut ctx.accounts.job_escrow;
     job.poster = ctx.accounts.poster.key();

@@ -1,4 +1,5 @@
 use anchor_lang::prelude::*;
+use crate::errors::PolicyRegistryError;
 use crate::state::OperatorAccount;
 
 /// Squads v4 Multisig Program ID (Devnet & Mainnet)
@@ -36,7 +37,7 @@ pub struct SetMultisig<'info> {
     /// CHECK: Verified below to be owned by the Squads v4 program.
     #[account(
         constraint = squads_multisig.owner == &SQUADS_V4_PROGRAM_ID
-            @ SetMultisigError::InvalidSquadsProgram
+            @ PolicyRegistryError::InvalidSquadsProgram
     )]
     pub squads_multisig: UncheckedAccount<'info>,
 }
@@ -47,7 +48,7 @@ pub fn handler(ctx: Context<SetMultisig>, vault_index: u8) -> Result<()> {
     // Verify the Squads multisig account has data (is initialized)
     require!(
         !ctx.accounts.squads_multisig.data_is_empty(),
-        SetMultisigError::MultisigNotInitialized
+        PolicyRegistryError::MultisigNotInitialized
     );
 
     // Derive the vault PDA from the Squads multisig
@@ -66,10 +67,3 @@ pub fn handler(ctx: Context<SetMultisig>, vault_index: u8) -> Result<()> {
     Ok(())
 }
 
-#[error_code]
-pub enum SetMultisigError {
-    #[msg("Account is not owned by the Squads v4 program")]
-    InvalidSquadsProgram,
-    #[msg("Squads multisig account is not initialized")]
-    MultisigNotInitialized,
-}
