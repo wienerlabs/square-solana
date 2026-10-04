@@ -7,10 +7,12 @@
 //! - [`roles`]: rol sözlüğü.
 //! - [`constants`], [`time`]: ortak sabitler ve UTC gün başlangıcı.
 //! - [`account_read`]: CPI yerine hesap okuma; owner ve PDA adresi doğrulanır.
+//! - [`events`]: sözleşme event'leri ve programların bunları `#[event]` olarak tanımlayan makroları.
 
 pub mod account_read;
 pub mod constants;
 pub mod contract;
+pub mod events;
 pub mod roles;
 pub mod seeds;
 pub mod time;
