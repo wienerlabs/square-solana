@@ -1,6 +1,8 @@
 [workspace]
 resolver = "2"
 members = ["programs/*", "crates/*"]
+# Program testleri kendi workspace'inde (ayrı Cargo.lock): test araçları programların bağımlılık çözümünü değiştirmez.
+exclude = ["tests/programs"]
 
 # Proje lisansı (BC-02, docs/licensing.md); crate'ler `license.workspace = true` ile devralabilir.
 [workspace.package]
