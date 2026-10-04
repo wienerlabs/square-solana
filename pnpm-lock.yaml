@@ -187,6 +187,9 @@ importers:
       '@squaresdk/solana-identity':
         specifier: workspace:*
         version: link:../../packages/identity
+      '@squaresdk/solana-policy':
+        specifier: workspace:*
+        version: link:../../packages/policy
       '@squaresdk/solana-sdk':
         specifier: workspace:*
         version: link:../../packages/sdk
@@ -205,6 +208,9 @@ importers:
       react-dom:
         specifier: 19.3.0
         version: 19.3.0(react@19.3.0)
+      zod:
+        specifier: ^4.6.5
+        version: 4.6.5
     devDependencies:
       '@squaresdk/solana-config':
         specifier: workspace:*

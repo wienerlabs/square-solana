@@ -5,7 +5,7 @@ import { Keypair, PublicKey, type AccountInfo } from '@solana/web3.js';
 import { createPda } from '@squaresdk/solana-sdk';
 import { describe, expect, it } from 'vitest';
 import { formatUnits, settlementAccount, tokenAmount, type SettlementToken } from '../src/lib/settlement';
-import { escrowConfigAddress } from '../src/lib/settlement-config';
+import { escrowConfigAddress } from '../src/lib/idl-pda';
 
 const key = () => Keypair.generate().publicKey;
 

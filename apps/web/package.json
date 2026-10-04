@@ -24,12 +24,14 @@
     "@solana/wallet-standard-chains": "^1.1.2",
     "@solana/web3.js": "^1.99.0",
     "@squaresdk/solana-identity": "workspace:*",
+    "@squaresdk/solana-policy": "workspace:*",
     "@squaresdk/solana-sdk": "workspace:*",
     "@squaresdk/solana-types": "workspace:*",
     "next": "16.3.8",
     "next-themes": "^0.4.6",
     "react": "19.3.0",
-    "react-dom": "19.3.0"
+    "react-dom": "19.3.0",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@squaresdk/solana-config": "workspace:*",
