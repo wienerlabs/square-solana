@@ -5,7 +5,7 @@ Square'in Anchor programları. Tek Anchor workspace'inde derlenir; programlar bi
 
 | Dizin (crate) | Kaynak | Taşıma | Square işleri |
 |---|---|---|---|
-| `square-escrow` | `covenant/programs/covenant` | [BC-04] | job yaşam döngüsü, finalize + keeper fee, proof-gated release, alacak piyasası, itibar, M-of-N arbitration, dispute timeout |
+| `square-escrow` | `covenant/programs/covenant` | [BC-04] ✓ | job yaşam döngüsü, finalize + keeper fee, proof-gated release, alacak piyasası, itibar, M-of-N arbitration, dispute timeout |
 | `square-policy` (`policy-registry`) | `aperture/programs/policy-registry` | [BC-05] ✓ | kurum + politika commitment'ı + public günlük tavan, alıcı Merkle kökü |
 | `square-verifier` (`verifier`) | `aperture/programs/verifier` | [BC-05] ✓ | Groth16 doğrulama, release ispatı bağlama (`ReleaseProof`) |
 | `square-registry` (`aip-registry`) | `dr-wilson-empty/aip-beta` → `programs/aip-escrow/programs/aip-registry` | [BC-07] ✓ | agent kaydı (`did:aip` v2 Solana profili), event'ler |

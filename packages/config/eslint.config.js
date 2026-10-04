@@ -16,6 +16,8 @@ export const ignores = [
   'packages/sdk/src/idl/**',
   'db/src/generated/**',
   'circuits/**/build/**',
+  // Taşınan referans kaynak; çalıştırılmaz (BC-04).
+  'tests/legacy/**',
 ];
 
 export default tseslint.config(
