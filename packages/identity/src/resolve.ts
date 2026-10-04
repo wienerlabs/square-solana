@@ -1,6 +1,6 @@
 // did:aip çözümü: Solana profili §6.1, v1 §6.1 (Solana profili §9.2), çapraz kayıtlar v2 §8.
 // Çözücü asla fırlatmaz; her başarısızlık `didResolutionMetadata.error`'dadır.
-import { Program, type Idl } from '@coral-xyz/anchor';
+import { Program, type Idl } from '@anchor-lang/core';
 import { PublicKey, type Connection } from '@solana/web3.js';
 import { SQUARE_IDLS } from '@squaresdk/solana-sdk';
 import { classifyCard, fetchCardBytes, uriScheme, verifyAgentCardHash } from './card.js';

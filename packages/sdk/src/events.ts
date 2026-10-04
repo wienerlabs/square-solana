@@ -1,7 +1,7 @@
 // Tx loglarından Anchor event'lerini çözer. Loglar program çağrı yığınıyla birlikte yürünür; bir
 // `Program data:` satırı yalnızca o anda çalışan program Square programlarından biriyse ve
 // event'i o programın IDL'iyle çözülüyorsa alınır. Sıra logdaki sıradır (CPI'lar dahil).
-import type { Coder, Idl } from '@coral-xyz/anchor';
+import type { Coder, Idl } from '@anchor-lang/core';
 import type { DecodedEvent, SquareEventName } from './types.js';
 
 const INVOKE = /^Program ([1-9A-HJ-NP-Za-km-z]{32,44}) invoke \[\d+\]$/;

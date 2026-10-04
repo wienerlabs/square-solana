@@ -1,7 +1,7 @@
 // Square client: 4 program için typed client, tx builder'lar ve 8 adım akışı (BE-35 sözleşmesi,
 // uygulama BE-08). Adım 1 (policy commitment) ve 7 (ispat bağlama) kurum tarafıdır:
 // @squaresdk/solana-policy.
-import { Program, type Idl, type Provider } from '@coral-xyz/anchor';
+import { Program, type Idl, type Provider } from '@anchor-lang/core';
 import type { Commitment, Connection, PublicKey, TransactionInstruction, VersionedTransaction } from '@solana/web3.js';
 import type { ProgramErrorRef } from '@squaresdk/solana-types';
 import { mapProgramError } from './errors.js';

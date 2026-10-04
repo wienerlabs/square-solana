@@ -57,7 +57,7 @@ export type SquareEscrowContract = {
               },
               {
                 "kind": "account",
-                "path": "job.spec_hash",
+                "path": "job.specHash",
                 "account": "job"
               }
             ]
@@ -144,7 +144,7 @@ export type SquareEscrowContract = {
               },
               {
                 "kind": "account",
-                "path": "job.spec_hash",
+                "path": "job.specHash",
                 "account": "job"
               }
             ]
@@ -207,7 +207,7 @@ export type SquareEscrowContract = {
             ],
             "program": {
               "kind": "account",
-              "path": "config.registry_program",
+              "path": "config.registryProgram",
               "account": "escrowConfig"
             }
           }
@@ -297,7 +297,7 @@ export type SquareEscrowContract = {
               },
               {
                 "kind": "account",
-                "path": "claim_listing.job",
+                "path": "claimListing.job",
                 "account": "claimListing"
               }
             ]
@@ -357,7 +357,7 @@ export type SquareEscrowContract = {
               },
               {
                 "kind": "account",
-                "path": "job.spec_hash",
+                "path": "job.specHash",
                 "account": "job"
               }
             ]
@@ -459,7 +459,7 @@ export type SquareEscrowContract = {
               },
               {
                 "kind": "account",
-                "path": "job.spec_hash",
+                "path": "job.specHash",
                 "account": "job"
               }
             ]
@@ -693,7 +693,7 @@ export type SquareEscrowContract = {
               },
               {
                 "kind": "account",
-                "path": "job.spec_hash",
+                "path": "job.specHash",
                 "account": "job"
               }
             ]
@@ -728,7 +728,7 @@ export type SquareEscrowContract = {
             ],
             "program": {
               "kind": "account",
-              "path": "config.verifier_program",
+              "path": "config.verifierProgram",
               "account": "escrowConfig"
             }
           }
@@ -800,7 +800,7 @@ export type SquareEscrowContract = {
               },
               {
                 "kind": "account",
-                "path": "job.spec_hash",
+                "path": "job.specHash",
                 "account": "job"
               }
             ]
@@ -930,7 +930,7 @@ export type SquareEscrowContract = {
             ],
             "program": {
               "kind": "account",
-              "path": "config.verifier_program",
+              "path": "config.verifierProgram",
               "account": "escrowConfig"
             }
           }
@@ -968,7 +968,7 @@ export type SquareEscrowContract = {
             ],
             "program": {
               "kind": "account",
-              "path": "config.verifier_program",
+              "path": "config.verifierProgram",
               "account": "escrowConfig"
             }
           }
@@ -1027,7 +1027,7 @@ export type SquareEscrowContract = {
               },
               {
                 "kind": "account",
-                "path": "job.agent_record",
+                "path": "job.agentRecord",
                 "account": "job"
               }
             ]
@@ -1147,7 +1147,7 @@ export type SquareEscrowContract = {
               },
               {
                 "kind": "account",
-                "path": "job.spec_hash",
+                "path": "job.specHash",
                 "account": "job"
               }
             ]
@@ -1262,7 +1262,7 @@ export type SquareEscrowContract = {
             ],
             "program": {
               "kind": "account",
-              "path": "config.verifier_program",
+              "path": "config.verifierProgram",
               "account": "escrowConfig"
             }
           }
@@ -1303,7 +1303,7 @@ export type SquareEscrowContract = {
             ],
             "program": {
               "kind": "account",
-              "path": "config.verifier_program",
+              "path": "config.verifierProgram",
               "account": "escrowConfig"
             }
           }
@@ -1362,7 +1362,7 @@ export type SquareEscrowContract = {
               },
               {
                 "kind": "account",
-                "path": "job.agent_record",
+                "path": "job.agentRecord",
                 "account": "job"
               }
             ]
@@ -1475,7 +1475,7 @@ export type SquareEscrowContract = {
               },
               {
                 "kind": "account",
-                "path": "job.spec_hash",
+                "path": "job.specHash",
                 "account": "job"
               }
             ]
@@ -1545,7 +1545,7 @@ export type SquareEscrowContract = {
             ],
             "program": {
               "kind": "account",
-              "path": "config.registry_program",
+              "path": "config.registryProgram",
               "account": "escrowConfig"
             }
           }
@@ -1570,13 +1570,13 @@ export type SquareEscrowContract = {
               },
               {
                 "kind": "account",
-                "path": "job.agent_wallet",
+                "path": "job.agentWallet",
                 "account": "job"
               }
             ],
             "program": {
               "kind": "account",
-              "path": "config.registry_program",
+              "path": "config.registryProgram",
               "account": "escrowConfig"
             }
           }
@@ -1739,7 +1739,7 @@ export type SquareEscrowContract = {
               },
               {
                 "kind": "account",
-                "path": "job.spec_hash",
+                "path": "job.specHash",
                 "account": "job"
               }
             ]
@@ -1843,7 +1843,7 @@ export type SquareEscrowContract = {
               },
               {
                 "kind": "account",
-                "path": "job.spec_hash",
+                "path": "job.specHash",
                 "account": "job"
               }
             ]
@@ -1950,7 +1950,7 @@ export type SquareEscrowContract = {
               },
               {
                 "kind": "account",
-                "path": "job.spec_hash",
+                "path": "job.specHash",
                 "account": "job"
               }
             ]
@@ -2073,7 +2073,7 @@ export type SquareEscrowContract = {
               },
               {
                 "kind": "account",
-                "path": "job.spec_hash",
+                "path": "job.specHash",
                 "account": "job"
               }
             ]
@@ -2134,7 +2134,7 @@ export type SquareEscrowContract = {
               },
               {
                 "kind": "account",
-                "path": "job.spec_hash",
+                "path": "job.specHash",
                 "account": "job"
               }
             ]
@@ -2210,7 +2210,7 @@ export type SquareEscrowContract = {
               },
               {
                 "kind": "account",
-                "path": "job.spec_hash",
+                "path": "job.specHash",
                 "account": "job"
               }
             ]

@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // idl/*.json → src/idl/<program>.json (kopya) + src/idl/<program>.ts (Anchor'ın camelCase TS tipi).
-// Anchor CLI'ın ürettiği tip dosyasıyla aynı dönüşümü yapar: `name`, `relations` ve `account` değerleri
-// lowerCamelCase olur; `path` nokta içermiyorsa çevrilir (ör. `job.agent_record` olduğu gibi kalır).
+// Anchor CLI'ın (1.2.0, `anchor idl type`) ürettiği tip dosyasıyla aynı dönüşümü yapar: `name`,
+// `relations` ve `account` değerleri lowerCamelCase olur; `path`'in her nokta parçası ayrı çevrilir
+// (ör. `release_proof.job` → `releaseProof.job`).
 //   node scripts/gen-idl-types.mjs          dosyaları yazar
 //   node scripts/gen-idl-types.mjs --check  dosyalar güncel değilse 1 ile çıkar
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
@@ -34,7 +35,7 @@ function convert(value, key) {
   }
   if (typeof value !== 'string') return value;
   if (key === 'name' || key === 'relations' || key === 'account') return lowerCamel(value);
-  if (key === 'path' && !value.includes('.')) return lowerCamel(value);
+  if (key === 'path') return value.split('.').map(lowerCamel).join('.');
   return value;
 }
 

@@ -1,6 +1,6 @@
 // PDA türetme. Seed'ler BC-44 sözleşmesindeki tabloyla aynıdır (docs/design/program-interface.md §5)
 // ve sabit metin olarak yazılmaz: her programın IDL'indeki `*_SEED` sabitlerinden okunur.
-import type { Idl } from '@coral-xyz/anchor';
+import type { Idl } from '@anchor-lang/core';
 import { PublicKey } from '@solana/web3.js';
 import { idlBytesConstant } from './idl-constants.js';
 import { SQUARE_IDLS, type SquareProgramIds, type SquareProgramName } from './programs.js';

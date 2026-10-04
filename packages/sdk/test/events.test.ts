@@ -1,4 +1,4 @@
-import type { Idl, Program } from '@coral-xyz/anchor';
+import type { Idl, Program } from '@anchor-lang/core';
 import { Keypair } from '@solana/web3.js';
 import { describe, expect, it } from 'vitest';
 import { createSquareClient } from '../src/client.js';

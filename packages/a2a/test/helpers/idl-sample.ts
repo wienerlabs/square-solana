@@ -1,6 +1,6 @@
 // Test fixture (packages/policy/test/helpers ile aynı): bir IDL tipine uyan örnek değer üretir (Anchor'ın JS biçiminde) ve karşılaştırma
 // için değerleri düz JSON'a indirger. Değerler sayaçtan türetilir; her alan farklıdır.
-import { BN, type Idl } from '@coral-xyz/anchor';
+import { BN, type Idl } from '@anchor-lang/core';
 import { PublicKey } from '@solana/web3.js';
 
 type IdlTypeLike =
