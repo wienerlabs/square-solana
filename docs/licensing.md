@@ -22,6 +22,8 @@ Bir kaynak projeden dizin taşıyan PR, aynı PR'da:
 
 Dosyalara tek tek başlık eklenmez, birinci taraf kod CI'da denetlenmez.
 
+Covenant'ın LGPL-2.1 kodu için katkıcı onayları [`legal/relicensing/`](legal/relicensing/) altında kayıtlıdır (BC-03).
+
 ## Yeni dosyalar
 
 Bu repoda yazılan kaynak dosyalar ilk satırda (shebang varsa ondan sonra) SPDX başlığı taşıyabilir;
