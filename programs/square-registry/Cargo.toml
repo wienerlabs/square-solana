@@ -26,7 +26,3 @@ anchor-lang = "1.2.0"
 
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(target_os, values("solana"))'] }
-
-[dev-dependencies]
-# Program testleri: derlenmiş programı (`anchor build`) LiteSVM'de çalıştırır (crates/square-testkit).
-square-testkit = { path = "../../crates/square-testkit" }

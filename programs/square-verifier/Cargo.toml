@@ -22,7 +22,3 @@ groth16-solana = "0.2"
 # Anchor 1.x `solana_program` yerine ayrık Solana crate'leri (MPP yolu: ed25519 ön derlemesi, talimat sysvar'ı).
 solana-instructions-sysvar = "3"
 solana-sdk-ids = "3"
-
-[dev-dependencies]
-# Program testleri: derlenmiş programı (`anchor build`) LiteSVM'de çalıştırır (crates/square-testkit).
-square-testkit = { path = "../../crates/square-testkit" }

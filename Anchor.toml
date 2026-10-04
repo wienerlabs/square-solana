@@ -19,6 +19,5 @@ cluster = "localnet"
 wallet = "~/.config/solana/id.json"
 
 [scripts]
-# Birim testleri ve programların LiteSVM testleri (programs/*/tests, crates/square-testkit); testler
-# `anchor build`'in ürettiği target/deploy/*.so'yu yükler (BC-12).
-test = "cargo test --workspace --locked -- --nocapture"
+# Program testleri LiteSVM'de, `anchor build`'in ürettiği target/deploy/*.so ile koşar (BC-12, tests/programs).
+test = "cargo test --locked --manifest-path tests/programs/Cargo.toml -- --nocapture"
