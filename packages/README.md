@@ -17,7 +17,7 @@ kopyaları `pnpm license:write` yazar, `pnpm license:check` denetler.
 | [`policy/`](policy/) | `@squaresdk/solana-policy` | kurum tarafı: politika, commitment, alıcı listesi, ispat | [BE-10] |
 | `observability/` | `@squaresdk/solana-observability` | logger, metrikler, health, alarm | [BE-12] |
 | `hardening/` | `@squaresdk/solana-hardening` | SSRF, idempotency, rate limit, RPC failover, imzalı eylemler | [BE-13] |
-| `a2a/` | `@squaresdk/solana-a2a` | JSON-RPC 2.0 görev protokolü, görev ↔ job durum eşlemesi | [BE-17] |
+| [`a2a/`](a2a/) | `@squaresdk/solana-a2a` | A2A v1.0 görev protokolü (JSON-RPC 2.0 + SSE), görev ↔ job durum eşlemesi, Postgres görev deposu ([tasarım](../docs/design/a2a.md)) | [BE-17] |
 | [`agent-sdk/`](agent-sdk/) | `@squaresdk/solana-agent-sdk` | agent yazma kiti | [BE-19] |
 | `x402/` | `@squaresdk/solana-x402` | x402 v2 gateway (resmi `@x402/*` üzerine) | [BE-24] |
 | [`mcp/`](mcp/) | `@squaresdk/solana-mcp` | Square MCP sunucusu + agent MCP istemcisi | [BE-28] |

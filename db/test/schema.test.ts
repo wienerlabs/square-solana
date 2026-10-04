@@ -12,7 +12,9 @@ import {
   KeeperOutcomeSchema,
   KeeperReasonSchema,
   ReleaseVerdictSchema,
+  RoleSchema,
   ScreeningStatusSchema,
+  TaskStateSchema,
   ValidationOutcomeSchema,
 } from '@squaresdk/solana-types';
 import bs58 from 'bs58';
@@ -94,6 +96,8 @@ describe('@squaresdk/solana-types ile hiza', () => {
     const labels = (type: string) => rows.filter((r) => r.type === type).map((r) => r.label);
     const expected: Record<string, readonly string[]> = {
       JobStatus: JobStatusSchema.options,
+      A2aTaskState: TaskStateSchema.options,
+      A2aRole: RoleSchema.options,
       ClaimStatus: ClaimStatusSchema.options,
       AgentStatus: AgentStatusSchema.options,
       ScreeningStatus: ScreeningStatusSchema.options,
