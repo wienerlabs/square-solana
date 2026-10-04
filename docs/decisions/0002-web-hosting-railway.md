@@ -1,6 +1,6 @@
 # ADR 0002 — Web uygulaması da Railway'de çalışır
 
-- **Durum:** Kabul edildi (proje sahibi: MuhammedAkinci)
+- **Durum:** Kabul edildi
 - **Issue:** BE-37 (#133)
 - **Değiştirdiği karar:** [§12.4](../analysis/square-solana-analysis.md#124-varsay%C4%B1lanlar) "Hosting: Vercel (web) + Railway (api ve worker'lar)"
 - **Kapsam:** `apps/web` ve dağıtılan bütün servisler
