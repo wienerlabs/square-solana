@@ -516,7 +516,7 @@ export function createA2aServer(options: A2aServerOptions): A2aServer {
       task.id,
       () => onMessage(contextFor(task, job, opening, signal), message),
       signal,
-      () => store.markProcessed(task.id, message.messageId),
+      () => locked(task.id, () => store.markProcessed(task.id, message.messageId)),
     ).then(clear, clear);
   }
 
@@ -949,13 +949,19 @@ export function createA2aServer(options: A2aServerOptions): A2aServer {
           const started = await locked(listed.id, async () => {
             if (closing) return false;
             const fresh = await store.get(agentRecord, listed.id);
-            if (!fresh || isTerminal(fresh.state)) return false;
+            if (!fresh) return false;
+            const pending = onMessage ? await store.pendingMessages(fresh.id) : [];
+            const settleAll = async () => {
+              for (const message of pending) await store.markProcessed(fresh.id, message.messageId);
+              return false;
+            };
+            if (isTerminal(fresh.state)) return settleAll();
             const runnable = fresh.state === 'TASK_STATE_SUBMITTED' || fresh.state === 'TASK_STATE_WORKING';
             const busy = queues.has(fresh.id) || controllers.has(fresh.id);
-            const pending = onMessage ? await store.pendingMessages(fresh.id) : [];
             if ((!runnable || busy) && pending.length === 0) return false;
             const { task, job } = await reconcileTask(fresh, true);
-            if (!job || isTerminal(task.state)) return false;
+            if (!job) return false;
+            if (isTerminal(task.state)) return settleAll();
             const opening = (await store.message(task.id, task.createMessageId))?.message;
             if (!opening) return false;
             let any = false;

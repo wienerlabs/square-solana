@@ -20,6 +20,7 @@ import {
 } from '@squaresdk/solana-types';
 import type { z } from 'zod';
 import { A2aError, type ErrorDetail } from './errors.js';
+import { exceedsDepth } from './jsonrpc.js';
 
 export interface A2aClientOptions {
   /** Agent kartındaki A2A uç noktası. */
@@ -59,6 +60,8 @@ export interface A2aClient {
 const DEFAULT_MAX_RESPONSE_BYTES = 4 * 1024 * 1024;
 const INVALID_RESPONSE = -32006;
 const MAX_ERROR_MESSAGE = 1024;
+/** Yanıttaki en derin iç içelik: görev, artefakt ve parça zarfı ile 64 seviyelik veri. */
+const MAX_RESPONSE_DEPTH = 100;
 
 const invalid = (detail: string) => new A2aError(INVALID_RESPONSE, `Invalid agent response: ${detail}`);
 
@@ -103,6 +106,7 @@ function errorDetails(data: unknown): ErrorDetail[] | undefined {
 }
 
 function unwrap<T>(text: string, id: string, schema: z.ZodType<T>): T {
+  if (exceedsDepth(text, MAX_RESPONSE_DEPTH)) throw invalid('iç içe derinlik sınırı aşıldı');
   let value: unknown;
   try {
     value = JSON.parse(text);

@@ -180,6 +180,10 @@ describe('createA2aClient', () => {
         res.write(`data: ${'x'.repeat(2048)}`);
         return;
       }
+      if (mode === 'partial-multibyte') {
+        res.write(`data: ${'ğ'.repeat(400)}`);
+        return;
+      }
       res.end(
         `data: ${JSON.stringify({ jsonrpc: '2.0', id: body.id, result: { task: { ...TASK, metadata: { not: 'ğ'.repeat(300) } } } })}\n\n`,
       );
@@ -192,6 +196,12 @@ describe('createA2aClient', () => {
       })(),
     ).rejects.toMatchObject({ code: -32006 });
     expect(Date.now() - started).toBeLessThan(2_000);
+    mode = 'partial-multibyte';
+    await expect(
+      (async () => {
+        for await (const event of client.subscribeToTask({ id: 't-1' })) void event;
+      })(),
+    ).rejects.toMatchObject({ code: -32006 });
     mode = 'multibyte';
     await expect(
       (async () => {

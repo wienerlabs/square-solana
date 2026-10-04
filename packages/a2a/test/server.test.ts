@@ -769,7 +769,7 @@ describe('üçüncü tur: teslim, bekleyici ve kapanış', () => {
         message: { messageId: `${title}-2`, role: 'ROLE_USER', taskId: task!.id, parts: [{ text: 'yanıt' }] },
       });
     }
-    expect(await db.client.a2aMessage.count({ where: { pending: true } })).toBe(0);
+    await until(async () => (await db.client.a2aMessage.count({ where: { pending: true } })) === 0);
     await restart({ chain: h.chain });
     let redelivered = 0;
     h.continuations.set(JOB_A, async () => {
@@ -916,10 +916,13 @@ describe('üçüncü tur: teslim, bekleyici ve kapanış', () => {
     const counting = countingBus();
     let failGet = 0;
     let forceDuplicate = false;
+    let hideCreated = false;
     await restart({
       bus: counting.bus,
       wrapStore: (store): TaskStore => ({
         ...store,
+        findCreated: async (agentRecord, caller, messageId) =>
+          hideCreated ? null : store.findCreated(agentRecord, caller, messageId),
         get: async (agentRecord, id) => {
           if (failGet > 0) {
             failGet -= 1;
@@ -952,6 +955,12 @@ describe('üçüncü tur: teslim, bekleyici ve kapanış', () => {
     await expect(client.sendMessage({ message: openingMessage(JOB_B, 'b') })).rejects.toMatchObject({
       code: -32603,
     });
+    expect(counting.counter.subscriptions).toBe(0);
+    forceDuplicate = false;
+    hideCreated = true;
+    expect((await client.sendMessage({ message: openingMessage(JOB_A, 'a') })).task?.status.state).toBe(
+      'TASK_STATE_REJECTED',
+    );
     expect(counting.counter.subscriptions).toBe(0);
   });
 
@@ -1025,6 +1034,211 @@ describe('üçüncü tur: teslim, bekleyici ve kapanış', () => {
     open();
     await closing;
     await expect(stream).rejects.toMatchObject({ code: -32000 });
+  });
+});
+
+describe('dördüncü tur: kuyruk, resume ve kapanış yolları', () => {
+  it('kapanış sırasında kabul edilen devam mesajı iletilmez, bekliyor kalır', async () => {
+    let gate: Promise<void> | null = null;
+    let reached: () => void = () => undefined;
+    await restart({
+      wrapJobSource: (source) => ({
+        getJob: async (address) => {
+          if (gate) {
+            const waiting = gate;
+            gate = null;
+            reached();
+            await waiting;
+          }
+          return source.getJob(address);
+        },
+      }),
+    });
+    await h.openJob(JOB_A, 'a');
+    h.scripts.set(JOB_A, async (context) => context.requireInput('ayrıntı?'));
+    let handled = 0;
+    h.continuations.set(JOB_A, async () => {
+      handled += 1;
+    });
+    const client = h.client();
+    const { task } = await client.sendMessage({ message: openingMessage(JOB_A, 'a') });
+    let open: () => void = () => undefined;
+    gate = new Promise<void>((resolve) => (open = resolve));
+    const reachedP = new Promise<void>((resolve) => (reached = resolve));
+    const pending = client.sendMessage({
+      message: { messageId: 'm-2', role: 'ROLE_USER', taskId: task!.id, parts: [{ text: 'cuma' }] },
+      configuration: { returnImmediately: true },
+    });
+    await reachedP;
+    const closing = h.server.close();
+    open();
+    await closing;
+    await pending;
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(handled).toBe(0);
+    expect(await db.client.a2aMessage.count({ where: { pending: true } })).toBe(1);
+  });
+
+  it('bu süreçte başlamış görevin onTask işi bitmiş olsa da resume onu yeniden başlatmaz', async () => {
+    await h.openJob(JOB_A, 'a');
+    let calls = 0;
+    h.scripts.set(JOB_A, async () => {
+      calls += 1;
+    });
+    await h.client().sendMessage({ message: openingMessage(JOB_A, 'a'), configuration: { returnImmediately: true } });
+    await until(() => calls === 1);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(await h.server.resume()).toBe(0);
+    expect(await h.server.resume()).toBe(0);
+    expect(calls).toBe(1);
+  });
+
+  it('meşgul SUBMITTED görevde resume onTask i yeniden başlatmaz ama bekleyen mesajı iletir', async () => {
+    let failOpening = false;
+    await restart({
+      wrapStore: (store): TaskStore => ({
+        ...store,
+        message: async (taskId, messageId) => {
+          if (failOpening && messageId === 'm-a') {
+            failOpening = false;
+            throw new Error('geçici depo hatası');
+          }
+          return store.message(taskId, messageId);
+        },
+      }),
+    });
+    await h.openJob(JOB_A, 'a');
+    let release: () => void = () => undefined;
+    const held = new Promise<void>((resolve) => (release = resolve));
+    let onTaskCalls = 0;
+    h.scripts.set(JOB_A, async () => {
+      onTaskCalls += 1;
+      await held;
+    });
+    const delivered: string[] = [];
+    h.continuations.set(JOB_A, async (context, message) => {
+      delivered.push(message.messageId);
+      await context.reject('olmaz');
+    });
+    const client = h.client();
+    const { task } = await client.sendMessage({
+      message: openingMessage(JOB_A, 'a'),
+      configuration: { returnImmediately: true },
+    });
+    await until(() => onTaskCalls === 1);
+    failOpening = true;
+    await expect(
+      client.sendMessage({
+        message: { messageId: 'm-2', role: 'ROLE_USER', taskId: task!.id, parts: [{ text: 'cuma' }] },
+        configuration: { returnImmediately: true },
+      }),
+    ).rejects.toMatchObject({ code: -32603 });
+    expect(await h.server.resume()).toBe(1);
+    release();
+    await until(() => delivered.length === 1);
+    expect(onTaskCalls).toBe(1);
+    expect(delivered).toEqual(['m-2']);
+  });
+
+  it('bekleyen mesajı olmayan kesintili görev için resume zincire gitmez', async () => {
+    let reads = 0;
+    let counting = false;
+    await restart({
+      wrapJobSource: (source) => ({
+        getJob: async (address) => {
+          if (counting) reads += 1;
+          return source.getJob(address);
+        },
+      }),
+    });
+    await h.openJob(JOB_A, 'a');
+    h.scripts.set(JOB_A, async (context) => context.requireInput('ayrıntı?'));
+    await h.client().sendMessage({ message: openingMessage(JOB_A, 'a') });
+    await restart({ chain: h.chain, wrapJobSource: h.options.wrapJobSource });
+    counting = true;
+    expect(await h.server.resume()).toBe(0);
+    expect(reads).toBe(0);
+  });
+
+  it('kuyrukta bekleyen devam mesajı görev iptal edilince çalışmaz ve işlenmiş sayılır', async () => {
+    await h.openJob(JOB_A, 'a');
+    let release: () => void = () => undefined;
+    const held = new Promise<void>((resolve) => (release = resolve));
+    h.scripts.set(JOB_A, async () => held);
+    let handled = 0;
+    h.continuations.set(JOB_A, async () => {
+      handled += 1;
+    });
+    const client = h.client();
+    const { task } = await client.sendMessage({
+      message: openingMessage(JOB_A, 'a'),
+      configuration: { returnImmediately: true },
+    });
+    await client.sendMessage({
+      message: { messageId: 'm-2', role: 'ROLE_USER', taskId: task!.id, parts: [{ text: 'cuma' }] },
+      configuration: { returnImmediately: true },
+    });
+    expect((await client.cancelTask({ id: task!.id })).status.state).toBe('TASK_STATE_CANCELED');
+    release();
+    await until(async () => (await db.client.a2aMessage.count({ where: { pending: true } })) === 0);
+    expect(handled).toBe(0);
+  });
+
+  it('zincirde iptal edilen görevin bekleyen mesaj işareti resume da kalkar', async () => {
+    let failOpening = false;
+    await restart({
+      wrapStore: (store): TaskStore => ({
+        ...store,
+        message: async (taskId, messageId) => {
+          if (failOpening && messageId === 'm-a') {
+            failOpening = false;
+            throw new Error('geçici depo hatası');
+          }
+          return store.message(taskId, messageId);
+        },
+      }),
+    });
+    await h.openJob(JOB_A, 'a');
+    h.scripts.set(JOB_A, async (context) => context.requireInput('ayrıntı?'));
+    const client = h.client();
+    const { task } = await client.sendMessage({ message: openingMessage(JOB_A, 'a') });
+    failOpening = true;
+    await expect(
+      client.sendMessage({
+        message: { messageId: 'm-2', role: 'ROLE_USER', taskId: task!.id, parts: [{ text: 'cuma' }] },
+        configuration: { returnImmediately: true },
+      }),
+    ).rejects.toMatchObject({ code: -32603 });
+    await restart({ chain: h.chain });
+    await h.chain.setStatus(JOB_A, 'cancelled');
+    expect(await h.server.resume()).toBe(0);
+    expect(await db.client.a2aMessage.count({ where: { pending: true } })).toBe(0);
+  });
+
+  it('kapanış açık akışları sonlandırır', async () => {
+    await h.openJob(JOB_A, 'a');
+    h.scripts.set(JOB_A, async (context) => context.requireInput('?'));
+    const client = h.client();
+    const { task } = await client.sendMessage({ message: openingMessage(JOB_A, 'a') });
+    let first = false;
+    const stream = (async () => {
+      for await (const event of client.subscribeToTask({ id: task!.id })) {
+        void event;
+        first = true;
+      }
+    })();
+    await until(() => first);
+    const closedAt = Date.now();
+    await h.server.close();
+    await stream;
+    expect(Date.now() - closedAt).toBeLessThan(2_000);
+  });
+
+  it('aşırı derin istek gövdesi ayrıştırılmadan reddedilir', async () => {
+    const deep = `${'['.repeat(10_000)}0${']'.repeat(10_000)}`;
+    const body = `{"jsonrpc":"2.0","id":1,"method":"GetTask","params":{"id":"x","deep":${deep}}}`;
+    expect((await rpc(body)).json.error?.code).toBe(-32600);
+    expect(h.errors).toEqual([]);
   });
 });
 

@@ -1,7 +1,14 @@
 import { GetTaskRequestSchema } from '@squaresdk/solana-types';
 import { describe, expect, it } from 'vitest';
 import { A2aError, BAD_REQUEST_TYPE, ERROR_INFO_TYPE, errors } from '../src/errors.js';
-import { errorResponse, jsonViolation, parseJsonRpc, parseParams, successResponse } from '../src/jsonrpc.js';
+import {
+  errorResponse,
+  exceedsDepth,
+  jsonViolation,
+  parseJsonRpc,
+  parseParams,
+  successResponse,
+} from '../src/jsonrpc.js';
 
 describe('parseJsonRpc', () => {
   it('geçerli isteği ayrıştırır', () => {
@@ -114,5 +121,15 @@ describe('jsonViolation (I-JSON, RFC 7493)', () => {
       return null;
     })();
     expect(error?.code).toBe(-32602);
+  });
+});
+
+describe('exceedsDepth', () => {
+  it('dizgi içindeki parantezleri ve kaçışları saymaz', () => {
+    expect(exceedsDepth('[[[]]]', 3)).toBe(false);
+    expect(exceedsDepth('[[[[]]]]', 3)).toBe(true);
+    expect(exceedsDepth('{"a":"[[[[[[","b":[1]}', 2)).toBe(false);
+    expect(exceedsDepth('{"a":"\\"[[[[","b":{"c":{}}}', 2)).toBe(true);
+    expect(exceedsDepth('"[[[[[["', 1)).toBe(false);
   });
 });

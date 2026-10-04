@@ -5,7 +5,39 @@ import { A2aError, errors, type FieldViolation } from './errors.js';
 
 export type ParsedRequest = { ok: true; request: JsonRpcRequest } | { ok: false; id: JsonRpcId; error: A2aError };
 
+/**
+ * Ayrıştırılmadan reddedilen gövde derinliği. Parametre sınırının (64) iki katı: makul derinlikler
+ * ayrıştırılıp alan yoluyla -32602 alır, aşırı iç içe gövde belleğe açılmadan -32600 alır.
+ */
+const MAX_BODY_DEPTH = 128;
+
+/**
+ * Metindeki iç içe derinlik `limit`'i aşıyor mu; dizgi içindekiler sayılmaz. JSON.parse çok derin girdiyi
+ * bellekte metnin onlarca katına büyüttüğü için ayrıştırmadan önce bakılır.
+ */
+export function exceedsDepth(text: string, limit: number): boolean {
+  let depth = 0;
+  let inString = false;
+  for (let index = 0; index < text.length; index += 1) {
+    const code = text.charCodeAt(index);
+    if (inString) {
+      if (code === 0x5c) index += 1;
+      else if (code === 0x22) inString = false;
+      continue;
+    }
+    if (code === 0x22) inString = true;
+    else if (code === 0x5b || code === 0x7b) {
+      depth += 1;
+      if (depth > limit) return true;
+    } else if (code === 0x5d || code === 0x7d) depth -= 1;
+  }
+  return false;
+}
+
 export function parseJsonRpc(body: string): ParsedRequest {
+  if (exceedsDepth(body, MAX_BODY_DEPTH)) {
+    return { ok: false, id: null, error: errors.invalidRequest('iç içe derinlik sınırı aşıldı') };
+  }
   let value: unknown;
   try {
     value = JSON.parse(body);
