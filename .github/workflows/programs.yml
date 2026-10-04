@@ -94,7 +94,9 @@ jobs:
       # `anchor test` yerel validator'ı Anchor.toml'daki sağlayıcı cüzdanıyla başlatır; CI'da bu iş için
       # geçici bir anahtar üretilir (fon ve yetki taşımaz, depoya girmez).
       - name: Yerel validator için geçici cüzdan
-        run: solana-keygen new --no-bip39-passphrase --silent --force --outfile ~/.config/solana/id.json
+        run: |
+          mkdir -p ~/.config/solana
+          solana-keygen new --no-bip39-passphrase --silent --force --outfile ~/.config/solana/id.json
 
       # `anchor test`, Anchor.toml'daki test betiğini (`cargo test --workspace`: birim testleri ve
       # programs/*/tests'teki LiteSVM testleri) yerel bir solana-test-validator'la çalıştırır.
