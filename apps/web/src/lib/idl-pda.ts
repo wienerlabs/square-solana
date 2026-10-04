@@ -32,3 +32,10 @@ export function policyAddress(policyProgramId: PublicKey, institution: PublicKey
   if (policyId.length !== 32) throw new Error(`policyId must be 32 bytes, got ${policyId.length}`);
   return find(policyProgramId, [seed('policy', 'POLICY_SEED'), institution.toBytes(), policyId]);
 }
+
+/** square_registry `AgentRecord`: `["agent", creator, agent_id]`; kimlik 1–32 bayt olmalı (tek seed sınırı). */
+export function agentRecordAddress(registryProgramId: PublicKey, creator: PublicKey, agentId: string): PublicKey {
+  const id = new TextEncoder().encode(agentId);
+  if (id.length === 0 || id.length > 32) throw new Error(`agentId must be 1-32 bytes, got ${id.length}`);
+  return find(registryProgramId, [seed('registry', 'AGENT_SEED'), creator.toBytes(), id]);
+}
