@@ -22,7 +22,7 @@ pnpm license:write
 <!-- license-inventory:begin -->
 | Paket | Ekosistem | Lisans | Kapsam | Kullanan | Durum |
 |---|---|---|---|---|---|
-| `anchor-lang` | cargo | Apache-2.0 | runtime | `aip-registry`, `square-common`, `square-escrow`, `square-policy`, `square-testkit`, `verifier` | ✓ |
+| `anchor-lang` | cargo | Apache-2.0 | runtime | `square-common`, `square-escrow`, `square-policy`, `square-registry`, `square-testkit`, `verifier` | ✓ |
 | `anchor-spl` | cargo | Apache-2.0 | runtime | `square-escrow` | ✓ |
 | `base64` | cargo | MIT OR Apache-2.0 | runtime | `square-policy`, `square-testkit` | ✓ |
 | `groth16-solana` | cargo | MIT | runtime | `verifier` | ✓ |

@@ -11,7 +11,7 @@ skip-lint = false
 # Kaynak programların declare_id! değerleri; yeni Square program ID'leri BC-09'da.
 square_policy = "FXD7ycSguBQw7o3DXqq4VUBHtdx5ZQpu9P2zb4KG4ZEU"
 verifier = "AzKirEv7h5PstLNYNqLj7fCXU9EFA6nSnuoed3QkmUfU"
-aip_registry = "CgchXu2dRV3r9E1YjRhp4kbeLLtv1Xz61yoerJzp1Vbc"
+square_registry = "CgchXu2dRV3r9E1YjRhp4kbeLLtv1Xz61yoerJzp1Vbc"
 square_escrow = "5hstj5grBUL1BeSaPLYpgkD6n3ALasmbseRvKRFfCVNT"
 
 [provider]

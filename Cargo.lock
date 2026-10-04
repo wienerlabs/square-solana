@@ -104,15 +104,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "aip-registry"
-version = "0.1.0"
-dependencies = [
- "anchor-lang",
- "square-common",
- "square-testkit",
-]
-
-[[package]]
 name = "allocator-api2"
 version = "0.2.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4310,6 +4301,15 @@ dependencies = [
  "solana-signer",
  "solana-transaction",
  "square-common",
+]
+
+[[package]]
+name = "square-registry"
+version = "0.2.0"
+dependencies = [
+ "anchor-lang",
+ "square-common",
+ "square-testkit",
 ]
 
 [[package]]

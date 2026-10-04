@@ -52,7 +52,7 @@ anahtarlar kullanılmalıdır (BC-29).
 
 | Dosya | Kapsam |
 |---|---|
-| `programs/square-registry/tests/registry.rs` | Kayıt, çift kayıt, sahiplik kısıtı, uzunluk sınırları (AIP registry arayüzü; BC-15 sözleşmeye taşır) |
+| `programs/square-registry/tests/registry.rs` | BC-15'in testleri (sözleşme arayüzü): kayıt, kart / hash, durum, devir, kalıcı kayıt silme, event'ler, Squads vault'u sahip olarak |
 | `programs/square-policy/tests/policy.rs` | BC-17'nin testleri (sözleşme arayüzü) |
 | `programs/square-verifier/tests/verifier.rs` | Günlük sayacın ayarlanan saatte UTC gün başına bağlanması (Aperture verifier arayüzü; BC-21 taşır) |
 | `programs/square-escrow/tests/escrow.rs` | Yükseltme yetkilisinin config'i kurması; USDC'yle iş açma, kabul, teslim; challenge penceresi bitmeden (son saniye dahil) finalize reddi, saat pencerenin sonuna gelince ödeme (Covenant arayüzü; BC-22 taşır) |

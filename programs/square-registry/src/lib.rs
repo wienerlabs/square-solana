@@ -1,314 +1,84 @@
+//! Square registry programı (program arayüzü §10.1, BC-15). Akışın 2. adımı: agent kaydolur ve did:aip
+//! olarak çözümlenir (did:aip v2 Solana profili, BC-14). Zincirde DID metni yoktur: DID küme, program
+//! kimliği ve kayıt adresinden türetilir (profil §4.2). Kayıt bir A2A agent card'ına işaret eder:
+//! `agent_card_uri` ve kartın SHA-256'sı `agent_card_hash`.
+//!
+//! Registry config'i ve screening kayıtları (`init_registry_config`, `update_registry_config`,
+//! `record_screening`) BC-27'dedir.
+
 use anchor_lang::prelude::*;
-use square_common::seeds::AGENT_SEED;
+
+pub mod errors;
+pub mod instructions;
+pub mod state;
+
+use instructions::*;
+pub use state::{AgentStatus, ScreeningStatus};
 
 declare_id!("CgchXu2dRV3r9E1YjRhp4kbeLLtv1Xz61yoerJzp1Vbc");
 
-/// AIP Agent Registry Program
-///
-/// On-chain agent card storage and discovery.
-/// One wallet can register multiple agents, each with a unique agent_id.
-/// PDA seeds: ["agent", owner, agent_id]
+square_common::square_registry_events!();
+
+// PDA seed'leri IDL'de de yayımlanır; değerler sözleşmeden (square-common).
+#[constant]
+pub const AGENT_SEED: &[u8] = square_common::seeds::AGENT_SEED;
+#[constant]
+pub const REGISTRY_CONFIG_SEED: &[u8] = square_common::seeds::REGISTRY_CONFIG_SEED;
+#[constant]
+pub const SCREENING_SEED: &[u8] = square_common::seeds::SCREENING_SEED;
+
 #[program]
-pub mod aip_registry {
+pub mod square_registry {
     use super::*;
 
-    /// Register a new agent on-chain.
-    /// agent_id is a unique slug per owner (max 32 chars, immutable after creation).
+    /// Terminal: sets `Deregistered`. The record is kept (not closed) so the same (creator, agent_id)
+    /// can never be re-registered and inherit the agent's reputation or did:aip.
+    pub fn deregister_agent(ctx: Context<DeregisterAgent>) -> Result<()> {
+        instructions::deregister_agent::handler(ctx)
+    }
+
+    /// Flow step 2: an agent registers; it resolves as did:aip (Solana profile, BC-14).
+    /// `agent_id` is an immutable slug, unique per creator and never reusable (see `deregister_agent`).
     pub fn register_agent(
         ctx: Context<RegisterAgent>,
         agent_id: String,
-        did: String,
-        name: String,
-        endpoint: String,
-        wallet_address: Pubkey,
-        agent_type: AgentType,
-        capabilities: Vec<Capability>,
-        price_per_task: u64,
-        version: String,
+        agent_card_uri: String,
+        agent_card_hash: [u8; 32],
+        wallet: Pubkey,
     ) -> Result<()> {
-        require!(agent_id.len() > 0 && agent_id.len() <= 32, RegistryError::AgentIdInvalid);
-        require!(did.len() <= 100, RegistryError::DidTooLong);
-        require!(name.len() <= 64, RegistryError::NameTooLong);
-        require!(endpoint.len() <= 200, RegistryError::EndpointTooLong);
-        require!(version.len() <= 16, RegistryError::VersionTooLong);
-        validate_capabilities(&capabilities)?;
-
-        let record = &mut ctx.accounts.agent_record;
-        record.owner = ctx.accounts.owner.key();
-        record.agent_id = agent_id;
-        record.did = did;
-        record.name = name;
-        record.endpoint = endpoint;
-        record.wallet_address = wallet_address;
-        record.agent_type = agent_type;
-        record.capabilities = capabilities;
-        record.price_per_task = price_per_task;
-        record.version = version;
-        record.registered_at = Clock::get()?.unix_timestamp;
-        record.updated_at = Clock::get()?.unix_timestamp;
-        record.bump = ctx.bumps.agent_record;
-
-        msg!("Agent registered: {} ({})", record.name, record.agent_id);
-        Ok(())
+        instructions::register_agent::handler(
+            ctx,
+            agent_id,
+            agent_card_uri,
+            agent_card_hash,
+            wallet,
+        )
     }
 
-    /// Update an existing agent record.
-    /// Only the original owner can update. agent_id cannot change.
+    /// Pauses (`Inactive`) or resumes (`Active`) the agent. Escrow rejects `create_job` and
+    /// `accept_job` for a non-active agent; jobs already accepted can still be delivered and settled.
+    /// `Deregistered` is not accepted here.
+    pub fn set_agent_status(ctx: Context<SetAgentStatus>, status: AgentStatus) -> Result<()> {
+        instructions::set_agent_status::handler(ctx, status)
+    }
+
+    /// Transfers ownership and resets `wallet` to the new owner (did:aip Solana profile §4.2). The PDA
+    /// is derived from the immutable `creator`, so the address stays stable.
+    pub fn transfer_agent_ownership(
+        ctx: Context<TransferAgentOwnership>,
+        new_owner: Pubkey,
+    ) -> Result<()> {
+        instructions::transfer_agent_ownership::handler(ctx, new_owner)
+    }
+
+    /// Updates the agent card pointer/hash and the agent wallet. Owner only. Jobs keep the wallet they
+    /// were created with until the owner calls escrow `sync_agent_wallet`.
     pub fn update_agent(
         ctx: Context<UpdateAgent>,
-        name: String,
-        endpoint: String,
-        wallet_address: Pubkey,
-        agent_type: AgentType,
-        capabilities: Vec<Capability>,
-        price_per_task: u64,
-        version: String,
+        agent_card_uri: String,
+        agent_card_hash: [u8; 32],
+        wallet: Pubkey,
     ) -> Result<()> {
-        require!(name.len() <= 64, RegistryError::NameTooLong);
-        require!(endpoint.len() <= 200, RegistryError::EndpointTooLong);
-        require!(version.len() <= 16, RegistryError::VersionTooLong);
-        validate_capabilities(&capabilities)?;
-
-        let record = &mut ctx.accounts.agent_record;
-        record.name = name;
-        record.endpoint = endpoint;
-        record.wallet_address = wallet_address;
-        record.agent_type = agent_type;
-        record.capabilities = capabilities;
-        record.price_per_task = price_per_task;
-        record.version = version;
-        record.updated_at = Clock::get()?.unix_timestamp;
-
-        msg!("Agent updated: {} ({})", record.name, record.agent_id);
-        Ok(())
+        instructions::update_agent::handler(ctx, agent_card_uri, agent_card_hash, wallet)
     }
-
-    /// Deregister an agent - close the PDA and return rent to owner.
-    pub fn deregister_agent(_ctx: Context<DeregisterAgent>) -> Result<()> {
-        msg!("Agent deregistered");
-        Ok(())
-    }
-
-    /// Force-close a legacy account that uses a stale schema and can no
-    /// longer be deserialized (so `deregister_agent` panics on its
-    /// `Account<AgentRecord>` constraint). The account is treated as
-    /// raw bytes — we just transfer its lamports to the platform
-    /// authority and zero out the data so the runtime garbage-collects
-    /// it on the next rent sweep.
-    ///
-    /// Authorized only for the platform key hardcoded in
-    /// `LEGACY_CLOSE_AUTHORITY` (which is also the program upgrade
-    /// authority).
-    pub fn force_close_legacy(ctx: Context<ForceCloseLegacy>) -> Result<()> {
-        let account_info = ctx.accounts.account.to_account_info();
-        let authority_info = ctx.accounts.authority.to_account_info();
-
-        let lamports = account_info.lamports();
-        let new_auth_balance = authority_info
-            .lamports()
-            .checked_add(lamports)
-            .ok_or(RegistryError::Overflow)?;
-        **authority_info.try_borrow_mut_lamports()? = new_auth_balance;
-        **account_info.try_borrow_mut_lamports()? = 0;
-
-        let mut data = account_info.try_borrow_mut_data()?;
-        data.fill(0);
-
-        msg!("Force-closed legacy account: {}", account_info.key());
-        Ok(())
-    }
-}
-
-/// Platform key authorized to call `force_close_legacy`. Also the
-/// program upgrade authority on devnet.
-/// Base58: 33qU3JFkrehB2HkgdHzcpj9gDkFk8c2okQC51REWhjKh
-const LEGACY_CLOSE_AUTHORITY: Pubkey = Pubkey::new_from_array([
-    30, 113, 86, 28, 224, 160, 107, 29,
-    2, 32, 171, 122, 22, 51, 215, 105,
-    22, 36, 123, 130, 240, 165, 251, 25,
-    115, 130, 173, 24, 186, 227, 34, 84,
-]);
-
-// ---------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------
-
-fn validate_capabilities(caps: &[Capability]) -> Result<()> {
-    require!(caps.len() <= AgentRecord::MAX_CAPABILITIES, RegistryError::TooManyCapabilities);
-    for cap in caps {
-        require!(cap.name.len() > 0 && cap.name.len() <= 32, RegistryError::CapabilityNameInvalid);
-        require!(cap.description.len() <= 64, RegistryError::CapabilityDescriptionTooLong);
-    }
-    Ok(())
-}
-
-// ---------------------------------------------------------------
-// Account structures
-// ---------------------------------------------------------------
-
-#[derive(Accounts)]
-#[instruction(agent_id: String)]
-pub struct RegisterAgent<'info> {
-    #[account(mut)]
-    pub owner: Signer<'info>,
-
-    #[account(
-        init,
-        payer = owner,
-        space = AgentRecord::SIZE,
-        seeds = [AGENT_SEED, owner.key().as_ref(), agent_id.as_bytes()],
-        bump
-    )]
-    pub agent_record: Account<'info, AgentRecord>,
-
-    pub system_program: Program<'info, System>,
-}
-
-#[derive(Accounts)]
-pub struct UpdateAgent<'info> {
-    #[account(
-        mut,
-        constraint = owner.key() == agent_record.owner @ RegistryError::Unauthorized,
-    )]
-    pub owner: Signer<'info>,
-
-    #[account(
-        mut,
-        seeds = [AGENT_SEED, owner.key().as_ref(), agent_record.agent_id.as_bytes()],
-        bump = agent_record.bump,
-    )]
-    pub agent_record: Account<'info, AgentRecord>,
-}
-
-#[derive(Accounts)]
-pub struct DeregisterAgent<'info> {
-    #[account(mut)]
-    pub owner: Signer<'info>,
-
-    #[account(
-        mut,
-        close = owner,
-        constraint = owner.key() == agent_record.owner @ RegistryError::Unauthorized,
-        seeds = [AGENT_SEED, owner.key().as_ref(), agent_record.agent_id.as_bytes()],
-        bump = agent_record.bump,
-    )]
-    pub agent_record: Account<'info, AgentRecord>,
-}
-
-#[derive(Accounts)]
-pub struct ForceCloseLegacy<'info> {
-    /// Hardcoded platform authority; checked against
-    /// `LEGACY_CLOSE_AUTHORITY` so no other signer can call this.
-    #[account(
-        mut,
-        constraint = authority.key() == LEGACY_CLOSE_AUTHORITY @ RegistryError::Unauthorized,
-    )]
-    pub authority: Signer<'info>,
-
-    /// CHECK: Account is intentionally not deserialized — it may be a
-    /// stale-schema record from an earlier program deployment. We only
-    /// require that it is owned by this program so we don't accidentally
-    /// drain unrelated accounts.
-    #[account(
-        mut,
-        owner = crate::ID,
-    )]
-    pub account: UncheckedAccount<'info>,
-}
-
-// ---------------------------------------------------------------
-// State
-// ---------------------------------------------------------------
-
-#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq, Debug)]
-pub enum AgentType {
-    Llm,        // 0
-    Task,       // 1
-    Execution,  // 2
-}
-
-#[derive(AnchorSerialize, AnchorDeserialize, Clone, PartialEq, Eq, Debug)]
-pub struct Capability {
-    pub name: String,        // 4 + 32 - capability identifier (e.g., "text-completion")
-    pub description: String, // 4 + 64 - short human-readable summary
-}
-
-#[account]
-pub struct AgentRecord {
-    pub owner: Pubkey,                 // 32
-    pub agent_id: String,              // 4 + 32 - unique slug per owner
-    pub did: String,                   // 4 + 100 - auto-generated DID
-    pub name: String,                  // 4 + 64
-    pub endpoint: String,              // 4 + 200
-    pub wallet_address: Pubkey,        // 32 - off-chain signing key (may differ from owner)
-    pub agent_type: AgentType,         // 1 - Borsh-encoded enum tag
-    pub capabilities: Vec<Capability>, // 4 + N * 104, max N = 8
-    pub price_per_task: u64,           // 8 - base price in lamports per capability invocation
-    pub version: String,               // 4 + 16
-    pub registered_at: i64,            // 8
-    pub updated_at: i64,               // 8
-    pub bump: u8,                      // 1
-}
-
-impl AgentRecord {
-    pub const MAX_CAPABILITIES: usize = 8;
-    pub const CAP_SIZE: usize = (4 + 32) + (4 + 64); // 104
-
-    // 8 (discriminator)
-    // + 32 (owner)
-    // + 36 (agent_id)
-    // + 104 (did)
-    // + 68 (name)
-    // + 204 (endpoint)
-    // + 32 (wallet_address)
-    // + 1 (agent_type)
-    // + 4 + 8*104 = 836 (capabilities)
-    // + 8 (price_per_task)
-    // + 20 (version)
-    // + 8 (registered_at)
-    // + 8 (updated_at)
-    // + 1 (bump)
-    // = 1366
-    pub const SIZE: usize = 8
-        + 32
-        + (4 + 32)
-        + (4 + 100)
-        + (4 + 64)
-        + (4 + 200)
-        + 32
-        + 1
-        + (4 + Self::MAX_CAPABILITIES * Self::CAP_SIZE)
-        + 8
-        + (4 + 16)
-        + 8
-        + 8
-        + 1;
-}
-
-// ---------------------------------------------------------------
-// Errors
-// ---------------------------------------------------------------
-
-#[error_code]
-pub enum RegistryError {
-    #[msg("Agent ID invalid: 1-32 characters required")]
-    AgentIdInvalid,
-    #[msg("DID too long: maximum 100 characters")]
-    DidTooLong,
-    #[msg("Name too long: maximum 64 characters")]
-    NameTooLong,
-    #[msg("Endpoint too long: maximum 200 characters")]
-    EndpointTooLong,
-    #[msg("Version too long: maximum 16 characters")]
-    VersionTooLong,
-    #[msg("Too many capabilities: maximum 8 allowed")]
-    TooManyCapabilities,
-    #[msg("Capability name invalid: 1-32 characters required")]
-    CapabilityNameInvalid,
-    #[msg("Capability description too long: maximum 64 characters")]
-    CapabilityDescriptionTooLong,
-    #[msg("Unauthorized: only the owner can modify this record")]
-    Unauthorized,
-    #[msg("Arithmetic overflow during lamport transfer")]
-    Overflow,
 }
