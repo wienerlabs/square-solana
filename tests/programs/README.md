@@ -34,21 +34,23 @@ LiteSVM testleri validator'ı kullanmaz. `.so` başka bir dizindeyse `SBF_OUT_DI
 | `account::<T>(address)` | Anchor hesabını discriminator denetimiyle çözer |
 | `now()`, `set_time(t)`, `advance(seconds)` | Clock sysvar'ı: challenge penceresi, deadline, UTC gün sınırı |
 | `token::create_usdc_mint`, `create_ata`, `mint_to`, `balance` | Settlement mint'i ve hesapları, SPL Token programının kendi instruction'larıyla |
-| `squads::SquadsMultisig` | Squads v4 multisig hesabı ve vault PDA'sı. `Harness::without_sigverify()` + `send_as(ixs, keypairs, pdas)` ile vault imzacı olur |
+| `squads::SquadsMultisig` | Squads v4'e ait, `Multisig` discriminator'ıyla başlatılmış hesap ve vault PDA'sı (`square_common::squads`). `Harness::without_sigverify()` + `send_as(ixs, keypairs, pdas)` ile vault imzacı olur |
 | `cu::within(label, executed, budget)` | Compute unit'i `[cu] label: N / bütçe` olarak yazar, bütçe aşılırsa testi düşürür |
 
 Squads programının kendisi ortamda yoktur. Square programları Squads'tan yalnızca multisig hesabının
-Squads'a ait ve dolu olmasını, işlemi vault PDA'sının imzalamasını bekler. Fikstür bu ikisini kurar;
-eşik ve onaylar Squads'ın kendi kurallarıdır, burada denenmez.
+Squads v4'e ait, başlatılmış bir `Multisig` olmasını (sahip + discriminator, `square_common::squads`) ve
+işlemi vault PDA'sının imzalamasını bekler. Fikstür bu ikisini kurar; üyeler, eşik ve onaylar Squads'ın
+kendi kurallarıdır, burada denenmez.
 
 ## Testler (`tests/`)
 
-Programlar henüz kaynak projelerin arayüzündedir (AIP registry, Aperture policy-registry ve verifier,
-Covenant escrow). Sözleşmeye (`idl/`) taşındıkça bu testler de taşınır: BC-15, BC-17, BC-21, BC-22.
+`square_policy` sözleşme arayüzündedir (BC-17). Diğerleri henüz kaynak projelerin arayüzündedir (AIP
+registry, Aperture verifier, Covenant escrow); sözleşmeye (`idl/`) taşındıkça testleri de taşınır: BC-15,
+BC-21, BC-22.
 
 | Dosya | Kapsam |
 |---|---|
 | `registry.rs` | Kayıt, çift kayıt, sahiplik kısıtı, uzunluk sınırları |
-| `policy.rs` | Operatör ve politika kaydı; Squads vault imzasıyla kayıt, vault olmayan imzacının reddi |
+| `policy.rs` | Kurum ve politika commitment'ı (yalnızca commitment ve public tavan); tavan 0 ve yabancı imzacı reddi; Squads multisig bağlanınca yalnızca vault PDA'sının yetkili olması; Squads'a ait olmayan ya da `Multisig` olmayan hesabın reddi |
 | `verifier.rs` | Günlük sayacın ayarlanan saatte UTC gün başına bağlanması |
 | `escrow.rs` | Yükseltme yetkilisinin config'i kurması; USDC'yle iş açma, kabul, teslim; challenge penceresi bitmeden (son saniye dahil) finalize reddi, saat pencerenin sonuna gelince ödeme |

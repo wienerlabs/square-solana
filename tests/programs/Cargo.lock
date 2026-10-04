@@ -2012,15 +2012,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "policy-registry"
-version = "0.1.0"
-dependencies = [
- "anchor-lang",
- "sha2 0.10.9",
- "square-common",
-]
-
-[[package]]
 name = "polyval"
 version = "0.6.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4243,13 +4234,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "square-policy"
+version = "0.2.0"
+dependencies = [
+ "anchor-lang",
+ "square-common",
+]
+
+[[package]]
 name = "square-program-tests"
 version = "0.1.0"
 dependencies = [
  "aip-registry",
  "anchor-lang",
  "litesvm",
- "policy-registry",
  "solana-account",
  "solana-instruction-error",
  "solana-keypair",
@@ -4265,6 +4263,7 @@ dependencies = [
  "spl-token-interface",
  "square-common",
  "square-escrow",
+ "square-policy",
  "verifier",
 ]
 
@@ -4457,7 +4456,6 @@ version = "0.1.0"
 dependencies = [
  "anchor-lang",
  "groth16-solana",
- "policy-registry",
  "solana-instructions-sysvar 3.0.1",
  "solana-sdk-ids",
  "square-common",

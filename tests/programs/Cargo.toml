@@ -31,6 +31,6 @@ square-common = { path = "../../crates/square-common" }
 
 [dev-dependencies]
 aip-registry = { path = "../../programs/square-registry", features = ["no-entrypoint"] }
-policy-registry = { path = "../../programs/square-policy", features = ["no-entrypoint"] }
+square-policy = { path = "../../programs/square-policy", features = ["no-entrypoint"] }
 square-escrow = { path = "../../programs/square-escrow", features = ["no-entrypoint"] }
 verifier = { path = "../../programs/square-verifier", features = ["no-entrypoint"] }

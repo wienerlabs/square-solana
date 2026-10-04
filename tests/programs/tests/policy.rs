@@ -1,145 +1,227 @@
-//! square_policy (henüz Aperture policy-registry'nin arayüzü; BC-17 sözleşmeye taşır): operatör ve
-//! politika kaydı, Squads vault imzacısıyla kayıt.
+//! square_policy (sözleşme arayüzü, BC-17): kurum ve politika commitment'ı; Squads multisig bağlanınca
+//! yetkili yalnızca vault PDA'sı olur.
 
 use anchor_lang::prelude::Pubkey;
 use anchor_lang::solana_program::instruction::Instruction;
 use anchor_lang::{InstructionData, ToAccountMetas};
-use policy_registry::errors::PolicyRegistryError;
-use policy_registry::instructions::SQUADS_V4_PROGRAM_ID;
-use policy_registry::state::{OperatorAccount, PolicyAccount};
 use solana_keypair::Keypair;
 use solana_signer::Signer;
-use square_common::seeds::{legacy::OPERATOR_SEED, POLICY_SEED};
-use square_program_tests::squads::SquadsMultisig;
+use square_common::seeds::{INSTITUTION_SEED, POLICY_SEED};
+use square_policy::errors::PolicyError;
+use square_policy::state::{Institution, Policy};
+use square_program_tests::squads::{self, SquadsMultisig};
 use square_program_tests::{anchor_error, cu, Harness};
 
 const POLICY_ID: [u8; 32] = [7; 32];
+const COMMITMENT: [u8; 32] = [2; 32];
+const CEILING: u64 = 1_000_000_000; // 1 000 USDC
 
-fn operator(authority: &Pubkey) -> Pubkey {
-    Pubkey::find_program_address(&[OPERATOR_SEED, authority.as_ref()], &policy_registry::ID).0
+fn institution(owner: &Pubkey) -> Pubkey {
+    Pubkey::find_program_address(&[INSTITUTION_SEED, owner.as_ref()], &square_policy::ID).0
 }
 
-fn policy(operator: &Pubkey, policy_id: &[u8; 32]) -> Pubkey {
+fn policy(institution: &Pubkey, policy_id: &[u8; 32]) -> Pubkey {
     Pubkey::find_program_address(
-        &[POLICY_SEED, operator.as_ref(), policy_id],
-        &policy_registry::ID,
+        &[POLICY_SEED, institution.as_ref(), policy_id],
+        &square_policy::ID,
     )
     .0
 }
 
-fn initialize_operator(authority: &Keypair) -> Instruction {
+fn init_institution(payer: &Pubkey, owner: &Keypair) -> Instruction {
     Instruction {
-        program_id: policy_registry::ID,
-        accounts: policy_registry::accounts::InitializeOperator {
-            operator_account: operator(&authority.pubkey()),
-            authority: authority.pubkey(),
+        program_id: square_policy::ID,
+        accounts: square_policy::accounts::InitInstitution {
+            payer: *payer,
+            authority: owner.pubkey(),
+            institution: institution(&owner.pubkey()),
             system_program: anchor_lang::system_program::ID,
         }
         .to_account_metas(None),
-        data: policy_registry::instruction::InitializeOperator {
-            operator_name: "Acme Treasury".to_string(),
+        data: square_policy::instruction::InitInstitution {
+            name: "Acme Treasury".to_string(),
+        }
+        .data(),
+    }
+}
+
+fn set_policy(
+    payer: &Pubkey,
+    owner: &Pubkey,
+    authority: &Pubkey,
+    daily_ceiling: u64,
+) -> Instruction {
+    let institution = institution(owner);
+    Instruction {
+        program_id: square_policy::ID,
+        accounts: square_policy::accounts::SetPolicy {
+            payer: *payer,
+            authority: *authority,
+            institution,
+            policy: policy(&institution, &POLICY_ID),
+            system_program: anchor_lang::system_program::ID,
+        }
+        .to_account_metas(None),
+        data: square_policy::instruction::SetPolicy {
+            policy_id: POLICY_ID,
+            commitment: COMMITMENT,
+            daily_ceiling,
+        }
+        .data(),
+    }
+}
+
+fn set_multisig(owner: &Pubkey, authority: &Pubkey, multisig: Pubkey) -> Instruction {
+    Instruction {
+        program_id: square_policy::ID,
+        accounts: square_policy::accounts::SetInstitutionMultisig {
+            authority: *authority,
+            institution: institution(owner),
+            squads_multisig: multisig,
+        }
+        .to_account_metas(None),
+        data: square_policy::instruction::SetInstitutionMultisig {
+            multisig,
+            vault_index: 0,
         }
         .data(),
     }
 }
 
 #[test]
-fn registers_an_operator_and_a_policy() {
+fn commits_a_policy_with_only_the_commitment_and_the_public_ceiling() {
     let mut h = Harness::new();
-    h.deploy("policy_registry", policy_registry::ID);
-    let authority = h.funded(1_000_000_000);
-    h.send(&[initialize_operator(&authority)], &[&authority])
-        .expect("initialize_operator");
+    h.deploy("square_policy", square_policy::ID);
+    let owner = h.funded(1_000_000_000);
+    let payer = h.payer.pubkey();
+    h.send(&[init_institution(&payer, &owner)], &[&owner])
+        .expect("init_institution");
 
-    let operator_address = operator(&authority.pubkey());
-    let register = Instruction {
-        program_id: policy_registry::ID,
-        accounts: policy_registry::accounts::RegisterPolicy {
-            policy_account: policy(&operator_address, &POLICY_ID),
-            operator_account: operator_address,
-            authority: authority.pubkey(),
-            system_program: anchor_lang::system_program::ID,
-        }
-        .to_account_metas(None),
-        data: policy_registry::instruction::RegisterPolicy {
-            policy_id: POLICY_ID,
-            merkle_root: [1; 32],
-            policy_data_hash: [2; 32],
-        }
-        .data(),
-    };
-    let executed = h.send(&[register], &[&authority]).expect("register_policy");
-    cu::within("policy.register_policy", &executed, 40_000);
+    let executed = h
+        .send(
+            &[set_policy(
+                &payer,
+                &owner.pubkey(),
+                &owner.pubkey(),
+                CEILING,
+            )],
+            &[&owner],
+        )
+        .expect("set_policy");
+    cu::within("policy.set_policy", &executed, 40_000);
 
-    let stored: PolicyAccount = h
-        .account(&policy(&operator_address, &POLICY_ID))
-        .expect("PolicyAccount");
-    assert_eq!(stored.operator, operator_address);
-    assert_eq!(stored.policy_data_hash, [2; 32]);
+    let address = institution(&owner.pubkey());
+    let stored: Policy = h.account(&policy(&address, &POLICY_ID)).expect("Policy");
+    assert_eq!(stored.institution, address);
+    assert_eq!(stored.commitment, COMMITMENT);
+    assert_eq!(stored.daily_ceiling, CEILING);
+    assert_eq!(stored.buyer_root, [0; 32]);
+    assert_eq!(stored.version, 1);
     assert!(stored.active);
-    let op: OperatorAccount = h.account(&operator_address).expect("OperatorAccount");
-    assert_eq!(op.policy_count, 1);
+    let inst: Institution = h.account(&address).expect("Institution");
+    assert_eq!(inst.policy_count, 1);
+    assert_eq!(inst.authority(), owner.pubkey());
 }
 
-/// Squads vault'u imzacı olarak: operatör multisig'e bağlanır, politikayı vault PDA'sı kaydeder.
 #[test]
-fn a_squads_vault_registers_a_policy_and_a_stranger_cannot() {
-    let mut h = Harness::without_sigverify();
-    h.deploy("policy_registry", policy_registry::ID);
-    let authority = h.funded(1_000_000_000);
-    h.send(&[initialize_operator(&authority)], &[&authority])
-        .expect("initialize_operator");
-
-    let multisig = SquadsMultisig::create(&mut h, SQUADS_V4_PROGRAM_ID);
-    let vault = multisig.vault(0);
-    let operator_address = operator(&authority.pubkey());
-    let set_multisig = Instruction {
-        program_id: policy_registry::ID,
-        accounts: policy_registry::accounts::SetMultisig {
-            operator_account: operator_address,
-            authority: authority.pubkey(),
-            squads_multisig: multisig.address,
-        }
-        .to_account_metas(None),
-        data: policy_registry::instruction::SetMultisig { vault_index: 0 }.data(),
-    };
-    h.send(&[set_multisig], &[&authority])
-        .expect("set_multisig");
-    let op: OperatorAccount = h.account(&operator_address).expect("OperatorAccount");
-    assert_eq!(op.multisig, Some(vault));
-
+fn rejects_a_zero_ceiling_and_a_stranger() {
+    let mut h = Harness::new();
+    h.deploy("square_policy", square_policy::ID);
+    let owner = h.funded(1_000_000_000);
+    let stranger = h.funded(1_000_000_000);
     let payer = h.payer.pubkey();
-    let register_as = |signer: Pubkey| Instruction {
-        program_id: policy_registry::ID,
-        accounts: policy_registry::accounts::RegisterPolicyMultisig {
-            policy_account: policy(&operator_address, &POLICY_ID),
-            operator_account: operator_address,
-            squads_multisig: multisig.address,
-            multisig_signer: signer,
-            payer,
-            system_program: anchor_lang::system_program::ID,
-        }
-        .to_account_metas(None),
-        data: policy_registry::instruction::RegisterPolicyMultisig {
-            policy_id: POLICY_ID,
-            merkle_root: [1; 32],
-            policy_data_hash: [2; 32],
-            vault_index: 0,
-        }
-        .data(),
-    };
+    h.send(&[init_institution(&payer, &owner)], &[&owner])
+        .expect("init_institution");
 
-    let stranger = Keypair::new();
-    let ix = register_as(stranger.pubkey());
-    h.send_as(&[ix], &[&stranger], &[])
-        .expect_err("vault olmayan imzacı")
-        .assert_error(anchor_error(PolicyRegistryError::UnauthorizedMultisig));
+    h.send(
+        &[set_policy(&payer, &owner.pubkey(), &owner.pubkey(), 0)],
+        &[&owner],
+    )
+    .expect_err("tavan 0")
+    .assert_error(anchor_error(PolicyError::InvalidDailyCeiling));
+    h.send(
+        &[set_policy(
+            &payer,
+            &owner.pubkey(),
+            &stranger.pubkey(),
+            CEILING,
+        )],
+        &[&stranger],
+    )
+    .expect_err("yabancı imzacı")
+    .assert_error(anchor_error(PolicyError::Unauthorized));
+}
 
-    let ix = register_as(vault);
+/// Squads vault'u imzacı olarak: multisig bağlanınca kurumun sahibi artık yetkili değildir, politikayı
+/// yalnızca vault PDA'sı yazar.
+#[test]
+fn a_bound_squads_vault_becomes_the_only_authority() {
+    let mut h = Harness::without_sigverify();
+    h.deploy("square_policy", square_policy::ID);
+    let owner = h.funded(1_000_000_000);
+    let payer = h.payer.pubkey();
+    h.send(&[init_institution(&payer, &owner)], &[&owner])
+        .expect("init_institution");
+
+    let multisig = SquadsMultisig::create(&mut h);
+    let vault = multisig.vault(0);
+    h.send(
+        &[set_multisig(
+            &owner.pubkey(),
+            &owner.pubkey(),
+            multisig.address,
+        )],
+        &[&owner],
+    )
+    .expect("set_institution_multisig");
+    let inst: Institution = h
+        .account(&institution(&owner.pubkey()))
+        .expect("Institution");
+    assert_eq!(inst.multisig, Some(multisig.address));
+    assert_eq!(inst.multisig_vault, Some(vault));
+    assert_eq!(inst.authority(), vault);
+
+    h.send(
+        &[set_policy(
+            &payer,
+            &owner.pubkey(),
+            &owner.pubkey(),
+            CEILING,
+        )],
+        &[&owner],
+    )
+    .expect_err("multisig sonrası sahip")
+    .assert_error(anchor_error(PolicyError::Unauthorized));
+    let ix = set_policy(&payer, &owner.pubkey(), &vault, CEILING);
     h.send_as(&[ix], &[], &[vault])
-        .expect("vault imzasıyla register_policy_multisig");
-    let stored: PolicyAccount = h
-        .account(&policy(&operator_address, &POLICY_ID))
-        .expect("PolicyAccount");
-    assert_eq!(stored.operator, operator_address);
+        .expect("vault imzasıyla set_policy");
+    let stored: Policy = h
+        .account(&policy(&institution(&owner.pubkey()), &POLICY_ID))
+        .expect("Policy");
+    assert_eq!(stored.daily_ceiling, CEILING);
+}
+
+#[test]
+fn only_an_initialized_squads_multisig_can_be_bound() {
+    let mut h = Harness::new();
+    h.deploy("square_policy", square_policy::ID);
+    let owner = h.funded(1_000_000_000);
+    let payer = h.payer.pubkey();
+    h.send(&[init_institution(&payer, &owner)], &[&owner])
+        .expect("init_institution");
+
+    // Squads'a ait ama Multisig olmayan hesap ve Multisig discriminator'ı taşıyan ama başka programa ait hesap.
+    let not_multisig =
+        squads::write_account(&mut h, vec![1; 40], square_common::squads::PROGRAM_ID);
+    let mut data = square_common::squads::MULTISIG_DISCRIMINATOR.to_vec();
+    data.extend_from_slice(&[0; 32]);
+    let foreign = squads::write_account(&mut h, data, Pubkey::new_unique());
+    for multisig in [not_multisig, foreign] {
+        h.send(
+            &[set_multisig(&owner.pubkey(), &owner.pubkey(), multisig)],
+            &[&owner],
+        )
+        .expect_err("geçersiz multisig")
+        .assert_error(anchor_error(PolicyError::InvalidSquadsMultisig));
+    }
 }
