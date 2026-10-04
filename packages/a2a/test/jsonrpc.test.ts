@@ -131,5 +131,6 @@ describe('exceedsDepth', () => {
     expect(exceedsDepth('{"a":"[[[[[[","b":[1]}', 2)).toBe(false);
     expect(exceedsDepth('{"a":"\\"[[[[","b":{"c":{}}}', 2)).toBe(true);
     expect(exceedsDepth('"[[[[[["', 1)).toBe(false);
+    expect(exceedsDepth(']]]][[[', 2)).toBe(true);
   });
 });

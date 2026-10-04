@@ -210,6 +210,20 @@ describe('createA2aClient', () => {
     ).rejects.toMatchObject({ code: -32006 });
   });
 
+  it('yanıt derinliği 100 seviyeye kadar kabul edilir, ötesi ayrıştırılmadan -32006', async () => {
+    let levels = 97;
+    const url = await fake((body, res) => {
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end(
+        `{"jsonrpc":"2.0","id":${JSON.stringify(body.id)},"result":{"id":"t-1","contextId":"c-1","status":{"state":"TASK_STATE_WORKING"},"metadata":{"x":${'['.repeat(levels)}0${']'.repeat(levels)}}}}`,
+      );
+    });
+    const client = createA2aClient({ url, timeoutMs: 2_000, allowInsecureHttp: true });
+    expect((await client.getTask({ id: 't-1' })).id).toBe('t-1');
+    levels = 98;
+    await expect(client.getTask({ id: 't-1' })).rejects.toMatchObject({ code: -32006 });
+  });
+
   it('çok derin iç içe yanıt -32006 olur', async () => {
     const deep = `${'['.repeat(20_000)}0${']'.repeat(20_000)}`;
     const url = await fake((body, res) => {

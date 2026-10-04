@@ -29,7 +29,7 @@ export function exceedsDepth(text: string, limit: number): boolean {
     else if (code === 0x5b || code === 0x7b) {
       depth += 1;
       if (depth > limit) return true;
-    } else if (code === 0x5d || code === 0x7d) depth -= 1;
+    } else if ((code === 0x5d || code === 0x7d) && depth > 0) depth -= 1;
   }
   return false;
 }

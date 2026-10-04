@@ -177,8 +177,12 @@ function encodeCursor(cursor: ListCursor): string {
   return Buffer.from(JSON.stringify({ t: cursor.statusAt.toISOString(), i: cursor.id })).toString('base64url');
 }
 
+/** Gerçek imleç yaklaşık 100 karakterdir; daha uzunu çözülmeden reddedilir. */
+const MAX_CURSOR_LENGTH = 512;
+
 function decodeCursor(token: string): ListCursor {
   try {
+    if (token.length > MAX_CURSOR_LENGTH) throw new Error('imleç');
     const value = JSON.parse(Buffer.from(token, 'base64url').toString('utf8')) as { t?: unknown; i?: unknown };
     const statusAt = new Date(String(value.t));
     if (typeof value.i !== 'string' || !TASK_ID_PATTERN.test(value.i) || !storable(statusAt)) {

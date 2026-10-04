@@ -849,6 +849,11 @@ describe('üçüncü tur: teslim, bekleyici ve kapanış', () => {
       configuration: { returnImmediately: true },
     });
     await client.cancelTask({ id: done!.id });
+    await inner!.appendMessage(
+      done!.id,
+      { messageId: 'b-2', role: 'ROLE_USER', taskId: done!.id, parts: [{ text: 'geç kalan' }] },
+      { pending: true },
+    );
     staleActive = [(await inner!.get(AGENT_RECORD, done!.id))!];
     let started = 0;
     h.scripts.set(JOB_B, async () => {
@@ -856,6 +861,7 @@ describe('üçüncü tur: teslim, bekleyici ve kapanış', () => {
     });
     expect(await h.server.resume()).toBe(0);
     expect(started).toBe(0);
+    expect(await db.client.a2aMessage.count({ where: { taskId: done!.id, pending: true } })).toBe(0);
 
     staleActive = null;
     await restart({ chain: h.chain });
@@ -1234,11 +1240,66 @@ describe('dördüncü tur: kuyruk, resume ve kapanış yolları', () => {
     expect(Date.now() - closedAt).toBeLessThan(2_000);
   });
 
-  it('aşırı derin istek gövdesi ayrıştırılmadan reddedilir', async () => {
-    const deep = `${'['.repeat(10_000)}0${']'.repeat(10_000)}`;
-    const body = `{"jsonrpc":"2.0","id":1,"method":"GetTask","params":{"id":"x","deep":${deep}}}`;
-    expect((await rpc(body)).json.error?.code).toBe(-32600);
+  it('aşırı derin istek gövdesi ayrıştırılmadan reddedilir; sınır 128 seviye', async () => {
+    const body = (levels: number) =>
+      `{"jsonrpc":"2.0","id":1,"method":"GetTask","params":{"id":"x","deep":${'['.repeat(levels)}0${']'.repeat(levels)}}}`;
+    expect((await rpc(body(10_000))).json.error?.code).toBe(-32600);
+    expect((await rpc(body(127))).json.error?.code).toBe(-32600);
+    expect((await rpc(body(126))).json.error?.code).toBe(-32602);
+    const longToken = 'a'.repeat(513);
+    await expect(h.client().listTasks({ pageToken: longToken })).rejects.toMatchObject({ code: -32602 });
     expect(h.errors).toEqual([]);
+  });
+
+  it('işlendi işareti görev kilidi altında yazılır: aynı kimlikli tekrar işlenmiş mesajı yeniden iletmez', async () => {
+    let gate: Promise<void> | null = null;
+    let reached: () => void = () => undefined;
+    await restart({
+      wrapJobSource: (source) => ({
+        getJob: async (address) => {
+          if (gate) {
+            const waiting = gate;
+            gate = null;
+            reached();
+            await waiting;
+          }
+          return source.getJob(address);
+        },
+      }),
+    });
+    await h.openJob(JOB_A, 'a');
+    h.scripts.set(JOB_A, async (context) => context.requireInput('ayrıntı?'));
+    let calls = 0;
+    let started: () => void = () => undefined;
+    const startedP = new Promise<void>((resolve) => (started = resolve));
+    let finish: () => void = () => undefined;
+    const finishP = new Promise<void>((resolve) => (finish = resolve));
+    h.continuations.set(JOB_A, async () => {
+      calls += 1;
+      started();
+      await finishP;
+    });
+    const client = h.client();
+    const { task } = await client.sendMessage({ message: openingMessage(JOB_A, 'a') });
+    const reply = () =>
+      client.sendMessage({
+        message: { messageId: 'm-2', role: 'ROLE_USER', taskId: task!.id, parts: [{ text: 'cuma' }] },
+        configuration: { returnImmediately: true },
+      });
+    await reply();
+    await startedP;
+    let open: () => void = () => undefined;
+    gate = new Promise<void>((resolve) => (open = resolve));
+    const reachedP = new Promise<void>((resolve) => (reached = resolve));
+    const retry = reply();
+    await reachedP;
+    finish();
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    open();
+    await retry;
+    await until(async () => (await db.client.a2aMessage.count({ where: { pending: true } })) === 0);
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(calls).toBe(1);
   });
 });
 
