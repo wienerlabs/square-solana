@@ -2,11 +2,13 @@
 //! bölümünden gelir; burada yeniden yazılmaz.
 
 pub use crate::contract::square_escrow_contract::constants::{
-    BOND_SEED, CLAIM_SEED, CONFIG_SEED, ESCROW_AUTHORITY_SEED, JOB_SEED, REPUTATION_SEED, VALIDATION_SEED,
-    VAULT_SEED,
+    BOND_SEED, CLAIM_SEED, CONFIG_SEED, ESCROW_AUTHORITY_SEED, JOB_SEED, REPUTATION_SEED,
+    VALIDATION_SEED, VAULT_SEED,
 };
 pub use crate::contract::square_policy_contract::constants::{INSTITUTION_SEED, POLICY_SEED};
-pub use crate::contract::square_registry_contract::constants::{AGENT_SEED, REGISTRY_CONFIG_SEED, SCREENING_SEED};
+pub use crate::contract::square_registry_contract::constants::{
+    AGENT_SEED, REGISTRY_CONFIG_SEED, SCREENING_SEED,
+};
 pub use crate::contract::square_verifier_contract::constants::{
     OPERATOR_STATE_SEED, RELEASE_PROOF_SEED, VERIFIER_CONFIG_SEED,
 };

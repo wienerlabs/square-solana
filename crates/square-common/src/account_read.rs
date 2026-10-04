@@ -46,7 +46,9 @@ pub fn verify_pda_with_bump(
 }
 
 fn deserialize<T: AccountDeserialize>(info: &AccountInfo) -> ReadResult<T> {
-    let data = info.try_borrow_data().map_err(|_| AccountReadError::InvalidData)?;
+    let data = info
+        .try_borrow_data()
+        .map_err(|_| AccountReadError::InvalidData)?;
     T::try_deserialize(&mut &data[..]).map_err(|_| AccountReadError::InvalidData)
 }
 
@@ -106,7 +108,12 @@ mod tests {
         data
     }
 
-    fn with_account<R>(key: Pubkey, owner: Pubkey, mut data: Vec<u8>, f: impl FnOnce(&AccountInfo) -> R) -> R {
+    fn with_account<R>(
+        key: Pubkey,
+        owner: Pubkey,
+        mut data: Vec<u8>,
+        f: impl FnOnce(&AccountInfo) -> R,
+    ) -> R {
         let mut lamports = 1_000_000u64;
         let info = AccountInfo::new(&key, false, false, &mut lamports, &mut data, &owner, false);
         f(&info)
@@ -155,8 +162,10 @@ mod tests {
         let (_, bump) = Pubkey::find_program_address(seeds, &program_id());
         // Aynı program altında başka bir kurumun PDA'sı.
         let other_inst = Pubkey::new_from_array([10; 32]);
-        let (decoy, decoy_bump) =
-            Pubkey::find_program_address(&[OPERATOR_STATE_SEED, other_inst.as_ref()], &program_id());
+        let (decoy, decoy_bump) = Pubkey::find_program_address(
+            &[OPERATOR_STATE_SEED, other_inst.as_ref()],
+            &program_id(),
+        );
         let result = with_account(decoy, program_id(), operator_state(bump), |info| {
             read_pda::<OperatorState>(info, &program_id(), seeds)
         });
@@ -167,7 +176,10 @@ mod tests {
         assert_eq!(result.unwrap_err(), AccountReadError::WrongAddress);
         // Seed'ler doğru ama başka programın PDA'sı.
         let (foreign, _) = Pubkey::find_program_address(seeds, &Pubkey::new_from_array([8; 32]));
-        assert_eq!(verify_pda(&foreign, &program_id(), seeds), Err(AccountReadError::WrongAddress));
+        assert_eq!(
+            verify_pda(&foreign, &program_id(), seeds),
+            Err(AccountReadError::WrongAddress)
+        );
     }
 
     #[test]
