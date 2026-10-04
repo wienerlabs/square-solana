@@ -114,30 +114,23 @@ function npmDeps(packages) {
   return deps;
 }
 
-// --- Cargo workspace'leri ---
+// --- Cargo workspace ---
 
-// Kök workspace (programlar, crate'ler) ve program testleri. Testlerin ayrı Cargo.lock'u vardır
-// (tests/programs/Cargo.toml); crate dağıtılmaz, bağımlılıkları dev kapsamındadır.
-const CARGO_WORKSPACES = [
-  { dir: '.', dev: false },
-  { dir: 'tests/programs', dev: true },
-];
-
-function cargoMetadata(dir) {
+function cargoMetadata() {
   try {
     const out = execFileSync('cargo', ['metadata', '--format-version', '1', '--locked', '--quiet'], {
-      cwd: join(ROOT, dir),
+      cwd: ROOT,
       encoding: 'utf8',
       maxBuffer: 256 * 1024 * 1024,
       stdio: ['ignore', 'pipe', 'inherit'],
     });
     return JSON.parse(out);
   } catch (err) {
-    throw new Error(`cargo metadata çalıştırılamadı (${dir}): ${err.message}`, { cause: err });
+    throw new Error(`cargo metadata çalıştırılamadı: ${err.message}`, { cause: err });
   }
 }
 
-function cargoDeps(meta, { dev }) {
+function cargoDeps(meta) {
   const members = new Set(meta.workspace_members);
   const byId = new Map(meta.packages.map((p) => [p.id, p]));
   const deps = [];
@@ -145,11 +138,10 @@ function cargoDeps(meta, { dev }) {
     if (!members.has(node.id)) continue;
     const owner = byId.get(node.id).name;
     for (const dep of node.deps) {
-      const p = byId.get(dep.pkg);
-      // Workspace üyeleri ve yol bağımlılıkları (source yok) birinci taraftır.
-      if (members.has(dep.pkg) || p.source === null) continue;
+      if (members.has(dep.pkg)) continue;
       const kinds = dep.dep_kinds.map((k) => k.kind);
-      const scope = dev ? 'dev' : kinds.includes(null) ? 'runtime' : kinds.includes('build') ? 'build' : 'dev';
+      const scope = kinds.includes(null) ? 'runtime' : kinds.includes('build') ? 'build' : 'dev';
+      const p = byId.get(dep.pkg);
       const license = p.license ?? (p.license_file ? `SEE FILE ${p.license_file}` : 'UNKNOWN');
       deps.push({ ecosystem: 'cargo', name: p.name, license, scope, user: owner });
     }
@@ -237,8 +229,8 @@ function main() {
   }
 
   const packages = npmPackages();
-  const cargo = CARGO_WORKSPACES.flatMap((w) => cargoDeps(cargoMetadata(w.dir), w));
-  const rows = mergeRows([...npmDeps(packages), ...cargo]);
+  const meta = cargoMetadata();
+  const rows = mergeRows([...npmDeps(packages), ...cargoDeps(meta)]);
   const generated = renderInventory(rows);
   const docPath = join(ROOT, DOC);
 

@@ -1,0 +1,28 @@
+[package]
+name = "square-testkit"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.89"
+publish = false
+license.workspace = true
+description = "Square programlarının LiteSVM test altyapısı: harness, fikstürler, saat, event'ler, compute unit ölçümü (BC-12)"
+
+# Yalnızca programların testlerinde (dev-dependency) kullanılır; deploy edilen programlara girmez.
+[dependencies]
+anchor-lang = "1.2.0"
+base64 = "0.22"
+litesvm = "0.16"
+solana-account = "4"
+solana-instruction-error = "2"
+solana-keypair = "3"
+solana-loader-v3-interface = "8"
+solana-message = "4"
+solana-program-pack = "3"
+solana-signature = "3"
+solana-signer = "3"
+solana-system-interface = { version = "3", features = ["bincode"] }
+solana-transaction = "4"
+solana-transaction-error = "3"
+spl-associated-token-account-interface = "2"
+spl-token-interface = "2"
+square-common = { path = "../square-common" }

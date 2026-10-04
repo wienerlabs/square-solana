@@ -4,10 +4,10 @@
 use anchor_lang::prelude::Pubkey;
 use anchor_lang::solana_program::instruction::Instruction;
 use anchor_lang::{InstructionData, ToAccountMetas};
-use solana_signer::Signer;
 use square_common::seeds::OPERATOR_STATE_SEED;
 use square_common::time::day_start;
-use square_program_tests::{cu, Harness};
+use square_testkit::TestSigner as Signer;
+use square_testkit::{cu, Harness};
 use verifier::state::OperatorState;
 
 fn initialize(h: &Harness, operator: &Pubkey) -> Instruction {
@@ -60,7 +60,8 @@ fn a_second_initialization_is_rejected() {
     h.deploy("verifier", verifier::ID);
     let operator = h.funded(1_000_000_000);
     let ix = initialize(&h, &operator.pubkey());
-    h.send(&[ix.clone()], &[&operator]).expect("ilk init");
+    h.send(std::slice::from_ref(&ix), &[&operator])
+        .expect("ilk init");
     // Saat bir gün ilerlese de PDA zaten var: `init` ikinci kez çalışmaz.
     h.advance(86_400);
     let failed = h.send(&[ix], &[&operator]).expect_err("ikinci init");

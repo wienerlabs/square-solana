@@ -1,20 +1,20 @@
-# tests/programs — program testleri (LiteSVM)
+# crates/square-testkit — program testlerinin altyapısı (LiteSVM)
 
-Dört programın testleri [LiteSVM](https://github.com/LiteSVM/litesvm) üzerinde koşar. LiteSVM, Agave'nin
+Programların testleri [LiteSVM](https://github.com/LiteSVM/litesvm) üzerinde koşar. LiteSVM, Agave'nin
 SBF çalışma zamanını süreç içinde çalıştırır: `anchor build`'in ürettiği `target/deploy/*.so` dosyaları
 yüklenir, validator gerekmez, testler milisaniyeler sürer. Instruction'lar ve hesaplar programların kendi
-crate'lerinden (`no-entrypoint`) kurulur; program arayüzü değişince testler derlenmez.
+crate'lerinden kurulur; program arayüzü değişince testler derlenmez.
 
-Bu dizin kendi Cargo workspace'idir ve kendi `Cargo.lock`'u vardır. Böylece test araçlarının bağımlılıkları
-(litesvm, Agave çalışma zamanı crate'leri) deploy edilen programların kök `Cargo.lock`'taki çözümünü
-değiştirmez.
+Crate yalnızca dev-dependency'dir (`publish = false`): her program `programs/<program>/tests/` altındaki
+testlerinde kullanır, deploy edilen programlara girmez.
 
 ## Çalıştırma
 
 ```bash
-anchor build                                            # target/deploy/*.so
-anchor test --validator legacy --skip-build             # Anchor.toml test betiği: aşağıdaki cargo test
-cargo test --locked --manifest-path tests/programs/Cargo.toml -- --nocapture
+anchor build                                  # target/deploy/*.so
+anchor test --validator legacy --skip-build   # Anchor.toml test betiği: cargo test --workspace
+cargo test --workspace --locked -- --nocapture
+cargo test -p square-escrow --test escrow     # tek programın testleri
 ```
 
 Araç sürümleri `Anchor.toml [toolchain]`'deki gibi: Anchor 1.2.0, Agave 4.1.2 (ADR 0007). Anchor 1.2'nin
@@ -22,7 +22,7 @@ Araç sürümleri `Anchor.toml [toolchain]`'deki gibi: Anchor 1.2.0, Agave 4.1.2
 LiteSVM testleri validator'ı kullanmaz. `.so` başka bir dizindeyse `SBF_OUT_DIR` ile verilir. CI:
 [`.github/workflows/programs.yml`](../../.github/workflows/programs.yml).
 
-## Harness (`src/`)
+## Harness
 
 | Parça | Ne yapar |
 |---|---|
@@ -32,25 +32,27 @@ LiteSVM testleri validator'ı kullanmaz. `.so` başka bir dizindeyse `SBF_OUT_DI
 | `send(ixs, signers)` | Taze blockhash'le gönderir; `Executed { compute_units, logs }` ya da `Failed { error, logs, compute_units }` |
 | `Failed::assert_error(code)`, `anchor_error(E)` | Anchor hata kodunu (6000 + sıra) programın kendi hata enum'undan karşılaştırır |
 | `account::<T>(address)` | Anchor hesabını discriminator denetimiyle çözer |
+| `event::<E>(executed)`, `events::<E>` | İşlem loglarındaki `Program data:` satırlarından Anchor event'lerini (`emit!`) çözer |
 | `now()`, `set_time(t)`, `advance(seconds)` | Clock sysvar'ı: challenge penceresi, deadline, UTC gün sınırı |
 | `token::create_usdc_mint`, `create_ata`, `mint_to`, `balance` | Settlement mint'i ve hesapları, SPL Token programının kendi instruction'larıyla |
 | `squads::SquadsMultisig` | Squads v4'e ait, `Multisig` discriminator'ıyla başlatılmış hesap ve vault PDA'sı (`square_common::squads`). `Harness::without_sigverify()` + `send_as(ixs, keypairs, pdas)` ile vault imzacı olur |
 | `cu::within(label, executed, budget)` | Compute unit'i `[cu] label: N / bütçe` olarak yazar, bütçe aşılırsa testi düşürür |
+| `TestKeypair`, `TestSigner`, `TxError`, `InstructionErrorKind` | Solana tiplerinin yeniden dışa aktarımı; programların dev-dependency listesi kısa kalır |
 
 Squads programının kendisi ortamda yoktur. Square programları Squads'tan yalnızca multisig hesabının
 Squads v4'e ait, başlatılmış bir `Multisig` olmasını (sahip + discriminator, `square_common::squads`) ve
 işlemi vault PDA'sının imzalamasını bekler. Fikstür bu ikisini kurar; üyeler, eşik ve onaylar Squads'ın
 kendi kurallarıdır, burada denenmez.
 
-## Testler (`tests/`)
+Compute unit değerleri çalıştırmadan çalıştırmaya değişir: testler rastgele anahtar kullanır ve programlar
+PDA bump'ını arar (her ek deneme ~1 500 CU). Bütçeler bu yüzden geniştir; sabit bir CU raporu için sabit
+anahtarlar kullanılmalıdır (BC-29).
 
-`square_policy` sözleşme arayüzündedir (BC-17). Diğerleri henüz kaynak projelerin arayüzündedir (AIP
-registry, Aperture verifier, Covenant escrow); sözleşmeye (`idl/`) taşındıkça testleri de taşınır: BC-15,
-BC-21, BC-22.
+## Programların testleri
 
 | Dosya | Kapsam |
 |---|---|
-| `registry.rs` | Kayıt, çift kayıt, sahiplik kısıtı, uzunluk sınırları |
-| `policy.rs` | Kurum ve politika commitment'ı (yalnızca commitment ve public tavan); tavan 0 ve yabancı imzacı reddi; Squads multisig bağlanınca yalnızca vault PDA'sının yetkili olması; Squads'a ait olmayan ya da `Multisig` olmayan hesabın reddi |
-| `verifier.rs` | Günlük sayacın ayarlanan saatte UTC gün başına bağlanması |
-| `escrow.rs` | Yükseltme yetkilisinin config'i kurması; USDC'yle iş açma, kabul, teslim; challenge penceresi bitmeden (son saniye dahil) finalize reddi, saat pencerenin sonuna gelince ödeme |
+| `programs/square-registry/tests/registry.rs` | Kayıt, çift kayıt, sahiplik kısıtı, uzunluk sınırları (AIP registry arayüzü; BC-15 sözleşmeye taşır) |
+| `programs/square-policy/tests/policy.rs` | BC-17'nin testleri (sözleşme arayüzü) |
+| `programs/square-verifier/tests/verifier.rs` | Günlük sayacın ayarlanan saatte UTC gün başına bağlanması (Aperture verifier arayüzü; BC-21 taşır) |
+| `programs/square-escrow/tests/escrow.rs` | Yükseltme yetkilisinin config'i kurması; USDC'yle iş açma, kabul, teslim; challenge penceresi bitmeden (son saniye dahil) finalize reddi, saat pencerenin sonuna gelince ödeme (Covenant arayüzü; BC-22 taşır) |

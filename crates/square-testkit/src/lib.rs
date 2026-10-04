@@ -7,7 +7,11 @@
 //! - [`Harness`]: programları yükler, işlem gönderir, hesap okur, saati yönetir.
 //! - [`token`]: mint, associated token account ve basım fikstürleri (SPL Token programının kendisiyle).
 //! - [`squads`]: Squads v4 multisig hesabı ve vault imzacısı.
+//! - [`event`] / [`events`]: işlem loglarından Anchor event'lerini (`emit!`) çözer.
 //! - [`Executed::compute_units`]: compute unit ölçümü; [`cu`] bütçe denetimi ve rapor satırı.
+//!
+//! Programların testleri (`programs/<program>/tests/`) bu crate'i dev-dependency olarak kullanır;
+//! imza, anahtar ve hata tipleri buradan yeniden dışa aktarılır.
 
 pub mod squads;
 pub mod token;
@@ -29,6 +33,10 @@ use solana_transaction::versioned::VersionedTransaction;
 use solana_transaction_error::TransactionError;
 
 pub use litesvm;
+pub use solana_instruction_error::InstructionError as InstructionErrorKind;
+pub use solana_keypair::Keypair as TestKeypair;
+pub use solana_signer::Signer as TestSigner;
+pub use solana_transaction_error::TransactionError as TxError;
 
 /// Bir işlemin başarıyla işlenmesi.
 #[derive(Debug)]
@@ -314,6 +322,42 @@ where
         anchor_lang::error::Error::AnchorError(e) => e.error_code_number,
         anchor_lang::error::Error::ProgramError(e) => panic!("Anchor hatası değil: {e:?}"),
     }
+}
+
+/// İşlem loglarındaki `Program data:` satırlarından `E` event'lerini çözer (Anchor `emit!`).
+pub fn events<E>(executed: &Executed) -> Vec<E>
+where
+    E: anchor_lang::AnchorDeserialize + anchor_lang::Discriminator,
+{
+    use base64::Engine;
+    executed
+        .logs
+        .iter()
+        .filter_map(|line| line.strip_prefix("Program data: "))
+        .filter_map(|data| base64::engine::general_purpose::STANDARD.decode(data).ok())
+        .filter(|bytes| bytes.starts_with(E::DISCRIMINATOR))
+        .map(|bytes| {
+            E::try_from_slice(&bytes[E::DISCRIMINATOR.len()..])
+                .unwrap_or_else(|e| panic!("event çözülemedi: {e}"))
+        })
+        .collect()
+}
+
+/// İşlemin yayımladığı tek `E` event'i; hiç ya da birden fazla yayımlandıysa test düşer.
+#[track_caller]
+pub fn event<E>(executed: &Executed) -> E
+where
+    E: anchor_lang::AnchorDeserialize + anchor_lang::Discriminator,
+{
+    let mut found = events::<E>(executed);
+    assert_eq!(
+        found.len(),
+        1,
+        "beklenen 1 event, gelen {}\n{}",
+        found.len(),
+        executed.logs.join("\n")
+    );
+    found.remove(0)
 }
 
 /// Compute unit bütçeleri ve rapor.

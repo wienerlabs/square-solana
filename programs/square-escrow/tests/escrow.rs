@@ -6,13 +6,13 @@ use anchor_lang::prelude::{Pubkey, Rent};
 use anchor_lang::solana_program::instruction::Instruction;
 use anchor_lang::solana_program::sysvar::SysvarId;
 use anchor_lang::{InstructionData, ToAccountMetas};
-use solana_keypair::Keypair;
-use solana_signer::Signer;
 use square_common::seeds::{CLAIM_SEED, CONFIG_SEED, JOB_SEED, REPUTATION_SEED, VAULT_SEED};
 use square_escrow::errors::CovError;
 use square_escrow::state::{AgentReputation, JobEscrow, JobStatus, ProtocolConfig};
-use square_program_tests::token::{self, TOKEN_PROGRAM_ID};
-use square_program_tests::{anchor_error, cu, programdata_address, Harness};
+use square_testkit::token::{self, TOKEN_PROGRAM_ID};
+use square_testkit::TestKeypair as Keypair;
+use square_testkit::TestSigner as Signer;
+use square_testkit::{anchor_error, cu, programdata_address, Harness};
 
 const DAY: i64 = 86_400;
 const AMOUNT: u64 = 250_000_000; // 250 USDC
@@ -181,11 +181,11 @@ fn pays_the_taker_only_after_the_challenge_window() {
     // Finalize herkese açıktır (crank); pencere bitmeden reddedilir.
     let crank = h.funded(1_000_000_000);
     let ix = finalize(&j, &crank);
-    h.send(&[ix.clone()], &[&crank])
+    h.send(std::slice::from_ref(&ix), &[&crank])
         .expect_err("pencere bitmeden finalize")
         .assert_error(anchor_error(CovError::ChallengePeriodNotExpired));
     h.advance(DAY - 1);
-    h.send(&[ix.clone()], &[&crank])
+    h.send(std::slice::from_ref(&ix), &[&crank])
         .expect_err("pencerenin son saniyesinde finalize")
         .assert_error(anchor_error(CovError::ChallengePeriodNotExpired));
 

@@ -5,10 +5,10 @@ use aip_registry::{AgentRecord, AgentType, Capability, RegistryError};
 use anchor_lang::prelude::Pubkey;
 use anchor_lang::solana_program::instruction::Instruction;
 use anchor_lang::{InstructionData, ToAccountMetas};
-use solana_keypair::Keypair;
-use solana_signer::Signer;
 use square_common::seeds::AGENT_SEED;
-use square_program_tests::{anchor_error, cu, Harness};
+use square_testkit::TestKeypair as Keypair;
+use square_testkit::TestSigner as Signer;
+use square_testkit::{anchor_error, cu, Harness};
 
 fn harness() -> Harness {
     let mut h = Harness::new();
@@ -111,9 +111,9 @@ fn an_agent_id_longer_than_a_seed_aborts_before_the_length_check() {
     let failed = h.send(&[ix], &[&owner]).expect_err("33 baytlık agent_id");
     assert_eq!(
         failed.error,
-        solana_transaction_error::TransactionError::InstructionError(
+        square_testkit::TxError::InstructionError(
             0,
-            solana_instruction_error::InstructionError::ProgramFailedToComplete
+            square_testkit::InstructionErrorKind::ProgramFailedToComplete
         )
     );
 }

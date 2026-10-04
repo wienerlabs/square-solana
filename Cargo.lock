@@ -109,6 +109,7 @@ version = "0.1.0"
 dependencies = [
  "anchor-lang",
  "square-common",
+ "square-testkit",
 ]
 
 [[package]]
@@ -4291,6 +4292,7 @@ dependencies = [
  "anchor-lang",
  "anchor-spl",
  "square-common",
+ "square-testkit",
 ]
 
 [[package]]
@@ -4307,6 +4309,29 @@ dependencies = [
  "solana-signature",
  "solana-signer",
  "solana-transaction",
+ "square-common",
+]
+
+[[package]]
+name = "square-testkit"
+version = "0.1.0"
+dependencies = [
+ "anchor-lang",
+ "base64 0.22.1",
+ "litesvm",
+ "solana-account",
+ "solana-instruction-error",
+ "solana-keypair",
+ "solana-loader-v3-interface 8.0.1",
+ "solana-message",
+ "solana-program-pack",
+ "solana-signature",
+ "solana-signer",
+ "solana-system-interface 3.2.0",
+ "solana-transaction",
+ "solana-transaction-error",
+ "spl-associated-token-account-interface",
+ "spl-token-interface",
  "square-common",
 ]
 
@@ -4532,6 +4557,7 @@ dependencies = [
  "solana-instructions-sysvar 3.0.1",
  "solana-sdk-ids",
  "square-common",
+ "square-testkit",
 ]
 
 [[package]]
