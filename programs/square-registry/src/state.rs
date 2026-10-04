@@ -51,12 +51,48 @@ pub enum AgentStatus {
     Deregistered,
 }
 
-// Screening sonucu (`ScreeningRecord`, BC-27); `ScreeningRecorded` event'inin alanı. Doküman yorumu IDL'e
-// girer, sözleşmedeki tip yorumsuz olduğu için düz yorum.
+/// Singleton. seeds = ["registry_config"]
+#[account]
+pub struct RegistryConfig {
+    pub admin: Pubkey,
+    pub screener_authority: Pubkey,
+    /// Lifetime of a screening record; `expires_at = screened_at + screening_ttl_secs`.
+    pub screening_ttl_secs: i64,
+    pub bump: u8,
+}
+
+impl RegistryConfig {
+    pub const SPACE: usize = 8 + 32 + 32 + 8 + 1;
+}
+
+/// seeds = ["screening", wallet]
+#[account]
+pub struct ScreeningRecord {
+    pub wallet: Pubkey,
+    pub status: ScreeningStatus,
+    /// Hash of the screening evidence (provider response / list version).
+    pub source_hash: [u8; 32],
+    pub screened_at: i64,
+    pub expires_at: i64,
+    pub bump: u8,
+}
+
+impl ScreeningRecord {
+    pub const SPACE: usize = 8 + 32 + 1 + 32 + 8 + 8 + 1;
+}
+
+// Screening sonucu: `ScreeningRecord` ve `ScreeningRecorded` event'inin alanı. Doküman yorumu IDL'e girer,
+// sözleşmedeki tip yorumsuz olduğu için düz yorum.
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq, Debug)]
 pub enum ScreeningStatus {
     Clear,
     Flagged,
+}
+
+/// TTL pozitif olmalı (`InvalidScreeningTtl`); `init_registry_config` ve `update_registry_config`'te.
+pub fn validate_screening_ttl(screening_ttl_secs: i64) -> Result<()> {
+    require!(screening_ttl_secs > 0, RegistryError::InvalidScreeningTtl);
+    Ok(())
 }
 
 /// `agent_id`: `[A-Za-z0-9_-]{1,32}` (did:aip v2 Solana profili §3.4, §4.1). `register_agent`'ın hesap

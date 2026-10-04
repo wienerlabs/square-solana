@@ -1,10 +1,11 @@
-//! Square registry programı (program arayüzü §10.1, BC-15). Akışın 2. adımı: agent kaydolur ve did:aip
+//! Square registry programı (program arayüzü §10.1). Akışın 2. adımı (BC-15): agent kaydolur ve did:aip
 //! olarak çözümlenir (did:aip v2 Solana profili, BC-14). Zincirde DID metni yoktur: DID küme, program
 //! kimliği ve kayıt adresinden türetilir (profil §4.2). Kayıt bir A2A agent card'ına işaret eder:
 //! `agent_card_uri` ve kartın SHA-256'sı `agent_card_hash`.
 //!
-//! Registry config'i ve screening kayıtları (`init_registry_config`, `update_registry_config`,
-//! `record_screening`) BC-27'dedir.
+//! Akışın 3. adımı (BC-27): screener servisi cüzdanların sanctions screening sonucunu `ScreeningRecord`'a
+//! yazar; escrow fonlama, alacak satışı ve release'te kaydın temiz ve taze olmasını ister
+//! (`square_common::screening`). Screener'ı ve kayıtların ömrünü `RegistryConfig` tutar.
 
 use anchor_lang::prelude::*;
 
@@ -35,6 +36,27 @@ pub mod square_registry {
     /// can never be re-registered and inherit the agent's reputation or did:aip.
     pub fn deregister_agent(ctx: Context<DeregisterAgent>) -> Result<()> {
         instructions::deregister_agent::handler(ctx)
+    }
+
+    /// Creates the singleton registry config. Only the program upgrade authority (Squads vault) can
+    /// call it (checked through `program_data`), so the config cannot be front-run.
+    pub fn init_registry_config(
+        ctx: Context<InitRegistryConfig>,
+        screener_authority: Pubkey,
+        screening_ttl_secs: i64,
+    ) -> Result<()> {
+        instructions::init_registry_config::handler(ctx, screener_authority, screening_ttl_secs)
+    }
+
+    /// Flow step 3: the screener service (BE-16) records a sanctions screening result for a wallet.
+    /// Escrow reads it on `fund_job` (institution and agent), `buy_claim` (buyer) and release (payee).
+    pub fn record_screening(
+        ctx: Context<RecordScreening>,
+        wallet: Pubkey,
+        status: ScreeningStatus,
+        source_hash: [u8; 32],
+    ) -> Result<()> {
+        instructions::record_screening::handler(ctx, wallet, status, source_hash)
     }
 
     /// Flow step 2: an agent registers; it resolves as did:aip (Solana profile, BC-14).
@@ -80,5 +102,14 @@ pub mod square_registry {
         wallet: Pubkey,
     ) -> Result<()> {
         instructions::update_agent::handler(ctx, agent_card_uri, agent_card_hash, wallet)
+    }
+
+    /// Rotates the screener authority and the screening record lifetime.
+    pub fn update_registry_config(
+        ctx: Context<UpdateRegistryConfig>,
+        screener_authority: Pubkey,
+        screening_ttl_secs: i64,
+    ) -> Result<()> {
+        instructions::update_registry_config::handler(ctx, screener_authority, screening_ttl_secs)
     }
 }

@@ -4,7 +4,7 @@ Programlar arasında paylaşılan Rust crate'leri. Cargo workspace üyesidir (`m
 
 | Crate | İçerik | Issue |
 |---|---|---|
-| [`square-common`](square-common/) | seed'ler, roller, ortak sabitler, UTC gün başlangıcı, owner/seed doğrulamalı account-read, programlar arası okunan hesap tipleri [BC-10] ✓; event tipleri ve programların event'leri tanımlayan makroları [BC-16] ✓ | [BC-10], [BC-16] |
+| [`square-common`](square-common/) | seed'ler, roller, ortak sabitler, UTC gün başlangıcı, owner/seed doğrulamalı account-read, programlar arası okunan hesap tipleri [BC-10] ✓; event tipleri ve programların event'leri tanımlayan makroları [BC-16] ✓; sanctions screening kaydının temiz ve taze olması [BC-27] | [BC-10], [BC-16], [BC-27] |
 
 `square-common`:
 
@@ -16,6 +16,9 @@ Programlar arasında paylaşılan Rust crate'leri. Cargo workspace üyesidir (`m
   denetimiyle çözer. Owner, IDL'deki adres değil, okuyan programın config'inde tuttuğu program kimliğidir
   ([program arayüzü §4](../docs/design/program-interface.md#4-programlar-aras%C4%B1-eri%C5%9Fim)).
 
+- **`screening`:** Escrow'un `fund_job`, `buy_claim` ve release'te uyguladığı kural: hesap registry'nin
+  `["screening", wallet]` PDA'sı, durum `Clear`, `expires_at > now`. Ret sebebi (`Missing`, `Flagged`,
+  `Expired`) escrow'un hata koduna çevrilir.
 - **`events`:** Sözleşme event'leri ve `square_<program>_events!()` makroları. Makrolar `build.rs` ile IDL'den
   üretilir; program bunları crate kökünde çağırınca event'ler programın IDL'ine girer
   ([event şeması](../docs/design/events.md)).
@@ -26,3 +29,4 @@ bağımlılıkların bu sınırı aşan sürümlere çözülmesini önler.
 
 [BC-10]: https://github.com/wienerlabs/square-solana/issues/10
 [BC-16]: https://github.com/wienerlabs/square-solana/issues/23
+[BC-27]: https://github.com/wienerlabs/square-solana/issues/35
