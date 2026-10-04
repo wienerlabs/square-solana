@@ -10,6 +10,7 @@ packages/types/src/generated
 packages/sdk/src/idl
 db/src/generated
 docs/api/schemas
+crates/square-common/tests/fixtures
 idl
 programs
 circuits

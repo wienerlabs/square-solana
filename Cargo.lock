@@ -2505,6 +2505,7 @@ version = "0.1.0"
 dependencies = [
  "anchor-lang",
  "serde_json",
+ "solana-sha256-hasher",
 ]
 
 [[package]]

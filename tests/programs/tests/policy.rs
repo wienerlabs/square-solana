@@ -1,18 +1,19 @@
-//! square_policy program testleri (BC-17, sözleşme arayüzü): kurum ve politika commitment'ı; Squads
-//! multisig bağlanınca yetkili yalnızca vault PDA'sı olur.
+//! square_policy program testleri (BC-17, BC-18; sözleşme arayüzü): kurum, politika commitment'ı ve alıcı
+//! listesi kökü; Squads multisig bağlanınca yetkili yalnızca vault PDA'sı olur.
 
 use anchor_lang::prelude::{AccountMeta, Pubkey};
 use anchor_lang::solana_program::instruction::Instruction;
 use anchor_lang::{InstructionData, ToAccountMetas};
 use solana_keypair::Keypair;
 use solana_signer::Signer;
+use square_common::merkle;
 use square_common::seeds::{INSTITUTION_SEED, POLICY_SEED};
 use square_common::squads::{
     vault_address, MULTISIG_DISCRIMINATOR, PROGRAM_ID as SQUADS_PROGRAM_ID,
 };
 use square_policy::errors::PolicyError;
 use square_policy::state::{Institution, Policy};
-use square_policy::{InstitutionMultisigSet, PolicyCommitted, PolicyUpdated};
+use square_policy::{BuyerRootCommitted, InstitutionMultisigSet, PolicyCommitted, PolicyUpdated};
 use square_program_tests::squads::{self, SquadsMultisig};
 use square_program_tests::{anchor_error, cu, event, Executed, Failed, Harness};
 
@@ -151,6 +152,24 @@ impl World {
             }
             .to_account_metas(None),
             data: square_policy::instruction::DeactivatePolicy {}.data(),
+        }
+    }
+
+    fn set_buyer_root_ix(
+        &self,
+        authority: Pubkey,
+        policy_id: [u8; 32],
+        root: [u8; 32],
+    ) -> Instruction {
+        Instruction {
+            program_id: square_policy::ID,
+            accounts: square_policy::accounts::SetBuyerRoot {
+                authority,
+                institution: self.institution(),
+                policy: self.policy(&policy_id),
+            }
+            .to_account_metas(None),
+            data: square_policy::instruction::SetBuyerRoot { buyer_root: root }.data(),
         }
     }
 
@@ -369,6 +388,105 @@ fn after_binding_only_the_vault_is_authority() {
     w.send_vault(w.deactivate_ix(vault, POLICY_ID), vault)
         .expect_err("eski vault")
         .assert_error(anchor_error(PolicyError::Unauthorized));
+}
+
+/// İki alıcılı liste: kök ve ilk alıcının kanıtı (`merkle` modülünün kurallarıyla).
+fn two_buyer_list() -> ([u8; 32], Pubkey, [u8; 32], [u8; 32]) {
+    let (buyer, salt) = (Pubkey::new_unique(), [3; 32]);
+    let sibling = merkle::buyer_leaf(&Pubkey::new_unique(), &[4; 32]);
+    let root = merkle::parent(&merkle::buyer_leaf(&buyer, &salt), &sibling);
+    (root, buyer, salt, sibling)
+}
+
+#[test]
+fn owner_publishes_buyer_root_and_proofs_verify_against_it() {
+    let mut w = World::new(true);
+    w.init_institution("Inst").unwrap();
+    let owner = w.owner.pubkey();
+    w.send_owner(w.set_policy_ix(owner, POLICY_ID, COMMITMENT, CEILING))
+        .unwrap();
+    assert!(merkle::is_unrestricted(
+        &w.policy_account(&POLICY_ID).buyer_root
+    ));
+
+    let (root, buyer, salt, sibling) = two_buyer_list();
+    let executed = w
+        .send_owner(w.set_buyer_root_ix(owner, POLICY_ID, root))
+        .unwrap();
+    cu::within("policy.set_buyer_root", &executed, 20_000);
+    let policy = w.policy_account(&POLICY_ID);
+    assert_eq!(policy.buyer_root, root);
+    // Kök job snapshot'ına girmez; politika sürümü değişmez.
+    assert_eq!(policy.version, 1);
+    let committed: BuyerRootCommitted = event(&executed);
+    assert_eq!(committed.policy, w.policy(&POLICY_ID));
+    assert_eq!(committed.buyer_root, root);
+    assert!(merkle::verify_buyer_proof(
+        &policy.buyer_root,
+        &buyer,
+        &salt,
+        &[sibling]
+    ));
+    assert!(!merkle::verify_buyer_proof(
+        &policy.buyer_root,
+        &Pubkey::new_unique(),
+        &salt,
+        &[sibling]
+    ));
+
+    // Sıfır kök kısıtı kaldırır.
+    w.send_owner(w.set_buyer_root_ix(owner, POLICY_ID, merkle::UNRESTRICTED_ROOT))
+        .unwrap();
+    assert!(merkle::is_unrestricted(
+        &w.policy_account(&POLICY_ID).buyer_root
+    ));
+}
+
+#[test]
+fn buyer_root_rejects_foreign_signer_and_inactive_policy() {
+    let mut w = World::new(true);
+    w.init_institution("Inst").unwrap();
+    let owner = w.owner.pubkey();
+    w.send_owner(w.set_policy_ix(owner, POLICY_ID, COMMITMENT, CEILING))
+        .unwrap();
+    let (root, ..) = two_buyer_list();
+
+    let stranger = w.h.funded(LAMPORTS);
+    w.h.send(
+        &[w.set_buyer_root_ix(stranger.pubkey(), POLICY_ID, root)],
+        &[&stranger],
+    )
+    .expect_err("yabancı imzacı")
+    .assert_error(anchor_error(PolicyError::Unauthorized));
+    assert!(merkle::is_unrestricted(
+        &w.policy_account(&POLICY_ID).buyer_root
+    ));
+
+    w.send_owner(w.deactivate_ix(owner, POLICY_ID)).unwrap();
+    w.send_owner(w.set_buyer_root_ix(owner, POLICY_ID, root))
+        .expect_err("kapalı politika")
+        .assert_error(anchor_error(PolicyError::PolicyInactive));
+}
+
+#[test]
+fn after_binding_only_the_vault_sets_buyer_root() {
+    let mut w = World::new(false);
+    w.init_institution("Inst").unwrap();
+    let owner = w.owner.pubkey();
+    w.send_owner(w.set_policy_ix(owner, POLICY_ID, COMMITMENT, CEILING))
+        .unwrap();
+    let multisig = SquadsMultisig::create(&mut w.h);
+    w.send_owner(w.set_multisig_ix(owner, multisig.address, multisig.address, 0))
+        .unwrap();
+    let vault = multisig.vault(0);
+    let (root, ..) = two_buyer_list();
+
+    w.send_owner(w.set_buyer_root_ix(owner, POLICY_ID, root))
+        .expect_err("multisig sonrası sahip")
+        .assert_error(anchor_error(PolicyError::Unauthorized));
+    w.send_vault(w.set_buyer_root_ix(vault, POLICY_ID, root), vault)
+        .unwrap();
+    assert_eq!(w.policy_account(&POLICY_ID).buyer_root, root);
 }
 
 #[test]

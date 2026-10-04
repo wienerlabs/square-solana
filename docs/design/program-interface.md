@@ -135,7 +135,7 @@ Kurum onaylı alıcıları bir Merkle köküyle taahhüt eder (`Policy.buyer_roo
 | Boş liste | Kök 32 sıfır bayt: alım kısıtsızdır (`buy_claim` kanıt istemez) |
 | Kanıt | Yapraktan köke kardeş düğümler, en fazla 16 tane (en çok 65 536 alıcı) |
 
-Salt, listeyi görmeyen birinin bir adresin listede olup olmadığını kökten sınamasını engeller. Yapraklar aynı ağaçta tekrar edemez. Kökü ve kanıtları `@squaresdk/solana-policy` üretir (BE-10); doğrulama `buy_claim`'de (BC-18).
+Salt, listeyi görmeyen birinin bir adresin listede olup olmadığını kökten sınamasını engeller. Yapraklar aynı ağaçta tekrar edemez. Kökü ve kanıtları `@squaresdk/solana-policy` üretir (BE-10). Zincirdeki doğrulama yardımcısı `square_common::merkle`'dir (BC-18); `buy_claim` onu kullanır (BC-25). İki uygulamanın uyumu ortak test vektörleriyle denetlenir (`crates/square-common/tests/fixtures/buyer-merkle-vectors.json`, `packages/policy/scripts/buyer-vectors.mjs`).
 
 ## 6. Escrow durum makinesi
 
