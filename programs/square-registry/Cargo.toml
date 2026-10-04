@@ -1,13 +1,13 @@
 [package]
-name = "aip-registry"
-version = "0.1.0"
-description = "AIP Agent Registry — On-chain agent card storage and discovery"
+name = "square-registry"
+version = "0.2.0"
+description = "Square registry programı: did:aip v2 (Solana) agent kaydı, agent card işaretçisi ve hash'i (BC-15)"
 edition = "2021"
 rust-version = "1.89"
 
 [lib]
 crate-type = ["cdylib", "lib"]
-name = "aip_registry"
+name = "square_registry"
 
 [features]
 default = []
@@ -16,6 +16,7 @@ no-entrypoint = []
 no-idl = []
 no-log-ix-name = []
 idl-build = ["anchor-lang/idl-build", "square-common/idl-build"]
+# Anchor makrolarının koşul olarak kullandığı özellikler.
 anchor-debug = []
 custom-heap = []
 custom-panic = []
@@ -25,4 +26,5 @@ square-common = { path = "../../crates/square-common" }
 anchor-lang = "1.2.0"
 
 [lints.rust]
+# Anchor makroları SBF hedefini (`target_os = "solana"`) koşul olarak kullanır.
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(target_os, values("solana"))'] }

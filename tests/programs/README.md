@@ -49,13 +49,13 @@ anahtarlar kullanılmalıdır (BC-29).
 
 ## Testler (`tests/`)
 
-`square_policy` sözleşme arayüzündedir (BC-17). Diğerleri henüz kaynak projelerin arayüzündedir (AIP
-registry, Aperture verifier, Covenant escrow); sözleşmeye (`idl/`) taşındıkça testleri de taşınır: BC-15,
-BC-21, BC-22.
+`square_registry` (BC-15) ve `square_policy` (BC-17) sözleşme arayüzündedir. Diğerleri henüz kaynak
+projelerin arayüzündedir (Aperture verifier, Covenant escrow); sözleşmeye (`idl/`) taşındıkça testleri de
+taşınır: BC-21, BC-22.
 
 | Dosya | Kapsam |
 |---|---|
-| `registry.rs` | Kayıt, çift kayıt, sahiplik kısıtı, uzunluk sınırları |
+| `registry.rs` | Kayıt, kart / hash, durum, devir, kalıcı kayıt silme, event'ler, Squads vault'u sahip olarak |
 | `policy.rs` | Kurum ve politika commitment'ı (yalnızca commitment ve public tavan, sabit hesap boyutu, event'ler); her güncellemede sürüm artışı; kapalı politikanın güncellenmemesi; tavan 0, uzun ad ve yabancı imzacı reddi; Squads'a ait olmayan, `Multisig` olmayan ya da argümanla uyuşmayan hesabın reddi; multisig bağlanınca yalnızca vault PDA'sının yetkili olması, vault'un yeniden bağlaması ve eski vault'un reddi |
 | `verifier.rs` | Günlük sayacın ayarlanan saatte UTC gün başına bağlanması |
 | `escrow.rs` | Yükseltme yetkilisinin config'i kurması; USDC'yle iş açma, kabul, teslim; challenge penceresi bitmeden (son saniye dahil) finalize reddi, saat pencerenin sonuna gelince ödeme |

@@ -8,7 +8,7 @@ Square'in Anchor programları. Tek Anchor workspace'inde derlenir; programlar bi
 | `square-escrow` | `covenant/programs/covenant` | [BC-04] ✓ | job yaşam döngüsü, finalize + keeper fee, proof-gated release, alacak piyasası, itibar, M-of-N arbitration, dispute timeout |
 | `square-policy` | `aperture/programs/policy-registry` | [BC-05] ✓ | kurum + politika commitment'ı + public günlük tavan [BC-17] ✓, alıcı Merkle kökü [BC-18] |
 | `square-verifier` (`verifier`) | `aperture/programs/verifier` | [BC-05] ✓ | Groth16 doğrulama, release ispatı bağlama (`ReleaseProof`) |
-| `square-registry` (`aip-registry`) | `dr-wilson-empty/aip-beta` → `programs/aip-escrow/programs/aip-registry` | [BC-07] ✓ | agent kaydı (`did:aip` v2 Solana profili), event'ler |
+| `square-registry` | `dr-wilson-empty/aip-beta` → `programs/aip-escrow/programs/aip-registry` | [BC-07] ✓ | agent kaydı (`did:aip` v2 Solana profili), event'ler [BC-15] ✓; registry config'i ve screening [BC-27] |
 
 - Programlar **geçmişleriyle** taşınır (`git subtree` ya da `git filter-repo`); kaynak repo, commit ve
   yöntem issue başına bir dosyada kaydedilir: [`docs/provenance/`](../docs/provenance/). Kaynağın
@@ -27,6 +27,8 @@ Square'in Anchor programları. Tek Anchor workspace'inde derlenir; programlar bi
 [BC-08]: https://github.com/wienerlabs/square-solana/issues/8
 [BC-09]: https://github.com/wienerlabs/square-solana/issues/9
 [BC-11]: https://github.com/wienerlabs/square-solana/issues/11
+[BC-15]: https://github.com/wienerlabs/square-solana/issues/24
 [BC-17]: https://github.com/wienerlabs/square-solana/issues/25
 [BC-18]: https://github.com/wienerlabs/square-solana/issues/26
+[BC-27]: https://github.com/wienerlabs/square-solana/issues/35
 [BC-44]: https://github.com/wienerlabs/square-solana/issues/101
