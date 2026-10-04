@@ -410,7 +410,8 @@ export type SquareRegistryContract = {
     {
       "name": "transferAgentOwnership",
       "docs": [
-        "Transfers ownership. The PDA is derived from the immutable `creator`, so the address stays stable."
+        "Transfers ownership and resets `wallet` to the new owner (did:aip Solana profile §4.2). The PDA",
+        "is derived from the immutable `creator`, so the address stays stable."
       ],
       "discriminator": [
         216,
@@ -741,7 +742,7 @@ export type SquareRegistryContract = {
     {
       "code": 6000,
       "name": "agentIdInvalid",
-      "msg": "Agent ID must be 1-32 bytes"
+      "msg": "Agent ID must be 1-32 characters from [A-Za-z0-9_-]"
     },
     {
       "code": 6001,
@@ -772,6 +773,11 @@ export type SquareRegistryContract = {
       "code": 6006,
       "name": "invalidScreeningTtl",
       "msg": "Screening TTL must be positive"
+    },
+    {
+      "code": 6007,
+      "name": "agentCardHashInvalid",
+      "msg": "Agent card hash must be all zero exactly when the agent card URI is empty"
     }
   ],
   "types": [
