@@ -6,6 +6,8 @@ import { usePathname } from 'next/navigation';
 const SECTIONS = [
   { href: '/app', label: 'Overview' },
   { href: '/app/policy', label: 'Policy' },
+  { href: '/app/agent', label: 'Agent' },
+  { href: '/app/did', label: 'Resolve DID' },
 ] as const;
 
 export function AppNav() {

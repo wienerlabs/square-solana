@@ -7,6 +7,8 @@ Square'in web uygulaması: Next.js 16 (App Router), React 19, Tailwind CSS 4 ve 
 | `/` | Landing: değer önerisi, 8 adımlı akış, programlar ve ağ (canlı); bütün butonlar uygulamaya gider |
 | `/app` | Uygulama: bağlı cüzdanın adresi, SOL ve USDC bakiyesi, ağın canlı durumu ve doğrulaması, rol seçimi |
 | `/app/policy` | Kurumun harcama politikası: sır, kural editörü, alıcı listesi, zincire gidecek değerler (FE-04) |
+| `/app/agent` | Agent kaydı: kimlik, DID ve kayıt adresi tx'ten önce, kartın indirilip doğrulanması, `register_agent` (FE-05) |
+| `/app/did` | did:aip çözümü: kayıt zincirden, kart kendi adresinden; DID belgesi ve meta verisi. `?did=` ile paylaşılır (FE-05) |
 | `/design` | Bileşen kataloğu |
 | `/healthz` | Sağlık kontrolü (Railway) |
 
@@ -51,6 +53,24 @@ Institution rolündeki cüzdan için; `SQUARE_PROGRAM_ID_POLICY` gerekir, çünk
 | Zincire giden | Institution ve Policy PDA'ları, `policy_id`, commitment (`computePolicyCommitment`), `daily_ceiling`, `buyer_root`; hepsi tarayıcıda hesaplanır. `set_policy` / `set_buyer_root` tx'leri, square_policy bu instruction'larla deploy edilince eklenecek (BC-17, BC-18) |
 
 PDA'lar SDK'nın IDL seed'lerinden türetilir (`src/lib/idl-pda.ts`, SDK'nın `createPda`'sıyla aynı adresler; testli). Anchor yalnızca gerektiğinde yüklenir.
+
+## Agent kaydı ve DID çözümü (FE-05)
+
+Kayıt sayfası agent rolündeki cüzdan için; `SQUARE_PROGRAM_ID_REGISTRY` gerekir. Kayıt adresi ve DID bu programın
+kimliğinden türetilir. did:aip v1 programının kimliği (`CgchXu…Vbc`) reddedilir: v2 registry'si olarak çözülmez
+(did:aip v2 Solana profili §6.1 adım 4, §9.2).
+
+| Parça | Davranış |
+|---|---|
+| Kimlik | `agent_id` `[A-Za-z0-9_-]{1,32}` (profil §3.4, §4.1); değişmez ve silinse de yeniden kullanılamaz |
+| DID | `did:aip:solana:{chain-ref}:{registry}:{agent_record}`; `chain-ref` doğrulanmış RPC'nin genesis hash'inden. Ağ doğrulanmadan türetilmez. Tx onaylanmadan DID var sayılmaz (§7.1) |
+| Kayıt | `AgentRecord` (`["agent", creator, agent_id]`) zincirden okunur: aynı cüzdan aynı kimliği ikinci kez kaydedemez |
+| Kart | Önce yayımlanır, sonra kaydedilir (§7.1). Tarayıcı kartı kendi adresinden indirir (https, yönlendirme yok, 256 KiB, 10 s; sunucusu cross-origin isteğe izin vermeli), `AgentCardSchema` ile doğrular ve kartın `registrations` listesinde bu kaydın girdisini arar. Girdi sayfada hazır verilir. Hash, indirilen baytların SHA-256'sıdır. URI boşsa kartsız kayıt (sıfır hash) |
+| Cüzdan | Varsayılan olarak bağlı cüzdan; kabul, teslim ve alacak listelemeyi imzalar, ödemeyi alır |
+| Tx | `register_agent` registry IDL'iyle kurulur, `useSendTransaction()` ile imzalanır; ücreti ve rent'i sahibi öder. Registry hata kodu IDL'deki mesajıyla gösterilir |
+| Çözüm | `@squaresdk/solana-identity`'nin `resolveDid`'i uygulamanın bağlantısıyla: başka bir ağın DID'i `unsupportedChain`. Kart durumu (doğrulandı, yok, ulaşılamadı, hash uyuşmuyor, geçersiz), sahip, agent cüzdanı, kayıt ve güncelleme zamanı, okunan slot, servisler ve DID belgesi |
+
+Profil sayfasındaki itibar, validation geçmişi ve işler ile agent dizini, indexer ve API'yi (BE-14, BE-18) bekliyor.
 
 ## Tasarım sistemi
 
