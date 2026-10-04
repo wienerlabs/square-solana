@@ -1,12 +1,13 @@
 [package]
-name = "covenant"
+name = "square-escrow"
 version = "0.2.0"
 description = "Open settlement protocol for AI agents — optimistic escrow with bonded dispute resolution"
 edition = "2021"
+rust-version = "1.84"
 
 [lib]
 crate-type = ["cdylib", "lib"]
-name = "covenant"
+name = "square_escrow"
 
 [features]
 default = []
