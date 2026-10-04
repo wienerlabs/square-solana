@@ -21,7 +21,3 @@ idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build", "square-common/idl
 square-common = { path = "../../crates/square-common" }
 anchor-lang = { version = "1.2.0", features = ["init-if-needed"] }
 anchor-spl = "1.2.0"
-
-[dev-dependencies]
-# Program testleri: derlenmiş programı (`anchor build`) LiteSVM'de çalıştırır (crates/square-testkit).
-square-testkit = { path = "../../crates/square-testkit" }

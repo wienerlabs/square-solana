@@ -4,10 +4,10 @@
 use anchor_lang::prelude::Pubkey;
 use anchor_lang::solana_program::instruction::Instruction;
 use anchor_lang::{InstructionData, ToAccountMetas};
+use solana_signer::Signer;
 use square_common::seeds::OPERATOR_STATE_SEED;
 use square_common::time::day_start;
-use square_testkit::TestSigner as Signer;
-use square_testkit::{cu, Harness};
+use square_program_tests::{cu, Harness};
 use verifier::state::OperatorState;
 
 fn initialize(h: &Harness, operator: &Pubkey) -> Instruction {

@@ -4,17 +4,17 @@
 use anchor_lang::prelude::Pubkey;
 use anchor_lang::solana_program::instruction::Instruction;
 use anchor_lang::{InstructionData, ToAccountMetas};
+use solana_keypair::Keypair;
+use solana_signer::Signer;
 use square_common::seeds::AGENT_SEED;
+use square_program_tests::squads::SquadsMultisig;
+use square_program_tests::{anchor_error, cu, event, Executed, Harness};
 use square_registry::errors::RegistryError;
 use square_registry::state::AgentRecord;
 use square_registry::{
     AgentDeregistered, AgentOwnershipTransferred, AgentRegistered, AgentStatus, AgentStatusChanged,
     AgentUpdated,
 };
-use square_testkit::squads::SquadsMultisig;
-use square_testkit::TestKeypair as Keypair;
-use square_testkit::TestSigner as Signer;
-use square_testkit::{anchor_error, cu, event, Executed, Harness};
 
 const NOW: i64 = 1_790_000_000;
 const CARD_URI: &str = "https://agents.example/alpha/agent-card.json";
@@ -237,9 +237,9 @@ fn rejects_agent_ids_outside_the_slug_alphabet_and_length() {
     let failed = h.send(&[ix], &[&owner]).expect_err("33 baytlık kimlik");
     assert_eq!(
         failed.error,
-        square_testkit::TxError::InstructionError(
+        solana_transaction_error::TransactionError::InstructionError(
             0,
-            square_testkit::InstructionErrorKind::ProgramFailedToComplete
+            solana_instruction_error::InstructionError::ProgramFailedToComplete
         )
     );
     assert!(h

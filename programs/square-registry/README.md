@@ -30,10 +30,11 @@ her talimat kendi event'ini yayımlar. Event'ler kayıt adresini taşır, DID'i 
 
 ```bash
 anchor build -p square_registry
-cargo test -p square-registry
+cargo test --manifest-path tests/programs/Cargo.toml --test registry
 ```
 
-Testler derlenmiş programı LiteSVM'de çalıştırır ([`square-testkit`](../../crates/square-testkit/)):
+Testler ([`tests/programs/tests/registry.rs`](../../tests/programs/tests/registry.rs)) derlenmiş programı
+LiteSVM'de çalıştırır ([`tests/programs`](../../tests/programs/)):
 
 - kayıt alanları, zincirde DID metninin olmaması ve `AgentRegistered`;
 - kartsız (boş URI, sıfır hash) kayıt; kimlik alfabesi ve uzunluğu; kart / hash birlikteliği ve URI sınırı;

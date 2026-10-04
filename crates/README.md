@@ -5,7 +5,6 @@ Programlar arasında paylaşılan Rust crate'leri. Cargo workspace üyesidir (`m
 | Crate | İçerik | Issue |
 |---|---|---|
 | [`square-common`](square-common/) | seed'ler, roller, ortak sabitler, UTC gün başlangıcı, owner/seed doğrulamalı account-read, programlar arası okunan hesap tipleri [BC-10] ✓; event tipleri ve programların event'leri tanımlayan makroları [BC-16] ✓ | [BC-10], [BC-16] |
-| [`square-testkit`](square-testkit/) | yalnızca testler için (dev-dependency, `publish = false`): LiteSVM harness'ı, USDC / ATA, Squads vault ve yükseltilebilir deploy fikstürleri, saat, event çözme, compute unit ölçümü [BC-12] | [BC-12] |
 
 `square-common`:
 
@@ -26,5 +25,4 @@ rustc 1.89'uyla yapılır. `.cargo/config.toml`'daki `incompatible-rust-versions
 bağımlılıkların bu sınırı aşan sürümlere çözülmesini önler.
 
 [BC-10]: https://github.com/wienerlabs/square-solana/issues/10
-[BC-12]: https://github.com/wienerlabs/square-solana/issues/12
 [BC-16]: https://github.com/wienerlabs/square-solana/issues/23

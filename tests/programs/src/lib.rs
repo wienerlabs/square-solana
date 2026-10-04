@@ -9,9 +9,6 @@
 //! - [`squads`]: Squads v4 multisig hesabı ve vault imzacısı.
 //! - [`event`] / [`events`]: işlem loglarından Anchor event'lerini (`emit!`) çözer.
 //! - [`Executed::compute_units`]: compute unit ölçümü; [`cu`] bütçe denetimi ve rapor satırı.
-//!
-//! Programların testleri (`programs/<program>/tests/`) bu crate'i dev-dependency olarak kullanır;
-//! imza, anahtar ve hata tipleri buradan yeniden dışa aktarılır.
 
 pub mod squads;
 pub mod token;
@@ -33,10 +30,6 @@ use solana_transaction::versioned::VersionedTransaction;
 use solana_transaction_error::TransactionError;
 
 pub use litesvm;
-pub use solana_instruction_error::InstructionError as InstructionErrorKind;
-pub use solana_keypair::Keypair as TestKeypair;
-pub use solana_signer::Signer as TestSigner;
-pub use solana_transaction_error::TransactionError as TxError;
 
 /// Bir işlemin başarıyla işlenmesi.
 #[derive(Debug)]

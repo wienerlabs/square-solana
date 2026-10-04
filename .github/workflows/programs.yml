@@ -1,4 +1,4 @@
-# Programlar (BC-12): SBF derlemesi, birim testleri ve programların LiteSVM testleri.
+# Programlar (BC-12): SBF derlemesi, kök workspace'in birim testleri ve LiteSVM program testleri.
 # Araç sürümleri Anchor.toml [toolchain] ile aynıdır (ADR 0007); indirilen dosyalar SHA-256 ile doğrulanır.
 name: Programs
 
@@ -8,6 +8,7 @@ on:
       - 'programs/**'
       - 'crates/**'
       - 'idl/**'
+      - 'tests/programs/**'
       - 'Anchor.toml'
       - 'Cargo.toml'
       - 'Cargo.lock'
@@ -20,6 +21,7 @@ on:
       - 'programs/**'
       - 'crates/**'
       - 'idl/**'
+      - 'tests/programs/**'
       - 'Anchor.toml'
       - 'Cargo.toml'
       - 'Cargo.lock'
@@ -84,12 +86,16 @@ jobs:
             ~/.cargo/git/db
             ~/.cache/solana
             target
-          key: programs-${{ runner.os }}-${{ env.AGAVE_VERSION }}-${{ hashFiles('rust-toolchain.toml', 'Cargo.lock') }}
+            tests/programs/target
+          key: programs-${{ runner.os }}-${{ env.AGAVE_VERSION }}-${{ hashFiles('rust-toolchain.toml', 'Cargo.lock', 'tests/programs/Cargo.lock') }}
           restore-keys: programs-${{ runner.os }}-${{ env.AGAVE_VERSION }}-
 
       # IDL'ler de üretilir: programların idl-build derlemesi de bu adımda denetlenir.
       - name: Programlar (anchor build)
         run: anchor build
+
+      - name: Birim testleri (kök workspace)
+        run: cargo test --workspace --locked
 
       # `anchor test` yerel validator'ı Anchor.toml'daki sağlayıcı cüzdanıyla başlatır; CI'da bu iş için
       # geçici bir anahtar üretilir (fon ve yetki taşımaz, depoya girmez).
@@ -98,7 +104,7 @@ jobs:
           mkdir -p ~/.config/solana
           solana-keygen new --no-bip39-passphrase --silent --force --outfile ~/.config/solana/id.json
 
-      # `anchor test`, Anchor.toml'daki test betiğini (`cargo test --workspace`: birim testleri ve
-      # programs/*/tests'teki LiteSVM testleri) yerel bir solana-test-validator'la çalıştırır.
+      # `anchor test`, Anchor.toml'daki test betiğini (tests/programs, LiteSVM) yerel bir
+      # solana-test-validator'la çalıştırır; programlar az önce derlendi.
       - name: Program testleri (anchor test)
         run: anchor test --validator legacy --skip-build

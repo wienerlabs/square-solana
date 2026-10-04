@@ -22,27 +22,27 @@ pnpm license:write
 <!-- license-inventory:begin -->
 | Paket | Ekosistem | Lisans | Kapsam | Kullanan | Durum |
 |---|---|---|---|---|---|
-| `anchor-lang` | cargo | Apache-2.0 | runtime | `square-common`, `square-escrow`, `square-policy`, `square-registry`, `square-testkit`, `verifier` | ✓ |
+| `anchor-lang` | cargo | Apache-2.0 | runtime | `square-common`, `square-escrow`, `square-policy`, `square-program-tests`, `square-registry`, `verifier` | ✓ |
 | `anchor-spl` | cargo | Apache-2.0 | runtime | `square-escrow` | ✓ |
-| `base64` | cargo | MIT OR Apache-2.0 | runtime | `square-policy`, `square-testkit` | ✓ |
+| `base64` | cargo | MIT OR Apache-2.0 | dev | `square-program-tests` | ✓ |
 | `groth16-solana` | cargo | MIT | runtime | `verifier` | ✓ |
-| `litesvm` | cargo | Apache-2.0 | runtime | `square-policy`, `square-testkit` | ✓ |
+| `litesvm` | cargo | Apache-2.0 | dev | `square-program-tests` | ✓ |
 | `serde_json` | cargo | MIT OR Apache-2.0 | build | `square-common` | ✓ |
-| `solana-account` | cargo | Apache-2.0 | runtime | `square-policy`, `square-testkit` | ✓ |
-| `solana-instruction-error` | cargo | Apache-2.0 | runtime | `square-policy`, `square-testkit` | ✓ |
+| `solana-account` | cargo | Apache-2.0 | dev | `square-program-tests` | ✓ |
+| `solana-instruction-error` | cargo | Apache-2.0 | dev | `square-program-tests` | ✓ |
 | `solana-instructions-sysvar` | cargo | Apache-2.0 | runtime | `verifier` | ✓ |
-| `solana-keypair` | cargo | Apache-2.0 | runtime | `square-policy`, `square-testkit` | ✓ |
-| `solana-loader-v3-interface` | cargo | Apache-2.0 | runtime | `square-testkit` | ✓ |
-| `solana-message` | cargo | Apache-2.0 | runtime | `square-policy`, `square-testkit` | ✓ |
-| `solana-program-pack` | cargo | Apache-2.0 | runtime | `square-testkit` | ✓ |
+| `solana-keypair` | cargo | Apache-2.0 | dev | `square-program-tests` | ✓ |
+| `solana-loader-v3-interface` | cargo | Apache-2.0 | dev | `square-program-tests` | ✓ |
+| `solana-message` | cargo | Apache-2.0 | dev | `square-program-tests` | ✓ |
+| `solana-program-pack` | cargo | Apache-2.0 | dev | `square-program-tests` | ✓ |
 | `solana-sdk-ids` | cargo | Apache-2.0 | runtime | `verifier` | ✓ |
-| `solana-signature` | cargo | Apache-2.0 | runtime | `square-policy`, `square-testkit` | ✓ |
-| `solana-signer` | cargo | Apache-2.0 | runtime | `square-policy`, `square-testkit` | ✓ |
-| `solana-system-interface` | cargo | Apache-2.0 | runtime | `square-testkit` | ✓ |
-| `solana-transaction` | cargo | Apache-2.0 | runtime | `square-policy`, `square-testkit` | ✓ |
-| `solana-transaction-error` | cargo | Apache-2.0 | runtime | `square-testkit` | ✓ |
-| `spl-associated-token-account-interface` | cargo | Apache-2.0 | runtime | `square-testkit` | ✓ |
-| `spl-token-interface` | cargo | Apache-2.0 | runtime | `square-testkit` | ✓ |
+| `solana-signature` | cargo | Apache-2.0 | dev | `square-program-tests` | ✓ |
+| `solana-signer` | cargo | Apache-2.0 | dev | `square-program-tests` | ✓ |
+| `solana-system-interface` | cargo | Apache-2.0 | dev | `square-program-tests` | ✓ |
+| `solana-transaction` | cargo | Apache-2.0 | dev | `square-program-tests` | ✓ |
+| `solana-transaction-error` | cargo | Apache-2.0 | dev | `square-program-tests` | ✓ |
+| `spl-associated-token-account-interface` | cargo | Apache-2.0 | dev | `square-program-tests` | ✓ |
+| `spl-token-interface` | cargo | Apache-2.0 | dev | `square-program-tests` | ✓ |
 | `@a2a-js/sdk` | npm | Apache-2.0 | dev | `@squaresdk/solana-a2a` | ✓ |
 | `@anchor-lang/core` | npm | (MIT OR Apache-2.0) | runtime | `@squaresdk/solana-a2a`, `@squaresdk/solana-identity`, `@squaresdk/solana-policy`, `@squaresdk/solana-sdk`, `@squaresdk/solana-web` | ✓ |
 | `@anthropic-ai/sdk` | npm | MIT | runtime | `@squaresdk/solana-agent-sdk` | ✓ |
