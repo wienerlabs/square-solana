@@ -1,6 +1,6 @@
 # Program arayüz sözleşmesi
 
-**Sözleşme sürümü:** v0.2.0 (taslak) · **Issue:** BC-44 (#101), BC-47 (#119), BE-10 (#42) · **IDL'ler:** [`idl/`](../../idl/)
+**Sözleşme sürümü:** v0.3.0 (taslak) · **Issue:** BC-44 (#101), BC-47 (#119), BE-10 (#42), BC-17 (#25) · **IDL'ler:** [`idl/`](../../idl/)
 
 Bu doküman Square'in dört Solana programının (`square_registry`, `square_policy`, `square_verifier`, `square_escrow`) dış arayüzünü sabitler: instruction adları ve argümanları, hesap sırası ve imzacılar, account düzenleri, PDA seed'leri, event'ler ve hata kodları. Backend (BE-35 API/SDK sözleşmesi, servisler) ve frontend (FE-24 veri katmanı) bu sözleşmeye göre geliştirir. Gerçek programlar `programs/` altında taşındıkça ve değiştikçe bu arayüze uyar; uyum BC-13 ile CI'da denetlenir.
 
@@ -278,7 +278,7 @@ IDL'den üretilmiştir; instruction'lar alfabetik sıradadır. "(w)" yazılabili
 | `deactivate_policy` | — | `authority` | `policy` | — |
 | `init_institution` | `name: string` | `payer` (w), `authority` | `institution` | — |
 | `set_buyer_root` | `buyer_root: [u8; 32]` | `authority` | `policy` | — |
-| `set_institution_multisig` | `multisig: pubkey`, `vault_index: u8` | `authority` | `institution` | — |
+| `set_institution_multisig` | `multisig: pubkey`, `vault_index: u8` | `authority` | `institution`; salt okunur: `squads_multisig` | — |
 | `set_policy` | `policy_id: [u8; 32]`, `commitment: [u8; 32]`, `daily_ceiling: u64` | `payer` (w), `authority` | `institution`, `policy` | — |
 | `update_policy` | `commitment: [u8; 32]`, `daily_ceiling: u64` | `authority` | `policy` | — |
 
@@ -301,7 +301,7 @@ IDL'den üretilmiştir; instruction'lar alfabetik sıradadır. "(w)" yazılabili
 | 6001 | `NameTooLong` | Institution name exceeds 64 bytes |
 | 6002 | `PolicyInactive` | Policy is not active |
 | 6003 | `InvalidDailyCeiling` | Daily ceiling must be greater than zero |
-| 6004 | `InvalidMultisigVault` | Multisig vault does not match the Squads v4 derivation |
+| 6004 | `InvalidSquadsMultisig` | Account is not an initialized Squads v4 multisig |
 
 ### 10.3 square_verifier
 
@@ -455,4 +455,5 @@ IDL'den üretilmiştir; instruction'lar alfabetik sıradadır. "(w)" yazılabili
 |---|---|---|
 | v0.1.0 | İlk taslak: 4 program, 38 instruction, 13 account, 40 event, 75 hata kodu (4'ü stub'a ait `NotImplemented`); M5–M6 taslakları (§7) | BC-44 (#101) |
 | v0.2.0 | `set_compliance_proof` release devresinin 13 sinyaline geçti (yol A, [release-circuit.md](release-circuit.md) §6): `public_inputs: [[u8; 32]; 10]` yerine `refusal_code: u16`, `net_amount: u64`, `proof_timestamp: i64`; diğer 10 sinyali program hesaplardan kurar. Alıcı listesi Merkle ağacının iç düğüm, tek düğüm, boş liste ve kanıt uzunluğu kuralları eklendi | BE-10 (#42) |
+| v0.3.0 | `set_institution_multisig` multisig hesabını da alır (`squads_multisig`, salt okunur): program, hesabın Squads v4'e ait ve başlatılmış bir `Multisig` olduğunu doğrular; yanlış ya da var olmayan bir multisig bağlanıp kurum kilitlenemez. Hata 6004 `InvalidMultisigVault` → `InvalidSquadsMultisig` ("Account is not an initialized Squads v4 multisig"); kodlar ve sıraları değişmedi. Program ilk kez bu arayüzle yazıldı (BC-17); IDL'i `set_buyer_root` (BC-18) dışında sözleşmeyle aynı | BC-17 (#25) |
 | v0.1.1 | Gövdesiz stub programlar (`interfaces/`) kaldırıldı; sözleşmenin tek kaynağı `idl/*.json` (proje kuralı: placeholder yok). Stub'a ait `NotImplemented` hata girdileri IDL'den çıktı; diğer kodların sırası değişmedi. Toplam: 38 instruction, 13 account, 40 event, 71 hata kodu | BC-47 (#119) |
