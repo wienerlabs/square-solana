@@ -1,6 +1,6 @@
 # BC-45 (#111): her PR'da `REVIEWER` repo değişkenindeki kullanıcıyı reviewer olarak ister
 # (Settings → Secrets and variables → Actions → Variables).
-# CODEOWNERS bu repoda kullanılmaz (proje sahibi kararı): GitHub Free planında private repolarda
+# CODEOWNERS bu repoda kullanılmaz (#111): GitHub Free planında private repolarda
 # otomatik atama yapmıyor. Bu iş akışı aynı işi Actions ile yapar.
 #
 # Güvenlik: `pull_request_target` taban dalın bağlamında çalışır ve fork PR'larında da yazma
