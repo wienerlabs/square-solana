@@ -46,6 +46,15 @@ Copyright the Covenant contributors
   Planned: programs/covenant -> programs/square-escrow
 
 --------------------------------------------------------------------------------
+Bundled third-party assets
+
+  OpenRunde typeface (apps/web, from the @fontsource/open-runde package)
+  Copyright (c) 2016 The Inter Project Authors (https://github.com/rsms/inter)
+  SIL Open Font License, Version 1.1. The font files are served unmodified; the
+  full license text ships with the package (@fontsource/open-runde/LICENSE) and
+  is published at https://openfontlicense.org.
+
+--------------------------------------------------------------------------------
 MIT License
 
 Permission is hereby granted, free of charge, to any person obtaining a copy

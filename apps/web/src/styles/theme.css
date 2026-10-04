@@ -1,0 +1,67 @@
+/*
+ * Square tasarım token'ları (FE-02). Görsel kimlik Arc Square'den referans alınır, kod taşınmaz
+ * (§12.4): açık tema Arc paletinin (carbon, paper-white, linen, mist, fog, graphite, lavender ve
+ * durum renkleri) anlamsal adlara eşlenmiş hâli, koyu tema ondan türetilmiştir.
+ *
+ * Bileşenler yalnızca anlamsal token'ları kullanır (Tailwind: bg-surface, text-muted, ...).
+ * test/contrast.test.ts bu dosyayı okuyup her iki temadaki metin / zemin çiftlerini WCAG 2.2'ye
+ * (metin 4.5:1, odak göstergesi 3:1) göre denetler; bir değer değişince test yeniden hesaplar.
+ */
+
+:root {
+  color-scheme: light;
+
+  --sq-bg: #fafafa;
+  --sq-surface: #ffffff;
+  --sq-surface-muted: #f5f5f5;
+  --sq-border: #e8e8e8;
+  --sq-text: #181925;
+  --sq-text-muted: #666666;
+  --sq-accent: #918df6;
+  --sq-accent-hover: #a5a2f8;
+  --sq-on-accent: #181925;
+  --sq-link: #4a44c6;
+  --sq-focus: #5a54d8;
+  --sq-danger-text: #b0245f;
+
+  --sq-tone-info-bg: #e9f1ff;
+  --sq-tone-info-dot: #2c78fc;
+  --sq-tone-warning-bg: #fff2d6;
+  --sq-tone-warning-dot: #ffa600;
+  --sq-tone-success-bg: #def6e4;
+  --sq-tone-success-dot: #33c758;
+  --sq-tone-danger-bg: #fbe6f2;
+  --sq-tone-danger-dot: #d6409f;
+  --sq-tone-neutral-bg: #f0f0f0;
+  --sq-tone-neutral-dot: #999999;
+  --sq-tone-fg: #181925;
+}
+
+[data-theme='dark'] {
+  color-scheme: dark;
+
+  --sq-bg: #0e0f16;
+  --sq-surface: #181925;
+  --sq-surface-muted: #222330;
+  --sq-border: #2f3040;
+  --sq-text: #f5f5f7;
+  --sq-text-muted: #a1a1ad;
+  --sq-accent: #918df6;
+  --sq-accent-hover: #a5a2f8;
+  --sq-on-accent: #181925;
+  --sq-link: #b6b3fb;
+  --sq-focus: #b6b3fb;
+  --sq-danger-text: #f293c9;
+
+  --sq-tone-info-bg: #172649;
+  --sq-tone-info-dot: #5b9bff;
+  --sq-tone-warning-bg: #3a2c0b;
+  --sq-tone-warning-dot: #ffb52e;
+  --sq-tone-success-bg: #12301d;
+  --sq-tone-success-dot: #4cd471;
+  --sq-tone-danger-bg: #3a1630;
+  --sq-tone-danger-dot: #e66ab6;
+  --sq-tone-neutral-bg: #262733;
+  --sq-tone-neutral-dot: #8c8c99;
+  --sq-tone-fg: #f5f5f7;
+}

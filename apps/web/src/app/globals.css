@@ -1,0 +1,99 @@
+@import 'tailwindcss';
+@import '../styles/theme.css';
+
+/* next-themes `data-theme` özniteliğini <html>'e yazar; `dark:` değişkeni ona bağlanır. */
+@custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
+
+@theme inline {
+  --color-bg: var(--sq-bg);
+  --color-surface: var(--sq-surface);
+  --color-surface-muted: var(--sq-surface-muted);
+  --color-border: var(--sq-border);
+  --color-text: var(--sq-text);
+  --color-muted: var(--sq-text-muted);
+  --color-accent: var(--sq-accent);
+  --color-accent-hover: var(--sq-accent-hover);
+  --color-on-accent: var(--sq-on-accent);
+  --color-link: var(--sq-link);
+  --color-focus: var(--sq-focus);
+  --color-danger-text: var(--sq-danger-text);
+  --color-tone-fg: var(--sq-tone-fg);
+  --color-tone-info-bg: var(--sq-tone-info-bg);
+  --color-tone-info-dot: var(--sq-tone-info-dot);
+  --color-tone-warning-bg: var(--sq-tone-warning-bg);
+  --color-tone-warning-dot: var(--sq-tone-warning-dot);
+  --color-tone-success-bg: var(--sq-tone-success-bg);
+  --color-tone-success-dot: var(--sq-tone-success-dot);
+  --color-tone-danger-bg: var(--sq-tone-danger-bg);
+  --color-tone-danger-dot: var(--sq-tone-danger-dot);
+  --color-tone-neutral-bg: var(--sq-tone-neutral-bg);
+  --color-tone-neutral-dot: var(--sq-tone-neutral-dot);
+
+  --font-sans: var(--font-open-runde), ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+/* Tipografi ölçeği (Arc Square referanslı). */
+@theme {
+  --text-caption: 12px;
+  --text-caption--line-height: 1.33;
+  --text-body: 16px;
+  --text-body--line-height: 1.5;
+  --text-subheading: 18px;
+  --text-subheading--line-height: 1.33;
+  --text-heading-sm: 24px;
+  --text-heading-sm--line-height: 1.17;
+  --text-heading: 36px;
+  --text-heading--line-height: 1.22;
+  --text-display: 60px;
+  --text-display--line-height: 1.13;
+  --radius-card: 12px;
+}
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    background: var(--sq-bg);
+    color: var(--sq-text);
+    font-family: var(--font-sans);
+    letter-spacing: -0.01em;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--sq-focus);
+    outline-offset: 2px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+/* wallet-adapter-react-ui butonu token'lara uyar. */
+.wallet-adapter-button.wallet-adapter-button-trigger {
+  background-color: var(--sq-accent);
+  color: var(--sq-on-accent);
+  border-radius: 9999px;
+  font-family: var(--font-sans);
+  font-weight: 500;
+  height: 40px;
+  padding: 0 18px;
+}
+
+.wallet-adapter-button.wallet-adapter-button-trigger:not([disabled]):hover {
+  background-color: var(--sq-accent-hover);
+}
+
+.wallet-adapter-button:focus-visible {
+  outline: 2px solid var(--sq-focus);
+  outline-offset: 2px;
+}

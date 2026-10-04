@@ -5,7 +5,7 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 
 const root = process.cwd();
-const SKIP = new Set(['node_modules', 'dist', 'target', '.turbo', '.git', 'build']);
+const SKIP = new Set(['node_modules', 'dist', 'target', '.turbo', '.git', 'build', '.next']);
 const PREFIX = '@squaresdk/solana-';
 
 function* packageJsons(dir) {
