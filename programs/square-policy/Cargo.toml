@@ -1,11 +1,13 @@
 [package]
-name = "policy-registry"
-version = "0.1.0"
+name = "square-policy"
+version = "0.2.0"
 edition = "2021"
 rust-version = "1.89"
+description = "Square policy programı: kurum, salt'lı Poseidon politika commitment'ı ve public günlük tavan (BC-17)"
 
 [lib]
 crate-type = ["cdylib", "lib"]
+name = "square_policy"
 
 [features]
 no-entrypoint = []
@@ -14,8 +16,27 @@ no-log-ix-name = []
 cpi = ["no-entrypoint"]
 default = []
 idl-build = ["anchor-lang/idl-build", "square-common/idl-build"]
+# Anchor makrolarının koşul olarak kullandığı özellikler.
+anchor-debug = []
+custom-heap = []
+custom-panic = []
+
+[lints.rust]
+# Anchor makroları SBF hedefini (`target_os = "solana"`) koşul olarak kullanır.
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(target_os, values("solana"))'] }
 
 [dependencies]
 square-common = { path = "../../crates/square-common" }
 anchor-lang = "1.2.0"
-sha2 = "0.10"
+
+[dev-dependencies]
+# Program testleri: derlenmiş programı (`anchor build`) LiteSVM'de çalıştırır.
+litesvm = "0.16"
+solana-account = "4"
+solana-instruction-error = "2"
+solana-keypair = "3"
+solana-message = "4"
+solana-signature = "3"
+solana-signer = "3"
+solana-transaction = "4"
+base64 = "0.22"

@@ -1,3 +1,6 @@
+//! Square policy programı (program arayüzü §10.2, BC-17). Akışın 1. adımı: kurum harcama yetkisini
+//! salt'lı Poseidon commitment'ı olarak yazar; politikanın kendisi zincire çıkmaz, yalnızca günlük
+//! tavan public'tir.
 use anchor_lang::prelude::*;
 
 pub mod errors;
@@ -8,61 +11,56 @@ use instructions::*;
 
 declare_id!("FXD7ycSguBQw7o3DXqq4VUBHtdx5ZQpu9P2zb4KG4ZEU");
 
+square_common::square_policy_events!();
+
+// PDA seed'leri IDL'de de yayımlanır; değerler sözleşmeden (square-common).
+#[constant]
+pub const INSTITUTION_SEED: &[u8] = square_common::seeds::INSTITUTION_SEED;
+#[constant]
+pub const POLICY_SEED: &[u8] = square_common::seeds::POLICY_SEED;
+
 #[program]
-pub mod policy_registry {
+pub mod square_policy {
     use super::*;
 
-    pub fn initialize_operator(
-        ctx: Context<InitializeOperator>,
-        operator_name: String,
-    ) -> Result<()> {
-        instructions::initialize_operator::handler(ctx, operator_name)
-    }
-
-    pub fn register_policy(
-        ctx: Context<RegisterPolicy>,
-        policy_id: [u8; 32],
-        merkle_root: [u8; 32],
-        policy_data_hash: [u8; 32],
-    ) -> Result<()> {
-        instructions::register_policy::handler(ctx, policy_id, merkle_root, policy_data_hash)
-    }
-
-    pub fn update_policy(
-        ctx: Context<UpdatePolicy>,
-        new_merkle_root: [u8; 32],
-        new_policy_data_hash: [u8; 32],
-    ) -> Result<()> {
-        instructions::update_policy::handler(ctx, new_merkle_root, new_policy_data_hash)
-    }
-
+    /// Deactivates a policy: no new jobs can reference it. Existing jobs settle against their snapshot.
     pub fn deactivate_policy(ctx: Context<DeactivatePolicy>) -> Result<()> {
         instructions::deactivate_policy::handler(ctx)
     }
 
-    pub fn set_multisig(
-        ctx: Context<SetMultisig>,
-        vault_index: u8,
-    ) -> Result<()> {
-        instructions::set_multisig::handler(ctx, vault_index)
+    /// Creates the institution account for `authority` (which becomes `owner_key`).
+    pub fn init_institution(ctx: Context<InitInstitution>, name: String) -> Result<()> {
+        instructions::init_institution::handler(ctx, name)
     }
 
-    pub fn register_policy_multisig(
-        ctx: Context<RegisterPolicyMultisig>,
+    /// Binds (or, signed by the current vault, rebinds) a Squads v4 multisig. Afterwards only its
+    /// vault PDA (`vault_index`) may sign as authority.
+    pub fn set_institution_multisig(
+        ctx: Context<SetInstitutionMultisig>,
+        multisig: Pubkey,
+        vault_index: u8,
+    ) -> Result<()> {
+        instructions::set_institution_multisig::handler(ctx, multisig, vault_index)
+    }
+
+    /// Flow step 1: commits a spending policy. Only the salted Poseidon commitment and the public
+    /// daily ceiling (settlement-mint atomic units) are stored.
+    pub fn set_policy(
+        ctx: Context<SetPolicy>,
         policy_id: [u8; 32],
-        merkle_root: [u8; 32],
-        policy_data_hash: [u8; 32],
-        vault_index: u8,
+        commitment: [u8; 32],
+        daily_ceiling: u64,
     ) -> Result<()> {
-        instructions::register_policy_multisig::handler(ctx, policy_id, merkle_root, policy_data_hash, vault_index)
+        instructions::set_policy::handler(ctx, policy_id, commitment, daily_ceiling)
     }
 
-    pub fn update_policy_multisig(
-        ctx: Context<UpdatePolicyMultisig>,
-        new_merkle_root: [u8; 32],
-        new_policy_data_hash: [u8; 32],
-        vault_index: u8,
+    /// Replaces the commitment and/or daily ceiling and increments `version`. Existing jobs keep the
+    /// snapshot taken at `create_job`.
+    pub fn update_policy(
+        ctx: Context<UpdatePolicy>,
+        commitment: [u8; 32],
+        daily_ceiling: u64,
     ) -> Result<()> {
-        instructions::update_policy_multisig::handler(ctx, new_merkle_root, new_policy_data_hash, vault_index)
+        instructions::update_policy::handler(ctx, commitment, daily_ceiling)
     }
 }
