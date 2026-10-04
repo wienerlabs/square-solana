@@ -1,0 +1,103 @@
+# Programlar (BC-12): SBF derlemesi, kök workspace'in birim testleri ve LiteSVM program testleri.
+# Araç sürümleri Anchor.toml [toolchain] ile aynıdır (ADR 0007); indirilen dosyalar SHA-256 ile doğrulanır.
+name: Programs
+
+on:
+  pull_request:
+    paths:
+      - 'programs/**'
+      - 'crates/**'
+      - 'idl/**'
+      - 'tests/programs/**'
+      - 'Anchor.toml'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'rust-toolchain.toml'
+      - '.cargo/**'
+      - '.github/workflows/programs.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'programs/**'
+      - 'crates/**'
+      - 'idl/**'
+      - 'tests/programs/**'
+      - 'Anchor.toml'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'rust-toolchain.toml'
+      - '.cargo/**'
+      - '.github/workflows/programs.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: programs-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  AGAVE_VERSION: 4.1.2
+  AGAVE_SHA256: 5991d027a686eb419a709a479178b33eb83501e8a2bfbf599a81a286bfcbf770
+  ANCHOR_VERSION: 1.2.0
+  ANCHOR_SHA256: 0c9c41a3292c281cc6eadb78d6e1c8224d8324a34b0736a89d640fd314db05b7
+
+jobs:
+  programs:
+    name: SBF derleme ve program testleri
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # rustup 1.28+ argümansız `toolchain install` ile rust-toolchain.toml'dan kurar.
+      - name: Rust toolchain
+        run: rustup toolchain install || rustup show
+
+      - name: Agave ve Anchor CLI
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP"
+          curl -sSfL -o agave.tar.bz2 \
+            "https://github.com/anza-xyz/agave/releases/download/v${AGAVE_VERSION}/solana-release-x86_64-unknown-linux-gnu.tar.bz2"
+          echo "${AGAVE_SHA256}  agave.tar.bz2" | sha256sum -c -
+          tar -xjf agave.tar.bz2
+          mkdir -p bin
+          curl -sSfL -o bin/anchor \
+            "https://github.com/solana-foundation/anchor/releases/download/v${ANCHOR_VERSION}/anchor-${ANCHOR_VERSION}-x86_64-unknown-linux-gnu"
+          echo "${ANCHOR_SHA256}  bin/anchor" | sha256sum -c -
+          chmod +x bin/anchor
+          echo "$RUNNER_TEMP/solana-release/bin" >> "$GITHUB_PATH"
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+
+      - name: Sürümler
+        run: |
+          solana --version
+          anchor --version
+          cargo --version
+
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            ~/.cache/solana
+            target
+            tests/programs/target
+          key: programs-${{ runner.os }}-${{ env.AGAVE_VERSION }}-${{ hashFiles('rust-toolchain.toml', 'Cargo.lock', 'tests/programs/Cargo.lock') }}
+          restore-keys: programs-${{ runner.os }}-${{ env.AGAVE_VERSION }}-
+
+      # IDL'ler de üretilir: programların idl-build derlemesi de bu adımda denetlenir.
+      - name: Programlar (anchor build)
+        run: anchor build
+
+      - name: Birim testleri (kök workspace)
+        run: cargo test --workspace --locked
+
+      # `anchor test`, Anchor.toml'daki test betiğini (tests/programs, LiteSVM) yerel bir
+      # solana-test-validator'la çalıştırır; programlar az önce derlendi.
+      - name: Program testleri (anchor test)
+        run: anchor test --validator legacy --skip-build
