@@ -74,7 +74,7 @@ export function parseWebConfig(env: Readonly<Record<string, string | undefined>>
 }
 
 /** 32 baytlık, kanonik base58 yazılmış bir Solana adresi mi? */
-function isAddress(value: string): boolean {
+export function isAddress(value: string): boolean {
   try {
     return new PublicKey(value).toBase58() === value;
   } catch {

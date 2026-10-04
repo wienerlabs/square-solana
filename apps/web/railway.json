@@ -8,6 +8,7 @@
       "/packages/types/**",
       "/packages/sdk/**",
       "/packages/identity/**",
+      "/packages/policy/**",
       "/packages/config/**",
       "/package.json",
       "/pnpm-lock.yaml",
