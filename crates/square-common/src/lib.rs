@@ -8,12 +8,14 @@
 //! - [`constants`], [`time`]: ortak sabitler ve UTC gün başlangıcı.
 //! - [`account_read`]: CPI yerine hesap okuma; owner ve PDA adresi doğrulanır.
 //! - [`squads`]: Squads v4 multisig hesabının doğrulanması ve vault PDA'sı.
+//! - [`merkle`]: onaylı alıcı listesinin yaprağı ve Merkle kanıtı doğrulaması (escrow `buy_claim`).
 //! - [`events`]: sözleşme event'leri ve programların bunları `#[event]` olarak tanımlayan makroları.
 
 pub mod account_read;
 pub mod constants;
 pub mod contract;
 pub mod events;
+pub mod merkle;
 pub mod roles;
 pub mod seeds;
 pub mod squads;

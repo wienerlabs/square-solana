@@ -4,12 +4,14 @@
 
 pub mod deactivate_policy;
 pub mod init_institution;
+pub mod set_buyer_root;
 pub mod set_institution_multisig;
 pub mod set_policy;
 pub mod update_policy;
 
 pub use deactivate_policy::*;
 pub use init_institution::*;
+pub use set_buyer_root::*;
 pub use set_institution_multisig::*;
 pub use set_policy::*;
 pub use update_policy::*;

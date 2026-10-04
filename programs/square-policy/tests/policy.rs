@@ -1,4 +1,4 @@
-//! square_policy program testleri (BC-17). Derlenmiş programı (`anchor build`) LiteSVM'de çalıştırır.
+//! square_policy program testleri (BC-17, BC-18). Derlenmiş programı (`anchor build`) LiteSVM'de çalıştırır.
 
 use anchor_lang::{
     AccountDeserialize, AnchorDeserialize, Discriminator, InstructionData, ToAccountMetas,
@@ -12,9 +12,9 @@ use solana_signature::Signature;
 use solana_signer::Signer;
 use solana_transaction::Transaction;
 use square_common::seeds::{INSTITUTION_SEED, POLICY_SEED};
-use square_common::squads;
+use square_common::{merkle, squads};
 use square_policy::state::{Institution, Policy};
-use square_policy::{InstitutionMultisigSet, PolicyCommitted, PolicyUpdated};
+use square_policy::{BuyerRootCommitted, InstitutionMultisigSet, PolicyCommitted, PolicyUpdated};
 
 use anchor_lang::prelude::{AccountMeta, Pubkey};
 use anchor_lang::solana_program::instruction::Instruction;
@@ -194,6 +194,24 @@ impl World {
             }
             .to_account_metas(None),
             data: square_policy::instruction::DeactivatePolicy {}.data(),
+        }
+    }
+
+    fn set_buyer_root_ix(
+        &self,
+        authority: Pubkey,
+        policy_id: [u8; 32],
+        root: [u8; 32],
+    ) -> Instruction {
+        Instruction {
+            program_id: square_policy::ID,
+            accounts: square_policy::accounts::SetBuyerRoot {
+                authority,
+                institution: self.institution(),
+                policy: self.policy(&policy_id),
+            }
+            .to_account_metas(None),
+            data: square_policy::instruction::SetBuyerRoot { buyer_root: root }.data(),
         }
     }
 
@@ -548,6 +566,130 @@ fn after_binding_only_the_vault_is_authority() {
             .unwrap_err(),
         UNAUTHORIZED
     );
+}
+
+/// İki alıcılı liste: kök ve ilk alıcının kanıtı (`merkle` modülünün kurallarıyla).
+fn two_buyer_list() -> ([u8; 32], Pubkey, [u8; 32], [u8; 32]) {
+    let (buyer, salt) = (Pubkey::new_unique(), [3; 32]);
+    let other = merkle::buyer_leaf(&Pubkey::new_unique(), &[4; 32]);
+    let root = merkle::parent(&merkle::buyer_leaf(&buyer, &salt), &other);
+    (root, buyer, salt, other)
+}
+
+#[test]
+fn owner_publishes_buyer_root_and_proofs_verify_against_it() {
+    let mut w = World::new(true);
+    w.init_institution("Inst").unwrap();
+    let owner = w.owner.pubkey();
+    let owner_kp = w.owner.insecure_clone();
+    w.send(
+        w.set_policy_ix(owner, POLICY_ID, COMMITMENT, CEILING),
+        &[&owner_kp],
+    )
+    .unwrap();
+    let address = w.policy(&POLICY_ID);
+    assert!(merkle::is_unrestricted(
+        &w.account::<Policy>(&address).buyer_root
+    ));
+
+    let (root, buyer, salt, sibling) = two_buyer_list();
+    let meta = w
+        .send(w.set_buyer_root_ix(owner, POLICY_ID, root), &[&owner_kp])
+        .unwrap();
+    let policy: Policy = w.account(&address);
+    assert_eq!(policy.buyer_root, root);
+    // Kök job snapshot'ına girmez; politika sürümü değişmez.
+    assert_eq!(policy.version, 1);
+    let committed: BuyerRootCommitted = event(&meta);
+    assert_eq!(committed.policy, address);
+    assert_eq!(committed.buyer_root, root);
+    assert!(merkle::verify_buyer_proof(
+        &policy.buyer_root,
+        &buyer,
+        &salt,
+        &[sibling]
+    ));
+    assert!(!merkle::verify_buyer_proof(
+        &policy.buyer_root,
+        &Pubkey::new_unique(),
+        &salt,
+        &[sibling]
+    ));
+
+    // Sıfır kök kısıtı kaldırır.
+    w.send(
+        w.set_buyer_root_ix(owner, POLICY_ID, merkle::UNRESTRICTED_ROOT),
+        &[&owner_kp],
+    )
+    .unwrap();
+    assert!(merkle::is_unrestricted(
+        &w.account::<Policy>(&address).buyer_root
+    ));
+}
+
+#[test]
+fn buyer_root_rejects_foreign_signer_and_inactive_policy() {
+    let mut w = World::new(true);
+    w.init_institution("Inst").unwrap();
+    let owner = w.owner.pubkey();
+    let owner_kp = w.owner.insecure_clone();
+    w.send(
+        w.set_policy_ix(owner, POLICY_ID, COMMITMENT, CEILING),
+        &[&owner_kp],
+    )
+    .unwrap();
+    let (root, ..) = two_buyer_list();
+
+    let stranger = Keypair::new();
+    assert_eq!(
+        w.send(
+            w.set_buyer_root_ix(stranger.pubkey(), POLICY_ID, root),
+            &[&stranger]
+        )
+        .unwrap_err(),
+        UNAUTHORIZED
+    );
+    assert!(merkle::is_unrestricted(
+        &w.account::<Policy>(&w.policy(&POLICY_ID)).buyer_root
+    ));
+
+    w.send(w.deactivate_ix(owner, POLICY_ID), &[&owner_kp])
+        .unwrap();
+    assert_eq!(
+        w.send(w.set_buyer_root_ix(owner, POLICY_ID, root), &[&owner_kp])
+            .unwrap_err(),
+        POLICY_INACTIVE
+    );
+}
+
+#[test]
+fn after_binding_only_the_vault_sets_buyer_root() {
+    let mut w = World::new(false);
+    w.init_institution("Inst").unwrap();
+    let owner = w.owner.pubkey();
+    let owner_kp = w.owner.insecure_clone();
+    w.send(
+        w.set_policy_ix(owner, POLICY_ID, COMMITMENT, CEILING),
+        &[&owner_kp],
+    )
+    .unwrap();
+    let multisig = w.squads_multisig(squads::PROGRAM_ID, squads::MULTISIG_DISCRIMINATOR);
+    w.send(
+        w.set_multisig_ix(owner, multisig, multisig, 0),
+        &[&owner_kp],
+    )
+    .unwrap();
+    let vault = squads::vault_address(&multisig, 0);
+    let (root, ..) = two_buyer_list();
+
+    assert_eq!(
+        w.send(w.set_buyer_root_ix(owner, POLICY_ID, root), &[&owner_kp])
+            .unwrap_err(),
+        UNAUTHORIZED
+    );
+    w.send_as(w.set_buyer_root_ix(vault, POLICY_ID, root), vault)
+        .unwrap();
+    assert_eq!(w.account::<Policy>(&w.policy(&POLICY_ID)).buyer_root, root);
 }
 
 #[test]

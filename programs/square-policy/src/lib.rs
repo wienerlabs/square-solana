@@ -33,6 +33,13 @@ pub mod square_policy {
         instructions::init_institution::handler(ctx, name)
     }
 
+    /// Flow step 5 (institution side): publishes the root of the salted approved-buyer list.
+    /// Leaf = sha256(buyer_pubkey || leaf_salt); escrow `buy_claim` checks a Merkle proof against the
+    /// current root. An all-zero root means "no buyer restriction".
+    pub fn set_buyer_root(ctx: Context<SetBuyerRoot>, buyer_root: [u8; 32]) -> Result<()> {
+        instructions::set_buyer_root::handler(ctx, buyer_root)
+    }
+
     /// Binds (or, signed by the current vault, rebinds) a Squads v4 multisig. Afterwards only its
     /// vault PDA (`vault_index`) may sign as authority.
     pub fn set_institution_multisig(
