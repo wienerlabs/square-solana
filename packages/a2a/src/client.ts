@@ -62,6 +62,15 @@ const MAX_ERROR_MESSAGE = 1024;
 
 const invalid = (detail: string) => new A2aError(INVALID_RESPONSE, `Invalid agent response: ${detail}`);
 
+/** Şema doğrulaması; aşırı derin bir yanıtta zod'un yığın taşması da geçersiz yanıt sayılır. */
+function validate<T>(schema: z.ZodType<T>, value: unknown): ReturnType<z.ZodType<T>['safeParse']> | null {
+  try {
+    return schema.safeParse(value);
+  } catch {
+    return null;
+  }
+}
+
 async function readLimited(response: Response, maxBytes: number): Promise<string> {
   if (!response.body) return '';
   const reader = response.body.getReader();
@@ -100,8 +109,8 @@ function unwrap<T>(text: string, id: string, schema: z.ZodType<T>): T {
   } catch {
     throw invalid('JSON değil');
   }
-  const envelope = JsonRpcResponseSchema.safeParse(value);
-  if (!envelope.success) throw invalid('JSON-RPC yanıtı değil');
+  const envelope = validate(JsonRpcResponseSchema, value);
+  if (!envelope?.success) throw invalid('JSON-RPC yanıtı değil');
   const isError = 'error' in envelope.data;
   if (envelope.data.id !== id && !(isError && envelope.data.id === null)) {
     throw invalid('yanıt kimliği istekle eşleşmiyor');
@@ -110,7 +119,8 @@ function unwrap<T>(text: string, id: string, schema: z.ZodType<T>): T {
     const { code, message, data } = envelope.data.error;
     throw new A2aError(code, message.slice(0, MAX_ERROR_MESSAGE), errorDetails(data));
   }
-  const result = schema.safeParse(envelope.data.result);
+  const result = validate(schema, envelope.data.result);
+  if (!result) throw invalid('yanıt çözülemedi');
   if (!result.success) throw invalid(result.error.issues[0]?.message ?? 'şema');
   return result.data;
 }
@@ -181,7 +191,7 @@ export function createA2aClient(options: A2aClientOptions): A2aClient {
         while (boundary !== -1) {
           const block = buffer.slice(0, boundary);
           buffer = buffer.slice(boundary + 2);
-          if (block.length > maxBytes) throw invalid('akış olayı boyut sınırını aşıyor');
+          if (Buffer.byteLength(block) > maxBytes) throw invalid('akış olayı boyut sınırını aşıyor');
           const data = block
             .split('\n')
             .filter((line) => line.startsWith('data:'))
@@ -190,7 +200,7 @@ export function createA2aClient(options: A2aClientOptions): A2aClient {
           if (data) yield unwrap(data, id, StreamResponseSchema);
           boundary = buffer.indexOf('\n\n');
         }
-        if (buffer.length > maxBytes) throw invalid('akış olayı boyut sınırını aşıyor');
+        if (Buffer.byteLength(buffer) > maxBytes) throw invalid('akış olayı boyut sınırını aşıyor');
       }
     } finally {
       clearTimeout(idle);

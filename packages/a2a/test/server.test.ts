@@ -705,6 +705,329 @@ describe('devam mesajlarının teslimi', () => {
   });
 });
 
+describe('üçüncü tur: teslim, bekleyici ve kapanış', () => {
+  const countingBus = () => {
+    const bus = createTaskEventBus();
+    const counter = { subscriptions: 0 };
+    return {
+      counter,
+      bus: {
+        publish: bus.publish,
+        subscribe: (taskId: string, listener: Parameters<typeof bus.subscribe>[1]) => {
+          counter.subscriptions += 1;
+          const unsubscribe = bus.subscribe(taskId, listener);
+          let active = true;
+          return () => {
+            if (!active) return;
+            active = false;
+            counter.subscriptions -= 1;
+            unsubscribe();
+          };
+        },
+      },
+    };
+  };
+
+  it('append ile birleşen artefakt 64 parça sınırını aşamaz; görev okunabilir kalır', async () => {
+    await h.openJob(JOB_A, 'a');
+    let failure: unknown = null;
+    h.scripts.set(JOB_A, async (context) => {
+      for (let i = 0; i < 65; i += 1) {
+        const added = await context
+          .addArtifact({ artifactId: 'rapor', parts: [{ text: `parça ${i}` }] }, { append: true })
+          .then(
+            () => true,
+            (error: unknown) => {
+              failure = error;
+              return false;
+            },
+          );
+        if (!added) break;
+      }
+      await context.reject('bitti');
+    });
+    const { task } = await h.client().sendMessage({ message: openingMessage(JOB_A, 'a') });
+    expect(String(failure)).toMatch(/64/);
+    expect(task?.artifacts?.[0]?.parts).toHaveLength(64);
+    expect((await h.client().getTask({ id: task!.id })).artifacts?.[0]?.parts).toHaveLength(64);
+  });
+
+  it('işlenmiş devam mesajı yeniden başlatmada tekrar iletilmez; agent görevi bitirince de işlendi sayılır', async () => {
+    await h.openJob(JOB_A, 'a');
+    await h.openJob(JOB_B, 'b');
+    h.scripts.set(JOB_A, async (context) => context.requireInput('ayrıntı?'));
+    h.scripts.set(JOB_B, async (context) => context.requireInput('ayrıntı?'));
+    h.continuations.set(JOB_A, async (context) => context.requireInput('başka ayrıntı?'));
+    h.continuations.set(JOB_B, async (context) => context.reject('olmaz'));
+    const client = h.client();
+    for (const [job, title] of [
+      [JOB_A, 'a'],
+      [JOB_B, 'b'],
+    ] as const) {
+      const { task } = await client.sendMessage({ message: openingMessage(job, title) });
+      await client.sendMessage({
+        message: { messageId: `${title}-2`, role: 'ROLE_USER', taskId: task!.id, parts: [{ text: 'yanıt' }] },
+      });
+    }
+    expect(await db.client.a2aMessage.count({ where: { pending: true } })).toBe(0);
+    await restart({ chain: h.chain });
+    let redelivered = 0;
+    h.continuations.set(JOB_A, async () => {
+      redelivered += 1;
+    });
+    expect(await h.server.resume()).toBe(0);
+    expect(redelivered).toBe(0);
+  });
+
+  it('aynı devam mesajının eşzamanlı tekrarları agent a bir kez iletilir', async () => {
+    await h.openJob(JOB_A, 'a');
+    h.scripts.set(JOB_A, async (context) => context.requireInput('ayrıntı?'));
+    let calls = 0;
+    h.continuations.set(JOB_A, async (context) => {
+      calls += 1;
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      await context.requireInput('başka?');
+    });
+    const client = h.client();
+    const { task } = await client.sendMessage({ message: openingMessage(JOB_A, 'a') });
+    const reply = () =>
+      client.sendMessage({
+        message: { messageId: 'm-2', role: 'ROLE_USER', taskId: task!.id, parts: [{ text: 'cuma' }] },
+        configuration: { returnImmediately: true },
+      });
+    await Promise.all(Array.from({ length: 5 }, reply));
+    await until(async () => (await db.client.a2aMessage.count({ where: { pending: true } })) === 0);
+    expect(calls).toBe(1);
+  });
+
+  it('resume meşgul görevin bekleyen mesajını da iletir, listede terminal görüneni başlatmaz', async () => {
+    let failOpening = false;
+    let staleActive: Awaited<ReturnType<TaskStore['active']>> | null = null;
+    let inner: TaskStore | null = null;
+    await restart({
+      wrapStore: (store): TaskStore => ({
+        ...((inner = store), store),
+        active: async (agentRecord) => staleActive ?? store.active(agentRecord),
+        message: async (taskId, messageId) => {
+          if (failOpening && messageId === 'm-a') {
+            failOpening = false;
+            throw new Error('geçici depo hatası');
+          }
+          return store.message(taskId, messageId);
+        },
+      }),
+    });
+    await h.openJob(JOB_A, 'a');
+    let release: () => void = () => undefined;
+    const held = new Promise<void>((resolve) => (release = resolve));
+    h.scripts.set(JOB_A, async (context) => {
+      await context.requireInput('ayrıntı?');
+      await held;
+    });
+    const delivered: string[] = [];
+    h.continuations.set(JOB_A, async (context, message) => {
+      delivered.push(message.messageId);
+      await context.reject('olmaz');
+    });
+    const client = h.client();
+    const { task } = await client.sendMessage({ message: openingMessage(JOB_A, 'a') });
+    failOpening = true;
+    await expect(
+      client.sendMessage({
+        message: { messageId: 'm-2', role: 'ROLE_USER', taskId: task!.id, parts: [{ text: 'cuma' }] },
+        configuration: { returnImmediately: true },
+      }),
+    ).rejects.toMatchObject({ code: -32603 });
+    expect(await h.server.resume()).toBe(1);
+    release();
+    await until(() => delivered.length === 1);
+    expect(delivered).toEqual(['m-2']);
+
+    await h.openJob(JOB_B, 'b');
+    const { task: done } = await client.sendMessage({
+      message: openingMessage(JOB_B, 'b'),
+      configuration: { returnImmediately: true },
+    });
+    await client.cancelTask({ id: done!.id });
+    staleActive = [(await inner!.get(AGENT_RECORD, done!.id))!];
+    let started = 0;
+    h.scripts.set(JOB_B, async () => {
+      started += 1;
+    });
+    expect(await h.server.resume()).toBe(0);
+    expect(started).toBe(0);
+
+    staleActive = null;
+    await restart({ chain: h.chain });
+    await h.openJob(JOB_C, 'c');
+    const { task: queued } = await h.client().sendMessage({
+      message: openingMessage(JOB_C, 'c'),
+      configuration: { returnImmediately: true },
+    });
+    await restart({ chain: h.chain });
+    await h.chain.setStatus(JOB_C, 'cancelled');
+    let resumedC = 0;
+    h.scripts.set(JOB_C, async () => {
+      resumedC += 1;
+    });
+    expect(await h.server.resume()).toBe(0);
+    expect(resumedC).toBe(0);
+    expect((await h.client().getTask({ id: queued!.id })).status.state).toBe('TASK_STATE_CANCELED');
+  });
+
+  it('resume zincirde iptal edilen görevin bekleyen devam mesajını iletmez', async () => {
+    let failOpening = false;
+    await restart({
+      wrapStore: (store): TaskStore => ({
+        ...store,
+        message: async (taskId, messageId) => {
+          if (failOpening && messageId === 'm-a') {
+            failOpening = false;
+            throw new Error('geçici depo hatası');
+          }
+          return store.message(taskId, messageId);
+        },
+      }),
+    });
+    await h.openJob(JOB_A, 'a');
+    h.scripts.set(JOB_A, async (context) => context.requireInput('ayrıntı?'));
+    const client = h.client();
+    const { task } = await client.sendMessage({ message: openingMessage(JOB_A, 'a') });
+    failOpening = true;
+    await expect(
+      client.sendMessage({
+        message: { messageId: 'm-2', role: 'ROLE_USER', taskId: task!.id, parts: [{ text: 'cuma' }] },
+        configuration: { returnImmediately: true },
+      }),
+    ).rejects.toMatchObject({ code: -32603 });
+    await restart({ chain: h.chain });
+    await h.chain.setStatus(JOB_A, 'cancelled');
+    let delivered = 0;
+    h.continuations.set(JOB_A, async () => {
+      delivered += 1;
+    });
+    expect(await h.server.resume()).toBe(0);
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(delivered).toBe(0);
+    expect((await h.client().getTask({ id: task!.id })).status.state).toBe('TASK_STATE_CANCELED');
+  });
+
+  it('bekleyici her yolda bırakılır: tekrar edilen bitmiş görev, okuma hatası ve eşzamanlı açılış', async () => {
+    const counting = countingBus();
+    let failGet = 0;
+    let forceDuplicate = false;
+    await restart({
+      bus: counting.bus,
+      wrapStore: (store): TaskStore => ({
+        ...store,
+        get: async (agentRecord, id) => {
+          if (failGet > 0) {
+            failGet -= 1;
+            throw new Error('okuma hatası');
+          }
+          return store.get(agentRecord, id);
+        },
+        create: async (task) => {
+          const result = await store.create(task);
+          return forceDuplicate ? { ...result, created: false } : result;
+        },
+      }),
+    });
+    await h.openJob(JOB_A, 'a');
+    h.scripts.set(JOB_A, async (context) => context.reject('olmaz'));
+    const client = h.client();
+    await client.sendMessage({ message: openingMessage(JOB_A, 'a') });
+    expect((await client.sendMessage({ message: openingMessage(JOB_A, 'a') })).task?.status.state).toBe(
+      'TASK_STATE_REJECTED',
+    );
+    expect(counting.counter.subscriptions).toBe(0);
+    failGet = 1;
+    await expect(client.sendMessage({ message: openingMessage(JOB_A, 'a') })).rejects.toMatchObject({
+      code: -32603,
+    });
+    expect(counting.counter.subscriptions).toBe(0);
+    await h.openJob(JOB_B, 'b');
+    forceDuplicate = true;
+    failGet = 1;
+    await expect(client.sendMessage({ message: openingMessage(JOB_B, 'b') })).rejects.toMatchObject({
+      code: -32603,
+    });
+    expect(counting.counter.subscriptions).toBe(0);
+  });
+
+  it('kapanış sırasında süren açılış görevi kaydeder ama agent işi başlatmaz; açılmak üzere olan akış 503 alır', async () => {
+    let gate: Promise<void> | null = null;
+    let reached: () => void = () => undefined;
+    await restart({
+      wrapJobSource: (source) => ({
+        getJob: async (address) => {
+          if (gate) {
+            const waiting = gate;
+            gate = null;
+            reached();
+            await waiting;
+          }
+          return source.getJob(address);
+        },
+      }),
+    });
+    await h.openJob(JOB_A, 'a');
+    let started = 0;
+    h.scripts.set(JOB_A, async () => {
+      started += 1;
+    });
+    let open: () => void = () => undefined;
+    gate = new Promise<void>((resolve) => (open = resolve));
+    const reachedP = new Promise<void>((resolve) => (reached = resolve));
+    const pending = h.client().sendMessage({
+      message: openingMessage(JOB_A, 'a'),
+      configuration: { returnImmediately: true },
+    });
+    await reachedP;
+    const closing = h.server.close();
+    open();
+    await closing;
+    const { task } = await pending;
+    expect(task?.status.state).toBe('TASK_STATE_SUBMITTED');
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(started).toBe(0);
+  });
+
+  it('kapanış başladıktan sonra açılmak üzere olan akış JSON 503 ile reddedilir', async () => {
+    let gate: Promise<void> | null = null;
+    let reached: () => void = () => undefined;
+    await restart({
+      wrapStore: (store): TaskStore => ({
+        ...store,
+        history: async (taskId, limit) => {
+          if (gate) {
+            const waiting = gate;
+            gate = null;
+            reached();
+            await waiting;
+          }
+          return store.history(taskId, limit);
+        },
+      }),
+    });
+    await h.openJob(JOB_A, 'a');
+    h.scripts.set(JOB_A, async (context) => context.requireInput('?'));
+    const client = h.client();
+    const { task } = await client.sendMessage({ message: openingMessage(JOB_A, 'a') });
+    let open: () => void = () => undefined;
+    gate = new Promise<void>((resolve) => (open = resolve));
+    const reachedP = new Promise<void>((resolve) => (reached = resolve));
+    const stream = (async () => {
+      for await (const event of client.subscribeToTask({ id: task!.id })) void event;
+    })();
+    await reachedP;
+    const closing = h.server.close();
+    open();
+    await closing;
+    await expect(stream).rejects.toMatchObject({ code: -32000 });
+  });
+});
+
 describe('agent girdisi ve akış açılışı', () => {
   it("agent'ın NUL içeren metni ve artefaktı depoya gitmeden reddedilir", async () => {
     await h.openJob(JOB_A, 'a');

@@ -107,7 +107,8 @@ export interface A2aServer {
   handle(request: IncomingMessage, response: ServerResponse): Promise<void>;
   /**
    * Yeniden başlatmadan sonra agent işlerini kurar: SUBMITTED ve WORKING görevler için `onTask`, işlenmemiş
-   * devam mesajları için `onMessage`. Bu süreçte işi süren göreve dokunmaz; iş kurulan görev sayısını döner.
+   * devam mesajları için `onMessage`. Bu süreçte işi süren görevin `onTask`'ını yeniden başlatmaz. Sunucu
+   * trafiğe açılmadan çağrılmalıdır. İş kurulan görev sayısını döner.
    */
   resume(): Promise<number>;
   /** Yeni istekleri ve agent işlerini durdurur, bekleyen istekleri bırakır, akışları kapatır ve çalışan işleri bekler. */
@@ -415,6 +416,10 @@ export function createA2aServer(options: A2aServerOptions): A2aServer {
         if (!current) throw new Error(`görev yok: ${taskId}`);
         if (isTerminal(current.state)) throw new Error(`terminal göreve artefakt eklenemez: ${current.state}`);
         const artifacts = mergeArtifact(current.artifacts, artifact, append);
+        const merged = artifacts.find((candidate) => candidate.artifactId === artifact.artifactId);
+        if (!ArtifactSchema.safeParse(merged).success) {
+          throw new Error(`artefakt ${artifact.artifactId} birleşince geçersiz: en fazla 64 parça`);
+        }
         if (Buffer.byteLength(JSON.stringify(artifacts)) > limits.maxArtifactBytes) {
           throw new Error(`görevin artefaktları ${limits.maxArtifactBytes} bayt sınırını aşıyor`);
         }
@@ -456,22 +461,30 @@ export function createA2aServer(options: A2aServerOptions): A2aServer {
   }
 
   /**
-   * Agent işini görevin kuyruğuna ekler. Sunucu kapanıyorsa ya da görevin sinyali kesildiyse iş çalışmaz.
-   * Hata fırlatırsa görev (hâlâ uygunsa) FAILED olur. İş kesintisiz biterse `settle` çalışır.
+   * Agent işini görevin kuyruğuna ekler. Sunucu kapanıyorsa iş çalışmaz; görevin sinyali kesildiyse (görev
+   * terminal) iş atlanır. Hata fırlatırsa görev (hâlâ uygunsa) FAILED olur. Kapanış dışında `settle` her
+   * durumda çalışır: terminal göreve gelen mesaj yeniden iletilmez, kapanışta yarım kalan mesaj bekler.
    */
   function run(taskId: string, work: () => Promise<void>, signal: AbortSignal, settle?: () => Promise<void>) {
     return track(
       serial(queues, taskId, async () => {
-        if (closing || signal.aborted) return;
-        try {
-          await work();
-        } catch (error) {
-          report(error);
-          if (!signal.aborted) {
-            await transition(taskId, 'TASK_STATE_FAILED', 'agent görevi tamamlayamadı').catch(report);
+        if (closing) return;
+        if (!signal.aborted) {
+          try {
+            await work();
+          } catch (error) {
+            report(error);
+            if (!signal.aborted) {
+              await transition(taskId, 'TASK_STATE_FAILED', 'agent görevi tamamlayamadı').catch(report);
+            }
           }
         }
-        if (settle && !signal.aborted) await settle().catch(report);
+        if (!settle || closing) return;
+        try {
+          await settle();
+        } catch (error) {
+          report(error);
+        }
       }),
     );
   }
@@ -496,12 +509,15 @@ export function createA2aServer(options: A2aServerOptions): A2aServer {
     if (closing || inflight.has(key)) return;
     inflight.add(key);
     const { signal } = controllerFor(task.id);
+    const clear = () => {
+      inflight.delete(key);
+    };
     void run(
       task.id,
       () => onMessage(contextFor(task, job, opening, signal), message),
       signal,
       () => store.markProcessed(task.id, message.messageId),
-    ).then(() => inflight.delete(key));
+    ).then(clear, clear);
   }
 
   const messageIdConflict = () => new TaskStoreError('message-id', 'aynı mesaj kimliği farklı içerikle kullanıldı');
@@ -541,7 +557,13 @@ export function createA2aServer(options: A2aServerOptions): A2aServer {
       start(task, decision.job, message);
       return { task, waiter };
     }
-    const latest = (await store.get(agentRecord, task.id)) ?? task;
+    let latest: TaskRecord;
+    try {
+      latest = (await store.get(agentRecord, task.id)) ?? task;
+    } catch (error) {
+      waiter?.cancel();
+      throw error;
+    }
     if (waiter && settled(latest.state)) {
       waiter.cancel();
       return { task: latest, waiter: null };
@@ -694,6 +716,7 @@ export function createA2aServer(options: A2aServerOptions): A2aServer {
       const snapshot = await store.get(agentRecord, taskId);
       if (!snapshot) throw errors.taskNotFound();
       const first = successResponse(id, { task: await wireWithHistory(snapshot, historyLength) });
+      if (closing) throw errors.unavailable();
       if (response.destroyed) return;
       sse = openSse(response, {
         heartbeatMs: limits.heartbeatMs,
@@ -924,20 +947,24 @@ export function createA2aServer(options: A2aServerOptions): A2aServer {
       for (const listed of await store.active(agentRecord)) {
         try {
           const started = await locked(listed.id, async () => {
-            if (closing || queues.has(listed.id)) return false;
+            if (closing) return false;
             const fresh = await store.get(agentRecord, listed.id);
-            if (!fresh) return false;
+            if (!fresh || isTerminal(fresh.state)) return false;
+            const runnable = fresh.state === 'TASK_STATE_SUBMITTED' || fresh.state === 'TASK_STATE_WORKING';
+            const busy = queues.has(fresh.id) || controllers.has(fresh.id);
+            const pending = onMessage ? await store.pendingMessages(fresh.id) : [];
+            if ((!runnable || busy) && pending.length === 0) return false;
             const { task, job } = await reconcileTask(fresh, true);
             if (!job || isTerminal(task.state)) return false;
             const opening = (await store.message(task.id, task.createMessageId))?.message;
             if (!opening) return false;
             let any = false;
-            if (task.state === 'TASK_STATE_SUBMITTED' || task.state === 'TASK_STATE_WORKING') {
+            if (!busy && (task.state === 'TASK_STATE_SUBMITTED' || task.state === 'TASK_STATE_WORKING')) {
               start(task, job, opening);
               any = true;
             }
             if (onMessage) {
-              for (const message of await store.pendingMessages(task.id)) {
+              for (const message of pending) {
                 deliver(task, job, opening, message, onMessage);
                 any = true;
               }

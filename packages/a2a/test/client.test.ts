@@ -1,3 +1,4 @@
+import { getEventListeners } from 'node:events';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -149,6 +150,66 @@ describe('createA2aClient', () => {
     const seen: unknown[] = [];
     for await (const event of client.subscribeToTask({ id: 't-1' })) seen.push(event);
     expect(seen).toEqual([{ task: TASK }]);
+  });
+
+  it('akış bitince signal dinleyicisi kalkar; önceden kesilmiş signal istek göndermez', async () => {
+    let requests = 0;
+    const url = await fake((body, res) => {
+      requests += 1;
+      res.writeHead(200, { 'content-type': 'text/event-stream' });
+      res.end(`data: ${JSON.stringify({ jsonrpc: '2.0', id: body.id, result: { task: TASK } })}\n\n`);
+    });
+    const client = createA2aClient({ url, timeoutMs: 2_000, allowInsecureHttp: true });
+    const controller = new AbortController();
+    for await (const event of client.subscribeToTask({ id: 't-1' }, { signal: controller.signal })) void event;
+    expect(getEventListeners(controller.signal, 'abort')).toHaveLength(0);
+    expect(requests).toBe(1);
+    await expect(
+      (async () => {
+        for await (const event of client.subscribeToTask({ id: 't-1' }, { signal: AbortSignal.abort() })) void event;
+      })(),
+    ).rejects.toThrow();
+    expect(requests).toBe(1);
+  });
+
+  it('sonlanmamış büyük olay boyut sınırında kesilir; sınır bayt sayar', async () => {
+    let mode = 'partial';
+    const url = await fake((body, res) => {
+      res.writeHead(200, { 'content-type': 'text/event-stream' });
+      if (mode === 'partial') {
+        res.write(`data: ${'x'.repeat(2048)}`);
+        return;
+      }
+      res.end(
+        `data: ${JSON.stringify({ jsonrpc: '2.0', id: body.id, result: { task: { ...TASK, metadata: { not: 'ğ'.repeat(300) } } } })}\n\n`,
+      );
+    });
+    const client = createA2aClient({ url, timeoutMs: 5_000, allowInsecureHttp: true, maxResponseBytes: 512 });
+    const started = Date.now();
+    await expect(
+      (async () => {
+        for await (const event of client.subscribeToTask({ id: 't-1' })) void event;
+      })(),
+    ).rejects.toMatchObject({ code: -32006 });
+    expect(Date.now() - started).toBeLessThan(2_000);
+    mode = 'multibyte';
+    await expect(
+      (async () => {
+        for await (const event of client.subscribeToTask({ id: 't-1' })) void event;
+      })(),
+    ).rejects.toMatchObject({ code: -32006 });
+  });
+
+  it('çok derin iç içe yanıt -32006 olur', async () => {
+    const deep = `${'['.repeat(20_000)}0${']'.repeat(20_000)}`;
+    const url = await fake((body, res) => {
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end(
+        `{"jsonrpc":"2.0","id":${JSON.stringify(body.id)},"result":{"id":"t-1","contextId":"c-1","status":{"state":"TASK_STATE_WORKING"},"artifacts":[{"artifactId":"a","parts":[{"data":${deep}}]}]}}`,
+      );
+    });
+    const client = createA2aClient({ url, timeoutMs: 5_000, allowInsecureHttp: true });
+    await expect(client.getTask({ id: 't-1' })).rejects.toMatchObject({ code: -32006 });
   });
 
   it('yalnız kalp atışı gelen akış signal ile durdurulur', async () => {
