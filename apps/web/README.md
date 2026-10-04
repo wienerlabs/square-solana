@@ -6,6 +6,7 @@ Square'in web uygulaması: Next.js 16 (App Router), React 19, Tailwind CSS 4 ve 
 |---|---|
 | `/` | Landing: değer önerisi, 8 adımlı akış, programlar ve ağ (canlı); bütün butonlar uygulamaya gider |
 | `/app` | Uygulama: bağlı cüzdanın adresi, SOL ve USDC bakiyesi, ağın canlı durumu ve doğrulaması, rol seçimi |
+| `/app/policy` | Kurumun harcama politikası: sır, kural editörü, alıcı listesi, zincire gidecek değerler (FE-04) |
 | `/design` | Bileşen kataloğu |
 | `/healthz` | Sağlık kontrolü (Railway) |
 
@@ -36,6 +37,20 @@ RPC adresi istemci bileşenine (`ConnectionProvider`) gider, yani tarayıcıya i
 | Bakiyeler | SOL ve USDC, hesap aboneliğiyle canlı. USDC'nin mint'i ortamdan değil, escrow'un `EscrowConfig` hesabındaki `settlement_mint`'ten okunur (işlerin kullanabildiği tek mint). `SQUARE_PROGRAM_ID_ESCROW` tanımlı değilse ya da config init edilmemişse bakiye yerine sebebi görünür |
 | Rol | Institution, agent ya da buyer (Square sözlüğü); her rolün adımları 8 adımlı akıştan türetilir. Seçim cüzdan başına, bu tarayıcıda (`localStorage.square-role:<adres>`) tutulur; `useRole()` ile okunur |
 | Oturum | Ed25519 imzalı API oturumu, imzalanacak mesajın biçimini belirleyecek BE-18'i (`apps/api`) bekliyor |
+
+## Politika sayfası (FE-04)
+
+Institution rolündeki cüzdan için; `SQUARE_PROGRAM_ID_POLICY` gerekir, çünkü commitment `Institution` PDA'sını (`operator_id_field`) bağlar.
+
+| Parça | Davranış |
+|---|---|
+| Sır | `generatePolicySecret()` ile 32 bayt; 8 salt'ın tek kaynağı (`derivePolicySalts`). Bu tarayıcıda `localStorage.square-policy-secret:<cüzdan>`'da, şifrelenmeden tutulur; sunucuya gönderilmez |
+| Yedek | `square-policy-backup` v1 JSON: sır, taslaklar ve alıcı salt'ları. Yalnızca aynı cüzdana geri yüklenir. Sır kaybolursa ispat üretilemez ve release'ler gerçekleşmez |
+| Kurallar | `PolicyDocument`'ın alanları, devrenin sınırlarıyla (`POLICY_CIRCUIT_LIMITS`). Settlement mint'i escrow config'inden biliniyorsa tutarlar USDC olarak girilir: ondalık mint hesabından okunur, çeviri tam sayı aritmetiğiyle (`parseUnits`) yapılır, mint'in ondalığından fazla basamak hatadır, taban birim karşılığı yanında gösterilir. Mint bilinmiyorsa alanlar taban birimdedir. Taslakta tutarlar her zaman taban birimdir. Whitelist'te settlement mint'in olup olmadığı da gösterilir. Public tavan 0 ya da whitelist'te settlement mint yoksa uyarı verilir |
+| Alıcılar | Satır başına bir cüzdan; her alıcıya `generateLeafSalt()` ile salt, kök `buildBuyerTree` ile. Boş liste sıfır kök (kısıtsız) |
+| Zincire giden | Institution ve Policy PDA'ları, `policy_id`, commitment (`computePolicyCommitment`), `daily_ceiling`, `buyer_root`; hepsi tarayıcıda hesaplanır. `set_policy` / `set_buyer_root` tx'leri, square_policy bu instruction'larla deploy edilince eklenecek (BC-17, BC-18) |
+
+PDA'lar SDK'nın IDL seed'lerinden türetilir (`src/lib/idl-pda.ts`, SDK'nın `createPda`'sıyla aynı adresler; testli). Anchor yalnızca gerektiğinde yüklenir.
 
 ## Tasarım sistemi
 

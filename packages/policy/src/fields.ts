@@ -2,18 +2,18 @@
 // circomlibjs ile aynı BN254 sabitlerini kullanan `poseidon-lite` (MIT) ile hesaplanır; uyum devrenin
 // test vektörleriyle denetlenir (test/circuit-vectors.test.ts).
 import type { PublicKey } from '@solana/web3.js';
-import {
-  poseidon1,
-  poseidon10,
-  poseidon2,
-  poseidon3,
-  poseidon4,
-  poseidon5,
-  poseidon6,
-  poseidon7,
-  poseidon8,
-  poseidon9,
-} from 'poseidon-lite';
+// Genişlikler alt yollardan alınır: paketin ana girişi 1–16'nın sabitlerini birlikte yükler, burada
+// yalnızca 1–10 kullanılır (tarayıcı paketlerinde ~350 KB fark).
+import { poseidon1 } from 'poseidon-lite/poseidon1';
+import { poseidon10 } from 'poseidon-lite/poseidon10';
+import { poseidon2 } from 'poseidon-lite/poseidon2';
+import { poseidon3 } from 'poseidon-lite/poseidon3';
+import { poseidon4 } from 'poseidon-lite/poseidon4';
+import { poseidon5 } from 'poseidon-lite/poseidon5';
+import { poseidon6 } from 'poseidon-lite/poseidon6';
+import { poseidon7 } from 'poseidon-lite/poseidon7';
+import { poseidon8 } from 'poseidon-lite/poseidon8';
+import { poseidon9 } from 'poseidon-lite/poseidon9';
 
 /** BN254 skaler alanı (devrenin alanı). */
 export const BN254_R = 21888242871839275222246405745257275088548364400416034343698204186575808495617n;

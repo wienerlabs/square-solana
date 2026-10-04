@@ -23,10 +23,11 @@ kanıt doğrulaması `square_common::merkle`'dedir.
 
 ```bash
 anchor build -p square_policy
-cargo test -p square-policy
+cargo test --manifest-path tests/programs/Cargo.toml --test policy
 ```
 
-Testler derlenmiş programı LiteSVM'de çalıştırır:
+Testler [`tests/programs/tests/policy.rs`](../../tests/programs/tests/policy.rs)'tedir ve derlenmiş
+programı LiteSVM'de çalıştırır (BC-12 harness'ı):
 
 - politika içeriğinin zincire çıkmaması;
 - her güncellemede sürümün artması;

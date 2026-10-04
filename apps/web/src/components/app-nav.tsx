@@ -1,0 +1,30 @@
+'use client';
+
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+
+const SECTIONS = [
+  { href: '/app', label: 'Overview' },
+  { href: '/app/policy', label: 'Policy' },
+] as const;
+
+export function AppNav() {
+  const pathname = usePathname();
+  return (
+    <nav aria-label="App" className="flex gap-1 text-sm">
+      {SECTIONS.map((section) => {
+        const current = pathname === section.href;
+        return (
+          <Link
+            key={section.href}
+            href={section.href}
+            aria-current={current ? 'page' : undefined}
+            className={`rounded-full px-3 py-1.5 ${current ? 'bg-surface-muted font-medium text-text' : 'text-muted hover:text-text'}`}
+          >
+            {section.label}
+          </Link>
+        );
+      })}
+    </nav>
+  );
+}
