@@ -25,7 +25,7 @@ pnpm license:write
 | `anchor-lang` | cargo | Apache-2.0 | runtime | `aip-registry`, `policy-registry`, `square-common`, `square-escrow`, `verifier` | ✓ |
 | `anchor-spl` | cargo | Apache-2.0 | runtime | `square-escrow` | ✓ |
 | `groth16-solana` | cargo | MIT | runtime | `verifier` | ✓ |
-| `serde_json` | cargo | MIT OR Apache-2.0 | dev | `square-common` | ✓ |
+| `serde_json` | cargo | MIT OR Apache-2.0 | build | `square-common` | ✓ |
 | `sha2` | cargo | MIT OR Apache-2.0 | runtime | `policy-registry` | ✓ |
 | `solana-instructions-sysvar` | cargo | Apache-2.0 | runtime | `verifier` | ✓ |
 | `solana-sdk-ids` | cargo | Apache-2.0 | runtime | `verifier` | ✓ |
