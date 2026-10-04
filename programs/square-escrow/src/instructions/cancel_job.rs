@@ -1,4 +1,5 @@
 use anchor_lang::prelude::*;
+use square_common::seeds::{JOB_SEED, REPUTATION_SEED, VAULT_SEED};
 use anchor_spl::token_interface::{self, CloseAccount, Mint, TokenAccount, TokenInterface, TransferChecked};
 
 use crate::errors::CovError;
@@ -19,7 +20,7 @@ pub struct CancelJob<'info> {
 
     #[account(
         mut,
-        seeds = [b"job", poster.key().as_ref(), &job_escrow.spec_hash],
+        seeds = [JOB_SEED, poster.key().as_ref(), &job_escrow.spec_hash],
         bump = job_escrow.bump,
         close = poster,
     )]
@@ -39,7 +40,7 @@ pub struct CancelJob<'info> {
     /// decoy, close the job PDA, and permanently strand the real escrow.
     #[account(
         mut,
-        seeds = [b"escrow_token", job_escrow.key().as_ref()],
+        seeds = [VAULT_SEED, job_escrow.key().as_ref()],
         bump,
         constraint = escrow_token_account.owner == job_escrow.key(),
         constraint = escrow_token_account.mint == job_escrow.token_mint @ CovError::MintMismatch,
@@ -57,7 +58,7 @@ pub struct CancelJob<'info> {
         init_if_needed,
         payer = signer,
         space = AgentReputation::LEN,
-        seeds = [b"reputation", job_escrow.taker.as_ref()],
+        seeds = [REPUTATION_SEED, job_escrow.taker.as_ref()],
         bump,
     )]
     pub taker_reputation: Box<Account<'info, AgentReputation>>,
@@ -99,7 +100,7 @@ pub fn handler(ctx: Context<CancelJob>) -> Result<()> {
     let poster_key = ctx.accounts.poster.key();
     let spec_hash = job.spec_hash;
     let bump = job.bump;
-    let seeds: &[&[u8]] = &[b"job", poster_key.as_ref(), spec_hash.as_ref(), &[bump]];
+    let seeds: &[&[u8]] = &[JOB_SEED, poster_key.as_ref(), spec_hash.as_ref(), &[bump]];
     let signer_seeds = &[seeds];
 
     // 1. Transfer escrow balance back to poster

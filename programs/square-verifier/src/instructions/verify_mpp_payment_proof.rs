@@ -1,4 +1,5 @@
 use anchor_lang::prelude::*;
+use square_common::seeds::{OPERATOR_STATE_SEED, legacy};
 use solana_instructions_sysvar::load_instruction_at_checked;
 use solana_sdk_ids::{ed25519_program, sysvar::instructions};
 use groth16_solana::groth16::Groth16Verifier;
@@ -44,7 +45,7 @@ pub struct VerifyMppPaymentProof<'info> {
         init_if_needed,
         payer = payer,
         space = 8 + ProofRecord::INIT_SPACE,
-        seeds = [b"proof", operator.key().as_ref(), &public_inputs[1]],
+        seeds = [legacy::PROOF_SEED, operator.key().as_ref(), &public_inputs[1]],
         bump,
     )]
     pub proof_record: Account<'info, ProofRecord>,
@@ -53,7 +54,7 @@ pub struct VerifyMppPaymentProof<'info> {
         init_if_needed,
         payer = payer,
         space = 8 + ComplianceStatus::INIT_SPACE,
-        seeds = [b"compliance", operator.key().as_ref()],
+        seeds = [legacy::COMPLIANCE_SEED, operator.key().as_ref()],
         bump,
     )]
     pub compliance_status: Account<'info, ComplianceStatus>,
@@ -62,7 +63,7 @@ pub struct VerifyMppPaymentProof<'info> {
         init_if_needed,
         payer = payer,
         space = 8 + OperatorState::INIT_SPACE,
-        seeds = [b"operator_state", operator.key().as_ref()],
+        seeds = [OPERATOR_STATE_SEED, operator.key().as_ref()],
         bump,
     )]
     pub operator_state: Account<'info, OperatorState>,

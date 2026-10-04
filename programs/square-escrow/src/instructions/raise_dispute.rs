@@ -1,4 +1,5 @@
 use anchor_lang::prelude::*;
+use square_common::seeds::{BOND_SEED, CONFIG_SEED, JOB_SEED};
 use anchor_spl::token_interface::{self, Mint, TokenAccount, TokenInterface, TransferChecked};
 
 use crate::errors::CovError;
@@ -10,14 +11,14 @@ pub struct RaiseDispute<'info> {
     pub poster: Signer<'info>,
 
     #[account(
-        seeds = [b"config"],
+        seeds = [CONFIG_SEED],
         bump = config.bump,
     )]
     pub config: Box<Account<'info, ProtocolConfig>>,
 
     #[account(
         mut,
-        seeds = [b"job", poster.key().as_ref(), &job_escrow.spec_hash],
+        seeds = [JOB_SEED, poster.key().as_ref(), &job_escrow.spec_hash],
         bump = job_escrow.bump,
     )]
     pub job_escrow: Box<Account<'info, JobEscrow>>,
@@ -30,7 +31,7 @@ pub struct RaiseDispute<'info> {
         token::mint = token_mint,
         token::authority = job_escrow,
         token::token_program = token_program,
-        seeds = [b"bond", job_escrow.key().as_ref()],
+        seeds = [BOND_SEED, job_escrow.key().as_ref()],
         bump,
     )]
     pub bond_token_account: Box<InterfaceAccount<'info, TokenAccount>>,

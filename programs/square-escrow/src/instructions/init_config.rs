@@ -1,4 +1,5 @@
 use anchor_lang::prelude::*;
+use square_common::seeds::CONFIG_SEED;
 
 use crate::errors::CovError;
 use crate::state::{ProtocolConfig, ARBITRATOR_COUNT};
@@ -12,7 +13,7 @@ pub struct InitConfig<'info> {
         init,
         payer = admin,
         space = ProtocolConfig::LEN,
-        seeds = [b"config"],
+        seeds = [CONFIG_SEED],
         bump,
     )]
     pub config: Box<Account<'info, ProtocolConfig>>,

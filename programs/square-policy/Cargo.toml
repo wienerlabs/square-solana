@@ -13,8 +13,9 @@ no-idl = []
 no-log-ix-name = []
 cpi = ["no-entrypoint"]
 default = []
-idl-build = ["anchor-lang/idl-build"]
+idl-build = ["anchor-lang/idl-build", "square-common/idl-build"]
 
 [dependencies]
+square-common = { path = "../../crates/square-common" }
 anchor-lang = "1.2.0"
 sha2 = "0.10"

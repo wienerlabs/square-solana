@@ -1,4 +1,5 @@
 use anchor_lang::prelude::*;
+use square_common::seeds::{CLAIM_SEED, JOB_SEED};
 
 use crate::errors::CovError;
 use crate::state::{ClaimListing, ClaimStatus, JobEscrow, JobStatus};
@@ -15,7 +16,7 @@ pub struct ListClaim<'info> {
     pub seller: Signer<'info>,
 
     #[account(
-        seeds = [b"job", poster.key().as_ref(), &job_escrow.spec_hash],
+        seeds = [JOB_SEED, poster.key().as_ref(), &job_escrow.spec_hash],
         bump = job_escrow.bump,
         constraint = job_escrow.taker == seller.key() @ CovError::Unauthorized,
         constraint = job_escrow.status == JobStatus::Delivered @ CovError::InvalidStatus,
@@ -33,7 +34,7 @@ pub struct ListClaim<'info> {
         init,
         payer = seller,
         space = ClaimListing::LEN,
-        seeds = [b"claim", job_escrow.key().as_ref()],
+        seeds = [CLAIM_SEED, job_escrow.key().as_ref()],
         bump,
     )]
     pub claim_listing: Box<Account<'info, ClaimListing>>,

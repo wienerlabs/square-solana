@@ -1,4 +1,5 @@
 use anchor_lang::prelude::*;
+use square_common::seeds::{CONFIG_SEED, JOB_SEED, VAULT_SEED};
 use anchor_spl::token_interface::{self, Mint, TokenAccount, TokenInterface, TransferChecked};
 
 use crate::errors::CovError;
@@ -11,7 +12,7 @@ pub struct CreateJob<'info> {
     pub poster: Signer<'info>,
 
     #[account(
-        seeds = [b"config"],
+        seeds = [CONFIG_SEED],
         bump = config.bump,
     )]
     pub config: Account<'info, ProtocolConfig>,
@@ -20,7 +21,7 @@ pub struct CreateJob<'info> {
         init,
         payer = poster,
         space = JobEscrow::LEN,
-        seeds = [b"job", poster.key().as_ref(), &spec_hash],
+        seeds = [JOB_SEED, poster.key().as_ref(), &spec_hash],
         bump,
     )]
     pub job_escrow: Box<Account<'info, JobEscrow>>,
@@ -41,7 +42,7 @@ pub struct CreateJob<'info> {
     #[account(
         init,
         payer = poster,
-        seeds = [b"escrow_token", job_escrow.key().as_ref()],
+        seeds = [VAULT_SEED, job_escrow.key().as_ref()],
         bump,
         token::mint = token_mint,
         token::authority = job_escrow,

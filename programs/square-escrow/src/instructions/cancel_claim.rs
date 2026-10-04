@@ -1,4 +1,5 @@
 use anchor_lang::prelude::*;
+use square_common::seeds::CLAIM_SEED;
 
 use crate::errors::CovError;
 use crate::state::{ClaimListing, ClaimStatus};
@@ -14,7 +15,7 @@ pub struct CancelClaim<'info> {
 
     #[account(
         mut,
-        seeds = [b"claim", claim_listing.job.as_ref()],
+        seeds = [CLAIM_SEED, claim_listing.job.as_ref()],
         bump = claim_listing.bump,
         close = seller,
         constraint = claim_listing.seller == seller.key() @ CovError::NotClaimSeller,

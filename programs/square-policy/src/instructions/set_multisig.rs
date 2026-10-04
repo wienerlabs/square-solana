@@ -1,4 +1,5 @@
 use anchor_lang::prelude::*;
+use square_common::seeds::{legacy, squads};
 use crate::errors::PolicyRegistryError;
 use crate::state::OperatorAccount;
 
@@ -11,9 +12,9 @@ pub const SQUADS_V4_PROGRAM_ID: Pubkey =
 pub fn derive_squads_vault(multisig_key: &Pubkey, vault_index: u8) -> (Pubkey, u8) {
     Pubkey::find_program_address(
         &[
-            b"multisig",
+            squads::MULTISIG_SEED,
             multisig_key.as_ref(),
-            b"vault",
+            squads::VAULT_SEED,
             &[vault_index],
         ],
         &SQUADS_V4_PROGRAM_ID,
@@ -24,7 +25,7 @@ pub fn derive_squads_vault(multisig_key: &Pubkey, vault_index: u8) -> (Pubkey, u
 pub struct SetMultisig<'info> {
     #[account(
         mut,
-        seeds = [b"operator", authority.key().as_ref()],
+        seeds = [legacy::OPERATOR_SEED, authority.key().as_ref()],
         bump = operator_account.bump,
         has_one = authority,
     )]

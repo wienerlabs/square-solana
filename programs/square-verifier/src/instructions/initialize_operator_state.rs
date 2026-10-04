@@ -1,4 +1,5 @@
 use anchor_lang::prelude::*;
+use square_common::seeds::OPERATOR_STATE_SEED;
 use crate::state::OperatorState;
 
 /// Allocates the OperatorState PDA for the signing operator. Called once,
@@ -16,7 +17,7 @@ pub struct InitializeOperatorState<'info> {
         init,
         payer = payer,
         space = 8 + OperatorState::INIT_SPACE,
-        seeds = [b"operator_state", operator.key().as_ref()],
+        seeds = [OPERATOR_STATE_SEED, operator.key().as_ref()],
         bump,
     )]
     pub operator_state: Account<'info, OperatorState>,

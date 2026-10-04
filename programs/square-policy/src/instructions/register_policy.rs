@@ -1,4 +1,5 @@
 use anchor_lang::prelude::*;
+use square_common::seeds::{POLICY_SEED, legacy};
 use crate::state::{OperatorAccount, PolicyAccount};
 
 #[derive(Accounts)]
@@ -8,14 +9,14 @@ pub struct RegisterPolicy<'info> {
         init,
         payer = authority,
         space = 8 + PolicyAccount::INIT_SPACE,
-        seeds = [b"policy", operator_account.key().as_ref(), &policy_id],
+        seeds = [POLICY_SEED, operator_account.key().as_ref(), &policy_id],
         bump,
     )]
     pub policy_account: Account<'info, PolicyAccount>,
 
     #[account(
         mut,
-        seeds = [b"operator", authority.key().as_ref()],
+        seeds = [legacy::OPERATOR_SEED, authority.key().as_ref()],
         bump = operator_account.bump,
         has_one = authority,
     )]

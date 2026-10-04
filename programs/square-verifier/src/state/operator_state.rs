@@ -34,19 +34,11 @@ pub struct OperatorState {
 }
 
 impl OperatorState {
-    /// Number of seconds in a UTC day. Day boundaries are computed by
-    /// flooring the current unix timestamp to a multiple of this value, so
-    /// every operator's "daily" window aligns with UTC midnight regardless
-    /// of where the wallet or the validator are physically located.
-    pub const SECONDS_PER_DAY: i64 = 86_400;
-
     /// Returns the UTC midnight (in unix seconds) that begins the day
-    /// containing `unix_timestamp`. Negative timestamps are clamped to 0.
+    /// containing `unix_timestamp`; shared with the other programs through
+    /// `square_common::time::day_start` (BC-10). Negative timestamps are clamped to 0.
     pub fn day_start_for(unix_timestamp: i64) -> i64 {
-        if unix_timestamp <= 0 {
-            return 0;
-        }
-        unix_timestamp - (unix_timestamp % Self::SECONDS_PER_DAY)
+        square_common::time::day_start(unix_timestamp)
     }
 
     /// Whether the supplied `now` timestamp belongs to a later UTC day than
