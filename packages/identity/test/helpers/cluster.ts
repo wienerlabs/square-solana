@@ -1,6 +1,6 @@
 // Test fixture: bir kümenin RPC'si (genesis hash + hesaplar) ve kart sunucusu. Çözücünün yaptığı
 // ağ çağrılarını kaydeder; "hiçbir şey okunmadan" beklentileri bununla denetlenir.
-import { BN, Program, type Idl } from '@coral-xyz/anchor';
+import { BN, Program, type Idl } from '@anchor-lang/core';
 import { PublicKey, type AccountInfo, type Connection } from '@solana/web3.js';
 import { SQUARE_IDLS } from '@squaresdk/solana-sdk';
 

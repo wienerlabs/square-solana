@@ -1,5 +1,5 @@
 // Derleme zamanı testi: instruction argüman ve hesap tipleri IDL'den eşleniyor (tsc --noEmit).
-import type { BN } from '@coral-xyz/anchor';
+import type { BN } from '@anchor-lang/core';
 import type { PublicKey } from '@solana/web3.js';
 import type { IxAccounts, IxArgs, JobAccount, SquareEscrowContract, SquareRegistryContract } from '../src/index.js';
 

@@ -1,7 +1,7 @@
 // IDL'deki seed sabitleriyle PDA türetme, tek programın kimliğiyle. SDK'nın `createPda`'sı dört program
 // kimliğini birden ister; web'de yalnızca yapılandırılmış programın PDA'ları türetilir. Seed'ler aynı
 // kaynaktan (IDL `constants`) ve aynı ad kuralıyla okunur; adresler SDK'nınkiyle aynıdır (testli).
-import type { Idl } from '@coral-xyz/anchor';
+import type { Idl } from '@anchor-lang/core';
 import { PublicKey } from '@solana/web3.js';
 import { SQUARE_IDLS } from '@squaresdk/solana-sdk';
 

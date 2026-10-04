@@ -14,5 +14,6 @@ idl
 programs
 circuits
 interfaces
+tests/legacy
 *.md
 docs/did-aip

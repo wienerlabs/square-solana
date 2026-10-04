@@ -31,19 +31,28 @@ sürüm" tercihi için başka gerekçe yazılmadı.
 
 ## Sonuçlar
 
-- Durum (2026-10-03): sürüm henüz sabitlenmedi. Taşınan üç programın `Cargo.toml`'u `anchor-lang`
-  0.31.1 ister (`Cargo.lock` 0.31.2'ye çözer), TS paketleri `@coral-xyz/anchor` 0.31.1'e sabit;
-  README'deki geliştirme ortamı tablosu Anchor CLI'ı "BC-08 ile sabitlenecek" olarak gösteriyor.
-- Sabitleme BC-08'dedir (#8): hedef sürüm, `Anchor.toml` `[toolchain]` ve `rust-toolchain.toml`,
-  gerekmiyorsa Covenant'ın `constant_time_eq` yamasının kaldırılması, escrow'da `token_interface`,
-  dört programın IDL üretimi. BC-08, escrow'un kendi sürümüyle taşınmasından (BC-04, #4) sonra gelir.
-  Kabul kriterlerinden biri Rust ve TS istemcisi için tek Anchor sürümünün belgelenmesidir; sabitlenen
-  sürüm bu ADR'nin sonuçlarına eklenir.
-- SBF derlemesi platform-tools rustc 1.84 ile yapılır (`.cargo/config.toml`); seçilecek sürüm bu
-  kısıtla uyumlu olmalıdır.
+- Sabitlenen sürüm (BC-08, #8, 2026-10-04): **Anchor 1.2.0**.
+  - Rust: dört programda `anchor-lang` 1.2.0 (escrow'da `anchor-spl` 1.2.0).
+  - TS: `@anchor-lang/core` 1.2.0. Anchor 1.0 ile TS paketi `@coral-xyz/anchor`'dan bu ada taşındı.
+  - CLI: `Anchor.toml [toolchain]` → `anchor_version = "1.2.0"`, `solana_version = "4.1.2"` (Anchor
+    1.2.0'ın önerdiği Agave sürümü).
+- SBF derlemesi Agave 4.1.2'nin platform-tools v1.54'üyle, rustc 1.89 ile yapılır. Crate'ler
+  `rust-version = "1.89"` bildirir (`.cargo/config.toml`); host derleyici `rust-toolchain.toml`'da 1.94.1.
+- Covenant'ın `constant_time_eq` yaması workspace'e hiç girmedi; gerekmedi (BC-04).
+- Escrow, `anchor_spl::token` yerine `token_interface` kullanır: transferler `transfer_checked`, bu
+  yüzden transfer yapan her talimat settlement mint'ini (`job_escrow.token_mint`) hesap olarak alır.
+- 1.x göçü: CPI'larda `CpiContext::new(program_id, …)`; program başına tek `#[error_code]` (policy'nin
+  dört ayrı hata kümesi birleşti); `solana_program` cephesinde olmayan yollar için ayrık Solana crate'leri
+  (verifier: `solana-sdk-ids`, `solana-instructions-sysvar`); `[registry]` bölümü kaldırıldı.
+- Dört programın IDL'i üretiliyor. SDK'nın IDL tip üreticisi Anchor 1.2.0'ın `anchor idl type`
+  çıktısıyla aynı (noktalı `path`'ler de parça parça camelCase).
+- Taşınabilen eski testler: verifier'ın Rust testleri (4) ve Covenant harness'ı
+  (`tests/legacy/covenant.ts`) yerel validator'da 22/22 geçiyor; 1 test kaynakta da atlanıyor (saat
+  ilerletme). Harness'ı çalıştıran altyapı BC-12'dedir.
 
 ## Açık noktalar
 
-- Aynı token hesabının bir instruction'da iki kez yazılabilir olarak geçmesinin seçilen sürümde kabul
-  edildiği doğrulanmalıdır ([program arayüzü, Açık noktalar](../design/program-interface.md#a%C3%A7%C4%B1k-noktalar),
-  8. madde).
+- Aynı yazılabilir hesabın bir talimatta iki kez geçmesi Anchor 1.x'te varsayılan olarak reddedilir
+  (`ConstraintDuplicateMutableAccount`, 2040); izin verilecek yerde hesaba açıkça `dup` kısıtı yazılır.
+  Harness'ta doğrulandı ([program arayüzü, Açık noktalar](../design/program-interface.md#a%C3%A7%C4%B1k-noktalar),
+  8. madde; uygulama BC-23).

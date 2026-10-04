@@ -1,4 +1,5 @@
 use anchor_lang::prelude::*;
+use square_common::seeds::legacy;
 use crate::state::OperatorAccount;
 
 #[derive(Accounts)]
@@ -7,7 +8,7 @@ pub struct InitializeOperator<'info> {
         init,
         payer = authority,
         space = 8 + OperatorAccount::INIT_SPACE,
-        seeds = [b"operator", authority.key().as_ref()],
+        seeds = [legacy::OPERATOR_SEED, authority.key().as_ref()],
         bump,
     )]
     pub operator_account: Account<'info, OperatorAccount>,

@@ -11,8 +11,9 @@ dizinlerinde durur.
 
 - Devnet'te gerçek işlemlerle 8 adımlı smoke testi bir script'tir ve [`scripts/`](../scripts/)
   altında durur [BC-31].
-- Covenant'ın Anchor test harness'ı (`covenant/tests/covenant.ts`) referans olarak `tests/legacy/`
-  altına taşınır [BC-04].
+- Covenant'ın Anchor test harness'ı (`covenant/tests/covenant.ts`) geçmişiyle
+  [`tests/legacy/covenant.ts`](legacy/covenant.ts)'e taşındı [BC-04]. Referanstır; çalıştırılmaz ve
+  lint / biçim denetimine girmez. Taşınabilen testler BC-08 ve BC-29'da yeniden yazılır.
 
 [BC-04]: https://github.com/wienerlabs/square-solana/issues/4
 [BC-12]: https://github.com/wienerlabs/square-solana/issues/12

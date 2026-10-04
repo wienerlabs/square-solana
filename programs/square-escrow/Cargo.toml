@@ -1,0 +1,23 @@
+[package]
+name = "square-escrow"
+version = "0.2.0"
+description = "Open settlement protocol for AI agents — optimistic escrow with bonded dispute resolution"
+edition = "2021"
+rust-version = "1.89"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "square_escrow"
+
+[features]
+default = []
+cpi = ["no-entrypoint"]
+no-entrypoint = []
+no-idl = []
+no-log-ix-name = []
+idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build", "square-common/idl-build"]
+
+[dependencies]
+square-common = { path = "../../crates/square-common" }
+anchor-lang = { version = "1.2.0", features = ["init-if-needed"] }
+anchor-spl = "1.2.0"

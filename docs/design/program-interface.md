@@ -95,7 +95,7 @@ Policy'li işlerde 7. adım, 6. adımdaki finalize'dan **önce** gelir (Arc mode
 
 **Tek CPI:** escrow → verifier `record_release`. İmzacı, escrow programı altında türetilen `["escrow_authority"]` PDA'sıdır; verifier bunu `VerifierConfig.escrow_program` ile doğrular. Gerekçe: `OperatorState` (günlük harcama sayacı) verifier'a aittir, escrow yazamaz. `release_proof` ve `operator_state` dış instruction'da da yazılabilir geçirilir (CPI yazma yetkisini yükseltemez). CPI derinliği 1'dir (token transferleri hariç).
 
-**Program ID'lerinin kaynağı:** Escrow okuduğu programların ID'lerini `EscrowConfig.{registry,policy,verifier}_program` alanlarında, verifier ise `VerifierConfig.{escrow,policy}_program` alanlarında tutar. Bu alanlar yalnızca upgrade authority'nin çağırabildiği `init_*` ile yazılır. Escrow ile verifier birbirinin hesabını okuduğu için ID'leri crate bağımlılığıyla paylaşmak döngü yaratırdı. Paylaşılan seed'ler ve tipler BC-10'da `square-common`'a taşınır.
+**Program ID'lerinin kaynağı:** Escrow okuduğu programların ID'lerini `EscrowConfig.{registry,policy,verifier}_program` alanlarında, verifier ise `VerifierConfig.{escrow,policy}_program` alanlarında tutar. Bu alanlar yalnızca upgrade authority'nin çağırabildiği `init_*` ile yazılır. Escrow ile verifier birbirinin hesabını okuduğu için ID'leri crate bağımlılığıyla paylaşmak döngü yaratırdı. Paylaşılan seed'ler, hesap tipleri ve owner/seed doğrulamalı okuma yardımcısı [`crates/square-common`](../../crates/square-common/)'dadır (BC-10); tipler ve seed'ler bu sözleşmenin IDL'lerinden üretilir.
 
 ## 5. PDA seed tablosu
 
@@ -203,9 +203,9 @@ Sözleşme bu konularda bir varsayımla yazıldı. Varsayım, ilgili issue'nun A
 5. **Payee screening başarısızlığı (BC-27):** Release'te payee kaydı temiz değilse ödeme bekler; iade yapılmaz.
 6. **Aktif dispute'ta arbitrator seti değişimi (BC-32):** Dispute, açıldığı andaki `arbitrator_set_version`'ı saklar; oylamanın hangi sete göre yapılacağı issue'da kesinleşir.
 7. **Keeper ücreti üst sınırı (BC-23):** `InvalidKeeperFee` için en yüksek bps değeri belirlenmeli.
-8. **Aynı token hesabının birden çok rolde geçmesi (BC-23):** Örneğin keeper kurumun kendisiyse, `finalize_payment`'te aynı token hesabı iki kez yazılabilir olarak geçebilir. Bunun kullanılan Anchor sürümünde (BC-08) kabul edildiği doğrulanmalı.
+8. **Aynı token hesabının birden çok rolde geçmesi (BC-23):** Örneğin keeper kurumun kendisiyse, `finalize_payment`'te aynı token hesabı iki kez yazılabilir olarak geçebilir. Anchor 1.2.0'da (BC-08) aynı yazılabilir hesabın iki kez geçmesi varsayılan olarak reddedilir (2040); izin verilecek hesaba `dup` kısıtı yazılmalı.
 9. **İşlem boyutu (BC-19, BC-21, BC-28):** v0.2.0'dan itibaren `set_compliance_proof` 13 public sinyalin 10'unu hesaplardan kendisi kurar ([release-circuit.md](release-circuit.md) §6, yol A); instruction verisi 8 + 256 + 2 + 8 + 8 = 282 bayttır. `verify_mpp_payment_proof` hâlâ 10 sinyali argüman olarak taşır ve Ed25519 instruction'ıyla birlikte sınırı aşar; 13 sinyale ve aynı yola geçişi BC-37'de.
-10. **`emit!` / `emit_cpi!` (BC-16):** Event'ler sözleşmede `#[event]` olarak tanımlıdır; log kırpılmasına karşı yayım yöntemi BC-16'da seçilir.
+10. **`emit!` / `emit_cpi!` (BC-16):** Karar `emit!`; gerekçe, istisna kuralı ve sürümleme [events.md](events.md)'de. Programlar event'leri `square_common::square_<program>_events!()` ile tanımlar.
 11. **Tek settlement mint'i (BC-22):** v0.1.0 yalnızca `EscrowConfig.settlement_mint` (USDC) ile çalışır. Policy tavanı ve günlük sayaç bu mint'in birimindedir. Çoklu mint ve Token-2022 uzantıları kapsam dışıdır.
 
 ## 9. BE-35 girdi incelemesi

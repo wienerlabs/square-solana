@@ -1,4 +1,5 @@
 use anchor_lang::prelude::*;
+use square_common::seeds::AGENT_SEED;
 
 declare_id!("CgchXu2dRV3r9E1YjRhp4kbeLLtv1Xz61yoerJzp1Vbc");
 
@@ -155,7 +156,7 @@ pub struct RegisterAgent<'info> {
         init,
         payer = owner,
         space = AgentRecord::SIZE,
-        seeds = [b"agent", owner.key().as_ref(), agent_id.as_bytes()],
+        seeds = [AGENT_SEED, owner.key().as_ref(), agent_id.as_bytes()],
         bump
     )]
     pub agent_record: Account<'info, AgentRecord>,
@@ -173,7 +174,7 @@ pub struct UpdateAgent<'info> {
 
     #[account(
         mut,
-        seeds = [b"agent", owner.key().as_ref(), agent_record.agent_id.as_bytes()],
+        seeds = [AGENT_SEED, owner.key().as_ref(), agent_record.agent_id.as_bytes()],
         bump = agent_record.bump,
     )]
     pub agent_record: Account<'info, AgentRecord>,
@@ -188,7 +189,7 @@ pub struct DeregisterAgent<'info> {
         mut,
         close = owner,
         constraint = owner.key() == agent_record.owner @ RegistryError::Unauthorized,
-        seeds = [b"agent", owner.key().as_ref(), agent_record.agent_id.as_bytes()],
+        seeds = [AGENT_SEED, owner.key().as_ref(), agent_record.agent_id.as_bytes()],
         bump = agent_record.bump,
     )]
     pub agent_record: Account<'info, AgentRecord>,

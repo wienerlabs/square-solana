@@ -1,4 +1,4 @@
-import type { Idl } from '@coral-xyz/anchor';
+import type { Idl } from '@anchor-lang/core';
 import { describe, expect, it } from 'vitest';
 import { idlBytesConstant } from '../src/idl-constants.js';
 import { SQUARE_IDLS } from '../src/programs.js';

@@ -1,6 +1,6 @@
 // IDL sabitlerine erişim. JSON IDL'de adlar SNAKE_CASE, Anchor'ın dönüştürdüğü IDL'de camelCase;
 // ikisi de aynı sabite çözülür.
-import type { Idl } from '@coral-xyz/anchor';
+import type { Idl } from '@anchor-lang/core';
 
 const normalize = (name: string) => name.replace(/_/g, '').toLowerCase();
 

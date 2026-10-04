@@ -30,7 +30,7 @@
     "poseidon-lite": "^0.3.0"
   },
   "devDependencies": {
-    "@coral-xyz/anchor": "0.31.1",
+    "@anchor-lang/core": "1.2.0",
     "@noble/curves": "2.4.0",
     "@squaresdk/solana-config": "workspace:*",
     "@types/bn.js": "^5.2.0",

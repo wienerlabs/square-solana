@@ -1,4 +1,6 @@
 use anchor_lang::prelude::*;
+use square_common::seeds::{legacy, squads};
+use crate::errors::PolicyRegistryError;
 use crate::state::OperatorAccount;
 
 /// Squads v4 Multisig Program ID (Devnet & Mainnet)
@@ -10,9 +12,9 @@ pub const SQUADS_V4_PROGRAM_ID: Pubkey =
 pub fn derive_squads_vault(multisig_key: &Pubkey, vault_index: u8) -> (Pubkey, u8) {
     Pubkey::find_program_address(
         &[
-            b"multisig",
+            squads::MULTISIG_SEED,
             multisig_key.as_ref(),
-            b"vault",
+            squads::VAULT_SEED,
             &[vault_index],
         ],
         &SQUADS_V4_PROGRAM_ID,
@@ -23,7 +25,7 @@ pub fn derive_squads_vault(multisig_key: &Pubkey, vault_index: u8) -> (Pubkey, u
 pub struct SetMultisig<'info> {
     #[account(
         mut,
-        seeds = [b"operator", authority.key().as_ref()],
+        seeds = [legacy::OPERATOR_SEED, authority.key().as_ref()],
         bump = operator_account.bump,
         has_one = authority,
     )]
@@ -36,7 +38,7 @@ pub struct SetMultisig<'info> {
     /// CHECK: Verified below to be owned by the Squads v4 program.
     #[account(
         constraint = squads_multisig.owner == &SQUADS_V4_PROGRAM_ID
-            @ SetMultisigError::InvalidSquadsProgram
+            @ PolicyRegistryError::InvalidSquadsProgram
     )]
     pub squads_multisig: UncheckedAccount<'info>,
 }
@@ -47,7 +49,7 @@ pub fn handler(ctx: Context<SetMultisig>, vault_index: u8) -> Result<()> {
     // Verify the Squads multisig account has data (is initialized)
     require!(
         !ctx.accounts.squads_multisig.data_is_empty(),
-        SetMultisigError::MultisigNotInitialized
+        PolicyRegistryError::MultisigNotInitialized
     );
 
     // Derive the vault PDA from the Squads multisig
@@ -66,10 +68,3 @@ pub fn handler(ctx: Context<SetMultisig>, vault_index: u8) -> Result<()> {
     Ok(())
 }
 
-#[error_code]
-pub enum SetMultisigError {
-    #[msg("Account is not owned by the Squads v4 program")]
-    InvalidSquadsProgram,
-    #[msg("Squads multisig account is not initialized")]
-    MultisigNotInitialized,
-}

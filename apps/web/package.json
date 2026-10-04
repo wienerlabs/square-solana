@@ -13,7 +13,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@coral-xyz/anchor": "0.31.1",
+    "@anchor-lang/core": "1.2.0",
     "@fontsource/open-runde": "^5.3.0",
     "@solana/spl-token": "^0.4.15",
     "@solana/wallet-adapter-base": "^0.9.28",

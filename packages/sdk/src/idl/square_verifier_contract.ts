@@ -169,7 +169,7 @@ export type SquareVerifierContract = {
               },
               {
                 "kind": "account",
-                "path": "release_proof.job",
+                "path": "releaseProof.job",
                 "account": "releaseProof"
               }
             ]
@@ -201,7 +201,7 @@ export type SquareVerifierContract = {
               },
               {
                 "kind": "account",
-                "path": "release_proof.institution",
+                "path": "releaseProof.institution",
                 "account": "releaseProof"
               }
             ]
@@ -308,7 +308,7 @@ export type SquareVerifierContract = {
             ],
             "program": {
               "kind": "account",
-              "path": "config.escrow_program",
+              "path": "config.escrowProgram",
               "account": "verifierConfig"
             }
           }

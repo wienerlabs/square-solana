@@ -1,4 +1,6 @@
 use anchor_lang::prelude::*;
+use square_common::seeds::{POLICY_SEED, legacy};
+use crate::errors::PolicyRegistryError;
 use crate::state::{OperatorAccount, PolicyAccount};
 use super::set_multisig::{SQUADS_V4_PROGRAM_ID, derive_squads_vault};
 
@@ -9,16 +11,16 @@ pub struct RegisterPolicyMultisig<'info> {
         init,
         payer = payer,
         space = 8 + PolicyAccount::INIT_SPACE,
-        seeds = [b"policy", operator_account.key().as_ref(), &policy_id],
+        seeds = [POLICY_SEED, operator_account.key().as_ref(), &policy_id],
         bump,
     )]
     pub policy_account: Account<'info, PolicyAccount>,
 
     #[account(
         mut,
-        seeds = [b"operator", operator_account.authority.as_ref()],
+        seeds = [legacy::OPERATOR_SEED, operator_account.authority.as_ref()],
         bump = operator_account.bump,
-        constraint = operator_account.multisig == Some(multisig_signer.key()) @ MultisigError::UnauthorizedMultisig,
+        constraint = operator_account.multisig == Some(multisig_signer.key()) @ PolicyRegistryError::UnauthorizedMultisig,
     )]
     pub operator_account: Account<'info, OperatorAccount>,
 
@@ -26,7 +28,7 @@ pub struct RegisterPolicyMultisig<'info> {
     /// CHECK: Verified below to be owned by the Squads v4 program.
     #[account(
         constraint = squads_multisig.owner == &SQUADS_V4_PROGRAM_ID
-            @ MultisigError::InvalidSquadsProgram
+            @ PolicyRegistryError::InvalidSquadsProgram
     )]
     pub squads_multisig: UncheckedAccount<'info>,
 
@@ -51,7 +53,7 @@ pub fn handler(
     let (expected_vault, _bump) = derive_squads_vault(&squads_key, vault_index);
     require!(
         ctx.accounts.multisig_signer.key() == expected_vault,
-        MultisigError::InvalidVaultPDA
+        PolicyRegistryError::InvalidVaultPDA
     );
 
     let policy = &mut ctx.accounts.policy_account;
@@ -78,12 +80,3 @@ pub fn handler(
     Ok(())
 }
 
-#[error_code]
-pub enum MultisigError {
-    #[msg("Signer is not the authorized multisig for this operator")]
-    UnauthorizedMultisig,
-    #[msg("Account is not owned by the Squads v4 program")]
-    InvalidSquadsProgram,
-    #[msg("Signer does not match the vault PDA derived from the Squads multisig")]
-    InvalidVaultPDA,
-}

@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import { BN } from '@coral-xyz/anchor';
+import { BN } from '@anchor-lang/core';
 import { Keypair, PublicKey } from '@solana/web3.js';
 import { describe, expect, it } from 'vitest';
 import { createSquareClient } from '../src/client.js';

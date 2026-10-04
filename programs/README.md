@@ -5,7 +5,7 @@ Square'in Anchor programları. Tek Anchor workspace'inde derlenir; programlar bi
 
 | Dizin (crate) | Kaynak | Taşıma | Square işleri |
 |---|---|---|---|
-| `square-escrow` | `covenant/programs/covenant` | [BC-04] | job yaşam döngüsü, finalize + keeper fee, proof-gated release, alacak piyasası, itibar, M-of-N arbitration, dispute timeout |
+| `square-escrow` | `covenant/programs/covenant` | [BC-04] ✓ | job yaşam döngüsü, finalize + keeper fee, proof-gated release, alacak piyasası, itibar, M-of-N arbitration, dispute timeout |
 | `square-policy` (`policy-registry`) | `aperture/programs/policy-registry` | [BC-05] ✓ | kurum + politika commitment'ı + public günlük tavan, alıcı Merkle kökü |
 | `square-verifier` (`verifier`) | `aperture/programs/verifier` | [BC-05] ✓ | Groth16 doğrulama, release ispatı bağlama (`ReleaseProof`) |
 | `square-registry` (`aip-registry`) | `dr-wilson-empty/aip-beta` → `programs/aip-escrow/programs/aip-registry` | [BC-07] ✓ | agent kaydı (`did:aip` v2 Solana profili), event'ler |
@@ -15,7 +15,7 @@ Square'in Anchor programları. Tek Anchor workspace'inde derlenir; programlar bi
   `LICENSE` dosyası program dizininde korunur.
 - **Taşınmayanlar:** AIP `aip_escrow`, Aperture `transfer-hook`. Verifier'ın RISC Zero v1 ve batch
   instruction'ları geçmişle birlikte geldi ve [BC-11] ile kaldırıldı.
-- Tek Anchor sürümü [BC-08], yeni program ID'leri ve 2-of-3 Squads upgrade authority [BC-09].
+- Tek Anchor sürümü 1.2.0 [BC-08] ✓ ([ADR 0007](../docs/decisions/0007-anchor-surumu.md)), yeni program ID'leri ve 2-of-3 Squads upgrade authority [BC-09].
 - Dış arayüz sözleşmesi (instruction / account / PDA / event) [BC-44] ile önce sabitlenir:
   [`docs/design/program-interface.md`](../docs/design/program-interface.md). Sözleşmenin tek kaynağı
   [`idl/`](../idl/) altındaki IDL'lerdir.

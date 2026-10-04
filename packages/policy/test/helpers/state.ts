@@ -1,6 +1,6 @@
 // Test fixture: ok_compliant senaryosunun zincir durumu (job, politika, escrow config, operator
 // sayacı) program IDL'leriyle kodlanıp test zincirine konur.
-import { BN, type Idl, type Program } from '@coral-xyz/anchor';
+import { BN, type Idl, type Program } from '@anchor-lang/core';
 import { Keypair, PublicKey } from '@solana/web3.js';
 import { createSquareClient, SQUARE_IDLS, type SquareClient, type SquareProgramIds } from '@squaresdk/solana-sdk';
 import type { PolicyDocument } from '@squaresdk/solana-types';

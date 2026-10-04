@@ -1,0 +1,122 @@
+use anchor_lang::prelude::*;
+use square_common::seeds::{CONFIG_SEED, JOB_SEED, VAULT_SEED};
+use anchor_spl::token_interface::{self, Mint, TokenAccount, TokenInterface, TransferChecked};
+
+use crate::errors::CovError;
+use crate::state::{JobEscrow, JobStatus, ProtocolConfig, DisputeInfo};
+
+#[derive(Accounts)]
+#[instruction(amount: u64, spec_hash: [u8; 32], deadline: i64, challenge_period: u64)]
+pub struct CreateJob<'info> {
+    #[account(mut)]
+    pub poster: Signer<'info>,
+
+    #[account(
+        seeds = [CONFIG_SEED],
+        bump = config.bump,
+    )]
+    pub config: Account<'info, ProtocolConfig>,
+
+    #[account(
+        init,
+        payer = poster,
+        space = JobEscrow::LEN,
+        seeds = [JOB_SEED, poster.key().as_ref(), &spec_hash],
+        bump,
+    )]
+    pub job_escrow: Box<Account<'info, JobEscrow>>,
+
+    /// PDA-derived escrow token account.
+    ///
+    /// Previously this was a `Keypair`-init account requiring the
+    /// generated keypair as a co-signer. Some wallet-standard adapters
+    /// (notably the Solana Connector / WalletConnect path) reject any
+    /// transaction with an unknown signer, breaking create_job for
+    /// browser users.
+    ///
+    /// Switching to a PDA-derived address removes the co-signer entirely.
+    /// The seed `[b"escrow_token", job_escrow.key().as_ref()]` is
+    /// deterministic from the JobEscrow PDA, so every other instruction
+    /// (cancel_job, finalize_payment, resolve_dispute) derives the same
+    /// address client-side without any per-job state lookup.
+    #[account(
+        init,
+        payer = poster,
+        seeds = [VAULT_SEED, job_escrow.key().as_ref()],
+        bump,
+        token::mint = token_mint,
+        token::authority = job_escrow,
+        token::token_program = token_program,
+    )]
+    pub escrow_token_account: Box<InterfaceAccount<'info, TokenAccount>>,
+
+    #[account(
+        mut,
+        constraint = poster_token_account.owner == poster.key(),
+        constraint = poster_token_account.mint == token_mint.key(),
+    )]
+    pub poster_token_account: Box<InterfaceAccount<'info, TokenAccount>>,
+
+    pub token_mint: Box<InterfaceAccount<'info, Mint>>,
+    pub token_program: Interface<'info, TokenInterface>,
+    pub system_program: Program<'info, System>,
+    pub rent: Sysvar<'info, Rent>,
+}
+
+pub fn handler(
+    ctx: Context<CreateJob>,
+    amount: u64,
+    spec_hash: [u8; 32],
+    deadline: i64,
+    challenge_period: u64,
+) -> Result<()> {
+    let clock = Clock::get()?;
+    let config = &ctx.accounts.config;
+
+    require!(amount > 0, CovError::InvalidAmount);
+    require!(deadline > clock.unix_timestamp, CovError::DeadlineExpired);
+    require!(
+        challenge_period >= config.min_challenge_period
+            && challenge_period <= config.max_challenge_period,
+        CovError::InvalidChallengePeriod
+    );
+
+    // Transfer tokens from poster to escrow token account
+    let transfer_ctx = CpiContext::new(
+        ctx.accounts.token_program.key(),
+        TransferChecked {
+            from: ctx.accounts.poster_token_account.to_account_info(),
+            mint: ctx.accounts.token_mint.to_account_info(),
+            to: ctx.accounts.escrow_token_account.to_account_info(),
+            authority: ctx.accounts.poster.to_account_info(),
+        },
+    );
+    token_interface::transfer_checked(transfer_ctx, amount, ctx.accounts.token_mint.decimals)?;
+
+    let job = &mut ctx.accounts.job_escrow;
+    job.poster = ctx.accounts.poster.key();
+    job.taker = Pubkey::default();
+    job.token_mint = ctx.accounts.token_mint.key();
+    job.amount = amount;
+    job.spec_hash = spec_hash;
+    job.status = JobStatus::Open;
+    job.created_at = clock.unix_timestamp;
+    job.deadline = deadline;
+    job.challenge_period = challenge_period;
+    job.challenge_end = 0;
+    job.delivered_at = 0;
+    job.work_hash = [0u8; 32];
+    job.delivery_uri = [0u8; crate::state::DELIVERY_URI_MAX_LEN];
+    job.delivery_uri_len = 0;
+    job.dispute = DisputeInfo::default();
+    job.bump = ctx.bumps.job_escrow;
+
+    msg!(
+        "Job created: poster={}, amount={}, challenge_period={}s",
+        job.poster,
+        amount,
+        challenge_period
+    );
+
+    Ok(())
+}

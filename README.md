@@ -90,8 +90,8 @@ Yapının gerekçesi: [§9](docs/analysis/square-solana-analysis.md#9-%C3%B6neri
 | Araç | Sürüm | Kaynak |
 |---|---|---|
 | Rust (host) | 1.94.1 | [`rust-toolchain.toml`](rust-toolchain.toml) |
-| Solana CLI | 2.x (platform-tools rustc 1.84 ile SBF derlemesi) | [`.cargo/config.toml`](.cargo/config.toml) |
-| Anchor CLI | BC-08 ile sabitlenecek | [ADR 0007](docs/decisions/0007-anchor-surumu.md) |
+| Solana CLI (Agave) | 4.1.2 (platform-tools v1.54, rustc 1.89 ile SBF derlemesi) | `Anchor.toml` → `[toolchain]`, [`.cargo/config.toml`](.cargo/config.toml) |
+| Anchor CLI | 1.2.0 (`avm install 1.2.0`) | `Anchor.toml` → `[toolchain]`, [ADR 0007](docs/decisions/0007-anchor-surumu.md) |
 | Node.js | 24 (LTS) | [`.nvmrc`](.nvmrc) |
 | pnpm | 10.34.6 | `package.json` → `packageManager`, [ADR 0011](docs/decisions/0011-monorepo-araclari-pnpm-ve-turborepo.md) |
 

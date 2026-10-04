@@ -43,7 +43,11 @@ Copyright the Covenant contributors
   Imported at 9894a41 (docs/provenance/BE-02.md):
            mcp/              -> packages/mcp   (Apache-2.0; the source directory has
                                                 no LICENSE file of its own)
-  Planned: programs/covenant -> programs/square-escrow
+  Imported at 9894a41 (docs/provenance/BC-04.md):
+           programs/covenant -> programs/square-escrow
+           tests/covenant.ts -> tests/legacy/covenant.ts
+  The authors of programs/covenant also license their contributions under
+  Apache-2.0 (docs/legal/relicensing/).
 
 --------------------------------------------------------------------------------
 Bundled third-party assets
