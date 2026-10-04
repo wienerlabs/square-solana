@@ -3268,7 +3268,7 @@
   },
   "TransferAgentOwnershipCall": {
     "type": "object",
-    "description": "Transfers ownership. The PDA is derived from the immutable `creator`, so the address stays stable.",
+    "description": "Transfers ownership and resets `wallet` to the new owner (did:aip Solana profile §4.2). The PDA is derived from the immutable `creator`, so the address stays stable.",
     "required": [
       "program",
       "instruction",

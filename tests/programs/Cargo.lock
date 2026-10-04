@@ -95,14 +95,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "aip-registry"
-version = "0.1.0"
-dependencies = [
- "anchor-lang",
- "square-common",
-]
-
-[[package]]
 name = "allocator-api2"
 version = "0.2.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4246,7 +4238,6 @@ dependencies = [
 name = "square-program-tests"
 version = "0.1.0"
 dependencies = [
- "aip-registry",
  "anchor-lang",
  "base64 0.22.1",
  "litesvm",
@@ -4266,7 +4257,16 @@ dependencies = [
  "square-common",
  "square-escrow",
  "square-policy",
+ "square-registry",
  "verifier",
+]
+
+[[package]]
+name = "square-registry"
+version = "0.3.0"
+dependencies = [
+ "anchor-lang",
+ "square-common",
 ]
 
 [[package]]

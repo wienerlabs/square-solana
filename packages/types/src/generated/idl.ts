@@ -641,7 +641,7 @@ export const IDL_PROGRAMS = {
       {
         "code": 6000,
         "name": "AgentIdInvalid",
-        "msg": "Agent ID must be 1-32 bytes"
+        "msg": "Agent ID must be 1-32 characters from [A-Za-z0-9_-]"
       },
       {
         "code": 6001,
@@ -672,6 +672,11 @@ export const IDL_PROGRAMS = {
         "code": 6006,
         "name": "InvalidScreeningTtl",
         "msg": "Screening TTL must be positive"
+      },
+      {
+        "code": 6007,
+        "name": "AgentCardHashInvalid",
+        "msg": "Agent card hash must be all zero exactly when the agent card URI is empty"
       }
     ]
   },

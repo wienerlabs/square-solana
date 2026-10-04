@@ -1,6 +1,6 @@
 # Program arayüz sözleşmesi
 
-**Sözleşme sürümü:** v0.3.0 (taslak) · **Issue:** BC-44 (#101), BC-47 (#119), BE-10 (#42), BC-17 (#25) · **IDL'ler:** [`idl/`](../../idl/)
+**Sözleşme sürümü:** v0.4.0 (taslak) · **Issue:** BC-44 (#101), BC-47 (#119), BE-10 (#42), BC-17 (#25), BC-15 (#24) · **IDL'ler:** [`idl/`](../../idl/)
 
 Bu doküman Square'in dört Solana programının (`square_registry`, `square_policy`, `square_verifier`, `square_escrow`) dış arayüzünü sabitler: instruction adları ve argümanları, hesap sırası ve imzacılar, account düzenleri, PDA seed'leri, event'ler ve hata kodları. Backend (BE-35 API/SDK sözleşmesi, servisler) ve frontend (FE-24 veri katmanı) bu sözleşmeye göre geliştirir. Gerçek programlar `programs/` altında taşındıkça ve değiştikçe bu arayüze uyar; uyum BC-13 ile CI'da denetlenir.
 
@@ -257,17 +257,18 @@ IDL'den üretilmiştir; instruction'lar alfabetik sıradadır. "(w)" yazılabili
 | `RegistryConfigUpdated` | `admin: pubkey`, `screener_authority: pubkey`, `screening_ttl_secs: i64` |
 | `ScreeningRecorded` | `wallet: pubkey`, `status: ScreeningStatus`, `source_hash: [u8; 32]`, `expires_at: i64` |
 
-#### Hata kodları (7)
+#### Hata kodları (8)
 
 | Kod | Ad | Mesaj |
 |---|---|---|
-| 6000 | `AgentIdInvalid` | Agent ID must be 1-32 bytes |
+| 6000 | `AgentIdInvalid` | Agent ID must be 1-32 characters from [A-Za-z0-9_-] |
 | 6001 | `AgentCardUriTooLong` | Agent card URI exceeds 200 bytes |
 | 6002 | `Unauthorized` | Signer is not authorized for this operation |
 | 6003 | `AgentInactive` | Agent is not active |
 | 6004 | `AgentDeregistered` | Agent is deregistered |
 | 6005 | `InvalidAgentStatus` | Status cannot be set with this instruction |
 | 6006 | `InvalidScreeningTtl` | Screening TTL must be positive |
+| 6007 | `AgentCardHashInvalid` | Agent card hash must be all zero exactly when the agent card URI is empty |
 
 ### 10.2 square_policy
 
@@ -456,4 +457,5 @@ IDL'den üretilmiştir; instruction'lar alfabetik sıradadır. "(w)" yazılabili
 | v0.1.0 | İlk taslak: 4 program, 38 instruction, 13 account, 40 event, 75 hata kodu (4'ü stub'a ait `NotImplemented`); M5–M6 taslakları (§7) | BC-44 (#101) |
 | v0.2.0 | `set_compliance_proof` release devresinin 13 sinyaline geçti (yol A, [release-circuit.md](release-circuit.md) §6): `public_inputs: [[u8; 32]; 10]` yerine `refusal_code: u16`, `net_amount: u64`, `proof_timestamp: i64`; diğer 10 sinyali program hesaplardan kurar. Alıcı listesi Merkle ağacının iç düğüm, tek düğüm, boş liste ve kanıt uzunluğu kuralları eklendi | BE-10 (#42) |
 | v0.3.0 | `set_institution_multisig` multisig hesabını da alır (`squads_multisig`, salt okunur): program, hesabın Squads v4'e ait ve başlatılmış bir `Multisig` olduğunu doğrular; yanlış ya da var olmayan bir multisig bağlanıp kurum kilitlenemez. Hata 6004 `InvalidMultisigVault` → `InvalidSquadsMultisig` ("Account is not an initialized Squads v4 multisig"); kodlar ve sıraları değişmedi. Program ilk kez bu arayüzle yazıldı (BC-17); IDL'i `set_buyer_root` (BC-18) dışında sözleşmeyle aynı | BC-17 (#25) |
+| v0.4.0 | Registry'nin agent kuralları did:aip v2 Solana profili §4.2'yle hizalandı. `AgentIdInvalid` (6000) kimliğin alfabesini de kapsar: `[A-Za-z0-9_-]{1,32}`. Yeni hata 6007 `AgentCardHashInvalid`: kart hash'i tam olarak URI boşken sıfırdır (§4.2/4; dolu URI'nin hash'i kartın SHA-256'sıdır). `transfer_agent_ownership` `wallet`'ı yeni sahibe sıfırlar (§4.2/5), dokümanı buna göre. Mevcut kodlar ve sıraları değişmedi. Program ilk kez bu arayüzle yazıldı (BC-15); IDL'i `init_registry_config`, `update_registry_config`, `record_screening` ve `RegistryConfig` / `ScreeningRecord` (BC-27) dışında sözleşmeyle aynı | BC-15 (#24) |
 | v0.1.1 | Gövdesiz stub programlar (`interfaces/`) kaldırıldı; sözleşmenin tek kaynağı `idl/*.json` (proje kuralı: placeholder yok). Stub'a ait `NotImplemented` hata girdileri IDL'den çıktı; diğer kodların sırası değişmedi. Toplam: 38 instruction, 13 account, 40 event, 71 hata kodu | BC-47 (#119) |
