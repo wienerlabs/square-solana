@@ -95,7 +95,7 @@ Policy'li işlerde 7. adım, 6. adımdaki finalize'dan **önce** gelir (Arc mode
 
 **Tek CPI:** escrow → verifier `record_release`. İmzacı, escrow programı altında türetilen `["escrow_authority"]` PDA'sıdır; verifier bunu `VerifierConfig.escrow_program` ile doğrular. Gerekçe: `OperatorState` (günlük harcama sayacı) verifier'a aittir, escrow yazamaz. `release_proof` ve `operator_state` dış instruction'da da yazılabilir geçirilir (CPI yazma yetkisini yükseltemez). CPI derinliği 1'dir (token transferleri hariç).
 
-**Program ID'lerinin kaynağı:** Escrow okuduğu programların ID'lerini `EscrowConfig.{registry,policy,verifier}_program` alanlarında, verifier ise `VerifierConfig.{escrow,policy}_program` alanlarında tutar. Bu alanlar yalnızca upgrade authority'nin çağırabildiği `init_*` ile yazılır. Escrow ile verifier birbirinin hesabını okuduğu için ID'leri crate bağımlılığıyla paylaşmak döngü yaratırdı. Paylaşılan seed'ler ve tipler BC-10'da `square-common`'a taşınır.
+**Program ID'lerinin kaynağı:** Escrow okuduğu programların ID'lerini `EscrowConfig.{registry,policy,verifier}_program` alanlarında, verifier ise `VerifierConfig.{escrow,policy}_program` alanlarında tutar. Bu alanlar yalnızca upgrade authority'nin çağırabildiği `init_*` ile yazılır. Escrow ile verifier birbirinin hesabını okuduğu için ID'leri crate bağımlılığıyla paylaşmak döngü yaratırdı. Paylaşılan seed'ler, hesap tipleri ve owner/seed doğrulamalı okuma yardımcısı [`crates/square-common`](../../crates/square-common/)'dadır (BC-10); tipler ve seed'ler bu sözleşmenin IDL'lerinden üretilir.
 
 ## 5. PDA seed tablosu
 

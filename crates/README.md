@@ -4,11 +4,21 @@ Programlar arasında paylaşılan Rust crate'leri. Cargo workspace üyesidir (`m
 
 | Crate | İçerik | Issue |
 |---|---|---|
-| [`square-common`](square-common/) | seed'ler, roller, hata kodları, programlar arası okunan hesap tipleri; event tipleri | [BC-10], [BC-16] |
+| [`square-common`](square-common/) | seed'ler, roller, ortak sabitler, UTC gün başlangıcı, owner/seed doğrulamalı account-read, programlar arası okunan hesap tipleri [BC-10] ✓; event tipleri [BC-16] | [BC-10], [BC-16] |
 
-Her crate `rust-version = "1.84"` bildirir: SBF derlemesi Solana platform-tools'un rustc 1.84'üyle
-yapılır ve `.cargo/config.toml`'daki `incompatible-rust-versions = "fallback"` ayarı, bağımlılıkların
-bu sınırı aşan sürümlere çözülmesini önler.
+`square-common`:
+
+- **Hesap tipleri ve sözleşme seed'leri:** Sözleşme IDL'lerinden `declare_program!` ile üretilir. `idls/`, repo kökündeki
+  [`idl/`](../idl/)'a sembolik bağdır; seed'ler IDL'in `constants` bölümündedir, crate'te yeniden yazılmaz.
+- **Taşınan programlara özgü seed'ler:** Sözleşmede karşılığı olmayan seed'ler `seeds::legacy`'de durur ve programlar
+  sözleşmeye geçtikçe kalkar. Squads v4 seed'leri `seeds::squads`'tadır.
+- **`account_read`:** Hesabın owner'ını ve adresini (seed'lerden türetilen PDA) doğrular, sonra discriminator
+  denetimiyle çözer. Owner, IDL'deki adres değil, okuyan programın config'inde tuttuğu program kimliğidir
+  ([program arayüzü §4](../docs/design/program-interface.md#4-programlar-aras%C4%B1-eri%C5%9Fim)).
+
+Her crate `rust-version = "1.89"` bildirir: SBF derlemesi Agave 4.1.2'nin platform-tools v1.54'ünün
+rustc 1.89'uyla yapılır. `.cargo/config.toml`'daki `incompatible-rust-versions = "fallback"` ayarı,
+bağımlılıkların bu sınırı aşan sürümlere çözülmesini önler.
 
 [BC-10]: https://github.com/wienerlabs/square-solana/issues/10
 [BC-16]: https://github.com/wienerlabs/square-solana/issues/23
