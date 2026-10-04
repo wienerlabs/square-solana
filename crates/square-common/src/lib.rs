@@ -7,6 +7,7 @@
 //! - [`roles`]: rol sözlüğü.
 //! - [`constants`], [`time`]: ortak sabitler ve UTC gün başlangıcı.
 //! - [`account_read`]: CPI yerine hesap okuma; owner ve PDA adresi doğrulanır.
+//! - [`screening`]: sanctions screening kaydının temiz ve taze olması (escrow fonlama, alacak, release).
 //! - [`squads`]: Squads v4 multisig hesabının doğrulanması ve vault PDA'sı.
 //! - [`events`]: sözleşme event'leri ve programların bunları `#[event]` olarak tanımlayan makroları.
 
@@ -15,6 +16,7 @@ pub mod constants;
 pub mod contract;
 pub mod events;
 pub mod roles;
+pub mod screening;
 pub mod seeds;
 pub mod squads;
 pub mod time;
