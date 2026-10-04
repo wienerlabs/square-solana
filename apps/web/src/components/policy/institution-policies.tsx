@@ -67,7 +67,7 @@ export function InstitutionPolicies({ owner, policyProgramId }: { owner: string;
           {draft && check && (
             <div className="mt-5">
               <PolicyForm
-                key={draft.policyId}
+                key={`${draft.policyId}:${settlement?.decimals ?? 'base'}`}
                 draft={draft}
                 check={check}
                 settlement={settlement}

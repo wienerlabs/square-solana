@@ -5,7 +5,7 @@ import { generateLeafSalt } from '@squaresdk/solana-policy';
 import { DAYS_OF_WEEK, POLICY_CIRCUIT_LIMITS } from '@squaresdk/solana-types';
 import { Button } from '@/components/ui/button';
 import { bytesToHex, type DraftCheck, type DraftField, type PolicyDraft } from '@/lib/policy-draft';
-import { formatUnits, type SettlementToken } from '@/lib/settlement';
+import { formatUnits, parseUnits, type SettlementToken } from '@/lib/settlement';
 
 const lines = (text: string) =>
   text
@@ -31,6 +31,7 @@ function Field({
   hint,
   check,
   field,
+  error: localError,
   children,
 }: {
   id: string;
@@ -39,9 +40,11 @@ function Field({
   hint?: ReactNode;
   check: DraftCheck;
   field: DraftField;
+  /** Alanın kendi hatası (ör. ayrıştırma); taslağın denetiminden önce gösterilir. */
+  error?: string;
   children: ReactNode;
 }) {
-  const error = check.errors[field];
+  const error = localError ?? check.errors[field];
   const warning = check.warnings[field];
   return (
     <div className="flex flex-col gap-1.5">
@@ -64,6 +67,10 @@ function Field({
     </div>
   );
 }
+
+type AmountField = 'maxPerTx' | 'maxDaily' | 'dailyCeiling';
+const AMOUNT_FIELDS: readonly AmountField[] = ['maxPerTx', 'maxDaily', 'dailyCeiling'];
+const BASE_UNITS = /^(0|[1-9][0-9]*)$/;
 
 const inputClass =
   'w-full rounded-lg border border-border bg-surface px-3 py-2 font-mono text-sm text-text aria-invalid:border-danger-text';
@@ -100,14 +107,56 @@ export function PolicyForm({ draft, check, settlement, onChange }: Props) {
     });
   };
 
+  // Settlement mint'i biliniyorsa tutarlar USDC olarak girilir (ondalık mint hesabından); taslakta her zaman
+  // taban birim durur. Mint bilinmiyorsa alanlar taban birimdedir.
+  const [amounts, setAmounts] = useState(
+    () =>
+      Object.fromEntries(
+        AMOUNT_FIELDS.map((field) => {
+          const value = draft[field];
+          return [
+            field,
+            settlement && BASE_UNITS.test(value)
+              ? formatUnits(BigInt(value), settlement.decimals, { grouping: false })
+              : value,
+          ];
+        }),
+      ) as Record<AmountField, string>,
+  );
+  const [amountErrors, setAmountErrors] = useState<Partial<Record<AmountField, string>>>(() =>
+    settlement
+      ? Object.fromEntries(
+          AMOUNT_FIELDS.filter((f) => draft[f] !== '' && !BASE_UNITS.test(draft[f])).map((f) => [
+            f,
+            'Re-enter the amount in USDC.',
+          ]),
+        )
+      : {},
+  );
+
+  const setAmount = (field: AmountField, raw: string) => {
+    const text = raw.trim();
+    setAmounts((a) => ({ ...a, [field]: text }));
+    if (!settlement || text === '') {
+      setAmountErrors((e) => ({ ...e, [field]: undefined }));
+      onChange({ ...draft, [field]: text });
+      return;
+    }
+    const parsed = parseUnits(text, settlement.decimals);
+    setAmountErrors((e) => ({ ...e, [field]: parsed.ok ? undefined : parsed.error }));
+    onChange({ ...draft, [field]: parsed.ok ? parsed.value.toString() : '' });
+  };
+
   const addSettlementMint = () => {
     if (!settlement) return;
     setList('tokenWhitelist', [...draft.tokenWhitelist, settlement.mint.toBase58()].join('\n'));
   };
 
-  const amount = (field: 'maxPerTx' | 'maxDaily' | 'dailyCeiling', label: string, scope: string) => {
-    const value = draft[field];
-    const valid = !check.errors[field];
+  const amount = (field: AmountField, label: string, scope: string) => {
+    const error = amountErrors[field] ?? check.errors[field];
+    const unit = settlement
+      ? `In USDC; the mint has ${settlement.decimals} decimal places.`
+      : 'In base units of the settlement mint; its decimals are not known yet.';
     return (
       <Field
         id={`${id}-${field}`}
@@ -115,20 +164,17 @@ export function PolicyForm({ draft, check, settlement, onChange }: Props) {
         scope={scope}
         check={check}
         field={field}
-        hint={
-          settlement && valid
-            ? `= ${formatUnits(BigInt(value), settlement.decimals)} USDC`
-            : 'In base units of the settlement mint.'
-        }
+        error={amountErrors[field]}
+        hint={settlement && !error ? `${unit} = ${draft[field]} base units` : unit}
       >
         <input
           id={`${id}-${field}`}
-          inputMode="numeric"
+          inputMode={settlement ? 'decimal' : 'numeric'}
           autoComplete="off"
-          value={value}
-          aria-invalid={!valid || undefined}
-          aria-describedby={`${id}-${field}-hint${check.errors[field] ? ` ${id}-${field}-error` : ''}`}
-          onChange={(event) => onChange({ ...draft, [field]: event.currentTarget.value.trim() })}
+          value={amounts[field]}
+          aria-invalid={Boolean(error) || undefined}
+          aria-describedby={`${id}-${field}-hint${error ? ` ${id}-${field}-error` : ''}`}
+          onChange={(event) => setAmount(field, event.currentTarget.value)}
           className={inputClass}
         />
       </Field>

@@ -24,10 +24,39 @@ export function tokenAmount(
   return unpackAccount(address, info, token.tokenProgram).amount;
 }
 
-/** Taban birimdeki miktarı ondalıkla, yuvarlamadan yazar (ör. 1234500000, 6 → "1,234.5"). */
-export function formatUnits(amount: bigint, decimals: number): string {
+/**
+ * Taban birimdeki miktarı ondalıkla, yuvarlamadan yazar (ör. 1234500000, 6 → "1,234.5").
+ * `grouping: false` binlik ayırıcısız yazar; `parseUnits` bu biçimi geri okur.
+ */
+export function formatUnits(amount: bigint, decimals: number, { grouping = true } = {}): string {
   const base = 10n ** BigInt(decimals);
-  const whole = (amount / base).toLocaleString('en-US');
+  const integer = amount / base;
+  const whole = grouping ? integer.toLocaleString('en-US') : integer.toString();
   const fraction = (amount % base).toString().padStart(decimals, '0').replace(/0+$/, '');
   return fraction ? `${whole}.${fraction}` : whole;
+}
+
+export type ParsedUnits = { ok: true; value: bigint } | { ok: false; error: string };
+
+/**
+ * Ondalıklı token miktarını taban birime çevirir, yalnızca tam sayı aritmetiğiyle (float yok):
+ * "1250.5", 6 → 1250500000n. Mint'in ondalığından fazla basamak yuvarlanmaz, hatadır.
+ */
+export function parseUnits(text: string, decimals: number): ParsedUnits {
+  const match = /^(0|[1-9][0-9]*)(?:\.([0-9]+))?$/.exec(text);
+  if (!match) return { ok: false, error: 'Use digits and at most one decimal point, without separators.' };
+  const fraction = match[2] ?? '';
+  if (fraction.length > decimals) {
+    return {
+      ok: false,
+      error:
+        decimals === 0
+          ? 'The mint has no decimal places.'
+          : `At most ${decimals} decimal places: the mint's precision.`,
+    };
+  }
+  return {
+    ok: true,
+    value: BigInt(match[1]!) * 10n ** BigInt(decimals) + BigInt(fraction.padEnd(decimals, '0') || '0'),
+  };
 }

@@ -46,7 +46,7 @@ Institution rolündeki cüzdan için; `SQUARE_PROGRAM_ID_POLICY` gerekir, çünk
 |---|---|
 | Sır | `generatePolicySecret()` ile 32 bayt; 8 salt'ın tek kaynağı (`derivePolicySalts`). Bu tarayıcıda `localStorage.square-policy-secret:<cüzdan>`'da, şifrelenmeden tutulur; sunucuya gönderilmez |
 | Yedek | `square-policy-backup` v1 JSON: sır, taslaklar ve alıcı salt'ları. Yalnızca aynı cüzdana geri yüklenir. Sır kaybolursa ispat üretilemez ve release'ler gerçekleşmez |
-| Kurallar | `PolicyDocument`'ın alanları, devrenin sınırlarıyla (`POLICY_CIRCUIT_LIMITS`). Tutarlar settlement mint'inin taban biriminde; mint biliniyorsa USDC karşılığı ve whitelist'te olup olmadığı gösterilir. Public tavan 0 ya da whitelist'te settlement mint yoksa uyarı verilir |
+| Kurallar | `PolicyDocument`'ın alanları, devrenin sınırlarıyla (`POLICY_CIRCUIT_LIMITS`). Settlement mint'i escrow config'inden biliniyorsa tutarlar USDC olarak girilir: ondalık mint hesabından okunur, çeviri tam sayı aritmetiğiyle (`parseUnits`) yapılır, mint'in ondalığından fazla basamak hatadır, taban birim karşılığı yanında gösterilir. Mint bilinmiyorsa alanlar taban birimdedir. Taslakta tutarlar her zaman taban birimdir. Whitelist'te settlement mint'in olup olmadığı da gösterilir. Public tavan 0 ya da whitelist'te settlement mint yoksa uyarı verilir |
 | Alıcılar | Satır başına bir cüzdan; her alıcıya `generateLeafSalt()` ile salt, kök `buildBuyerTree` ile. Boş liste sıfır kök (kısıtsız) |
 | Zincire giden | Institution ve Policy PDA'ları, `policy_id`, commitment (`computePolicyCommitment`), `daily_ceiling`, `buyer_root`; hepsi tarayıcıda hesaplanır. `set_policy` / `set_buyer_root` tx'leri, square_policy bu instruction'larla deploy edilince eklenecek (BC-17, BC-18) |
 
