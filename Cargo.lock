@@ -64,6 +64,7 @@ name = "aip-registry"
 version = "0.1.0"
 dependencies = [
  "anchor-lang",
+ "square-common",
 ]
 
 [[package]]
@@ -1346,6 +1347,7 @@ version = "0.1.0"
 dependencies = [
  "anchor-lang",
  "sha2 0.10.9",
+ "square-common",
 ]
 
 [[package]]
@@ -2517,6 +2519,10 @@ dependencies = [
 [[package]]
 name = "square-common"
 version = "0.1.0"
+dependencies = [
+ "anchor-lang",
+ "serde_json",
+]
 
 [[package]]
 name = "square-escrow"
@@ -2524,6 +2530,7 @@ version = "0.2.0"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
+ "square-common",
 ]
 
 [[package]]
@@ -2724,6 +2731,7 @@ dependencies = [
  "policy-registry",
  "solana-instructions-sysvar",
  "solana-sdk-ids",
+ "square-common",
 ]
 
 [[package]]

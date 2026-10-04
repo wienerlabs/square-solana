@@ -1,4 +1,5 @@
 use anchor_lang::prelude::*;
+use square_common::seeds::{BOND_SEED, CLAIM_SEED, CONFIG_SEED, JOB_SEED, REPUTATION_SEED, VAULT_SEED};
 use anchor_spl::token_interface::{self, CloseAccount, Mint, TokenAccount, TokenInterface, TransferChecked};
 
 use crate::errors::CovError;
@@ -22,14 +23,14 @@ pub struct ResolveDispute<'info> {
     pub arbitrator: Signer<'info>,
 
     #[account(
-        seeds = [b"config"],
+        seeds = [CONFIG_SEED],
         bump = config.bump,
     )]
     pub config: Box<Account<'info, ProtocolConfig>>,
 
     #[account(
         mut,
-        seeds = [b"job", poster.key().as_ref(), &job_escrow.spec_hash],
+        seeds = [JOB_SEED, poster.key().as_ref(), &job_escrow.spec_hash],
         bump = job_escrow.bump,
     )]
     pub job_escrow: Box<Account<'info, JobEscrow>>,
@@ -46,7 +47,7 @@ pub struct ResolveDispute<'info> {
     /// constraint below — no attacker-supplied decoy can be substituted.
     #[account(
         mut,
-        seeds = [b"escrow_token", job_escrow.key().as_ref()],
+        seeds = [VAULT_SEED, job_escrow.key().as_ref()],
         bump,
         constraint = escrow_token_account.owner == job_escrow.key(),
         constraint = escrow_token_account.mint == job_escrow.token_mint @ CovError::MintMismatch,
@@ -55,7 +56,7 @@ pub struct ResolveDispute<'info> {
 
     #[account(
         mut,
-        seeds = [b"bond", job_escrow.key().as_ref()],
+        seeds = [BOND_SEED, job_escrow.key().as_ref()],
         bump,
     )]
     pub bond_token_account: Box<InterfaceAccount<'info, TokenAccount>>,
@@ -88,7 +89,7 @@ pub struct ResolveDispute<'info> {
         init_if_needed,
         payer = arbitrator,
         space = AgentReputation::LEN,
-        seeds = [b"reputation", job_escrow.taker.as_ref()],
+        seeds = [REPUTATION_SEED, job_escrow.taker.as_ref()],
         bump,
     )]
     pub taker_reputation: Box<Account<'info, AgentReputation>>,
@@ -99,7 +100,7 @@ pub struct ResolveDispute<'info> {
     /// a Bought listing is present.
     #[account(
         mut,
-        seeds = [b"claim", job_escrow.key().as_ref()],
+        seeds = [CLAIM_SEED, job_escrow.key().as_ref()],
         bump,
     )]
     pub claim_listing: UncheckedAccount<'info>,
@@ -178,7 +179,7 @@ pub fn handler(ctx: Context<ResolveDispute>, resolution: DisputeResolution) -> R
     }
 
     // 2. Threshold reached — distribute escrow and bond per resolution.
-    let seeds: &[&[u8]] = &[b"job", poster_key.as_ref(), spec_hash.as_ref(), &[bump]];
+    let seeds: &[&[u8]] = &[JOB_SEED, poster_key.as_ref(), spec_hash.as_ref(), &[bump]];
     let signer_seeds = &[seeds];
 
     let (escrow_to_taker, escrow_to_poster, bond_to_taker): (u64, u64, u64) = match final_resolution {

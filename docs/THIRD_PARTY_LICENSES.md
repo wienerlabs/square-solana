@@ -22,9 +22,10 @@ pnpm license:write
 <!-- license-inventory:begin -->
 | Paket | Ekosistem | Lisans | Kapsam | Kullanan | Durum |
 |---|---|---|---|---|---|
-| `anchor-lang` | cargo | Apache-2.0 | runtime | `aip-registry`, `policy-registry`, `square-escrow`, `verifier` | ✓ |
+| `anchor-lang` | cargo | Apache-2.0 | runtime | `aip-registry`, `policy-registry`, `square-common`, `square-escrow`, `verifier` | ✓ |
 | `anchor-spl` | cargo | Apache-2.0 | runtime | `square-escrow` | ✓ |
 | `groth16-solana` | cargo | MIT | runtime | `verifier` | ✓ |
+| `serde_json` | cargo | MIT OR Apache-2.0 | dev | `square-common` | ✓ |
 | `sha2` | cargo | MIT OR Apache-2.0 | runtime | `policy-registry` | ✓ |
 | `solana-instructions-sysvar` | cargo | Apache-2.0 | runtime | `verifier` | ✓ |
 | `solana-sdk-ids` | cargo | Apache-2.0 | runtime | `verifier` | ✓ |
@@ -100,7 +101,7 @@ pnpm license:write
 | `yaml` | npm | ISC | dev | `@squaresdk/solana-sdk`, `@squaresdk/solana-types` | ✓ |
 | `zod` | npm | MIT | runtime | `@squaresdk/solana-a2a`, `@squaresdk/solana-compliance-api`, `@squaresdk/solana-mcp`, `@squaresdk/solana-prover`, `@squaresdk/solana-types` | ✓ |
 
-**Özet:** 71 npm, 6 Cargo doğrudan bağımlılık; lisans dağılımı: 51× MIT, 17× Apache-2.0, 2× GPL-3.0, 2× MIT OR Apache-2.0, 1× BSD-2-Clause, 1× ISC, 1× MPL-2.0, 1× OFL-1.1, 1× Unlicense.
+**Özet:** 71 npm, 7 Cargo doğrudan bağımlılık; lisans dağılımı: 51× MIT, 17× Apache-2.0, 3× MIT OR Apache-2.0, 2× GPL-3.0, 1× BSD-2-Clause, 1× ISC, 1× MPL-2.0, 1× OFL-1.1, 1× Unlicense.
 
 **Mainnet öncesi hukuki inceleme gerektirenler:**
 - `circomlibjs` (npm) — GPL-3.0. Poseidon hash (devreyle aynı sabitler); yalnızca apps/compliance-api (BE-02). Yayınlanan bir pakette yok; snarkjs ile aynı onay kapsamında.

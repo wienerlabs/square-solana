@@ -1,4 +1,5 @@
 use anchor_lang::prelude::*;
+use square_common::seeds::{CLAIM_SEED, JOB_SEED};
 use anchor_spl::token_interface::{self, Mint, TokenAccount, TokenInterface, TransferChecked};
 
 use crate::errors::CovError;
@@ -18,7 +19,7 @@ pub struct BuyClaim<'info> {
     pub buyer: Signer<'info>,
 
     #[account(
-        seeds = [b"job", poster.key().as_ref(), &job_escrow.spec_hash],
+        seeds = [JOB_SEED, poster.key().as_ref(), &job_escrow.spec_hash],
         bump = job_escrow.bump,
         constraint = job_escrow.status == JobStatus::Delivered @ CovError::InvalidStatus,
         constraint = !job_escrow.has_active_dispute() @ CovError::DisputeAlreadyActive,
@@ -33,7 +34,7 @@ pub struct BuyClaim<'info> {
 
     #[account(
         mut,
-        seeds = [b"claim", job_escrow.key().as_ref()],
+        seeds = [CLAIM_SEED, job_escrow.key().as_ref()],
         bump = claim_listing.bump,
         constraint = claim_listing.job == job_escrow.key() @ CovError::ClaimListingMismatch,
         constraint = claim_listing.status == ClaimStatus::Listed @ CovError::InvalidClaimStatus,

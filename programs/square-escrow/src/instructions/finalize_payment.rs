@@ -1,4 +1,5 @@
 use anchor_lang::prelude::*;
+use square_common::seeds::{CLAIM_SEED, JOB_SEED, REPUTATION_SEED, VAULT_SEED};
 use anchor_spl::token_interface::{self, CloseAccount, Mint, TokenAccount, TokenInterface, TransferChecked};
 
 use crate::errors::CovError;
@@ -29,7 +30,7 @@ pub struct FinalizePayment<'info> {
 
     #[account(
         mut,
-        seeds = [b"job", poster.key().as_ref(), &job_escrow.spec_hash],
+        seeds = [JOB_SEED, poster.key().as_ref(), &job_escrow.spec_hash],
         bump = job_escrow.bump,
         close = poster,
     )]
@@ -47,7 +48,7 @@ pub struct FinalizePayment<'info> {
     /// account can be substituted for the real escrow.
     #[account(
         mut,
-        seeds = [b"escrow_token", job_escrow.key().as_ref()],
+        seeds = [VAULT_SEED, job_escrow.key().as_ref()],
         bump,
         constraint = escrow_token_account.owner == job_escrow.key(),
         constraint = escrow_token_account.mint == job_escrow.token_mint @ CovError::MintMismatch,
@@ -74,7 +75,7 @@ pub struct FinalizePayment<'info> {
         init_if_needed,
         payer = crank,
         space = AgentReputation::LEN,
-        seeds = [b"reputation", job_escrow.taker.as_ref()],
+        seeds = [REPUTATION_SEED, job_escrow.taker.as_ref()],
         bump,
     )]
     pub taker_reputation: Box<Account<'info, AgentReputation>>,
@@ -84,7 +85,7 @@ pub struct FinalizePayment<'info> {
     /// and routes payment accordingly.
     #[account(
         mut,
-        seeds = [b"claim", job_escrow.key().as_ref()],
+        seeds = [CLAIM_SEED, job_escrow.key().as_ref()],
         bump,
     )]
     pub claim_listing: UncheckedAccount<'info>,
@@ -143,7 +144,7 @@ pub fn handler(ctx: Context<FinalizePayment>) -> Result<()> {
         CovError::Unauthorized,
     );
 
-    let seeds: &[&[u8]] = &[b"job", poster_key.as_ref(), spec_hash.as_ref(), &[bump]];
+    let seeds: &[&[u8]] = &[JOB_SEED, poster_key.as_ref(), spec_hash.as_ref(), &[bump]];
     let signer_seeds = &[seeds];
 
     // 1. Transfer full escrow to the beneficiary.

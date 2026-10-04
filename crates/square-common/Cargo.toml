@@ -4,10 +4,22 @@ version = "0.1.0"
 edition = "2021"
 rust-version = "1.89"
 license.workspace = true
-description = "Square programları arasında paylaşılan seed'ler, roller, hata kodları ve hesap tipleri (içerik BC-10'da)"
+description = "Square programları arasında paylaşılan seed'ler, roller, sabitler, UTC gün yardımcısı ve owner/seed doğrulamalı account-read (BC-10)"
 publish = false
 
 [lib]
 path = "src/lib.rs"
 
+[features]
+# Programlar IDL üretirken (`anchor build`) bu crate'in tiplerini de aynı özellikle derler.
+idl-build = ["anchor-lang/idl-build"]
+
 [dependencies]
+anchor-lang = "1.2.0"
+
+[dev-dependencies]
+serde_json = "1"
+
+[lints.rust]
+# `declare_program!` SBF hedefini (`target_os = "solana"`) koşul olarak kullanır.
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(target_os, values("solana"))'] }

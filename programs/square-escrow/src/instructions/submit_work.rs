@@ -1,4 +1,5 @@
 use anchor_lang::prelude::*;
+use square_common::seeds::JOB_SEED;
 
 use crate::errors::CovError;
 use crate::state::{JobEscrow, JobStatus};
@@ -10,7 +11,7 @@ pub struct SubmitWork<'info> {
 
     #[account(
         mut,
-        seeds = [b"job", poster.key().as_ref(), &job_escrow.spec_hash],
+        seeds = [JOB_SEED, poster.key().as_ref(), &job_escrow.spec_hash],
         bump = job_escrow.bump,
     )]
     pub job_escrow: Box<Account<'info, JobEscrow>>,
