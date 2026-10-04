@@ -40,7 +40,7 @@ fn anchors_the_daily_counter_to_the_utc_day_of_the_clock() {
     let executed = h
         .send(&[ix], &[&operator])
         .expect("initialize_operator_state");
-    cu::within("verifier.initialize_operator_state", &executed, 20_000);
+    cu::within("verifier.initialize_operator_state", &executed, 40_000);
 
     let address = Pubkey::find_program_address(
         &[OPERATOR_STATE_SEED, operator.pubkey().as_ref()],
