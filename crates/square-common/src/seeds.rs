@@ -16,18 +16,10 @@ pub use crate::contract::square_verifier_contract::constants::{
 /// Taşınan programların sözleşmede karşılığı olmayan seed'leri. Programlar sözleşmeye geçtikçe
 /// (BC-15, BC-17, BC-21) kaldırılır.
 pub mod legacy {
-    /// Aperture `OperatorAccount` (`["operator", authority]`); sözleşmede `Institution`.
-    pub const OPERATOR_SEED: &[u8] = b"operator";
     /// Aperture `ComplianceStatus` (`["compliance", operator]`).
     pub const COMPLIANCE_SEED: &[u8] = b"compliance";
     /// Aperture `ProofRecord` (`["proof", operator, public_inputs[1]]`); sözleşmede `ReleaseProof`.
     pub const PROOF_SEED: &[u8] = b"proof";
-}
-
-/// Squads v4 programının PDA seed'leri (dış program; policy, kurumun multisig'ini doğrularken türetir).
-pub mod squads {
-    pub const MULTISIG_SEED: &[u8] = b"multisig";
-    pub const VAULT_SEED: &[u8] = b"vault";
 }
 
 #[cfg(test)]

@@ -722,8 +722,8 @@ export const IDL_PROGRAMS = {
       },
       {
         "code": 6004,
-        "name": "InvalidMultisigVault",
-        "msg": "Multisig vault does not match the Squads v4 derivation"
+        "name": "InvalidSquadsMultisig",
+        "msg": "Account is not an initialized Squads v4 multisig"
       }
     ]
   },

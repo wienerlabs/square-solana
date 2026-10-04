@@ -1,36 +1,41 @@
-# Aperture Policy Registry
+# square_policy
 
-Anchor program for on-chain policy management. Operators register their compliance policies as Merkle roots on Solana, enabling verifiable policy lookups.
+Akışın 1. adımı: kurum harcama yetkisini (mandate) salt'lı Poseidon commitment'ı olarak zincire yazar.
+Politikanın kendisi zincire çıkmaz; zincirde yalnızca commitment ve public günlük tavan durur. Arayüz
+[program arayüzü §10.2](../../docs/design/program-interface.md#102-square_policy)'dedir; IDL'i sözleşme
+IDL'iyle (`idl/square_policy_contract.json`) aynıdır.
 
-## Instructions
+| Talimat | Ne yapar |
+|---|---|
+| `init_institution` | `authority` için `Institution` hesabını açar (`["institution", owner_key]`) |
+| `set_institution_multisig` | Squads v4 multisig'i bağlar; hesabın Squads'a ait, başlatılmış bir `Multisig` olduğu doğrulanır. Sonrasında yalnızca vault PDA'sı yetkilidir |
+| `set_policy` | `Policy` hesabını açar (`["policy", institution, policy_id]`): commitment, günlük tavan, `version = 1` |
+| `update_policy` | Commitment ve tavanı değiştirir, `version`'ı artırır; mevcut job'lar `create_job` anındaki snapshot'la kalır |
+| `deactivate_policy` | Politikayı kapatır; yeni job onu kullanamaz |
 
-| Instruction | Description |
-|-------------|-------------|
-| `initialize_operator` | Create operator account (PDA seeded by authority) |
-| `register_policy` | Register new policy with Merkle root and data hash |
-| `update_policy` | Update existing policy, increment version |
-| `deactivate_policy` | Mark policy as inactive |
-| `register_policy_multisig` | Register via Squads multisig authority |
-| `update_policy_multisig` | Update via Squads multisig authority |
+Yetkili, multisig bağlanana kadar kurum anahtarı (`owner_key`), sonrasında yalnızca multisig'in vault
+PDA'sıdır. Event'ler `square_common::square_policy_events!()` ile tanımlanır ([event şeması](../../docs/design/events.md)).
+Alıcı listesi kökü (`set_buyer_root`) BC-18'de.
 
-## Account Structure
-
-**OperatorAccount**: authority, name, policy_count, multisig (optional), created_at
-**PolicyAccount**: operator, policy_id, merkle_root, policy_data_hash, version, active, timestamps
-
-## Squads Multisig
-
-Operators can assign a Squads Protocol multisig address to their operator account. Once set, the multisig variants of register/update instructions validate that the signer matches the authorized multisig.
-
-## Build & Test
+## Testler
 
 ```bash
-anchor build -p policy_registry
-anchor test
+anchor build -p square_policy
+cargo test -p square-policy
 ```
 
-## Deploy
+Testler derlenmiş programı LiteSVM'de çalıştırır:
 
-```bash
-anchor deploy --program-name policy_registry --provider.cluster devnet
-```
+- politika içeriğinin zincire çıkmaması;
+- her güncellemede sürümün artması;
+- sıfır tavan, uzun ad ve yetkisiz imzacı reddi;
+- kapalı politikanın güncellenememesi;
+- multisig bağlama ve bağlandıktan sonra yalnızca vault'un yetkili olması.
+
+Vault PDA'sının imzası gerçekte Squads programından gelir. Testte bu, imza doğrulaması kapalı LiteSVM'de
+vault'un imzacı olarak işaretlenmesiyle canlandırılır.
+
+## Köken
+
+Aperture `programs/policy-registry`'den geçmişiyle taşındı (BC-05); BC-17 ile Square arayüzüne göre
+yeniden yazıldı. Kaynak lisansı: [`LICENSE`](LICENSE).

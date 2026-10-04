@@ -315,6 +315,12 @@ export type SquarePolicyContract = {
               }
             ]
           }
+        },
+        {
+          "name": "squadsMultisig",
+          "docs": [
+            "Squads v4 multisig account; must be owned by the Squads v4 program and initialized."
+          ]
         }
       ],
       "args": [
@@ -675,8 +681,8 @@ export type SquarePolicyContract = {
     },
     {
       "code": 6004,
-      "name": "invalidMultisigVault",
-      "msg": "Multisig vault does not match the Squads v4 derivation"
+      "name": "invalidSquadsMultisig",
+      "msg": "Account is not an initialized Squads v4 multisig"
     }
   ],
   "types": [
