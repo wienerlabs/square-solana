@@ -16,7 +16,7 @@ idl-build = ["anchor-lang/idl-build"]
 
 [dependencies]
 anchor-lang = "1.2.0"
-# Zincirde sha256 sistem çağrısı (alıcı Merkle doğrulaması).
+# Zincirde sha256 sistem çağrısı (alıcı Merkle doğrulaması, Travel Rule commitment'ı).
 solana-sha256-hasher = "3"
 
 [build-dependencies]

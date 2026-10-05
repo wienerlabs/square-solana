@@ -24,6 +24,7 @@
     "registerAgent": 40000,
     "recordScreening": 40000,
     "createJob": 100000,
+    "commitTravelRule": 20000,
     "fundJob": 90000,
     "acceptJob": 20000,
     "submitWork": 20000,

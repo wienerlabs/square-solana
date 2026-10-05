@@ -263,6 +263,22 @@ describe('flow', () => {
     await expect(client.flow.createJob(params, options())).rejects.toThrow(/mint bulunamadı/);
   });
 
+  it('commitTravelRule: commitment ve kurum; 32 bayt olmayan commitment reddedilir', async () => {
+    const institution = key();
+    const { address } = await jobAccount({ mint: mint(), institution });
+    const commitment = randomBytes(32);
+    const built = decoded(
+      await client.flow.commitTravelRule({ institution, job: address, commitment }, options()),
+      escrow(),
+    );
+    expect(built.name).toBe('commitTravelRule');
+    expect(built.accounts).toEqual({ institution: b58(institution), job: b58(address) });
+    expect(built.data.commitment).toEqual(Array.from(commitment));
+    await expect(
+      client.flow.commitTravelRule({ institution, job: address, commitment: randomBytes(31) }, options()),
+    ).rejects.toThrow(/32 bayt/);
+  });
+
   it('fundJob, acceptJob, submitWork', async () => {
     const institution = key();
     const agentWallet = key();

@@ -64,7 +64,7 @@ pub struct Job {
     pub delivered_at: i64,
     pub settled_at: i64,
     pub work_hash: [u8; 32],
-    /// DRAFT (M5): salted Travel Rule commitment; all zeros = none.
+    /// Salted Travel Rule commitment bound before funding (ADR 0015); all zeros = none.
     pub travel_rule_commitment: [u8; 32],
     /// Policy snapshot taken at `create_job` (zeros when `policy` is None). The release proof is
     /// checked against it, so later policy updates or deactivation cannot change this job's rules.
@@ -222,7 +222,7 @@ pub struct EscrowParams {
     pub proof_timeout_secs: i64,
     /// DRAFT (M5, BC-33): `dispute.deadline = raised_at + dispute_timeout_secs`.
     pub dispute_timeout_secs: i64,
-    /// DRAFT (M5, BC-34): jobs at or above this amount need a Travel Rule commitment; 0 = disabled.
+    /// Jobs at or above this amount need a Travel Rule commitment before `fund_job`; 0 = disabled.
     pub travel_rule_threshold: u64,
 }
 

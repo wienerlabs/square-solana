@@ -369,6 +369,8 @@ fn institution_agent_job_and_claim(profile: &Profile) -> (Vec<Row>, usize) {
     );
     meter.run(&mut w.h, &["createJob"], "policy'li", vec![ix], &[&key]);
     let job = job_address(&key.pubkey(), &SPEC);
+    let ix = w.commit_travel_rule_ix(&key.pubkey(), &job, [0x7c; 32]);
+    meter.run(&mut w.h, &["commitTravelRule"], "", vec![ix], &[&key]);
     let ix = w.fund_job_ix(&institution, &job);
     meter.run(&mut w.h, &["fundJob"], "", vec![ix], &[&key]);
 

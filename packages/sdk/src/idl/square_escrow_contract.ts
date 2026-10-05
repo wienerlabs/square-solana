@@ -418,8 +418,9 @@ export type SquareEscrowContract = {
     {
       "name": "commitTravelRule",
       "docs": [
-        "DRAFT (M5, BC-34): binds a salted Travel Rule commitment (no PII on chain). Required before",
-        "`fund_job` when `amount >= params.travel_rule_threshold` (threshold 0 = disabled)."
+        "Binds a salted Travel Rule commitment to an Open job (no PII on chain, ADR 0015). It can be",
+        "replaced until `fund_job`, which requires it when `amount >= params.travel_rule_threshold`",
+        "(threshold 0 = disabled)."
       ],
       "discriminator": [
         33,
@@ -3564,7 +3565,7 @@ export type SquareEscrowContract = {
           {
             "name": "travelRuleThreshold",
             "docs": [
-              "DRAFT (M5, BC-34): jobs at or above this amount need a Travel Rule commitment; 0 = disabled."
+              "Jobs at or above this amount need a Travel Rule commitment before `fund_job`; 0 = disabled."
             ],
             "type": "u64"
           }
@@ -3703,7 +3704,7 @@ export type SquareEscrowContract = {
           {
             "name": "travelRuleCommitment",
             "docs": [
-              "DRAFT (M5): salted Travel Rule commitment; all zeros = none."
+              "Salted Travel Rule commitment bound before funding (ADR 0015); all zeros = none."
             ],
             "type": {
               "array": [
@@ -4058,7 +4059,7 @@ export type SquareEscrowContract = {
     {
       "name": "travelRuleCommitted",
       "docs": [
-        "DRAFT (M5)."
+        "A Travel Rule commitment was bound to an Open job (BC-34)."
       ],
       "type": {
         "kind": "struct",

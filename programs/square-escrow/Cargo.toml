@@ -1,6 +1,6 @@
 [package]
 name = "square-escrow"
-version = "0.4.0"
+version = "0.5.0"
 description = "Square escrow programı: kuruma ve registry agent'ına bağlı iş, policy anlık görüntüsü, fonlama, teslimat (BC-22)"
 edition = "2021"
 rust-version = "1.89"

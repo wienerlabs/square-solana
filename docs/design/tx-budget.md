@@ -42,6 +42,7 @@ cargo test --manifest-path tests/programs/Cargo.toml --test tx_budget -- --nocap
 | `registerAgent` | 32 baytlık kimlik, 200 baytlık kart URI'si | 2 | 6 | 700 | 703 | 17 160 | 40 000 |
 | `recordScreening` |  | 2 | 7 | 493 | 465 | 16 554 | 40 000 |
 | `createJob` | policy'li | 2 | 13 | 682 | 592 | 45 403 | 100 000 |
+| `commitTravelRule` |  | 2 | 5 | 393 | 393 | 6 373 | 20 000 |
 | `fundJob` |  | 2 | 12 | 592 | 533 | 41 076 | 90 000 |
 | `acceptJob` |  | 2 | 6 | 426 | 426 | 7 812 | 20 000 |
 | `submitWork` | 128 baytlık URI | 2 | 6 | 559 | 559 | 8 312 | 20 000 |
@@ -98,8 +99,8 @@ değildir.
   denetler. Program değişikliği CU'yu bu payın içine taşırsa test düşer; sınır yeniden ölçülerek
   güncellenir.
 - **Kapsam dışı:** Profili olmayan tx'ler kendi issue'larında eklenir: dispute talimatları (BC-32,
-  BC-33), `commit_travel_rule` (BC-34), MPP yolu (BC-37). SDK'nın dispute akışları o zamana kadar sınır
-  eklemez.
+  BC-33), MPP yolu (BC-37). SDK'nın dispute akışları o zamana kadar sınır eklemez. `commit_travel_rule`
+  BC-34'te eklendi.
 
 ## 6. SDK'da kullanım
 

@@ -766,7 +766,7 @@
       },
       "travelRuleThreshold": {
         "$ref": "#/U64",
-        "description": "DRAFT (M5, BC-34): jobs at or above this amount need a Travel Rule commitment; 0 = disabled."
+        "description": "Jobs at or above this amount need a Travel Rule commitment before `fund_job`; 0 = disabled."
       }
     }
   },
@@ -1092,7 +1092,7 @@
       },
       "travelRuleCommitment": {
         "$ref": "#/Hex32",
-        "description": "DRAFT (M5): salted Travel Rule commitment; all zeros = none."
+        "description": "Salted Travel Rule commitment bound before funding (ADR 0015); all zeros = none."
       },
       "policyCommitment": {
         "$ref": "#/Hex32",
@@ -1804,7 +1804,7 @@
   },
   "TravelRuleCommitted": {
     "type": "object",
-    "description": "DRAFT (M5).",
+    "description": "A Travel Rule commitment was bound to an Open job (BC-34).",
     "required": [
       "job",
       "commitment"
@@ -3970,7 +3970,7 @@
   },
   "CommitTravelRuleCall": {
     "type": "object",
-    "description": "DRAFT (M5, BC-34): binds a salted Travel Rule commitment (no PII on chain). Required before `fund_job` when `amount >= params.travel_rule_threshold` (threshold 0 = disabled).",
+    "description": "Binds a salted Travel Rule commitment to an Open job (no PII on chain, ADR 0015). It can be replaced until `fund_job`, which requires it when `amount >= params.travel_rule_threshold` (threshold 0 = disabled).",
     "required": [
       "program",
       "instruction",

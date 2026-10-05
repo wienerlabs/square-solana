@@ -1,6 +1,6 @@
 # API ve SDK sözleşmesi
 
-**Sözleşme sürümü:** v0.10.0 (taslak) · **Issue:** BE-35 (#102), BC-47 (#119), BE-07 (#39), BE-08 (#40), BE-09 (#41), BE-10 (#42), BE-11 (#44), BC-02 (#2), BE-17 (#50), BC-08 (#8), BC-17 (#25), BC-15 (#24), BC-21 (#29), BC-28 (#36) · **Dayandığı program sözleşmesi:** BC-44 v0.4.1 ([program-interface.md](program-interface.md))
+**Sözleşme sürümü:** v0.11.0 (taslak) · **Issue:** BE-35 (#102), BC-47 (#119), BE-07 (#39), BE-08 (#40), BE-09 (#41), BE-10 (#42), BE-11 (#44), BC-02 (#2), BE-17 (#50), BC-08 (#8), BC-17 (#25), BC-15 (#24), BC-21 (#29), BC-28 (#36), BC-34 (#71) · **Dayandığı program sözleşmesi:** BC-44 v0.4.2 ([program-interface.md](program-interface.md))
 
 Bu doküman Square'in HTTP API'sini ve TypeScript paketlerinin dış yüzeyini sabitler. Frontend (FE-24 veri katmanı) ve servisler (BE-18 API, BE-14 indexer, BE-15 keeper, BE-11 prover) bu sözleşmeye göre geliştirir. `@squaresdk/solana-sdk`'nin zincir tarafı BE-08, `@squaresdk/solana-identity` BE-09, `@squaresdk/solana-policy` BE-10 ile uygulandı; REST client'ın uygulaması BE-18'de. Paketlerde mock, placeholder gövde ya da sabit adres yoktur (proje kuralı).
 
@@ -88,7 +88,7 @@ Tüm `/v1` yanıtları `{ success, data, error, meta }` biçimindedir. `meta.req
 |---|---|---|---|
 | 1 | Politika commitment'ı | policy: `generatePolicySecret`, `derivePolicySalts`, `computePolicyCommitment`; sdk: `policy.instructions.setPolicy` | `prepareTx` (`setPolicy`), `putPolicyMeta` |
 | 2 | Agent kaydı | sdk: `flow.registerAgent`; identity: `formatDidAip` | `putAgentCard`, `prepareTx` (`registerAgent`) |
-| 3 | Screening + iş açma + fonlama | sdk: `flow.createJob`, `flow.fundJob`, `specHash` | `getScreening`, `prepareTx` (`createJob`, `fundJob`) |
+| 3 | Screening + iş açma + Travel Rule + fonlama | sdk: `flow.createJob`, `travelRule.commitment`, `flow.commitTravelRule`, `flow.fundJob`, `specHash` | `getScreening`, `prepareTx` (`createJob`, `commitTravelRule`, `fundJob`) |
 | 4 | Kabul ve teslim | sdk: `flow.acceptJob`, `flow.submitWork` | `uploadDelivery`, `prepareTx` (`acceptJob`, `submitWork`) |
 | 5 | Alacak satışı | policy: `buildBuyerTree`, `getBuyerProof`; sdk: `flow.listClaim`, `flow.buyClaim` | `listClaims`, `prepareTx` (`setBuyerRoot`, `listClaim`, `buyClaim`) |
 | 6 | Permissionless finalize | sdk: `flow.finalizePayment` | `listKeeperActions`, `prepareTx` (`finalizePayment`) |
@@ -131,6 +131,7 @@ Tüm `/v1` yanıtları `{ success, data, error, meta }` biçimindedir. `meta.req
 | Sürüm | Değişiklik | Issue / PR |
 |---|---|---|
 | v0.1.0 | İlk taslak: 28 operasyonluk OpenAPI 3.1 spec; IDL'den üretilen zod ve JSON Schema'lar; 4 paketin gövdesiz imzaları; hizalama testleri ve CI | BE-35 (#102) |
+| v0.11.0 | Program sözleşmesi v0.4.2'ye dayanır (Travel Rule dokümanları; SDK IDL kopyaları ve şemalar yeniden üretildi). SDK: `travelRule` (`recordDigest`, `commitment`, `generateSalt`), `TRAVEL_RULE_DOMAIN`, `flow.commitTravelRule`; işlem profilinde `commitTravelRule`. Spec hash'inin RFC 8785 kanonikleştirmesi ortak bir modüle taşındı, davranışı değişmedi ([ADR 0015](../decisions/0015-travel-rule-commitment-ve-esik.md)). HTTP yüzeyi değişmedi | BC-34 (#71) |
 | v0.10.0 | SDK işlem profili (BC-28): `TxKind`, `TX_COMPUTE_UNIT_LIMITS`, `MAX_COMPUTE_UNIT_LIMIT`, `PACKET_DATA_SIZE`, `computeUnitLimitFor`, `withComputeProfile`, `squareLookupTableAddresses`, `createLookupTableInstructions`. `flow.*` (dispute akışları hariç) ve `buildSetComplianceProofTx` çağıran sınır vermezse profilin sınırını ekler; `buildTx` pakete sığmayan tx'i reddeder. HTTP yüzeyi değişmedi | BC-28 (#36) |
 | v0.9.1 | Program sözleşmesi v0.4.1'e dayanır: `set_compliance_proof`'un argüman dokümanları talimatın dokümanına taşındı (SDK IDL kopyaları ve şemalar yeniden üretildi). Tipler, imzalar ve HTTP yüzeyi değişmedi | BC-21 (#29) |
 | v0.9.0 | Program sözleşmesi v0.4.0'a dayanır: registry hatası 6007 `AgentCardHashInvalid`, 6000 `AgentIdInvalid`'ın mesajı (SDK IDL tipleri ve şemalar yeniden üretildi). HTTP yüzeyi değişmedi | BC-15 (#24) |

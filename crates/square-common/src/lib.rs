@@ -11,6 +11,7 @@
 //! - [`squads`]: Squads v4 multisig hesabının doğrulanması ve vault PDA'sı.
 //! - [`merkle`]: onaylı alıcı listesinin yaprağı ve Merkle kanıtı doğrulaması (escrow `buy_claim`).
 //! - [`release`]: release ispatının tazeliği ve günlük sayacın gün dönümü (ADR 0012).
+//! - [`travel_rule`]: Travel Rule commitment'ı ve fonlama eşiği (ADR 0015).
 //! - [`events`]: sözleşme event'leri ve programların bunları `#[event]` olarak tanımlayan makroları.
 
 pub mod account_read;
@@ -24,3 +25,4 @@ pub mod screening;
 pub mod seeds;
 pub mod squads;
 pub mod time;
+pub mod travel_rule;
