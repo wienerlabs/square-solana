@@ -5,7 +5,7 @@ Square'in Anchor programları. Tek Anchor workspace'inde derlenir; programlar bi
 
 | Dizin (crate) | Kaynak | Taşıma | Square işleri |
 |---|---|---|---|
-| `square-escrow` | `covenant/programs/covenant` | [BC-04] ✓ | job yaşam döngüsü ve agent bağlama [BC-22] ✓, finalize + keeper fee, proof-gated release, alacak piyasası, itibar, M-of-N arbitration, dispute timeout |
+| `square-escrow` | `covenant/programs/covenant` | [BC-04] ✓ | job yaşam döngüsü ve agent bağlama [BC-22] ✓, finalize + keeper fee [BC-23] ✓, proof-gated release [BC-24] ✓, itibar ve validation [BC-26] ✓, alacak piyasası, M-of-N arbitration, dispute timeout |
 | `square-policy` | `aperture/programs/policy-registry` | [BC-05] ✓ | kurum + politika commitment'ı + public günlük tavan [BC-17] ✓, alıcı Merkle kökü [BC-18] ✓ |
 | `square-verifier` | `aperture/programs/verifier` | [BC-05] ✓ | Groth16 doğrulama, release ispatı bağlama (`ReleaseProof`) ve günlük sayaç [BC-21] ✓, Stripe MPP yolu |
 | `square-registry` | `dr-wilson-empty/aip-beta` → `programs/aip-escrow/programs/aip-registry` | [BC-07] ✓ | agent kaydı (`did:aip` v2 Solana profili), event'ler [BC-15] ✓; registry config'i ve screening [BC-27] |
@@ -36,5 +36,8 @@ Square'in Anchor programları. Tek Anchor workspace'inde derlenir; programlar bi
 [BC-18]: https://github.com/wienerlabs/square-solana/issues/26
 [BC-21]: https://github.com/wienerlabs/square-solana/issues/29
 [BC-22]: https://github.com/wienerlabs/square-solana/issues/30
+[BC-23]: https://github.com/wienerlabs/square-solana/issues/31
+[BC-24]: https://github.com/wienerlabs/square-solana/issues/32
+[BC-26]: https://github.com/wienerlabs/square-solana/issues/34
 [BC-27]: https://github.com/wienerlabs/square-solana/issues/35
 [BC-44]: https://github.com/wienerlabs/square-solana/issues/101

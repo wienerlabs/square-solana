@@ -43,8 +43,6 @@ export const PROGRAMS = Object.freeze([
     contract: 'square_escrow_contract',
     status: 'contract',
     pending: [
-      { issue: 'BC-23 (#31)', instructions: ['finalize_payment'] },
-      { issue: 'BC-24 (#32)', instructions: ['escalate_missing_proof'] },
       {
         issue: 'BC-25 (#33)',
         instructions: ['list_claim', 'buy_claim', 'cancel_claim'],
@@ -52,15 +50,10 @@ export const PROGRAMS = Object.freeze([
         types: ['ClaimListing', 'ClaimStatus'],
       },
       {
-        issue: 'BC-26 (#34)',
-        accounts: ['AgentReputation', 'ValidationRecord'],
-        types: ['AgentReputation', 'ValidationRecord'],
-      },
-      {
         issue: 'BC-32 (#69)',
         instructions: ['raise_dispute', 'resolve_dispute', 'execute_resolution', 'update_arbitrators'],
       },
-      { issue: 'BC-33 (#70)', instructions: ['lapse_dispute'] },
+      { issue: 'BC-33 (#70)', instructions: ['lapse_dispute', 'escalate_missing_proof'] },
       { issue: 'BC-34 (#71)', instructions: ['commit_travel_rule'] },
     ],
   },

@@ -24,6 +24,32 @@ pub const fn daily_spent_at(day_start_unix: i64, daily_spent: u64, at: i64) -> O
     }
 }
 
+/// Ret kodunun bitleri (release-circuit.md §3).
+pub mod refusal {
+    pub const PER_TX: u16 = 1;
+    pub const DAILY_PRIVATE: u16 = 2;
+    pub const MINT_NOT_ALLOWED: u16 = 4;
+    pub const PAYEE_BLOCKED: u16 = 8;
+    pub const CATEGORY_NOT_ALLOWED: u16 = 16;
+    pub const OUTSIDE_TIME_WINDOW: u16 = 32;
+    pub const DAILY_CEILING: u16 = 64;
+
+    /// Release'in kendisinden gelen, zamanla değişmeyen sebepler: tutar, mint ve payee job'dan ve
+    /// alacaktan, tavan ve listeler job'un policy anlık görüntüsünden gelir.
+    pub const PERMANENT: u16 = PER_TX | MINT_NOT_ALLOWED | PAYEE_BLOCKED;
+    /// Günlük tavanlar: sayaç 0 iken çiğneniyorsa net tutar tek başına tavanı aşar, kalıcıdır; değilse
+    /// sayaç gece yarısı sıfırlanınca geçebilir.
+    pub const DAILY: u16 = DAILY_PRIVATE | DAILY_CEILING;
+}
+
+/// Ret, escrow'u kuruma iade edecek kesin bir karar mı (ADR 0013). Kalıcı bir sebep yoksa ret
+/// geçicidir (günlük sayaç, zaman penceresi) ya da tamamen kurumun beyanına bağlıdır (kategori): escrow
+/// bekler, kurum uyumlu bir ispat bağlayınca ödenir.
+pub const fn is_final_refusal(refusal_code: u16, daily_spent_before: u64) -> bool {
+    refusal_code & refusal::PERMANENT != 0
+        || (daily_spent_before == 0 && refusal_code & refusal::DAILY != 0)
+}
+
 /// Release'in zincirde yapılacağı hâli: escrow kendi hesaplarından türetir.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ReleaseFacts {
@@ -181,6 +207,35 @@ mod tests {
                 Err(expected)
             );
         }
+    }
+
+    #[test]
+    fn only_a_permanent_refusal_is_final() {
+        use refusal::*;
+        for code in [
+            PER_TX,
+            MINT_NOT_ALLOWED,
+            PAYEE_BLOCKED,
+            PER_TX | OUTSIDE_TIME_WINDOW,
+        ] {
+            assert!(is_final_refusal(code, 40), "{code}");
+        }
+        // Sayaç 0 iken günlük tavanı aşan net tek başına tavanı aşar.
+        assert!(is_final_refusal(DAILY_CEILING, 0));
+        assert!(is_final_refusal(DAILY_PRIVATE, 0));
+        // Kurumun zamanlamasına ya da beyanına bağlı sebepler tek başına iade etmez.
+        for code in [
+            DAILY_CEILING,
+            DAILY_PRIVATE,
+            OUTSIDE_TIME_WINDOW,
+            CATEGORY_NOT_ALLOWED,
+            CATEGORY_NOT_ALLOWED | DAILY_CEILING | OUTSIDE_TIME_WINDOW,
+        ] {
+            assert!(!is_final_refusal(code, 40), "{code}");
+        }
+        assert!(!is_final_refusal(CATEGORY_NOT_ALLOWED, 0));
+        assert!(!is_final_refusal(OUTSIDE_TIME_WINDOW, 0));
+        assert!(!is_final_refusal(0, 0));
     }
 
     #[test]

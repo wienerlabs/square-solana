@@ -56,10 +56,10 @@ fn only_the_upgrade_authority_initializes_the_config() {
             EscrowError::InvalidChallengePeriod,
         ),
         (
-            "keeper ücreti %100'ü aşıyor",
+            "keeper ücreti %1'i aşıyor",
             arbitrators.clone(),
             2,
-            EscrowParamsChange::KeeperFee(10_001),
+            EscrowParamsChange::KeeperFee(101),
             EscrowError::InvalidKeeperFee,
         ),
         (

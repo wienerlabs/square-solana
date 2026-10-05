@@ -2,13 +2,12 @@
 //! kuralı `update_arbitrators`'la (BC-32) paylaşılır.
 
 use anchor_lang::prelude::*;
-use square_common::constants::BPS_DENOMINATOR;
 
 use crate::errors::EscrowError;
-use crate::state::{EscrowParams, MAX_ARBITRATORS};
+use crate::state::{EscrowParams, MAX_ARBITRATORS, MAX_KEEPER_FEE_BPS};
 
 /// Challenge sınırları: `0 < min <= max`; `max` i64'e sığmalı (`challenge_end = now + period`).
-/// Keeper ücreti escrow tutarını aşamaz; üst sınırın kesin değeri BC-23'te.
+/// Keeper ücreti en fazla `MAX_KEEPER_FEE_BPS` (ADR 0013).
 pub fn validate_params(params: &EscrowParams) -> Result<()> {
     require!(
         params.min_challenge_period > 0
@@ -17,7 +16,7 @@ pub fn validate_params(params: &EscrowParams) -> Result<()> {
         EscrowError::InvalidChallengePeriod
     );
     require!(
-        u64::from(params.keeper_fee_bps) <= BPS_DENOMINATOR,
+        params.keeper_fee_bps <= MAX_KEEPER_FEE_BPS,
         EscrowError::InvalidKeeperFee
     );
     Ok(())

@@ -1,7 +1,7 @@
 //! square_escrow hesapları ve tipleri (program arayüzü §5, §10.4). Düzen kuralı: sabit boyutlu alanlar
 //! önce, değişken boyutlu alanlar (Option, veri taşıyan enum, String) sonda; indexer ve keeper sabit
-//! önekte `memcmp` ile filtreler. `ClaimListing` (BC-25), `AgentReputation` ve `ValidationRecord`
-//! (BC-26) kendi issue'larında eklenir (scripts/ci/programs.mjs → pending).
+//! önekte `memcmp` ile filtreler. `ClaimListing` BC-25'te eklenir (scripts/ci/programs.mjs → pending);
+//! finalize onu sözleşmenin tipiyle (`square_common`) okur ve yazar.
 
 use anchor_lang::prelude::*;
 
@@ -9,6 +9,8 @@ use anchor_lang::prelude::*;
 pub const MAX_ARBITRATORS: usize = 7;
 /// Teslimat URI'sinin üst sınırı (bayt; Covenant ve `@squaresdk/solana-types` ile aynı).
 pub const DELIVERY_URI_MAX_LEN: usize = 128;
+/// Keeper ücretinin üst sınırı: escrow tutarının %1'i (ADR 0013).
+pub const MAX_KEEPER_FEE_BPS: u16 = 100;
 
 /// Singleton. seeds = ["config"]
 #[account]
@@ -135,6 +137,35 @@ pub enum DisputeResolution {
     FavorInstitution,
     /// Agent side gets `agent_amount`, rest refunded; a bond is returned.
     Split { agent_amount: u64 },
+}
+
+/// seeds = ["reputation", agent_record] — bound to the registry agent, not to a wallet (BC-26).
+#[account]
+#[derive(InitSpace)]
+pub struct AgentReputation {
+    pub agent_record: Pubkey,
+    pub jobs_completed: u64,
+    pub jobs_failed: u64,
+    pub jobs_disputed: u64,
+    pub total_earned: u64,
+    pub first_job_at: i64,
+    pub last_job_at: i64,
+    pub bump: u8,
+}
+
+/// seeds = ["validation", job] — gate outcome of a settled job (BC-26); written once per job.
+#[account]
+#[derive(InitSpace)]
+pub struct ValidationRecord {
+    pub job: Pubkey,
+    pub agent_record: Pubkey,
+    pub outcome: ValidationOutcome,
+    /// `ReleaseProof.refusal_code` when Refused, else 0.
+    pub refusal_code: u16,
+    pub recorded_at: i64,
+    pub bump: u8,
+    pub policy: Option<Pubkey>,
+    pub release_proof: Option<Pubkey>,
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq, Debug, InitSpace)]
