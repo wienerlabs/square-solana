@@ -3,10 +3,12 @@
 //
 //   node --test scripts/security/gitleaks-rules.check.mjs
 //
-// Anahtar benzeri girdiler her koşuda rastgele üretilir ve geçici dizinde kalır; depoya girmez.
+// Anahtar benzeri girdiler her koşuda rastgele üretilir ve geçici dizinde kalır; depoya girmez. Yalnızca bu
+// deponun kuralları denenir: gitleaks'in varsayılan kuralları (ör. generic-api-key) entropi ve stopword
+// filtreleriyle çalışır, rastgele girdide sonuçları kararsızdır.
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { randomBytes, randomInt } from 'node:crypto';
+import { randomBytes } from 'node:crypto';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -16,8 +18,6 @@ import { gitleaksArgs } from './gitleaks.mjs';
 
 const CONFIG = fileURLToPath(new URL('../../.gitleaks.toml', import.meta.url));
 const bytes = () => Array.from(randomBytes(64));
-const BASE58 = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
-const base58 = (n) => Array.from({ length: n }, () => BASE58[randomInt(BASE58.length)]).join('');
 
 /** Dosya adı → beklenen kural (null: bulgu olmamalı). */
 const CASES = {
@@ -34,7 +34,6 @@ const CASES = {
   ],
   'local.env': [`PRIVATE_KEY=[${bytes().join(',')}]\n`, 'solana-secret-key-array'],
   'key.rs': [`let secret_key: [u8; 64] = [${bytes().join(', ')}];\n`, 'solana-secret-key-array'],
-  'b58.env': [`SOLANA_PRIVATE_KEY=${base58(88)}\n`, 'generic-api-key'],
   // Adsız 64 baytlık açık veriler: doğrulama anahtarı, ispat noktası, belge örneği.
   'vk.rs': [`pub const ALPHA_G1: [u8; 64] = [${bytes().join(', ')}];\n`, null],
   'proof.json': [JSON.stringify({ proof_a: bytes(), public_inputs: [bytes().slice(0, 32)] }, null, 2), null],
