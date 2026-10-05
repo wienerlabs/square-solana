@@ -1,11 +1,8 @@
 'use client';
 
-import { useMemo } from 'react';
-import { PublicKey } from '@solana/web3.js';
-import { buildBuyerTree, computePolicyCommitment, derivePolicySalts } from '@squaresdk/solana-policy';
 import type { PolicyDocument } from '@squaresdk/solana-types';
 import { Address } from '@/components/ui/address';
-import { bytesToHex, hexToBytes, type PolicyDraft } from '@/lib/policy-draft';
+import { bytesToHex, type PolicyDraft } from '@/lib/policy-draft';
 import type { PolicyAddresses } from '@/lib/use-policy-workspace';
 
 function Hex({ value, label }: { value: string; label: string }) {
@@ -18,34 +15,24 @@ function Hex({ value, label }: { value: string; label: string }) {
 }
 
 interface Props {
-  cluster: string;
   addresses: PolicyAddresses;
   draft: PolicyDraft;
   document: PolicyDocument | null;
-  buyersValid: boolean;
-  secret: Uint8Array;
+  /** Bu tarayıcıda hesaplanan commitment ve alıcı kökü; kurallar ya da liste geçersizse null. */
+  commitment: Uint8Array | null;
+  buyerRoot: Uint8Array | null;
 }
 
 /** Zincire giden üç değer bu tarayıcıda hesaplanır: commitment, public tavan ve alıcı kökü. */
-export function OnChainPreview({ cluster, addresses, draft, document, buyersValid, secret }: Props) {
-  const commitment = useMemo(
-    () =>
-      document
-        ? bytesToHex(computePolicyCommitment(document, derivePolicySalts(secret, hexToBytes(draft.policyId))))
-        : null,
-    [document, secret, draft.policyId],
-  );
-  const buyerRoot = useMemo(
-    () =>
-      buyersValid
-        ? bytesToHex(
-            buildBuyerTree(
-              draft.buyers.map((b) => ({ buyer: new PublicKey(b.buyer), leafSalt: hexToBytes(b.leafSalt) })),
-            ).root,
-          )
-        : null,
-    [buyersValid, draft.buyers],
-  );
+export function OnChainPreview({
+  addresses,
+  draft,
+  document,
+  commitment: commitmentBytes,
+  buyerRoot: rootBytes,
+}: Props) {
+  const commitment = commitmentBytes ? bytesToHex(commitmentBytes) : null;
+  const buyerRoot = rootBytes ? bytesToHex(rootBytes) : null;
 
   return (
     <section aria-labelledby="onchain-heading" className="rounded-card border border-border bg-surface p-6">
@@ -91,8 +78,7 @@ export function OnChainPreview({ cluster, addresses, draft, document, buyersVali
       </dl>
       <p className="mt-4 text-sm text-muted">
         Everything else stays in this browser: both private limits, the three lists, the categories, the time window,
-        the secret and its salts. Committing on chain becomes available once square_policy with set_policy and
-        set_buyer_root is deployed on {cluster}.
+        the secret and its salts.
       </p>
       <p className="mt-2 text-sm text-muted">
         Release proofs are built later by the institution&apos;s software from this policy and the secret. A local

@@ -1,12 +1,15 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
+import { PublicKey } from '@solana/web3.js';
+import { buildBuyerTree, computePolicyCommitment, derivePolicySalts } from '@squaresdk/solana-policy';
 import { useWebConfig } from '@/components/providers';
 import { Button } from '@/components/ui/button';
-import { checkDraft, draftDocument } from '@/lib/policy-draft';
+import { checkDraft, draftDocument, hexToBytes } from '@/lib/policy-draft';
 import { usePolicyAddresses, usePolicyWorkspace } from '@/lib/use-policy-workspace';
 import { useSettlementToken } from '@/lib/use-settlement';
 import { OnChainPreview } from './onchain-preview';
+import { PolicyCommit } from './policy-commit';
 import { PolicyForm } from './policy-form';
 import { SecretPanel } from './secret-panel';
 
@@ -28,6 +31,31 @@ export function InstitutionPolicies({ owner, policyProgramId }: { owner: string;
   const document = useMemo(
     () => (draft && rulesValid && addresses.state === 'ready' ? draftDocument(draft, addresses.institution) : null),
     [draft, rulesValid, addresses],
+  );
+
+  const secret = workspace.secret;
+  const buyersValid = check !== null && !check.errors.buyers;
+  const commitment = useMemo(
+    () =>
+      document && secret && draft
+        ? computePolicyCommitment(document, derivePolicySalts(secret, hexToBytes(draft.policyId)))
+        : null,
+    [document, secret, draft],
+  );
+  const buyerRoot = useMemo(
+    () =>
+      draft && buyersValid
+        ? buildBuyerTree(draft.buyers.map((b) => ({ buyer: new PublicKey(b.buyer), leafSalt: hexToBytes(b.leafSalt) })))
+            .root
+        : null,
+    [draft, buyersValid],
+  );
+  const { update } = workspace;
+  const syncVersion = useCallback(
+    (version: number) => {
+      if (draft && draft.version !== version) update({ ...draft, version });
+    },
+    [draft, update],
   );
 
   if (!workspace.loaded) return null;
@@ -79,12 +107,23 @@ export function InstitutionPolicies({ owner, policyProgramId }: { owner: string;
       )}
       {workspace.secret && draft && check && (
         <OnChainPreview
-          cluster={cluster}
           addresses={addresses}
           draft={draft}
           document={document}
-          buyersValid={!check.errors.buyers}
-          secret={workspace.secret}
+          commitment={commitment}
+          buyerRoot={buyerRoot}
+        />
+      )}
+      {workspace.secret && draft && check && (
+        <PolicyCommit
+          owner={owner}
+          policyProgramId={policyProgramId}
+          policyId={draft.policyId}
+          commitment={commitment}
+          buyerRoot={buyerRoot}
+          dailyCeiling={document ? BigInt(document.dailyCeiling) : null}
+          draftVersion={draft.version}
+          onChainVersion={syncVersion}
         />
       )}
     </div>

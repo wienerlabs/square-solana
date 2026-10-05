@@ -89,6 +89,18 @@ describe('institution policies', () => {
     expect(await axeViolations(container)).toEqual([]);
   });
 
+  it('reads and commits nothing on chain until the network is verified', { timeout: 20000 }, async () => {
+    mount();
+    fireEvent.click(await screen.findByRole('button', { name: 'Create a secret' }));
+    fireEvent.click(screen.getByRole('button', { name: 'New policy' }));
+    const onChain = await screen.findByRole('region', { name: 'On chain' });
+    await within(onChain).findByText(/The network is not verified/, undefined, { timeout: 8000 });
+    expect((within(onChain).getByRole('button', { name: 'Commit on chain' }) as HTMLButtonElement).disabled).toBe(true);
+    // Kurum ve politika hesapları okunmadı: ağa giden tek istek genesis sorgusu.
+    expect(requests.length).toBeGreaterThan(0);
+    expect(requests.every((request) => request.includes('getGenesisHash'))).toBe(true);
+  });
+
   it('keeps the commitment empty until the rules are complete', async () => {
     mount();
     fireEvent.click(await screen.findByRole('button', { name: 'Create a secret' }));
