@@ -97,29 +97,47 @@ describe('job events from logs', () => {
 });
 
 describe('live updates', () => {
+  const jobAddress = job.toBase58();
+  const listingAddress = other.toBase58();
+  const read = (jobSignature: string | null, listingSignature: string | null) =>
+    new Map([
+      [jobAddress, jobSignature],
+      [listingAddress, listingSignature],
+    ]);
+
   it('re-reads once per new signature, whether the subscription or the poll reports it', () => {
-    const seen = new SignatureTracker();
+    const seen = new SignatureTracker([jobAddress, listingAddress]);
     // Okunan durum bilinmeden yoklama karşılaştırma yapmaz.
     expect(seen.known).toBe(false);
-    seen.baseline('sig-1');
+    seen.baseline(read('sig-1', null));
     expect(seen.known).toBe(true);
-    expect(seen.observe('sig-1')).toBe(false);
+    expect(seen.observe(jobAddress, 'sig-1')).toBe(false);
+    expect(seen.observe(listingAddress, null)).toBe(false);
     // Abonelik bildirdi; aynı imzayı sonra yoklama da görür.
-    expect(seen.observe('sig-2')).toBe(true);
-    expect(seen.observe('sig-2')).toBe(false);
+    expect(seen.observe(jobAddress, 'sig-2')).toBe(true);
+    expect(seen.observe(jobAddress, 'sig-2')).toBe(false);
     // Abonelik koptu: yoklama yeni imzayı görür.
-    expect(seen.observe('sig-3')).toBe(true);
+    expect(seen.observe(jobAddress, 'sig-3')).toBe(true);
     // Bildirimden hemen sonraki okuma henüz eski imzaya dayanıyorsa sıradaki yoklama yeniden okutur.
-    seen.baseline('sig-2');
-    expect(seen.observe('sig-3')).toBe(true);
+    seen.baseline(read('sig-2', null));
+    expect(seen.observe(jobAddress, 'sig-3')).toBe(true);
+  });
+
+  it('notices a transaction that touches only the listing', () => {
+    // `cancel_claim` job hesabına dokunmaz; listeleme adresi ayrıca izlenir.
+    const seen = new SignatureTracker([jobAddress, listingAddress]);
+    seen.baseline(read('sig-list', 'sig-list'));
+    expect(seen.observe(jobAddress, 'sig-list')).toBe(false);
+    expect(seen.observe(listingAddress, 'sig-cancel')).toBe(true);
+    expect(seen.observe(listingAddress, 'sig-cancel')).toBe(false);
   });
 
   it('knows a job without transactions', () => {
-    const seen = new SignatureTracker();
-    seen.baseline(null);
+    const seen = new SignatureTracker([jobAddress, listingAddress]);
+    seen.baseline(read(null, null));
     expect(seen.known).toBe(true);
-    expect(seen.observe(null)).toBe(false);
-    expect(seen.observe('sig-1')).toBe(true);
+    expect(seen.observe(jobAddress, null)).toBe(false);
+    expect(seen.observe(jobAddress, 'sig-1')).toBe(true);
   });
 });
 
