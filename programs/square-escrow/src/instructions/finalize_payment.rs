@@ -3,8 +3,6 @@ use anchor_spl::token_interface::{
     self, CloseAccount, Mint, TokenAccount, TokenInterface, TransferChecked,
 };
 use square_common::constants::BPS_DENOMINATOR;
-use square_common::contract::square_escrow_contract::accounts::ClaimListing;
-use square_common::contract::square_escrow_contract::types::ClaimStatus;
 use square_common::release::ReleaseFacts;
 use square_common::seeds::{
     CLAIM_SEED, CONFIG_SEED, ESCROW_AUTHORITY_SEED, JOB_SEED, RELEASE_PROOF_SEED, REPUTATION_SEED,
@@ -15,7 +13,8 @@ use crate::errors::EscrowError;
 use crate::linked;
 use crate::release_gate::{self, Gate};
 use crate::state::{
-    AgentReputation, EscrowConfig, Job, JobStatus, ValidationOutcome, ValidationRecord,
+    AgentReputation, ClaimListing, ClaimStatus, EscrowConfig, Job, JobStatus, ValidationOutcome,
+    ValidationRecord,
 };
 use crate::{Finalized, ReleaseRefused, ReleaseVerified, ReputationRecorded, ValidationRecorded};
 
@@ -132,14 +131,15 @@ fn read_listing(info: &AccountInfo, job: &Pubkey) -> Result<Option<ClaimListing>
 
 /// Settlement'ta listeleme: ödemede `Settled` (satılmışsa alıcıya ödendi, satılmamışsa satışa kapandı),
 /// iadede `Defaulted` (alıcıya ödenmez).
-fn settle_listing(info: &AccountInfo, mut listing: ClaimListing, paid: bool) -> Result<()> {
-    listing.status = if paid {
+fn settle_listing(info: &AccountInfo, listing: ClaimListing, paid: bool) -> Result<()> {
+    let status = if paid {
         ClaimStatus::Settled
     } else {
         ClaimStatus::Defaulted
     };
+    let settled = ClaimListing { status, ..listing };
     let mut data = info.try_borrow_mut_data()?;
-    listing.try_serialize(&mut &mut data[..])
+    settled.try_serialize(&mut &mut data[..])
 }
 
 /// Job PDA'sının imzasıyla vault'tan `amount` aktarır (0 ise aktarım yapılmaz).

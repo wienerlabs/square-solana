@@ -5,12 +5,9 @@
 
 use anchor_lang::prelude::Pubkey;
 use anchor_lang::solana_program::instruction::Instruction;
-use anchor_lang::{AccountSerialize, InstructionData, ToAccountMetas};
-use solana_account::Account;
+use anchor_lang::{InstructionData, ToAccountMetas};
 use solana_keypair::Keypair;
 use solana_signer::Signer;
-use square_common::contract::square_escrow_contract::accounts::ClaimListing;
-use square_common::contract::square_escrow_contract::types::ClaimStatus;
 use square_common::seeds::{
     AGENT_SEED, CLAIM_SEED, CONFIG_SEED, ESCROW_AUTHORITY_SEED, INSTITUTION_SEED, JOB_SEED,
     POLICY_SEED, REGISTRY_CONFIG_SEED, REPUTATION_SEED, SCREENING_SEED, VALIDATION_SEED,
@@ -33,7 +30,14 @@ pub const SPEC: [u8; 32] = [0x51; 32];
 pub const WORK: [u8; 32] = [0xa7; 32];
 pub const COMMITMENT: [u8; 32] = [0x2c; 32];
 pub const CEILING: u64 = 1_000_000_000;
+/// `open_job(true)`'nun politikası.
+pub const POLICY_ID: [u8; 32] = [7; 32];
 const LAMPORTS: u64 = 1_000_000_000;
+
+mod claims;
+// Alacak yardımcılarını kullanmayan test binary'leri de bu modülü içerir.
+#[allow(unused_imports)]
+pub use claims::*;
 
 pub fn params() -> EscrowParams {
     EscrowParams {
@@ -706,7 +710,7 @@ impl World {
         let agent = self.register_agent("research-agent");
         self.screen(&institution.key.pubkey(), ScreeningStatus::Clear);
         self.screen(&agent.wallet.pubkey(), ScreeningStatus::Clear);
-        let policy = policy.then(|| self.policy(&institution.key, [7; 32]));
+        let policy = policy.then(|| self.policy(&institution.key, POLICY_ID));
         let ix = self.default_create_ix(&institution.key.pubkey(), &agent, policy);
         let key = institution.key.insecure_clone();
         self.h.send(&[ix], &[&key]).expect("create_job");
@@ -715,7 +719,11 @@ impl World {
     }
 
     pub fn funded_job(&mut self) -> (Institution, Agent, Pubkey) {
-        let (institution, agent, job) = self.open_job(false);
+        self.funded_job_with(false)
+    }
+
+    pub fn funded_job_with(&mut self, policy: bool) -> (Institution, Agent, Pubkey) {
+        let (institution, agent, job) = self.open_job(policy);
         let ix = self.fund_job_ix(&institution, &job);
         let key = institution.key.insecure_clone();
         self.h.send(&[ix], &[&key]).expect("fund_job");
@@ -723,7 +731,11 @@ impl World {
     }
 
     pub fn accepted_job(&mut self) -> (Institution, Agent, Pubkey) {
-        let (institution, agent, job) = self.funded_job();
+        self.accepted_job_with(false)
+    }
+
+    pub fn accepted_job_with(&mut self, policy: bool) -> (Institution, Agent, Pubkey) {
+        let (institution, agent, job) = self.funded_job_with(policy);
         let ix = self.accept_ix(&agent.wallet.pubkey(), &job, agent.record, SPEC);
         let wallet = agent.wallet.insecure_clone();
         self.h.send(&[ix], &[&wallet]).expect("accept_job");
@@ -732,7 +744,12 @@ impl World {
 
     /// Teslim edilmiş policy'siz iş; challenge penceresi `CHALLENGE`.
     pub fn delivered_job(&mut self) -> (Institution, Agent, Pubkey) {
-        let (institution, agent, job) = self.accepted_job();
+        self.delivered_job_with(false)
+    }
+
+    /// Teslim edilmiş iş; `policy` ise kurumun [`POLICY_ID`] politikasına bağlı.
+    pub fn delivered_job_with(&mut self, policy: bool) -> (Institution, Agent, Pubkey) {
+        let (institution, agent, job) = self.accepted_job_with(policy);
         let ix = self.submit_ix(
             &agent.wallet.pubkey(),
             &job,
@@ -763,42 +780,5 @@ impl World {
     pub fn finalize(&mut self, keeper: &Keypair, job: &Pubkey, settlement: Settlement) -> Outcome {
         let ix = self.finalize_ix(&keeper.pubkey(), job, settlement, None);
         self.h.send(&[ix], &[keeper])
-    }
-
-    /// Alacak listelemesi. `list_claim` / `buy_claim` BC-25'te gelene kadar hesap sözleşmenin düzeniyle
-    /// (escrow'a ait, `["claim", job]`) yazılır.
-    pub fn write_claim(&mut self, job: &Pubkey, buyer: Pubkey, status: ClaimStatus) {
-        let now = self.h.now();
-        let state = self.job(job);
-        let bought = matches!(status, ClaimStatus::Bought);
-        let listing = ClaimListing {
-            job: *job,
-            seller: state.agent_wallet,
-            buyer: if bought { buyer } else { Pubkey::default() },
-            rent_payer: self.h.payer.pubkey(),
-            price: state.amount / 10 * 9,
-            face_value: state.amount,
-            listed_at: now,
-            bought_at: if bought { now } else { 0 },
-            status,
-            bump: Pubkey::find_program_address(&[CLAIM_SEED, job.as_ref()], &square_escrow::ID).1,
-        };
-        let mut data = Vec::new();
-        listing.try_serialize(&mut data).unwrap();
-        let lamports = self.h.svm.minimum_balance_for_rent_exemption(data.len());
-        self.h.set_account(
-            claim_address(job),
-            Account {
-                lamports,
-                data,
-                owner: square_escrow::ID,
-                executable: false,
-                rent_epoch: 0,
-            },
-        );
-    }
-
-    pub fn claim(&self, job: &Pubkey) -> ClaimListing {
-        self.h.account(&claim_address(job)).expect("ClaimListing")
     }
 }

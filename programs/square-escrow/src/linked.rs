@@ -7,6 +7,7 @@ use square_common::account_read::{self, AccountReadError};
 use square_common::contract::square_policy_contract::accounts::{Institution, Policy};
 use square_common::contract::square_registry_contract::accounts::AgentRecord;
 use square_common::contract::square_registry_contract::types::AgentStatus;
+use square_common::merkle::UNRESTRICTED_ROOT;
 use square_common::screening::{self, ScreeningRejection};
 use square_common::seeds::{AGENT_SEED, INSTITUTION_SEED, POLICY_SEED};
 
@@ -117,7 +118,29 @@ pub fn policy_snapshot(
     })
 }
 
-/// `fund_job`: cüzdanın screening kaydı temiz ve taze olmalı (registry `record_screening`, BC-27).
+/// `buy_claim`: onaylı alıcı listesinin kökü. Policy'siz işte liste yoktur (kısıtsız kök). Policy'li işte
+/// hesap job'un policy'si olmalı ve `policy_program`'a ait olmalı. Kök anlık görüntüden değil politikanın
+/// güncel hâlinden okunur: kurum listeyi `set_buyer_root` ile değiştirdikten sonraki alımlar yeni listeye
+/// göre değerlendirilir, önceki satışlar geçerli kalır.
+pub fn buyer_root(
+    policy_info: Option<&AccountInfo>,
+    job_policy: Option<Pubkey>,
+    policy_program: &Pubkey,
+) -> Result<[u8; 32]> {
+    match (job_policy, policy_info) {
+        (None, None) => Ok(UNRESTRICTED_ROOT),
+        (Some(expected), Some(info)) => {
+            require_keys_eq!(*info.key, expected, EscrowError::PolicyMismatch);
+            let policy: Policy =
+                account_read::read_owned(info, policy_program).map_err(policy_read_error)?;
+            Ok(policy.buyer_root)
+        }
+        (Some(_), None) | (None, Some(_)) => err!(EscrowError::PolicyMismatch),
+    }
+}
+
+/// `fund_job`, `buy_claim`, `finalize_payment`: cüzdanın screening kaydı temiz ve taze olmalı (registry
+/// `record_screening`, BC-27).
 pub fn require_clear_screening(
     info: &AccountInfo,
     registry_program: &Pubkey,

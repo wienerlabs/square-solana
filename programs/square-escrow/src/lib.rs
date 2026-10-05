@@ -1,15 +1,19 @@
 //! Square escrow programı (program arayüzü §6, §10.4). Covenant'ın escrow'undan geçmişiyle taşındı (BC-04)
 //! ve sözleşmeye göre yeniden yazılıyor. BC-22: config, iş yaşam döngüsü ve agent bağlama. BC-23, BC-24,
-//! BC-26: permissionless finalize, keeper ücreti, ispat kapısı, itibar ve validation kaydı.
+//! BC-26: permissionless finalize, keeper ücreti, ispat kapısı, itibar ve validation kaydı. BC-25: alacak
+//! piyasası ve alıcı uygunluğu.
 //!
 //!   Open -(fund_job)-> Funded -(accept_job)-> Accepted -(submit_work)-> Delivered
 //!   Delivered -(finalize_payment)-> Released | Refunded
 //!   Open | Funded | Accepted (deadline sonrası) -(cancel_job)-> Cancelled
 //!
+//!   Alacak (Delivered iş): -(list_claim)-> Listed -(buy_claim)-> Bought
+//!   Listed -(cancel_claim)-> kapanır; finalize: Listed | Bought -> Settled (ödeme) | Defaulted (iade)
+//!
 //! İş bir registry `AgentRecord`'una ve opsiyonel bir policy'ye bağlanır; policy'nin commitment'ı, günlük
 //! tavanı ve sürümü job'a kopyalanır. Diğer programların hesapları CPI'sız okunur (`linked`,
-//! `release_gate`); tek CPI verifier'ın `record_release`'idir. Alacak piyasası (BC-25), dispute (BC-32,
-//! BC-33) ve Travel Rule commitment'ı (BC-34) kendi issue'larında eklenir.
+//! `release_gate`); tek CPI verifier'ın `record_release`'idir. Dispute (BC-32, BC-33) ve Travel Rule
+//! commitment'ı (BC-34) kendi issue'larında eklenir.
 use anchor_lang::prelude::*;
 
 pub mod config_rules;
@@ -53,6 +57,23 @@ pub mod square_escrow {
     /// guards against a swapped spec.
     pub fn accept_job(ctx: Context<AgentJob>, spec_hash: [u8; 32]) -> Result<()> {
         instructions::accept_job::handler(ctx, spec_hash)
+    }
+
+    /// A screened buyer on the institution's approved list buys the receivable. `price` must equal
+    /// the listing price (front-running guard). Leaf = sha256(buyer || leaf_salt), checked against the
+    /// current `policy.buyer_root`; jobs without a policy or with an all-zero root are unrestricted.
+    pub fn buy_claim(
+        ctx: Context<BuyClaim>,
+        price: u64,
+        leaf_salt: [u8; 32],
+        merkle_proof: Vec<[u8; 32]>,
+    ) -> Result<()> {
+        instructions::buy_claim::handler(ctx, price, leaf_salt, merkle_proof)
+    }
+
+    /// The seller withdraws an unsold listing; the account is closed and its rent returned.
+    pub fn cancel_claim(ctx: Context<CancelClaim>) -> Result<()> {
+        instructions::cancel_claim::handler(ctx)
     }
 
     /// The institution cancels an Open / Funded job, or an Accepted job after `deadline`; the vault
@@ -113,6 +134,11 @@ pub mod square_escrow {
             params,
             linked,
         )
+    }
+
+    /// The agent lists its receivable on a delivered job below face value.
+    pub fn list_claim(ctx: Context<ListClaim>, price: u64) -> Result<()> {
+        instructions::list_claim::handler(ctx, price)
     }
 
     /// Flow step 4: delivery; the challenge window opens (`challenge_end = now + challenge_period`).

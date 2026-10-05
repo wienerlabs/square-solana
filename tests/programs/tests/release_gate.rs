@@ -13,9 +13,10 @@ use release_world::*;
 use solana_account::Account;
 use solana_keypair::Keypair;
 use solana_signer::Signer;
-use square_common::contract::square_escrow_contract::types::ClaimStatus;
 use square_escrow::errors::EscrowError;
-use square_escrow::state::{AgentReputation, JobStatus, ValidationOutcome, ValidationRecord};
+use square_escrow::state::{
+    AgentReputation, ClaimStatus, JobStatus, ValidationOutcome, ValidationRecord,
+};
 use square_escrow::{Finalized, ReleaseRefused, ReleaseVerified, ValidationRecorded};
 use square_program_tests::{anchor_error, cu, event, events};
 use square_verifier::ReleaseRecorded;
@@ -112,7 +113,9 @@ fn a_final_refusal_refunds_the_net_to_the_institution() {
     let mut r = ReleaseWorld::new(true);
     let (job, keeper, settlement) = ready(&mut r, "c");
     // Satılmamış listeleme: iadede `Defaulted` olur.
-    r.w.write_claim(&job, Pubkey::default(), ClaimStatus::Listed);
+    let wallet = r.agent.wallet.insecure_clone();
+    let price = r.w.claim_price(&job);
+    r.w.list_claim(&wallet, &job, price).expect("list_claim");
     let p = r.proof("refused_per_tx");
     r.bind(&job, &p).expect("ret ispatı");
     let before = r.w.balance(&settlement.institution_token_account).unwrap();
@@ -133,7 +136,7 @@ fn a_final_refusal_refunds_the_net_to_the_institution() {
     );
     assert_eq!(r.w.balance(&settlement.payee_token_account), Some(0));
     assert_eq!(r.w.job(&job).status, JobStatus::Refunded);
-    assert!(matches!(r.w.claim(&job).status, ClaimStatus::Defaulted));
+    assert_eq!(r.w.claim(&job).status, ClaimStatus::Defaulted);
 
     let refused: ReleaseRefused = event(&executed);
     assert_eq!(
@@ -232,20 +235,19 @@ fn a_changed_payee_makes_the_proof_stale() {
     let (job, keeper, _) = ready(&mut r, "a");
     r.bind(&job, &r.proof("compliant")).expect("bağlama");
     // İspat bağlandıktan sonra alacak satıldı: payee artık alıcı.
-    let buyer = keypair(&r.fx, "claimBuyer").pubkey();
-    r.write_sold_claim(&job, buyer);
-    r.w.screen(&buyer, square_registry::ScreeningStatus::Clear);
+    let buyer = r.sell_claim_to_fixture_buyer(&job);
     let settlement = r.settlement(&keeper, buyer);
     r.finalize(&keeper, &job, settlement)
         .expect_err("payee değişti")
         .assert_error(anchor_error(EscrowError::StaleReleaseProof));
     r.bind(&job, &r.proof("buyer_payee"))
         .expect("alıcıya ispat");
+    let before = r.w.balance(&settlement.payee_token_account).unwrap();
     r.finalize(&keeper, &job, settlement)
         .expect("alıcıya ödeme");
     assert_eq!(
         r.w.balance(&settlement.payee_token_account),
-        Some(r.proof("buyer_payee").net_amount)
+        Some(before + r.proof("buyer_payee").net_amount)
     );
 }
 
