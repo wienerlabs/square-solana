@@ -306,6 +306,12 @@ fn write_upgrade_authority(data: &mut [u8], authority: Pubkey) {
     data[13..45].copy_from_slice(authority.as_ref());
 }
 
+/// İşlemin compute unit sınırı (ComputeBudget programı). Varsayılan talimat başına 200 000'dir; Groth16
+/// doğrulaması gibi pahalı talimatlar önüne bu eklenir.
+pub fn compute_unit_limit(units: u32) -> Instruction {
+    solana_compute_budget_interface::ComputeBudgetInstruction::set_compute_unit_limit(units)
+}
+
 /// Anchor `#[error_code]` hatasının işlemde görünen kodu (6000 + sıra).
 pub fn anchor_error<E>(error: E) -> u32
 where

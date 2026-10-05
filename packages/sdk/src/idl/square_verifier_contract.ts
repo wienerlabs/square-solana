@@ -220,7 +220,10 @@ export type SquareVerifierContract = {
         "institution's daily counter (`OperatorState`, UTC day rollover applied), the job address and a",
         "zero `stripe_receipt_hash`. The caller supplies `refusal_code`, `net_amount` and",
         "`proof_timestamp`, which must be within the clock tolerance. Writes `ReleaseProof` with a verdict;",
-        "a refusing proof records `Refused` + reason code. Can be re-bound until escrow consumes it."
+        "a refusing proof records `Refused` + reason code. Can be re-bound until escrow consumes it.",
+        "Arguments: `refusal_code` is public signal 0, the bit mask of broken rules (0 when compliant,",
+        "release-circuit.md §3); `net_amount` is public signal 5, the amount the payee receives;",
+        "`proof_timestamp` is public signal 9, the instant the proof evaluates the policy at (Unix seconds)."
       ],
       "discriminator": [
         184,
@@ -409,23 +412,14 @@ export type SquareVerifierContract = {
         },
         {
           "name": "refusalCode",
-          "docs": [
-            "Public signal 0: bit mask of broken rules, 0 when compliant (release-circuit.md §3)."
-          ],
           "type": "u16"
         },
         {
           "name": "netAmount",
-          "docs": [
-            "Public signal 5: amount the payee receives."
-          ],
           "type": "u64"
         },
         {
           "name": "proofTimestamp",
-          "docs": [
-            "Public signal 9: the instant the proof evaluates the policy at (Unix seconds)."
-          ],
           "type": "i64"
         }
       ]

@@ -125,7 +125,7 @@ Her iki yolda da:
 - **Sayaç ve gün:** `daily_spent_before`, `OperatorState`'in ispat anının UTC gününe göre değeridir. `OperatorState.day_start_unix` daha eski bir güne aitse etkin sayaç 0'dır.
 - **Saat:** `current_unix_timestamp`, `Clock::unix_timestamp`'a göre küçük bir tolerans içinde olmalı (Arc'ta sahibi tarafından ayarlanabilir). Tolerans, kurumun pencere sınırında saat seçebildiği aralıktır.
 - **Malleability:** Groth16 ispatı kodlamasına bağlı değildir. Aynı sinyaller için yeniden rastgeleleştirilmiş bir kopya da doğrulanır (Arc `compliance-gate.md`). Burada zararsızdır: `ReleaseProof` job başına bir PDA'dır, sinyaller job'u içerir ve ispatı yalnızca kurumun yetkilisi bağlayabilir. Tüketilmiş bir ispatı işaretlemek gerekirse işaret ispatın baytlarına değil sinyallere konmalıdır.
-- **CU:** 10 yerine 13 public input, ispat hazırlamada üç ek G1 çarpımı demektir. Ölçüm BC-21'in kabul kriteri.
+- **CU:** 10 yerine 13 public input, ispat hazırlamada üç ek G1 çarpımı demektir. BC-21'in ölçümü (LiteSVM, hesap okumaları ve `ReleaseProof` yazımı dahil): `set_compliance_proof` yaklaşık 178 bin CU. Talimat başına varsayılan 200 bin CU'nun altında kalır ama işlem, aynı işlemdeki diğer talimatlarla birlikte sınırı yükseltmelidir (`ComputeBudget`, BC-28).
 
 ### Sözleşmeye etkisi (bir sonraki sözleşme sürümü için)
 

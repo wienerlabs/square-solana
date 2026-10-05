@@ -22,21 +22,20 @@ pnpm license:write
 <!-- license-inventory:begin -->
 | Paket | Ekosistem | Lisans | Kapsam | Kullanan | Durum |
 |---|---|---|---|---|---|
-| `anchor-lang` | cargo | Apache-2.0 | runtime | `square-common`, `square-escrow`, `square-policy`, `square-program-tests`, `square-registry`, `verifier` | ✓ |
+| `anchor-lang` | cargo | Apache-2.0 | runtime | `square-common`, `square-escrow`, `square-policy`, `square-program-tests`, `square-registry`, `square-verifier` | ✓ |
 | `anchor-spl` | cargo | Apache-2.0 | runtime | `square-escrow` | ✓ |
 | `base64` | cargo | MIT OR Apache-2.0 | dev | `square-program-tests` | ✓ |
-| `groth16-solana` | cargo | MIT | runtime | `verifier` | ✓ |
+| `groth16-solana` | cargo | MIT | runtime | `square-verifier` | ✓ |
 | `litesvm` | cargo | Apache-2.0 | dev | `square-program-tests` | ✓ |
-| `serde_json` | cargo | MIT OR Apache-2.0 | build | `square-common` | ✓ |
+| `serde_json` | cargo | MIT OR Apache-2.0 | build | `square-common`, `square-program-tests` | ✓ |
 | `solana-account` | cargo | Apache-2.0 | dev | `square-program-tests` | ✓ |
+| `solana-compute-budget-interface` | cargo | Apache-2.0 | dev | `square-program-tests` | ✓ |
 | `solana-instruction-error` | cargo | Apache-2.0 | dev | `square-program-tests` | ✓ |
-| `solana-instructions-sysvar` | cargo | Apache-2.0 | runtime | `verifier` | ✓ |
 | `solana-keypair` | cargo | Apache-2.0 | dev | `square-program-tests` | ✓ |
 | `solana-loader-v3-interface` | cargo | Apache-2.0 | dev | `square-program-tests` | ✓ |
 | `solana-message` | cargo | Apache-2.0 | dev | `square-program-tests` | ✓ |
 | `solana-program-pack` | cargo | Apache-2.0 | dev | `square-program-tests` | ✓ |
-| `solana-sdk-ids` | cargo | Apache-2.0 | runtime | `verifier` | ✓ |
-| `solana-sha256-hasher` | cargo | Apache-2.0 | runtime | `square-common` | ✓ |
+| `solana-sha256-hasher` | cargo | Apache-2.0 | runtime | `square-common`, `square-program-tests` | ✓ |
 | `solana-signature` | cargo | Apache-2.0 | dev | `square-program-tests` | ✓ |
 | `solana-signer` | cargo | Apache-2.0 | dev | `square-program-tests` | ✓ |
 | `solana-system-interface` | cargo | Apache-2.0 | dev | `square-program-tests` | ✓ |
@@ -116,7 +115,7 @@ pnpm license:write
 | `yaml` | npm | ISC | dev | `@squaresdk/solana-sdk`, `@squaresdk/solana-types` | ✓ |
 | `zod` | npm | MIT | runtime | `@squaresdk/solana-a2a`, `@squaresdk/solana-compliance-api`, `@squaresdk/solana-mcp`, `@squaresdk/solana-prover`, `@squaresdk/solana-types`, `@squaresdk/solana-web` | ✓ |
 
-**Özet:** 71 npm, 22 Cargo doğrudan bağımlılık; lisans dağılımı: 51× MIT, 32× Apache-2.0, 3× MIT OR Apache-2.0, 2× GPL-3.0, 1× BSD-2-Clause, 1× ISC, 1× MPL-2.0, 1× OFL-1.1, 1× Unlicense.
+**Özet:** 71 npm, 21 Cargo doğrudan bağımlılık; lisans dağılımı: 51× MIT, 31× Apache-2.0, 3× MIT OR Apache-2.0, 2× GPL-3.0, 1× BSD-2-Clause, 1× ISC, 1× MPL-2.0, 1× OFL-1.1, 1× Unlicense.
 
 **Mainnet öncesi hukuki inceleme gerektirenler:**
 - `circomlibjs` (npm) — GPL-3.0. Poseidon hash (devreyle aynı sabitler); yalnızca apps/compliance-api (BE-02). Yayınlanan bir pakette yok; snarkjs ile aynı onay kapsamında.

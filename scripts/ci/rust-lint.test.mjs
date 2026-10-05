@@ -7,7 +7,7 @@ const members = [
   { name: 'square-common', path: 'crates/square-common' },
   { name: 'square-policy', path: 'programs/square-policy' },
   { name: 'square-registry', path: 'programs/square-registry' },
-  { name: 'verifier', path: 'programs/square-verifier' },
+  { name: 'square-verifier', path: 'programs/square-verifier' },
   { name: 'square-escrow', path: 'programs/square-escrow' },
 ];
 

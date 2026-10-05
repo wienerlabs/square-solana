@@ -116,9 +116,8 @@ anchor test --validator legacy --skip-build   # program testleri (LiteSVM, tests
   programlar için yeni anahtar çifti üretir ve `declare_id!` değerleriyle `Anchor.toml`'u bu
   rastgele ID'lerle değiştirir. Önce `mkdir -p target/deploy` çalıştırın; derlemeden sonra
   `git status` bu dosyalarda değişiklik göstermemeli.
-- **Rust kontrolleri:** Sözleşmeye geçen programlar, `crates/*` ve `tests/programs` `cargo fmt --check`
-  ve `cargo clippy -D warnings`'ten geçer. Henüz kaynak arayüzündeki `square-verifier` sözleşmeye
-  geçene kadar yalnızca derlenir; uyarıları bildirilir. Kapsam
+- **Rust kontrolleri:** Programlar, `crates/*` ve `tests/programs` `cargo fmt --check` ve
+  `cargo clippy -D warnings`'ten geçer. Programların sözleşmeye göre durumu
   [`scripts/ci/programs.mjs`](scripts/ci/programs.mjs)'tedir.
 - **CI ve merge kuralı:** Kontrollerin listesi, yerel karşılıkları ve zorunlu kontrol kuralı
   [`docs/ci.md`](docs/ci.md)'de.

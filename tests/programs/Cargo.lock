@@ -4241,12 +4241,15 @@ dependencies = [
  "anchor-lang",
  "base64 0.22.1",
  "litesvm",
+ "serde_json",
  "solana-account",
+ "solana-compute-budget-interface",
  "solana-instruction-error",
  "solana-keypair",
  "solana-loader-v3-interface 8.0.1",
  "solana-message",
  "solana-program-pack",
+ "solana-sha256-hasher",
  "solana-signature",
  "solana-signer",
  "solana-system-interface 3.2.0",
@@ -4258,7 +4261,7 @@ dependencies = [
  "square-escrow",
  "square-policy",
  "square-registry",
- "verifier",
+ "square-verifier",
 ]
 
 [[package]]
@@ -4266,6 +4269,15 @@ name = "square-registry"
 version = "0.3.0"
 dependencies = [
  "anchor-lang",
+ "square-common",
+]
+
+[[package]]
+name = "square-verifier"
+version = "0.2.0"
+dependencies = [
+ "anchor-lang",
+ "groth16-solana",
  "square-common",
 ]
 
@@ -4450,17 +4462,6 @@ checksum = "0200d0fc04d809396c2ad43f3c95da3582a2556eba8d453c1087f4120ee352ff"
 dependencies = [
  "fnv",
  "lazy_static",
-]
-
-[[package]]
-name = "verifier"
-version = "0.1.0"
-dependencies = [
- "anchor-lang",
- "groth16-solana",
- "solana-instructions-sysvar 3.0.1",
- "solana-sdk-ids",
- "square-common",
 ]
 
 [[package]]

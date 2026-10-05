@@ -67,7 +67,7 @@ async function hash(values) {
 
 // ------------------------------------------------------------------ addresses
 
-const sha256 = (...parts) => crypto.createHash('sha256').update(Buffer.concat(parts.map((x) => Buffer.from(x)))).digest();
+export const sha256 = (...parts) => crypto.createHash('sha256').update(Buffer.concat(parts.map((x) => Buffer.from(x)))).digest();
 
 // high = bytes 0..15, low = bytes 16..31, each big-endian: the split the
 // verifier applies to the 32 bytes of an address.
@@ -151,7 +151,7 @@ export function world() {
 
 // Salts are field elements well above 2^128 derived from a label. They are not
 // secret and are not meant to be: a real policy draws them from a secret.
-async function testSalts(label) {
+export async function testSalts(label) {
   const p = await getPoseidon();
   const out = [];
   for (let i = 0; i < 8; i++) {

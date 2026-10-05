@@ -122,7 +122,7 @@ fn only_the_upgrade_authority_initializes_the_config() {
             config.policy_program,
             config.verifier_program
         ),
-        (square_registry::ID, square_policy::ID, verifier::ID)
+        (square_registry::ID, square_policy::ID, square_verifier::ID)
     );
     assert_eq!(&config.arbitrators[..3], arbitrators.as_slice());
     assert!(config.arbitrators[3..]
