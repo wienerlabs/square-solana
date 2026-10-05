@@ -1,9 +1,9 @@
 //! Square escrow programı (program arayüzü §6, §10.4). Covenant'ın escrow'undan geçmişiyle taşındı (BC-04)
 //! ve sözleşmeye göre yeniden yazılıyor. BC-22: config, iş yaşam döngüsü ve agent bağlama. BC-23, BC-24,
 //! BC-26: permissionless finalize, keeper ücreti, ispat kapısı, itibar ve validation kaydı. BC-25: alacak
-//! piyasası ve alıcı uygunluğu.
+//! piyasası ve alıcı uygunluğu. BC-34: Travel Rule commitment'ı.
 //!
-//!   Open -(fund_job)-> Funded -(accept_job)-> Accepted -(submit_work)-> Delivered
+//!   Open (-(commit_travel_rule)) -(fund_job)-> Funded -(accept_job)-> Accepted -(submit_work)-> Delivered
 //!   Delivered -(finalize_payment)-> Released | Refunded
 //!   Open | Funded | Accepted (deadline sonrası) -(cancel_job)-> Cancelled
 //!
@@ -12,8 +12,8 @@
 //!
 //! İş bir registry `AgentRecord`'una ve opsiyonel bir policy'ye bağlanır; policy'nin commitment'ı, günlük
 //! tavanı ve sürümü job'a kopyalanır. Diğer programların hesapları CPI'sız okunur (`linked`,
-//! `release_gate`); tek CPI verifier'ın `record_release`'idir. Dispute (BC-32, BC-33) ve Travel Rule
-//! commitment'ı (BC-34) kendi issue'larında eklenir.
+//! `release_gate`); tek CPI verifier'ın `record_release`'idir. Dispute (BC-32, BC-33) kendi
+//! issue'larında eklenir.
 use anchor_lang::prelude::*;
 
 pub mod config_rules;
@@ -80,6 +80,13 @@ pub mod square_escrow {
     /// balance is refunded and the vault closed (rent to `job.rent_payer`).
     pub fn cancel_job(ctx: Context<CancelJob>) -> Result<()> {
         instructions::cancel_job::handler(ctx)
+    }
+
+    /// Binds a salted Travel Rule commitment to an Open job (no PII on chain, ADR 0015). It can be
+    /// replaced until `fund_job`, which requires it when `amount >= params.travel_rule_threshold`
+    /// (threshold 0 = disabled).
+    pub fn commit_travel_rule(ctx: Context<InstitutionJob>, commitment: [u8; 32]) -> Result<()> {
+        instructions::commit_travel_rule::handler(ctx, commitment)
     }
 
     /// Flow step 3a: the institution opens a job for an active registered agent and creates its empty

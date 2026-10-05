@@ -544,7 +544,7 @@ export const ScreeningRecordedSchema = z.object({
 });
 export type ScreeningRecorded = z.infer<typeof ScreeningRecordedSchema>;
 
-/** escrow: DRAFT (M5). */
+/** escrow: A Travel Rule commitment was bound to an Open job (BC-34). */
 export const TravelRuleCommittedSchema = z.object({
   job: Address,
   commitment: Hex32,

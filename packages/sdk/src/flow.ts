@@ -178,6 +178,14 @@ export function createFlow(deps: FlowDeps): SquareFlow {
       return { ...(await deps.buildTx([ix], withComputeProfile(options, 'createJob'))), job: address, specHash };
     },
 
+    async commitTravelRule(params, options) {
+      const ix = await deps.escrow.methods
+        .commitTravelRule(bytes32(params.commitment, 'commitment'))
+        .accountsStrict({ institution: params.institution, job: params.job })
+        .instruction();
+      return deps.buildTx([ix], withComputeProfile(options, 'commitTravelRule'));
+    },
+
     async fundJob(params, options) {
       const account = await job(params.job);
       const ix = await deps.escrow.methods

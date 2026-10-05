@@ -30,6 +30,7 @@ describe('compute unit profili', () => {
         'buyClaim',
         'cancelClaim',
         'cancelJob',
+        'commitTravelRule',
         'createJob',
         'finalizePayment',
         'fundJob',
