@@ -16,6 +16,7 @@ import { squareIdentity, type CardFetchOptions } from '@squaresdk/solana-identit
 import { SQUARE_IDLS, type SquareRegistryContract } from '@squaresdk/solana-sdk';
 import type { AgentCard, AgentRegistration } from '@squaresdk/solana-types';
 import { agentRecordAddress } from './idl-pda';
+import { programErrorMessage } from './program-error';
 
 /** `agent_id`: `[A-Za-z0-9_-]{1,32}`, değişmez (profil §3.4, §4.1). */
 export const AGENT_ID_PATTERN = /^[A-Za-z0-9_-]{1,32}$/;
@@ -178,21 +179,5 @@ export async function buildRegisterAgentTx(
   return new VersionedTransaction(message);
 }
 
-/**
- * Gönderim ya da simülasyon hatasındaki registry hata kodunun açıklaması (registry IDL `errors`); kod
- * yoksa ya da bilinmiyorsa null. web3.js özel kodu `custom program error: 0x…` olarak yazar.
- */
-export function registryErrorMessage(error: unknown): string | null {
-  const text = [error instanceof Error ? error.message : String(error), ...logsOf(error)].join('\n');
-  const match = /custom program error: (0x[0-9a-f]+)/i.exec(text);
-  if (!match) return null;
-  const code = Number.parseInt(match[1]!, 16);
-  const errors: readonly { code: number; name: string; msg?: string }[] = SQUARE_IDLS.registry.errors;
-  const known = errors.find((entry) => entry.code === code);
-  return known ? `${known.msg ?? known.name} (${known.name}, ${code})` : null;
-}
-
-function logsOf(error: unknown): string[] {
-  const logs = (error as { logs?: unknown } | null)?.logs;
-  return Array.isArray(logs) ? logs.filter((line): line is string => typeof line === 'string') : [];
-}
+/** Registry hata kodunun IDL'deki açıklaması; registry hatası değilse null. */
+export const registryErrorMessage = (error: unknown): string | null => programErrorMessage(SQUARE_IDLS.registry, error);
