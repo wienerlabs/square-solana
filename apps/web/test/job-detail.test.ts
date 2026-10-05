@@ -13,6 +13,7 @@ import {
   deliveryUriProblem,
   describeJobEvent,
   jobEventsFromLogs,
+  SignatureTracker,
 } from '@/lib/job-detail';
 
 const key = () => Keypair.generate().publicKey;
@@ -92,6 +93,33 @@ describe('job events from logs', () => {
       title: 'Cancelled',
       detail: '250 USDC refunded',
     });
+  });
+});
+
+describe('live updates', () => {
+  it('re-reads once per new signature, whether the subscription or the poll reports it', () => {
+    const seen = new SignatureTracker();
+    // Okunan durum bilinmeden yoklama karşılaştırma yapmaz.
+    expect(seen.known).toBe(false);
+    seen.baseline('sig-1');
+    expect(seen.known).toBe(true);
+    expect(seen.observe('sig-1')).toBe(false);
+    // Abonelik bildirdi; aynı imzayı sonra yoklama da görür.
+    expect(seen.observe('sig-2')).toBe(true);
+    expect(seen.observe('sig-2')).toBe(false);
+    // Abonelik koptu: yoklama yeni imzayı görür.
+    expect(seen.observe('sig-3')).toBe(true);
+    // Bildirimden hemen sonraki okuma henüz eski imzaya dayanıyorsa sıradaki yoklama yeniden okutur.
+    seen.baseline('sig-2');
+    expect(seen.observe('sig-3')).toBe(true);
+  });
+
+  it('knows a job without transactions', () => {
+    const seen = new SignatureTracker();
+    seen.baseline(null);
+    expect(seen.known).toBe(true);
+    expect(seen.observe(null)).toBe(false);
+    expect(seen.observe('sig-1')).toBe(true);
   });
 });
 

@@ -17,8 +17,11 @@ import {
   deliveryHash,
   deliveryUriProblem,
   describeJobEvent,
+  JOB_POLL_INTERVAL_MS,
   readChainTime,
   readJobTimeline,
+  readNewestSignature,
+  SignatureTracker,
   type TimelineEntry,
 } from '@/lib/job-detail';
 import { escrowErrorMessage, formatDuration, readEscrowSetup, type EscrowSetupLookup } from '@/lib/job-wizard';
@@ -71,15 +74,36 @@ export function JobDetail({ jobAddress, escrowProgramId }: { jobAddress: string;
   }, [verified, connection, escrowKey]);
   const escrow = setup.state === 'ready' && setup.value.state === 'ready' ? setup.value.setup : null;
 
-  // Job adresini anan her onaylı işlemde job ve zaman çizelgesi yeniden okunur: event'ler canlı.
+  // Job adresini anan her işlemde job ve zaman çizelgesi yeniden okunur: event'ler canlı. Log aboneliği
+  // (WebSocket) anında bildirir; abonelik kurulamaz ya da koparsa en yeni imza birkaç saniyede bir yoklanır.
   const [revision, setRevision] = useState(0);
+  const seen = useMemo(() => new SignatureTracker(), [jobKey]);
   useEffect(() => {
     if (!verified) return;
-    const subscription = connection.onLogs(jobKey, ({ err }) => err === null && setRevision((n) => n + 1), 'confirmed');
+    const subscription = connection.onLogs(
+      jobKey,
+      ({ signature, err }) => seen.observe(signature) && err === null && setRevision((n) => n + 1),
+      'confirmed',
+    );
     return () => {
       void connection.removeOnLogsListener(subscription);
     };
-  }, [verified, connection, jobKey]);
+  }, [verified, connection, jobKey, seen]);
+  useEffect(() => {
+    if (!verified) return;
+    let active = true;
+    const poll = setInterval(() => {
+      if (document.visibilityState === 'hidden' || !seen.known) return;
+      readNewestSignature(connection, jobKey).then(
+        (newest) => active && seen.observe(newest) && setRevision((n) => n + 1),
+        () => undefined, // Okunamazsa bir sonraki aralıkta yeniden denenir.
+      );
+    }, JOB_POLL_INTERVAL_MS);
+    return () => {
+      active = false;
+      clearInterval(poll);
+    };
+  }, [verified, connection, jobKey, seen]);
 
   const [job, setJob] = useState<Load<JobAccount | null>>({ state: 'loading' });
   const [timeline, setTimeline] = useState<Load<TimelineEntry[]>>({ state: 'loading' });
@@ -91,13 +115,17 @@ export function JobDetail({ jobAddress, escrowProgramId }: { jobAddress: string;
       (error: Error) => active && setJob({ state: 'error', message: error.message }),
     );
     readJobTimeline(connection, escrowKey, jobKey).then(
-      (value) => active && setTimeline({ state: 'ready', value }),
+      ({ entries, newestSignature }) => {
+        if (!active) return;
+        seen.baseline(newestSignature);
+        setTimeline({ state: 'ready', value: entries });
+      },
       (error: Error) => active && setTimeline({ state: 'error', message: error.message }),
     );
     return () => {
       active = false;
     };
-  }, [escrow, connection, escrowKey, jobKey, revision]);
+  }, [escrow, connection, escrowKey, jobKey, seen, revision]);
 
   // Zincir saati: Clock sysvar'ından okunur, aradaki saniyeler yerel saatle ilerletilir.
   const [chainOffset, setChainOffset] = useState<number | null>(null);
