@@ -1,0 +1,38 @@
+{
+  "description": "BC-28 işlem profili. computeUnitLimits: her tx türünün compute unit sınırı; tests/programs/tests/tx_budget.rs'in 60 ölçümünün en yükseğinin iki katı, 10 bine yukarı yuvarlanmış. Ölçülen her değer sınırın (1 - headroom) katını aşmamalıdır. lookupTable: Square address lookup table'ının girdileri. Yöntem ve tablo: docs/design/tx-budget.md.",
+  "headroom": 0.25,
+  "lookupTable": [
+    "program:registry",
+    "program:policy",
+    "program:verifier",
+    "program:escrow",
+    "pda:registryConfig",
+    "pda:escrowConfig",
+    "pda:verifierConfig",
+    "pda:escrowAuthority",
+    "settlementMint",
+    "program:system",
+    "program:token",
+    "program:token2022",
+    "sysvar:instructions"
+  ],
+  "computeUnitLimits": {
+    "initInstitution": 50000,
+    "setPolicy": 40000,
+    "updatePolicy": 20000,
+    "setBuyerRoot": 20000,
+    "registerAgent": 40000,
+    "recordScreening": 40000,
+    "createJob": 100000,
+    "fundJob": 90000,
+    "acceptJob": 20000,
+    "submitWork": 20000,
+    "listClaim": 50000,
+    "buyClaim": 110000,
+    "cancelClaim": 10000,
+    "setComplianceProof": 360000,
+    "finalizePayment": 200000,
+    "cancelJob": 40000,
+    "syncAgentWallet": 20000
+  }
+}

@@ -203,6 +203,24 @@ impl World {
         }
     }
 
+    pub fn set_buyer_root_ix(
+        &self,
+        authority: &Pubkey,
+        policy: PolicyAccounts,
+        buyer_root: [u8; 32],
+    ) -> Instruction {
+        Instruction {
+            program_id: square_policy::ID,
+            accounts: square_policy::accounts::SetBuyerRoot {
+                authority: *authority,
+                institution: policy.institution,
+                policy: policy.policy,
+            }
+            .to_account_metas(None),
+            data: square_policy::instruction::SetBuyerRoot { buyer_root }.data(),
+        }
+    }
+
     /// Kurum politikanın onaylı alıcı listesini yayımlar (square_policy `set_buyer_root`).
     pub fn set_buyer_root(
         &mut self,
@@ -210,16 +228,7 @@ impl World {
         policy: PolicyAccounts,
         buyer_root: [u8; 32],
     ) -> Outcome {
-        let ix = Instruction {
-            program_id: square_policy::ID,
-            accounts: square_policy::accounts::SetBuyerRoot {
-                authority: authority.pubkey(),
-                institution: policy.institution,
-                policy: policy.policy,
-            }
-            .to_account_metas(None),
-            data: square_policy::instruction::SetBuyerRoot { buyer_root }.data(),
-        };
+        let ix = self.set_buyer_root_ix(&authority.pubkey(), policy, buyer_root);
         self.h.send(&[ix], &[authority])
     }
 }

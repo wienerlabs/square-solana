@@ -7,7 +7,8 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { sha256 } from '@noble/hashes/sha2';
 import { PublicKey } from '@solana/web3.js';
-import { buildBuyerTree, getBuyerProof } from '../dist/index.js';
+// Yalnızca ağaç modülü: paketin girişi SDK'yı (ve spl-token'ın bigint-buffer uyarısını) yükler.
+import { buildBuyerTree, getBuyerProof } from '../dist/buyers.js';
 
 const OUT = new URL('../../../crates/square-common/tests/fixtures/buyer-merkle-vectors.json', import.meta.url);
 const SIZES = [1, 2, 3, 5, 8, 17];

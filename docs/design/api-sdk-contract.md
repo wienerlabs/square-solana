@@ -1,6 +1,6 @@
 # API ve SDK sözleşmesi
 
-**Sözleşme sürümü:** v0.9.1 (taslak) · **Issue:** BE-35 (#102), BC-47 (#119), BE-07 (#39), BE-08 (#40), BE-09 (#41), BE-10 (#42), BE-11 (#44), BC-02 (#2), BE-17 (#50), BC-08 (#8), BC-17 (#25), BC-15 (#24), BC-21 (#29) · **Dayandığı program sözleşmesi:** BC-44 v0.4.1 ([program-interface.md](program-interface.md))
+**Sözleşme sürümü:** v0.10.0 (taslak) · **Issue:** BE-35 (#102), BC-47 (#119), BE-07 (#39), BE-08 (#40), BE-09 (#41), BE-10 (#42), BE-11 (#44), BC-02 (#2), BE-17 (#50), BC-08 (#8), BC-17 (#25), BC-15 (#24), BC-21 (#29), BC-28 (#36) · **Dayandığı program sözleşmesi:** BC-44 v0.4.1 ([program-interface.md](program-interface.md))
 
 Bu doküman Square'in HTTP API'sini ve TypeScript paketlerinin dış yüzeyini sabitler. Frontend (FE-24 veri katmanı) ve servisler (BE-18 API, BE-14 indexer, BE-15 keeper, BE-11 prover) bu sözleşmeye göre geliştirir. `@squaresdk/solana-sdk`'nin zincir tarafı BE-08, `@squaresdk/solana-identity` BE-09, `@squaresdk/solana-policy` BE-10 ile uygulandı; REST client'ın uygulaması BE-18'de. Paketlerde mock, placeholder gövde ya da sabit adres yoktur (proje kuralı).
 
@@ -113,7 +113,7 @@ Tüm `/v1` yanıtları `{ success, data, error, meta }` biçimindedir. `meta.req
 | Poseidon (policy) | `poseidon-lite` (MIT), circomlib parametreleri | Devrenin `Poseidon(n)`'i ile 14 senaryoda bayt bayt aynı (`packages/policy/test/circuit-vectors.test.ts`); circomlibjs GPL-3.0 |
 | snarkjs (policy) | Paketin bağımlılığı değil; `createLocalProver` çağıranın kurduğu `groth16` nesnesini alır (`Groth16Backend`). Paket testlerde dev bağımlılığı olarak kullanır | snarkjs GPL-3.0 (`scripts/license/policy.mjs`'te "review"); Apache-2.0 paket onu dağıtmaz |
 | Politika salt'ları | Kurum tek bir 32 baytlık sır saklar; 8 yaprağın salt'ı `sha256("square/policy-salt/v1" ‖ sır ‖ policyId ‖ i) mod r` | Yedeklenecek tek değer; aynı sır farklı politikalarda farklı salt verir |
-| Compute budget / ALT | `BuildOptions`'taki değerler yalnızca verilirse eklenir; SDK varsayılan CU sayısı uydurmaz. Ölçülmüş profiller BC-28'de | Proje kuralı (sabit değer yok) |
+| Compute budget / ALT | Akışlar ve `buildSetComplianceProofTx`, çağıran `computeUnitLimit` vermezse tx türünün ölçülmüş sınırını ekler (`TX_COMPUTE_UNIT_LIMITS`, `withComputeProfile`); fiyatı çağıran seçer. Square ALT'ı `squareLookupTableAddresses` + `createLookupTableInstructions`; `buildTx` pakete sığmayan tx'i reddeder ([tx-budget.md](tx-budget.md)) | Sınırlar ve ALT'ın içeriği `tx-profile.json`'da, programların ölçümünden (`tests/programs/tests/tx_budget.rs`); SDK değer uydurmaz |
 
 ## 8. Açık noktalar
 
@@ -122,7 +122,7 @@ Tüm `/v1` yanıtları `{ success, data, error, meta }` biçimindedir. `meta.req
 3. **Policy dokümanı (BE-10):** `PolicyDocument` v0.2.0'da release devresinin politika girdilerine hizalandı (BE-07, [release-circuit.md](release-circuit.md) §4–§5): yuva sınırları `POLICY_CIRCUIT_LIMITS`, tek UTC penceresi, gün adları devrenin maske sırasıyla. Alanların alan elemanlarına çevrilmesi ve commitment `normalizePolicy` / `computePolicyCommitment`'tadır (BE-10); `circuits/payment-compliance/scripts/release-input.mjs`'in 14 senaryosuyla bayt bayt aynı olduğu CI'da denetlenir.
 4. **Auth (BE-18):** İmzalanan mesajın metni (alan adı ve süre) ve oturum belirteci biçimi BE-18'de belirlenir. Sözleşme yalnızca alanları sabitler.
 5. **Prover servisi (BE-11):** `apps/prover` `POST /v1/prove`'u bu sözleşmedeki istek, yanıt, zarf ve `x-api-key` ile birebir sunar; kendi OpenAPI'si `GET /openapi.json`'dadır ([apps/prover/README.md](../../apps/prover/README.md)). `createRemoteProver` doğrudan servise ya da API'ye bağlanabilir. API'nin `/v1/prove`'u servise vekil mi olacak, ayrı mı kalkacak: BE-18'in kararı.
-6. **Tx boyutu (BC-28):** `setComplianceProof` için ALT gerekebilir (program sözleşmesi §8.9); `UnsignedTx.addressLookupTables` bunun için var.
+6. **Tx boyutu (BC-28):** v0.10.0'da kesinleşti ([tx-budget.md](tx-budget.md)): `setComplianceProof` ALT'sız sığar (868 bayt). ALT'sız sığmayan tek tx, 15–16 kardeşli kanıtla `buyClaim`'dir; Square ALT'ıyla her tx sığar. `UnsignedTx.addressLookupTables` ALT'ı taşır.
 
 ## 9. Sözleşme değişiklik kaydı
 
@@ -131,6 +131,7 @@ Tüm `/v1` yanıtları `{ success, data, error, meta }` biçimindedir. `meta.req
 | Sürüm | Değişiklik | Issue / PR |
 |---|---|---|
 | v0.1.0 | İlk taslak: 28 operasyonluk OpenAPI 3.1 spec; IDL'den üretilen zod ve JSON Schema'lar; 4 paketin gövdesiz imzaları; hizalama testleri ve CI | BE-35 (#102) |
+| v0.10.0 | SDK işlem profili (BC-28): `TxKind`, `TX_COMPUTE_UNIT_LIMITS`, `MAX_COMPUTE_UNIT_LIMIT`, `PACKET_DATA_SIZE`, `computeUnitLimitFor`, `withComputeProfile`, `squareLookupTableAddresses`, `createLookupTableInstructions`. `flow.*` (dispute akışları hariç) ve `buildSetComplianceProofTx` çağıran sınır vermezse profilin sınırını ekler; `buildTx` pakete sığmayan tx'i reddeder. HTTP yüzeyi değişmedi | BC-28 (#36) |
 | v0.9.1 | Program sözleşmesi v0.4.1'e dayanır: `set_compliance_proof`'un argüman dokümanları talimatın dokümanına taşındı (SDK IDL kopyaları ve şemalar yeniden üretildi). Tipler, imzalar ve HTTP yüzeyi değişmedi | BC-21 (#29) |
 | v0.9.0 | Program sözleşmesi v0.4.0'a dayanır: registry hatası 6007 `AgentCardHashInvalid`, 6000 `AgentIdInvalid`'ın mesajı (SDK IDL tipleri ve şemalar yeniden üretildi). HTTP yüzeyi değişmedi | BC-15 (#24) |
 | v0.8.0 | Program sözleşmesi v0.3.0'a dayanır: `set_institution_multisig` hesaplarına `squads_multisig` eklendi (SDK IDL tipleri yeniden üretildi), policy hata 6004 `InvalidSquadsMultisig`. HTTP yüzeyi değişmedi | BC-17 (#25) |

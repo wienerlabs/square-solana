@@ -1,7 +1,8 @@
 // 8 adımın SDK tarafı (BE-08). Her adım hesapları açıkça verir (`accountsStrict`): PDA'lar
 // `SquarePda`'dan, payee / mint / rent ödeyicisi zincirdeki job ve alacak kaydından, token programı
 // mint hesabının sahibinden. Token hesabı gereken alıcı tarafların ATA'sı aynı tx'te idempotent
-// olarak açılır. Program adresleri yapılandırmadan gelir (BC-09).
+// olarak açılır. Program adresleri yapılandırmadan gelir (BC-09). Çağıran compute unit sınırı vermezse
+// tx türünün profil sınırı eklenir (BC-28); dispute talimatlarının profili BC-32 / BC-33'te.
 import type { Program } from '@anchor-lang/core';
 import {
   createAssociatedTokenAccountIdempotentInstruction,
@@ -11,6 +12,7 @@ import {
 } from '@solana/spl-token';
 import { SystemProgram, type Connection, type PublicKey, type TransactionInstruction } from '@solana/web3.js';
 import BN from 'bn.js';
+import { withComputeProfile } from './budget.js';
 import type { SquareFlow } from './client.js';
 import type { SquarePda } from './pda.js';
 import type { SquareIdls, SquareProgramIds } from './programs.js';
@@ -138,7 +140,7 @@ export function createFlow(deps: FlowDeps): SquareFlow {
           systemProgram: SystemProgram.programId,
         })
         .instruction();
-      return { ...(await deps.buildTx([ix], options)), agentRecord };
+      return { ...(await deps.buildTx([ix], withComputeProfile(options, 'registerAgent'))), agentRecord };
     },
 
     async createJob(params, options) {
@@ -173,7 +175,7 @@ export function createFlow(deps: FlowDeps): SquareFlow {
           systemProgram: SystemProgram.programId,
         })
         .instruction();
-      return { ...(await deps.buildTx([ix], options)), job: address, specHash };
+      return { ...(await deps.buildTx([ix], withComputeProfile(options, 'createJob'))), job: address, specHash };
     },
 
     async fundJob(params, options) {
@@ -192,7 +194,7 @@ export function createFlow(deps: FlowDeps): SquareFlow {
           tokenProgram: await tokenProgram(account.mint),
         })
         .instruction();
-      return deps.buildTx([ix], options);
+      return deps.buildTx([ix], withComputeProfile(options, 'fundJob'));
     },
 
     async acceptJob(params, options) {
@@ -201,7 +203,7 @@ export function createFlow(deps: FlowDeps): SquareFlow {
         .acceptJob(account.specHash)
         .accountsStrict({ agent: params.agent, job: params.job, agentRecord: account.agentRecord })
         .instruction();
-      return deps.buildTx([ix], options);
+      return deps.buildTx([ix], withComputeProfile(options, 'acceptJob'));
     },
 
     async submitWork(params, options) {
@@ -210,7 +212,7 @@ export function createFlow(deps: FlowDeps): SquareFlow {
         .submitWork(bytes32(params.workHash, 'workHash'), params.deliveryUri)
         .accountsStrict({ agent: params.agent, job: params.job, agentRecord: account.agentRecord })
         .instruction();
-      return deps.buildTx([ix], options);
+      return deps.buildTx([ix], withComputeProfile(options, 'submitWork'));
     },
 
     async listClaim(params, options) {
@@ -224,7 +226,7 @@ export function createFlow(deps: FlowDeps): SquareFlow {
           systemProgram: SystemProgram.programId,
         })
         .instruction();
-      return deps.buildTx([ix], options);
+      return deps.buildTx([ix], withComputeProfile(options, 'listClaim'));
     },
 
     async buyClaim(params, options) {
@@ -252,7 +254,7 @@ export function createFlow(deps: FlowDeps): SquareFlow {
           tokenProgram: program,
         })
         .instruction();
-      return deps.buildTx([seller.create, ix], options);
+      return deps.buildTx([seller.create, ix], withComputeProfile(options, 'buyClaim'));
     },
 
     async cancelClaim(params, options) {
@@ -266,7 +268,7 @@ export function createFlow(deps: FlowDeps): SquareFlow {
           rentPayer: listing.rentPayer,
         })
         .instruction();
-      return deps.buildTx([ix], options);
+      return deps.buildTx([ix], withComputeProfile(options, 'cancelClaim'));
     },
 
     async finalizePayment(params, options) {
@@ -275,7 +277,7 @@ export function createFlow(deps: FlowDeps): SquareFlow {
         .finalizePayment()
         .accountsStrict({ keeper: params.keeper, keeperTokenAccount: params.keeperTokenAccount, ...accounts })
         .instruction();
-      return deps.buildTx([...prepend, ix], options);
+      return deps.buildTx([...prepend, ix], withComputeProfile(options, 'finalizePayment'));
     },
 
     async raiseDispute(params, options) {
@@ -332,7 +334,7 @@ export function createFlow(deps: FlowDeps): SquareFlow {
           tokenProgram: await tokenProgram(account.mint),
         })
         .instruction();
-      return deps.buildTx([ix], options);
+      return deps.buildTx([ix], withComputeProfile(options, 'cancelJob'));
     },
   };
 }

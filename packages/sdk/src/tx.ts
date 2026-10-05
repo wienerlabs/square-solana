@@ -1,5 +1,6 @@
-// Instruction'lardan imzasız v0 tx. Compute budget yalnızca istenirse eklenir (değerler çağıranın
-// ya da BC-28 profillerinin; SDK varsayılan bir değer uydurmaz). ALT'ler zincirden okunur.
+// Instruction'lardan imzasız v0 tx. Compute budget yalnızca seçeneklerde varsa eklenir: akışlar
+// profilin sınırını verir (budget.ts, BC-28), fiyatı çağıran seçer. ALT'ler zincirden okunur. Pakete
+// sığmayan tx kurulurken reddedilir.
 import {
   ComputeBudgetProgram,
   TransactionMessage,
@@ -9,7 +10,19 @@ import {
   type Connection,
   type TransactionInstruction,
 } from '@solana/web3.js';
+import { PACKET_DATA_SIZE } from './budget.js';
 import type { BuildOptions, BuiltTx } from './types.js';
+
+/** İmzalı tx'in tel boyutu (imzasız tx'te imza yerleri sıfırdır); mesaj paketi aşıyorsa sonsuz. */
+function wireSize(transaction: VersionedTransaction): number {
+  try {
+    return transaction.serialize().length;
+  } catch (error) {
+    // web3.js mesajı paket boyutunda bir tampona yazar; aşan mesaj RangeError verir.
+    if (error instanceof RangeError) return Number.POSITIVE_INFINITY;
+    throw error;
+  }
+}
 
 async function lookupTables(connection: Connection, keys: BuildOptions['addressLookupTables']) {
   return Promise.all(
@@ -43,8 +56,15 @@ export async function buildVersionedTx(
     recentBlockhash: blockhash,
     instructions: [...budget, ...instructions],
   }).compileToV0Message(tables);
+  const transaction = new VersionedTransaction(message);
+  if (wireSize(transaction) > PACKET_DATA_SIZE) {
+    throw new Error(
+      `tx paket sınırını (${PACKET_DATA_SIZE} bayt) aşıyor: Square address lookup table'ını ` +
+        '`addressLookupTables` ile verin (squareLookupTableAddresses)',
+    );
+  }
   return {
-    transaction: new VersionedTransaction(message),
+    transaction,
     signers: message.staticAccountKeys.slice(0, message.header.numRequiredSignatures),
     blockhash,
     lastValidBlockHeight,
