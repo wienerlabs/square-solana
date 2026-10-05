@@ -2,14 +2,36 @@
 #
 # Varsayılan kural seti olduğu gibi kullanılır. İstisnalar, Arc Square'deki düzende olduğu gibi,
 # YOL değil DEĞER bazında ve gerekçesiyle yazılır: yol bazında bir istisna o dosyaya sonradan
-# girecek gerçek bir sırrı da görünmez yapar. CI kapısı ve Covenant'tan uyarlanacak ek kurallar
-# BC-13'te eklenir.
+# girecek gerçek bir sırrı da görünmez yapar.
+#
+# BC-13: CI kapısı (.github/workflows/security.yml) ve yerel pre-commit kancası (.githooks/pre-commit)
+# bu dosyayı kullanır. Covenant'ın secret-scan işindeki grep korumasından Solana anahtar dizisi
+# denetimi aşağıdaki iki kurala uyarlandı (varsayılan kurallar bayt dizisi biçimindeki anahtarı hiç
+# yakalamıyor). Token önekleri (ghp_, npm_, AKIA, sk-ant- …) varsayılan kurallarda zaten var;
+# Covenant'ın yol bazlı istisnaları (app/tests/**, README.md) bu politikaya aykırı olduğu için
+# alınmadı. Kuralların testi: scripts/security/gitleaks-rules.check.mjs.
 #
 # Not: tekil [allowlist] bloğundaki `regexes`, `useDefault = true` ile birlikte uygulanmaz;
 # çoğul [[allowlists]] + `regexTarget` kullanılır (gitleaks 8.30).
 
 [extend]
 useDefault = true
+
+[[rules]]
+id = "solana-keypair-file"
+description = """Solana keypair dosyası (solana-keygen biçimi): JSON dosyasının tamamı 64 baytlık bir dizi.
+Dosyanın yalnızca dizi olması şartı, aynı uzunluktaki açık verileri (Groth16 ispat noktaları,
+doğrulama anahtarı) dışarıda bırakır."""
+path = '''(?i)\.json$'''
+regex = '''\A\s*\[\s*(?:\d{1,3}\s*,\s*){63}\d{1,3}\s*\]\s*\z'''
+
+[[rules]]
+id = "solana-secret-key-array"
+description = """Solana gizli anahtarı 64 baytlık dizi olarak: `Keypair.fromSecretKey(...)` içinde ya da
+secret / private key / keypair adlı bir alanın değeri (TS, JSON, .env, Rust `[u8; 64]`). Adsız 64
+baytlık diziler (ispat, doğrulama anahtarı) eşleşmez."""
+regex = '''(?i)(?:fromSecretKey\s*\(|(?:secret|private)[_-]?key|keypair)[^\[]{0,60}(?:\[u8;\s*64\][^\[]{0,10})?\[\s*(?:\d{1,3}\s*,\s*){63}\d{1,3}\s*,?\s*\]'''
+keywords = ["secret", "private", "keypair"]
 
 [[allowlists]]
 description = """Ed25519 did:key tanımlayıcıları açık anahtardır, sır değildir: did:key:z6Mk…

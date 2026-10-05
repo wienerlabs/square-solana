@@ -36,7 +36,7 @@ yazılmaz.
 - `square-common`'ın testleri, makronun ürettiği her event'in örnek değerlerde sözleşme tipiyle aynı
   baytları (discriminator dahil) verdiğini denetler (40 event). Bir programda çağrıldığında programın
   IDL'indeki event'ler ve tip tanımları sözleşme IDL'iyle aynıdır (BC-16'da `square_policy` ile
-  denendi). Programın IDL'inin sözleşmeyle eşitliği CI'da BC-13 ile denetlenir.
+  denendi). Programın IDL'inin sözleşmeyle eşitliği CI'da denetlenir (BC-13, [CI kontrolleri](../ci.md#program-kontrolleri-ve-programların-durumu)).
 
 ```rust
 use anchor_lang::prelude::*;
@@ -94,4 +94,5 @@ Sözleşmeye geçen her program (BC-15, BC-17, BC-18, BC-21, BC-22, BC-24 …):
 
 1. Crate kökünde `square_common::square_<program>_events!()` çağrılır; event'ler elle tanımlanmaz.
 2. Program arayüzündeki her event, sözleşmede tanımlı olduğu durumda `emit!` ile yayımlanır.
-3. `anchor build` ile üretilen IDL'in `events` ve `types` bölümleri sözleşme IDL'iyle aynıdır (BC-13).
+3. `anchor build` ile üretilen IDL'in `events` ve `types` bölümleri sözleşme IDL'iyle aynıdır; program
+   `scripts/ci/programs.mjs`'te `contract` olunca CI bunu denetler (BC-13).

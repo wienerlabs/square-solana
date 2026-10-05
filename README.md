@@ -94,29 +94,34 @@ Yapının gerekçesi: [§9](docs/analysis/square-solana-analysis.md#9-%C3%B6neri
 | Anchor CLI | 1.2.0 (`avm install 1.2.0`) | `Anchor.toml` → `[toolchain]`, [ADR 0007](docs/decisions/0007-anchor-surumu.md) |
 | Node.js | 24 (LTS) | [`.nvmrc`](.nvmrc) |
 | pnpm | 10.34.6 | `package.json` → `packageManager`, [ADR 0011](docs/decisions/0011-monorepo-araclari-pnpm-ve-turborepo.md) |
+| gitleaks | en az 8.30.1 (pre-commit kancası) | [`scripts/security/gitleaks.env`](scripts/security/gitleaks.env) |
 
 ```bash
-pnpm install
+pnpm install       # git kancalarını da kurar (.githooks/, pre-commit: gitleaks)
 pnpm build
 pnpm lint          # ESLint + Prettier (@squaresdk/solana-config)
 pnpm check:names   # paket adları @squaresdk/solana- (ADR 0001)
 pnpm test          # vitest
+pnpm secrets:scan  # gitleaks, bütün git geçmişi
 cargo build
-cargo clippy --workspace
+node scripts/ci/rust-lint.mjs   # cargo fmt --check + clippy; kapsam scripts/ci/programs.mjs
 cargo test --workspace
 mkdir -p target/deploy   # temiz klonda ilk anchor build'den önce şart, aşağıya bakın
 anchor build
+node scripts/ci/idl-conformance.mjs   # program IDL'leri sözleşmeyle (idl/) uyumlu
+anchor test --validator legacy --skip-build   # program testleri (LiteSVM, tests/programs)
 ```
 
 - **Temiz klonda `anchor build`:** Anchor 0.31, `target/deploy` yokken yapılan ilk derlemede
   programlar için yeni anahtar çifti üretir ve `declare_id!` değerleriyle `Anchor.toml`'u bu
   rastgele ID'lerle değiştirir. Önce `mkdir -p target/deploy` çalıştırın; derlemeden sonra
   `git status` bu dosyalarda değişiklik göstermemeli.
-- **Katı kontroller BC-13 ile gelir:** `cargo clippy --workspace -- -D warnings` ve
-  `cargo fmt --all --check` bugün main'de kırmızı. Uyarılar ve biçim farkları taşınan programlardan
-  (`square-policy`, `square-verifier`, `square-registry`) geliyor. Bu kurallar BC-13 ile CI'a
-  girene kadar yukarıdaki komutlar geçerli; yeni yazdığınız kodu yine de katı kurallara göre
-  temiz tutun.
+- **Rust kontrolleri:** Sözleşmeye geçen programlar, `crates/*` ve `tests/programs` `cargo fmt --check`
+  ve `cargo clippy -D warnings`'ten geçer. Henüz kaynak arayüzündeki `square-verifier` ve `square-escrow`
+  sözleşmeye geçene kadar yalnızca derlenir; uyarıları bildirilir. Kapsam
+  [`scripts/ci/programs.mjs`](scripts/ci/programs.mjs)'tedir.
+- **CI ve merge kuralı:** Kontrollerin listesi, yerel karşılıkları ve zorunlu kontrol kuralı
+  [`docs/ci.md`](docs/ci.md)'de.
 
 Editör ayarları [`.editorconfig`](.editorconfig) ile paylaşılır.
 

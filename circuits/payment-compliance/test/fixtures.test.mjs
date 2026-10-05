@@ -7,10 +7,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { render, scenarios } from '../scripts/generate_test_inputs.mjs';
 import { toArray } from '../scripts/release-input.mjs';
-import { BUILD, isBuilt, publicOutputs } from './helpers/witness.mjs';
+import { BUILD, isBuilt, prerequisite, publicOutputs } from './helpers/witness.mjs';
 
 const DIR = path.resolve(BUILD, '..', 'test-inputs');
-const skip = !isBuilt('payment') && 'run `npm run build` first';
+const skip = prerequisite(!isBuilt('payment') && 'run `npm run build` first');
 const read = (f) => JSON.parse(fs.readFileSync(path.join(DIR, f), 'utf8'));
 
 test('test-inputs/ matches the generator', async () => {

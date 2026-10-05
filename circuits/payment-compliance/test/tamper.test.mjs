@@ -13,7 +13,7 @@ import path from 'node:path';
 import * as snarkjs from 'snarkjs';
 import { PUBLIC_SIGNALS, addressHalves, toArray, world } from '../scripts/release-input.mjs';
 import { verifyPtau } from '../scripts/fetch-ptau.mjs';
-import { BUILD, isBuilt, wasmPath } from './helpers/witness.mjs';
+import { BUILD, isBuilt, prerequisite, wasmPath } from './helpers/witness.mjs';
 import { ensureTestKey } from './helpers/key.mjs';
 
 const R = 21888242871839275222246405745257275088548364400416034343698204186575808495617n;
@@ -22,7 +22,9 @@ const INPUTS = path.resolve(BUILD, '..', 'test-inputs');
 // The pinned PPoT file is fetched once (about 19 MB) by `npm run fetch-ptau`;
 // without it these tests are skipped rather than downloading on their own.
 const havePtau = (() => { try { verifyPtau(); return true; } catch { return false; } })();
-const skip = (!isBuilt('payment') && 'run `npm run build` first') || (!havePtau && 'run `npm run fetch-ptau` first');
+const skip = prerequisite(
+  (!isBuilt('payment') && 'run `npm run build` first') || (!havePtau && 'run `npm run fetch-ptau` first'),
+);
 
 const read = (f) => JSON.parse(fs.readFileSync(path.join(INPUTS, f), 'utf8'));
 let vk;

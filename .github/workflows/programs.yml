@@ -1,5 +1,7 @@
-# Programlar (BC-12): SBF derlemesi, kök workspace'in birim testleri ve LiteSVM program testleri.
-# Araç sürümleri Anchor.toml [toolchain] ile aynıdır (ADR 0007); indirilen dosyalar SHA-256 ile doğrulanır.
+# Programlar (BC-12, BC-13): SBF derlemesi, Rust biçim ve lint kontrolleri, program IDL'lerinin sözleşmeyle
+# uyumu, kök workspace'in birim testleri ve LiteSVM program testleri. Kapsam scripts/ci/programs.mjs'tedir
+# (sözleşmeye geçen ve legacy programlar). Araç sürümleri Anchor.toml [toolchain] ile aynıdır (ADR 0007,
+# scripts/ci/toolchain.mjs denetler); indirilen dosyalar SHA-256 ile doğrulanır.
 name: Programs
 
 on:
@@ -14,7 +16,12 @@ on:
       - 'Cargo.lock'
       - 'rust-toolchain.toml'
       - '.cargo/**'
+      - 'scripts/ci/programs.mjs'
+      - 'scripts/ci/idl-conformance.mjs'
+      - 'scripts/ci/rust-lint.mjs'
+      - 'scripts/ci/toolchain.mjs'
       - '.github/workflows/programs.yml'
+      - '.github/workflows/verifiable-build.yml'
   push:
     branches: [main]
     paths:
@@ -27,7 +34,12 @@ on:
       - 'Cargo.lock'
       - 'rust-toolchain.toml'
       - '.cargo/**'
+      - 'scripts/ci/programs.mjs'
+      - 'scripts/ci/idl-conformance.mjs'
+      - 'scripts/ci/rust-lint.mjs'
+      - 'scripts/ci/toolchain.mjs'
       - '.github/workflows/programs.yml'
+      - '.github/workflows/verifiable-build.yml'
 
 permissions:
   contents: read
@@ -52,9 +64,19 @@ jobs:
         with:
           persist-credentials: false
 
-      # rustup 1.28+ argümansız `toolchain install` ile rust-toolchain.toml'dan kurar.
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+
+      - name: Araç sürümleri Anchor.toml ile aynı
+        run: node scripts/ci/toolchain.mjs
+
+      # rustup 1.28+ argümansız `toolchain install` ile rust-toolchain.toml'dan kurar (rustfmt, clippy dahil).
       - name: Rust toolchain
         run: rustup toolchain install || rustup show
+
+      - name: Rust biçimi (cargo fmt --check)
+        run: node scripts/ci/rust-lint.mjs fmt
 
       - name: Agave ve Anchor CLI
         run: |
@@ -93,6 +115,13 @@ jobs:
       # IDL'ler de üretilir: programların idl-build derlemesi de bu adımda denetlenir.
       - name: Programlar (anchor build)
         run: anchor build
+
+      # Sözleşmeye geçen programın IDL'i sözleşme IDL'inden (idl/) ayrılırsa iş kırmızı olur.
+      - name: Program IDL'leri sözleşmeyle uyumlu
+        run: node scripts/ci/idl-conformance.mjs
+
+      - name: Clippy
+        run: node scripts/ci/rust-lint.mjs clippy
 
       - name: Birim testleri (kök workspace)
         run: cargo test --workspace --locked

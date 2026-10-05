@@ -8,9 +8,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import * as snarkjs from 'snarkjs';
 import { PUBLIC_SIGNALS } from '../scripts/release-input.mjs';
-import { BUILD, isBuilt } from './helpers/witness.mjs';
+import { BUILD, isBuilt, prerequisite } from './helpers/witness.mjs';
 
-const skip = !isBuilt('payment') && 'run `npm run build` first';
+const skip = prerequisite(!isBuilt('payment') && 'run `npm run build` first');
 const DOC = path.resolve(BUILD, '..', '..', '..', 'docs', 'design', 'release-circuit.md');
 
 // circom 2.2.3, default optimisation: 6 228 non-linear + 7 267 linear.

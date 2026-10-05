@@ -24,7 +24,7 @@ npm run artifacts:check                # release artefaktlarını yeniden üreti
 scripts/clean-room.sh check            # aynısı, commit'lenmiş HEAD'in Docker'daki temiz klonunda
 ```
 
-`npm test`, derleme yoksa devre testlerini, PPoT dosyası yoksa tamper testlerini atlar ve sebebini yazar.
+`npm test`, derleme yoksa devre testlerini, PPoT dosyası yoksa tamper testlerini atlar ve sebebini yazar. CI'da (`CIRCUIT_TESTS_STRICT=1`, [`circuits.yml`](../../.github/workflows/circuits.yml)) atlamaz, düşer; CI ayrıca `inputs:check` ve `artifacts:check`'i koşturur.
 
 ## Dosyalar
 
