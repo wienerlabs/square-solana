@@ -16,6 +16,7 @@ import {
   notBuyableReason,
   parseClaimPrice,
   payeeOf,
+  payoutOf,
 } from '@/lib/claim-market';
 import { claimListingAddress } from '@/lib/idl-pda';
 import { describeJobEvent, jobEventsFromLogs } from '@/lib/job-detail';
@@ -90,6 +91,26 @@ describe('payee', () => {
     expect(payeeOf(job(), { ...sold, status: { settled: {} } })).toEqual({ wallet: buyer, sold: true });
     // Satılmamış listeleme settlement'ta kapanır; payee agent'tı.
     expect(payeeOf(job(), listing({ status: { settled: {} } }))).toEqual({ wallet: agent, sold: false });
+  });
+});
+
+describe('payout', () => {
+  it('goes back to the institution when the job is refunded or cancelled', () => {
+    const sold = listing({ buyer, boughtAt: new BN(1_790_000_100), status: { defaulted: {} } });
+    expect(payoutOf(job({ status: { refunded: {} } }), sold)).toEqual({
+      kind: 'institution',
+      wallet: institution,
+      reason: 'refunded',
+    });
+    expect(payoutOf(job({ status: { cancelled: {} } }), null)).toEqual({
+      kind: 'institution',
+      wallet: institution,
+      reason: 'cancelled',
+    });
+    // Teslim edilmiş, uyuşmazlıkta ya da ödenmiş işte payee.
+    for (const status of [{ delivered: {} }, { disputed: {} }, { released: {} }]) {
+      expect(payoutOf(job({ status }), sold)).toEqual({ kind: 'payee', wallet: buyer, sold: true });
+    }
   });
 });
 
