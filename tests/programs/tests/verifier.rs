@@ -284,8 +284,7 @@ fn a_bought_claim_routes_the_proof_to_the_buyer() {
     let mut r = ReleaseWorld::new(true);
     let job = r.delivered_job("a");
     r.w.h.set_time(r.proof_time());
-    let buyer = keypair(&r.fx, "claimBuyer").pubkey();
-    r.write_sold_claim(&job, buyer);
+    let buyer = r.sell_claim_to_fixture_buyer(&job);
 
     r.bind(&job, &r.proof("compliant"))
         .expect_err("agent'a yapılmış ispat")

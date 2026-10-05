@@ -44,12 +44,6 @@ export const PROGRAMS = Object.freeze([
     status: 'contract',
     pending: [
       {
-        issue: 'BC-25 (#33)',
-        instructions: ['list_claim', 'buy_claim', 'cancel_claim'],
-        accounts: ['ClaimListing'],
-        types: ['ClaimListing', 'ClaimStatus'],
-      },
-      {
         issue: 'BC-32 (#69)',
         instructions: ['raise_dispute', 'resolve_dispute', 'execute_resolution', 'update_arbitrators'],
       },

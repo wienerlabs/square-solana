@@ -60,6 +60,34 @@ pub fn create_ata(h: &mut Harness, owner: &Pubkey, mint: &Pubkey) -> Pubkey {
         &TOKEN_PROGRAM_ID,
     );
     h.send(&[ix], &[]).expect("ATA oluşturulamadı");
+    ata_address(owner, mint)
+}
+
+/// `owner`'ın `mint` için ATA olmayan, yeni bir anahtarın adresinde açılmış token hesabı.
+pub fn create_token_account(h: &mut Harness, owner: &Pubkey, mint: &Pubkey) -> Pubkey {
+    let account = Keypair::new();
+    let rent = h.svm.minimum_balance_for_rent_exemption(TokenAccount::LEN);
+    let create = solana_system_interface::instruction::create_account(
+        &h.payer.pubkey(),
+        &account.pubkey(),
+        rent,
+        TokenAccount::LEN as u64,
+        &TOKEN_PROGRAM_ID,
+    );
+    let init = spl_token_interface::instruction::initialize_account3(
+        &TOKEN_PROGRAM_ID,
+        &account.pubkey(),
+        mint,
+        owner,
+    )
+    .expect("initialize_account3");
+    h.send(&[create, init], &[&account])
+        .expect("token hesabı oluşturulamadı");
+    account.pubkey()
+}
+
+/// `owner`'ın `mint` için associated token account adresi.
+pub fn ata_address(owner: &Pubkey, mint: &Pubkey) -> Pubkey {
     get_associated_token_address_with_program_id(owner, mint, &TOKEN_PROGRAM_ID)
 }
 

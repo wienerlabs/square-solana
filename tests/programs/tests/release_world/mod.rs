@@ -11,7 +11,6 @@ use anchor_lang::{InstructionData, ToAccountMetas};
 use serde_json::Value;
 use solana_keypair::Keypair;
 use solana_signer::Signer;
-use square_common::contract::square_escrow_contract::types::ClaimStatus;
 use square_common::contract::square_verifier_contract::accounts as contract;
 use square_common::release::{check_fresh, ReleaseFacts, Staleness};
 use square_common::seeds::{ESCROW_AUTHORITY_SEED, OPERATOR_STATE_SEED, RELEASE_PROOF_SEED};
@@ -323,9 +322,13 @@ impl ReleaseWorld {
         }
     }
 
-    /// Satılmış alacak (`escrow_world::World::write_claim`).
-    pub fn write_sold_claim(&mut self, job: &Pubkey, buyer: Pubkey) {
-        self.w.write_claim(job, buyer, ClaimStatus::Bought);
+    /// Agent alacağı fikstürün alıcısına (`claimBuyer`) satar; politikanın alıcı listesi kısıtsız.
+    pub fn sell_claim_to_fixture_buyer(&mut self, job: &Pubkey) -> Pubkey {
+        let buyer = self
+            .w
+            .buyer_with(keypair(&self.fx, "claimBuyer"), CLAIM_PRICE);
+        self.w.sell_claim(&self.agent, job, &buyer);
+        buyer.key.pubkey()
     }
 
     /// Policy'li işin ispat hesapları.

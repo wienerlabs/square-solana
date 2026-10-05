@@ -1,7 +1,6 @@
 //! square_escrow hesapları ve tipleri (program arayüzü §5, §10.4). Düzen kuralı: sabit boyutlu alanlar
 //! önce, değişken boyutlu alanlar (Option, veri taşıyan enum, String) sonda; indexer ve keeper sabit
-//! önekte `memcmp` ile filtreler. `ClaimListing` BC-25'te eklenir (scripts/ci/programs.mjs → pending);
-//! finalize onu sözleşmenin tipiyle (`square_common`) okur ve yazar.
+//! önekte `memcmp` ile filtreler.
 
 use anchor_lang::prelude::*;
 
@@ -137,6 +136,37 @@ pub enum DisputeResolution {
     FavorInstitution,
     /// Agent side gets `agent_amount`, rest refunded; a bond is returned.
     Split { agent_amount: u64 },
+}
+
+/// seeds = ["claim", job]
+#[account]
+#[derive(InitSpace)]
+pub struct ClaimListing {
+    pub job: Pubkey,
+    /// `job.agent_wallet` at listing time.
+    pub seller: Pubkey,
+    /// `Pubkey::default()` until bought.
+    pub buyer: Pubkey,
+    /// Paid the listing rent; receives it back on `cancel_claim`.
+    pub rent_payer: Pubkey,
+    pub price: u64,
+    /// `job.amount` at listing time (informational).
+    pub face_value: u64,
+    pub listed_at: i64,
+    pub bought_at: i64,
+    pub status: ClaimStatus,
+    pub bump: u8,
+}
+
+/// `cancel_claim` closes the listing, so there is no Cancelled state.
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq, Debug, InitSpace)]
+pub enum ClaimStatus {
+    Listed,
+    Bought,
+    /// Job settled: the buyer was paid, or an unsold listing was closed for buying.
+    Settled,
+    /// Job refunded to the institution; the buyer is not paid.
+    Defaulted,
 }
 
 /// seeds = ["reputation", agent_record] — bound to the registry agent, not to a wallet (BC-26).

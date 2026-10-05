@@ -8,11 +8,11 @@ mod escrow_world;
 use anchor_lang::error::ErrorCode as AnchorErrorCode;
 use anchor_lang::prelude::Pubkey;
 use escrow_world::*;
-use solana_keypair::Keypair;
 use solana_signer::Signer;
-use square_common::contract::square_escrow_contract::types::ClaimStatus;
 use square_escrow::errors::EscrowError;
-use square_escrow::state::{AgentReputation, JobStatus, ValidationOutcome, ValidationRecord};
+use square_escrow::state::{
+    AgentReputation, ClaimStatus, JobStatus, ValidationOutcome, ValidationRecord,
+};
 use square_escrow::{Finalized, ReleaseVerified, ReputationRecorded, ValidationRecorded};
 use square_program_tests::{anchor_error, cu, event};
 use square_registry::ScreeningStatus;
@@ -263,9 +263,9 @@ fn token_ata(w: &mut World, owner: &Pubkey) -> Pubkey {
 fn a_sold_claim_pays_the_buyer_but_reputation_goes_to_the_agent() {
     let mut w = World::new(true);
     let (institution, agent, job) = w.delivered_job();
-    let buyer = Keypair::new();
-    w.write_claim(&job, buyer.pubkey(), ClaimStatus::Bought);
-    w.screen(&buyer.pubkey(), ScreeningStatus::Clear);
+    let buyer = w.buyer(CLAIM_PRICE);
+    w.sell_claim(&agent, &job, &buyer);
+    let buyer = buyer.key.pubkey();
     let keeper = w.h.funded(LAMPORTS);
     w.h.set_time(w.job(&job).challenge_end);
 
@@ -275,14 +275,15 @@ fn a_sold_claim_pays_the_buyer_but_reputation_goes_to_the_agent() {
         .expect_err("alacak satıldı")
         .assert_error(anchor_error(EscrowError::ClaimListingRequired));
 
-    let settlement = w.settlement(&institution, &keeper.pubkey(), buyer.pubkey());
+    let settlement = w.settlement(&institution, &keeper.pubkey(), buyer);
     let executed = w
         .finalize(&keeper, &job, settlement)
         .expect("alıcıya ödeme");
     assert_eq!(w.balance(&settlement.payee_token_account), Some(NET));
-    assert_eq!(w.balance(&to_agent.payee_token_account), Some(0));
-    assert_eq!(event::<ReleaseVerified>(&executed).payee, buyer.pubkey());
-    assert!(matches!(w.claim(&job).status, ClaimStatus::Settled));
+    // Agent'a yalnızca satış fiyatı gitti; escrow'un neti alıcıya.
+    assert_eq!(w.balance(&to_agent.payee_token_account), Some(CLAIM_PRICE));
+    assert_eq!(event::<ReleaseVerified>(&executed).payee, buyer);
+    assert_eq!(w.claim(&job).status, ClaimStatus::Settled);
     // İtibar ve validation alıcıya değil, işi yapan agent kaydına.
     let reputation: AgentReputation = w.h.account(&reputation_address(&agent.record)).unwrap();
     assert_eq!(
@@ -315,17 +316,18 @@ fn an_unscreened_payee_waits_and_is_paid_once_cleared() {
         .expect("yenilenen kayıtla");
     assert_eq!(w.balance(&settlement.payee_token_account), Some(NET));
 
-    // Kaydı hiç olmayan alıcı.
+    // Satın aldıktan sonra işaretlenen alıcı.
     let mut w = World::new(true);
-    let (institution, _agent, job) = w.delivered_job();
-    let buyer = Keypair::new();
-    w.write_claim(&job, buyer.pubkey(), ClaimStatus::Bought);
+    let (institution, agent, job) = w.delivered_job();
+    let buyer = w.buyer(CLAIM_PRICE);
+    w.sell_claim(&agent, &job, &buyer);
+    w.screen(&buyer.key.pubkey(), ScreeningStatus::Flagged);
     let keeper = w.h.funded(LAMPORTS);
-    let settlement = w.settlement(&institution, &keeper.pubkey(), buyer.pubkey());
+    let settlement = w.settlement(&institution, &keeper.pubkey(), buyer.key.pubkey());
     w.h.set_time(w.job(&job).challenge_end);
     w.finalize(&keeper, &job, settlement)
-        .expect_err("alıcının kaydı yok")
-        .assert_error(anchor_error(EscrowError::ScreeningRequired));
+        .expect_err("alıcı işaretli")
+        .assert_error(anchor_error(EscrowError::ScreeningFlagged));
     assert_eq!(w.job(&job).status, JobStatus::Delivered, "escrow bekler");
 }
 
