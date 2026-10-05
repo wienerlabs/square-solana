@@ -5,6 +5,7 @@ import { BorshCoder, EventParser, type Idl } from '@anchor-lang/core';
 import { PublicKey, SYSVAR_CLOCK_PUBKEY, type Connection } from '@solana/web3.js';
 import { SQUARE_IDLS, workHash } from '@squaresdk/solana-sdk';
 import { formatDiscount } from './claim-market';
+import { refusalReasons } from './release-proof';
 
 /** `Job.delivery_uri` üst sınırı (square_escrow `DELIVERY_URI_MAX_LEN`, `DeliveryUriTooLong`). */
 export const MAX_DELIVERY_URI_BYTES = 128;
@@ -151,7 +152,10 @@ export function describeJobEvent(
     case 'ReleaseVerified':
       return { title: 'Release proof verified', detail: `${formatAmount(num(d.net_amount))} to ${str(d.payee)}` };
     case 'ReleaseRefused':
-      return { title: 'Release refused by the proof', detail: `${formatAmount(num(d.refunded_amount))} refunded` };
+      return {
+        title: 'Release refused by the proof',
+        detail: `${formatAmount(num(d.refunded_amount))} refunded to the institution: ${refusalReasons(Number(d.refusal_code)).join('; ')}`,
+      };
     case 'Finalized':
       return { title: 'Paid out', detail: `keeper fee ${formatAmount(num(d.keeper_fee))}` };
     case 'JobCancelled':
