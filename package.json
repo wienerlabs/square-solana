@@ -14,10 +14,12 @@
     "contract:check": "pnpm --filter @squaresdk/solana-types gen:check && pnpm --filter @squaresdk/solana-sdk gen:check",
     "license:check": "node scripts/license/pack-files.mjs --check && node scripts/license/inventory.mjs --check",
     "license:write": "node scripts/license/pack-files.mjs --write && node scripts/license/inventory.mjs --write",
+    "secrets:scan": "node scripts/security/gitleaks.mjs history",
     "format": "prettier --write .",
     "check:names": "node scripts/check-package-names.mjs",
     "changeset": "changeset",
-    "version-packages": "changeset version"
+    "version-packages": "changeset version",
+    "prepare": "node scripts/hooks/install.mjs"
   },
   "devDependencies": {
     "@changesets/cli": "^3.0.3",

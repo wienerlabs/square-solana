@@ -17,6 +17,15 @@ const calculators = new Map();
 export const wasmPath = (circuit) => path.join(BUILD, `${circuit}_js`, `${circuit}.wasm`);
 export const isBuilt = (...circuits) => circuits.every((c) => fs.existsSync(wasmPath(c)));
 
+// A test whose prerequisite is missing (`reason`) is skipped locally. CI sets
+// CIRCUIT_TESTS_STRICT=1 so that a missing build or PPoT file fails the run
+// instead of passing it with skipped tests.
+export function prerequisite(reason) {
+  if (!reason) return false;
+  if (process.env.CIRCUIT_TESTS_STRICT === '1') throw new Error(`${reason} (CIRCUIT_TESTS_STRICT=1)`);
+  return reason;
+}
+
 async function calculator(circuit) {
   if (!calculators.has(circuit)) {
     const build = require(path.join(BUILD, `${circuit}_js`, 'witness_calculator.js'));

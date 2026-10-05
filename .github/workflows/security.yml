@@ -1,0 +1,56 @@
+# Sır taraması (BC-13): gitleaks, depo yapılandırmasıyla (.gitleaks.toml, .gitleaksignore) HEAD'den
+# erişilen bütün git geçmişini tarar; PR'da HEAD, PR'ın merge commit'idir. Kuralların ve çalıştırıcının
+# testleri de burada koşar. Haftalık koşu, gitleaks'in yeni kurallarını eski geçmişe de uygular.
+# gitleaks-action organizasyon depolarında ücretli lisans istediği için resmi ikili kullanılır; sürüm ve
+# SHA-256 scripts/security/gitleaks.env'dedir. Yerelde aynı tarama: .githooks/pre-commit, pnpm secrets:scan.
+name: Security
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '0 6 * * 1'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: security-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  secrets:
+    name: Sır taraması (gitleaks)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+
+      - name: gitleaks (resmi ikili, SHA-256 doğrulanır)
+        run: |
+          set -euo pipefail
+          source scripts/security/gitleaks.env
+          cd "$RUNNER_TEMP"
+          curl -fsSL --retry 5 -o gitleaks.tar.gz \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          echo "${GITLEAKS_SHA256}  gitleaks.tar.gz" | sha256sum -c -
+          mkdir -p bin
+          tar -xzf gitleaks.tar.gz -C bin gitleaks
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+          bin/gitleaks version
+
+      - name: Kuralların, çalıştırıcının ve kanca kurulumunun testleri
+        run: >-
+          node --test scripts/security/gitleaks.test.mjs scripts/security/gitleaks-rules.check.mjs
+          scripts/hooks/install.test.mjs
+
+      - name: Git geçmişi taraması
+        run: node scripts/security/gitleaks.mjs history

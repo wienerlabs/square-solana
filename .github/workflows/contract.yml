@@ -1,5 +1,5 @@
-# BE-35: API / SDK sözleşmesinin BC-44 IDL'leriyle (idl/*.json) hizası. Gerçek programlar geldikçe
-# programların IDL'inin idl/ ile aynı olduğu denetimi BC-13'te eklenir.
+# BE-35: API / SDK sözleşmesinin BC-44 IDL'leriyle (idl/*.json) hizası. Programların derlenen IDL'inin
+# idl/ ile uyumu programs.yml'dedir (BC-13, scripts/ci/idl-conformance.mjs).
 # Derleme, tip kontrolü (IDL tip testleri dahil) ve hizalama testleri BE-03 ile packages.yml'e taşındı:
 # idl/, docs/api/ ya da docs/did-aip/ değişen her PR orada tam koşu alır (scripts/ci/turbo-scope.mjs).
 name: contract

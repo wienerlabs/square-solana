@@ -8,9 +8,9 @@ import crypto from 'node:crypto';
 import {
   NATIVE_MINT, TIMESTAMP, USDC_DEVNET, buildInput, evaluate, toArray, world,
 } from '../scripts/release-input.mjs';
-import { isBuilt, publicOutputs } from './helpers/witness.mjs';
+import { isBuilt, prerequisite, publicOutputs } from './helpers/witness.mjs';
 
-const skip = !isBuilt('payment') && 'run `npm run build` first';
+const skip = prerequisite(!isBuilt('payment') && 'run `npm run build` first');
 
 // Deterministic, so a failure names a case that can be rerun.
 function prng(seed) {

@@ -6,7 +6,7 @@ Square'in Anchor programları. Tek Anchor workspace'inde derlenir; programlar bi
 | Dizin (crate) | Kaynak | Taşıma | Square işleri |
 |---|---|---|---|
 | `square-escrow` | `covenant/programs/covenant` | [BC-04] ✓ | job yaşam döngüsü, finalize + keeper fee, proof-gated release, alacak piyasası, itibar, M-of-N arbitration, dispute timeout |
-| `square-policy` | `aperture/programs/policy-registry` | [BC-05] ✓ | kurum + politika commitment'ı + public günlük tavan [BC-17] ✓, alıcı Merkle kökü [BC-18] |
+| `square-policy` | `aperture/programs/policy-registry` | [BC-05] ✓ | kurum + politika commitment'ı + public günlük tavan [BC-17] ✓, alıcı Merkle kökü [BC-18] ✓ |
 | `square-verifier` (`verifier`) | `aperture/programs/verifier` | [BC-05] ✓ | Groth16 doğrulama, release ispatı bağlama (`ReleaseProof`) |
 | `square-registry` | `dr-wilson-empty/aip-beta` → `programs/aip-escrow/programs/aip-registry` | [BC-07] ✓ | agent kaydı (`did:aip` v2 Solana profili), event'ler [BC-15] ✓; registry config'i ve screening [BC-27] |
 
@@ -20,6 +20,9 @@ Square'in Anchor programları. Tek Anchor workspace'inde derlenir; programlar bi
   [`docs/design/program-interface.md`](../docs/design/program-interface.md). Sözleşmenin tek kaynağı
   [`idl/`](../idl/) altındaki IDL'lerdir.
 - Paylaşılan seed'ler, roller, hata kodları ve event tipleri [`crates/square-common`](../crates/).
+- Programın sözleşmeye göre durumu (`contract` / `legacy`) [`scripts/ci/programs.mjs`](../scripts/ci/programs.mjs)'tedir.
+  Sözleşmeye geçen programın derlenen IDL'i sözleşme IDL'iyle aynı olmalı ve crate'i `cargo fmt` ile
+  `cargo clippy -D warnings`'ten geçmeli; CI denetler ([docs/ci.md](../docs/ci.md)) [BC-13].
 
 [BC-04]: https://github.com/wienerlabs/square-solana/issues/4
 [BC-05]: https://github.com/wienerlabs/square-solana/issues/5
@@ -27,6 +30,7 @@ Square'in Anchor programları. Tek Anchor workspace'inde derlenir; programlar bi
 [BC-08]: https://github.com/wienerlabs/square-solana/issues/8
 [BC-09]: https://github.com/wienerlabs/square-solana/issues/9
 [BC-11]: https://github.com/wienerlabs/square-solana/issues/11
+[BC-13]: https://github.com/wienerlabs/square-solana/issues/13
 [BC-15]: https://github.com/wienerlabs/square-solana/issues/24
 [BC-17]: https://github.com/wienerlabs/square-solana/issues/25
 [BC-18]: https://github.com/wienerlabs/square-solana/issues/26

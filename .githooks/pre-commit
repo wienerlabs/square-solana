@@ -1,0 +1,4 @@
+#!/bin/sh
+# BC-13: commit'lenecek değişikliklerde sır taraması (gitleaks, .gitleaks.toml). `pnpm install` bu dizini
+# core.hooksPath yapar (scripts/hooks/install.mjs). gitleaks kurulu değilse ya da bulgu varsa commit durur.
+exec node scripts/security/gitleaks.mjs staged

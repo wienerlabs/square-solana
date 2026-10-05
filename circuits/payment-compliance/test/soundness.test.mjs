@@ -7,12 +7,14 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { buildInput } from '../scripts/release-input.mjs';
-import { BUILD, calculateWitness, isBuilt } from './helpers/witness.mjs';
+import { BUILD, calculateWitness, isBuilt, prerequisite } from './helpers/witness.mjs';
 
 // BN254 scalar field modulus.
 const R = 21888242871839275222246405745257275088548364400416034343698204186575808495617n;
-const skipPayment = !isBuilt('payment') && 'run `npm run build` first';
-const skipTimestamp = !isBuilt('timestamp_checked', 'timestamp_unchecked') && 'run `npm run build` first';
+const skipPayment = prerequisite(!isBuilt('payment') && 'run `npm run build` first');
+const skipTimestamp = prerequisite(
+  !isBuilt('timestamp_checked', 'timestamp_unchecked') && 'run `npm run build` first',
+);
 
 const rejects = (input, message) => assert.rejects(calculateWitness('payment', input), undefined, message);
 

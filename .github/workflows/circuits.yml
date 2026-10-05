@@ -1,0 +1,86 @@
+# Release devresi (BC-13): circom 2.2.3 ile derleme, devre testleri, test girdilerinin ve release
+# artefaktlarının (r1cs ve wasm hash'leri, zkey'in r1cs ve PPoT'tan türediği, doğrulama anahtarı, verifier'ın
+# Rust VK'sı ve ispat vektörü) commit'lenmiş hâliyle aynılığı. CI'da derleme ya da PPoT dosyası eksikse
+# devre testleri atlanmaz, düşer (CIRCUIT_TESTS_STRICT). circom ve PPoT hash'leriyle doğrulanır.
+name: Circuits
+
+on:
+  pull_request:
+    paths:
+      - 'circuits/**'
+      - 'programs/square-verifier/src/release_vk.rs'
+      - 'programs/square-verifier/src/release_vk_vector.rs'
+      - '.nvmrc'
+      - '.github/workflows/circuits.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'circuits/**'
+      - 'programs/square-verifier/src/release_vk.rs'
+      - 'programs/square-verifier/src/release_vk_vector.rs'
+      - '.nvmrc'
+      - '.github/workflows/circuits.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: circuits-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  circuit:
+    name: Devre derlemesi, testleri ve release artefaktları
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: circuits/payment-compliance
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # artifacts:check, .nvmrc'deki Node sürümünü ister (README, "Release artefaktları").
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: circuits/payment-compliance/package-lock.json
+
+      - name: circom (resmi ikili, SHA-256 doğrulanır)
+        run: |
+          set -euo pipefail
+          source scripts/circom.env
+          mkdir -p "$RUNNER_TEMP/circom"
+          curl -fsSL --retry 5 -o "$RUNNER_TEMP/circom/circom" "$CIRCOM_URL"
+          echo "$CIRCOM_SHA256  $RUNNER_TEMP/circom/circom" | sha256sum -c -
+          chmod +x "$RUNNER_TEMP/circom/circom"
+          echo "CIRCOM=$RUNNER_TEMP/circom/circom" >> "$GITHUB_ENV"
+          "$RUNNER_TEMP/circom/circom" --version
+
+      - name: Bağımlılıklar
+        run: npm ci --no-audit --no-fund
+
+      # ~19 MB; anahtar indirme betiğinin kendisi (PPoT'un adresi ve hash'leri orada sabit).
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: circuits/payment-compliance/build/ppot_0080_14.ptau
+          key: ppot-0080-14-${{ hashFiles('circuits/payment-compliance/scripts/fetch-ptau.mjs') }}
+
+      - name: Powers of tau (sha256 ve blake2b doğrulanır)
+        run: npm run fetch-ptau
+
+      - name: Devre derlemesi
+        run: npm run build
+
+      - name: Test girdileri güncel
+        run: npm run inputs:check
+
+      - name: Devre testleri
+        env:
+          CIRCUIT_TESTS_STRICT: '1'
+        run: npm test
+
+      - name: Release artefaktları commit'lenmiş hâliyle aynı
+        run: npm run artifacts:check
