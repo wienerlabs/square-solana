@@ -1,17 +1,20 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useId, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useId, useMemo, useState, type ReactNode } from 'react';
 import { useConnection, useWallet } from '@solana/wallet-adapter-react';
 import { PublicKey } from '@solana/web3.js';
 import { squareIdentity } from '@squaresdk/solana-identity';
-import type { JobAccount } from '@squaresdk/solana-sdk';
+import type { ClaimListingAccount, JobAccount } from '@squaresdk/solana-sdk';
 import { useNetworkGuard, useSendTransaction } from '@/components/network-guard';
 import { Address } from '@/components/ui/address';
 import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { TxConfirmation } from '@/components/ui/tx-confirmation';
+import { JobClaim } from './job-claim';
 import { chainRefOf, hex } from '@/lib/agent-registration';
+import { payeeOf } from '@/lib/claim-market';
+import { claimListingAddress } from '@/lib/idl-pda';
 import {
   challengeState,
   deliveryHash,
@@ -74,28 +77,39 @@ export function JobDetail({ jobAddress, escrowProgramId }: { jobAddress: string;
   }, [verified, connection, escrowKey]);
   const escrow = setup.state === 'ready' && setup.value.state === 'ready' ? setup.value.setup : null;
 
-  // Job adresini anan her işlemde job ve zaman çizelgesi yeniden okunur: event'ler canlı. Log aboneliği
-  // (WebSocket) anında bildirir; abonelik kurulamaz ya da koparsa en yeni imza birkaç saniyede bir yoklanır.
+  // Job'u ya da alacak listelemesini anan her işlemde job, listeleme ve zaman çizelgesi yeniden okunur:
+  // event'ler canlı. Log aboneliği (WebSocket) anında bildirir; abonelik kurulamaz ya da koparsa iki adresin
+  // en yeni imzası birkaç saniyede bir yoklanır.
+  const claimKey = useMemo(() => claimListingAddress(escrowKey, jobKey), [escrowKey, jobKey]);
+  const watched = useMemo(() => [jobKey, claimKey], [jobKey, claimKey]);
+  const seen = useMemo(() => new SignatureTracker(watched.map((address) => address.toBase58())), [watched]);
   const [revision, setRevision] = useState(0);
-  const seen = useMemo(() => new SignatureTracker(), [jobKey]);
+  const refresh = useCallback(() => setRevision((n) => n + 1), []);
   useEffect(() => {
     if (!verified) return;
-    const subscription = connection.onLogs(
-      jobKey,
-      ({ signature, err }) => seen.observe(signature) && err === null && setRevision((n) => n + 1),
-      'confirmed',
+    const subscriptions = watched.map((address) =>
+      connection.onLogs(
+        address,
+        ({ signature, err }) => seen.observe(address.toBase58(), signature) && err === null && refresh(),
+        'confirmed',
+      ),
     );
     return () => {
-      void connection.removeOnLogsListener(subscription);
+      for (const subscription of subscriptions) void connection.removeOnLogsListener(subscription);
     };
-  }, [verified, connection, jobKey, seen]);
+  }, [verified, connection, watched, seen, refresh]);
   useEffect(() => {
     if (!verified) return;
     let active = true;
     const poll = setInterval(() => {
       if (document.visibilityState === 'hidden' || !seen.known) return;
-      readNewestSignature(connection, jobKey).then(
-        (newest) => active && seen.observe(newest) && setRevision((n) => n + 1),
+      Promise.all(watched.map((address) => readNewestSignature(connection, address))).then(
+        (newest) => {
+          if (!active) return;
+          // Her adres ayrı denetlenir: biri değiştiyse yeniden okunur, diğerinin imzası da kaydedilir.
+          const changed = newest.map((signature, i) => seen.observe(watched[i]!.toBase58(), signature));
+          if (changed.some(Boolean)) refresh();
+        },
         () => undefined, // Okunamazsa bir sonraki aralıkta yeniden denenir.
       );
     }, JOB_POLL_INTERVAL_MS);
@@ -103,9 +117,10 @@ export function JobDetail({ jobAddress, escrowProgramId }: { jobAddress: string;
       active = false;
       clearInterval(poll);
     };
-  }, [verified, connection, jobKey, seen]);
+  }, [verified, connection, watched, seen, refresh]);
 
   const [job, setJob] = useState<Load<JobAccount | null>>({ state: 'loading' });
+  const [claim, setClaim] = useState<Load<ClaimListingAccount | null>>({ state: 'loading' });
   const [timeline, setTimeline] = useState<Load<TimelineEntry[]>>({ state: 'loading' });
   useEffect(() => {
     if (!escrow) return;
@@ -114,10 +129,14 @@ export function JobDetail({ jobAddress, escrowProgramId }: { jobAddress: string;
       (value) => active && setJob({ state: 'ready', value }),
       (error: Error) => active && setJob({ state: 'error', message: error.message }),
     );
-    readJobTimeline(connection, escrowKey, jobKey).then(
-      ({ entries, newestSignature }) => {
+    escrow.client.escrow.fetch('claimListing', claimKey).then(
+      (value) => active && setClaim({ state: 'ready', value }),
+      (error: Error) => active && setClaim({ state: 'error', message: error.message }),
+    );
+    readJobTimeline(connection, escrowKey, jobKey, claimKey).then(
+      ({ entries, newest }) => {
         if (!active) return;
-        seen.baseline(newestSignature);
+        seen.baseline(newest);
         setTimeline({ state: 'ready', value: entries });
       },
       (error: Error) => active && setTimeline({ state: 'error', message: error.message }),
@@ -125,7 +144,7 @@ export function JobDetail({ jobAddress, escrowProgramId }: { jobAddress: string;
     return () => {
       active = false;
     };
-  }, [escrow, connection, escrowKey, jobKey, seen, revision]);
+  }, [escrow, connection, escrowKey, jobKey, claimKey, seen, revision]);
 
   // Zincir saati: Clock sysvar'ından okunur, aradaki saniyeler yerel saatle ilerletilir.
   const [chainOffset, setChainOffset] = useState<number | null>(null);
@@ -203,6 +222,8 @@ export function JobDetail({ jobAddress, escrowProgramId }: { jobAddress: string;
   if (!account) return <p className="text-sm text-muted">No job exists at this address.</p>;
 
   const jobStatus = statusOf(account);
+  const listing = claim.state === 'ready' ? claim.value : null;
+  const payee = payeeOf(account, listing);
   const challengeEnd = account.challengeEnd.toNumber();
   const challenge = chainNow === null ? null : challengeState(challengeEnd, chainNow);
   const deadline = account.deadline.toNumber();
@@ -246,7 +267,10 @@ export function JobDetail({ jobAddress, escrowProgramId }: { jobAddress: string;
             )}
           </Row>
           <Row label="Paid to">
-            <Address value={account.agentWallet.toBase58()} label="agent wallet" />
+            <Address value={payee.wallet.toBase58()} label={payee.sold ? 'buyer' : 'agent wallet'} />
+            <span className="text-caption text-muted">
+              {payee.sold ? 'the buyer of the receivable' : 'the agent wallet'}
+            </span>
           </Row>
           <Row label="Deadline">
             <time dateTime={iso(deadline)}>{iso(deadline)}</time>
@@ -299,6 +323,17 @@ export function JobDetail({ jobAddress, escrowProgramId }: { jobAddress: string;
           )}
         </section>
       )}
+
+      <JobClaim
+        escrow={escrow}
+        jobKey={jobKey}
+        account={account}
+        claim={claim}
+        token={token}
+        formatAmount={formatAmount}
+        chainNow={chainNow}
+        revision={revision}
+      />
 
       {isAgent && (jobStatus === 'funded' || jobStatus === 'accepted') && (
         <section aria-labelledby="agent-heading" className="rounded-card border border-border bg-surface p-6">

@@ -10,7 +10,8 @@ Square'in web uygulaması: Next.js 16 (App Router), React 19, Tailwind CSS 4 ve 
 | `/app/agent` | Agent kaydı: kimlik, DID ve kayıt adresi tx'ten önce, kartın indirilip doğrulanması, `register_agent` (FE-05) |
 | `/app/did` | did:aip çözümü: kayıt zincirden, kart kendi adresinden; DID belgesi ve meta verisi. `?did=` ile paylaşılır (FE-05) |
 | `/app/jobs/new` | İş açma ve fonlama: agent, tutar, deadline, challenge süresi, politika bağlama, iş tanımı ve hash'i, iki tarafın screening'i, `create_job` + `fund_job` (FE-06) |
-| `/app/jobs/[job]` | İş detayı: zincirdeki job, event'lerden canlı zaman çizelgesi, zincir saatine göre challenge sayacı; agent cüzdanı için kabul ve teslim (FE-07) |
+| `/app/jobs/[job]` | İş detayı: zincirdeki job, event'lerden canlı zaman çizelgesi, zincir saatine göre challenge sayacı; agent cüzdanı için kabul ve teslim (FE-07); alacağın listelenmesi, geri çekilmesi ve onaylı alıcının alımı, payee (FE-08) |
+| `/app/claims` | Alacak piyasası: satıştaki alacaklar, fiyat, iskonto, kimin alabileceği (FE-08) |
 | `/design` | Bileşen kataloğu |
 | `/healthz` | Sağlık kontrolü (Railway) |
 
@@ -56,6 +57,7 @@ Institution rolündeki cüzdan için; `SQUARE_PROGRAM_ID_POLICY` gerekir, çünk
 | Commit | Zincirdeki Institution ve Policy hesapları okunur, taslakla karşılaştırılır; yalnızca farklı olan yazılır, tek tx'te ve bu sırayla: kurum yoksa `init_institution` (ad, en fazla 64 bayt), politika yoksa `set_policy`, varsa commitment ya da tavan değiştiyse `update_policy`, kök farklıysa `set_buyer_root`. Tx `useSendTransaction()` ile imzalanır; ücreti ve rent'i kurum cüzdanı öder. Kapalı politika güncellenmez; Squads multisig'e bağlı kurumun yetkilisi vault'tur, sayfa commit'i kapatır. square_policy hata kodu IDL'deki mesajıyla gösterilir. Hesaplar ağ doğrulanmadan okunmaz |
 | Sürüm | Taslağın `version`'ı zincirdeki `Policy.version`'ı izler (`PolicyDocument.version`); commitment sürümü içermez, güncelleme commitment'ı bozmaz |
 | Geçmiş | Politika hesabına dokunan son 20 işlemin loglarındaki event'ler (`PolicyCommitted`, `PolicyUpdated`, `BuyerRootCommitted`, `PolicyDeactivated`); indexer gerekmez |
+| Alıcı kanıtları | Zincirdeki `buyer_root` taslağın köküyle aynıysa her onaylı alıcı için kanıt dosyası indirilir (FE-08, aşağıda) |
 
 PDA'lar SDK'nın IDL seed'lerinden türetilir (`src/lib/idl-pda.ts`, SDK'nın `createPda`'sıyla aynı adresler; testli). Anchor yalnızca gerektiğinde yüklenir.
 
@@ -98,11 +100,24 @@ Herkese açık; eylemler bağlı cüzdana göre açılır. Yalnızca `SQUARE_PRO
 
 | Parça | Davranış |
 |---|---|
-| Job | Escrow `Job` hesabı: durum, tutar, kurum, agent (DID çözümüne bağlantı), ödeme cüzdanı, deadline, challenge süresi, politika ve sürümü, `spec_hash`, teslimde URI ve `work_hash` |
-| Zaman çizelgesi | Job hesabına dokunan son 50 işlemin loglarındaki escrow event'leri (`JobCreated` … `Finalized`, alacak ve uyuşmazlık event'leri), eskiden yeniye; yalnızca bu job'un ve escrow programının event'leri. Job adresini anan her onaylı işlemde job ve zaman çizelgesi yeniden okunur: log aboneliği (`onLogs`, WebSocket) anında bildirir; abonelik kurulamaz ya da koparsa job adresinin en yeni imzası 5 saniyede bir yoklanır (sekme görünürken). Aynı işlem ikisinden de gelirse bir kez okunur |
+| Job | Escrow `Job` hesabı: durum, tutar, kurum, agent (DID çözümüne bağlantı), ödeme cüzdanı (alacak satıldıysa alıcı, değilse agent cüzdanı), deadline, challenge süresi, politika ve sürümü, `spec_hash`, teslimde URI ve `work_hash` |
+| Zaman çizelgesi | Job hesabına ve alacak listelemesine (`["claim", job]`) dokunan son 50 işlemin loglarındaki escrow event'leri (`JobCreated` … `Finalized`, alacak ve uyuşmazlık event'leri), eskiden yeniye; yalnızca bu job'un ve escrow programının event'leri. Listelemenin geri çekilmesi (`cancel_claim`) yalnızca listelemeye dokunduğu için iki adres de izlenir. İki adresten birini anan her onaylı işlemde job, listeleme ve zaman çizelgesi yeniden okunur: log aboneliği (`onLogs`, WebSocket) anında bildirir; abonelik kurulamaz ya da koparsa iki adresin en yeni imzası 5 saniyede bir yoklanır (sekme görünürken). Aynı işlem ikisinden de gelirse bir kez okunur |
 | Challenge sayacı | `challenge_end` zincir saatine göre: Clock sysvar'ının `unix_timestamp`'i okunur (dakikada bir yeniden), aradaki saniyeler yerel saatle ilerler. Escrow'un kuralıyla `challenge_end`'te kapanır |
 | Agent | Bağlı cüzdan job'un `agent_wallet`'ıysa: fonlanmış işte `accept_job`; kabul edilmiş işte teslim dosyası tarayıcıda hash'lenir (SHA-256, SDK `workHash`; dosya yüklenmez), teslim URI'si en fazla 128 bayt, deadline'dan önce `submit_work`. Escrow hata kodu IDL'deki mesajıyla |
 | Ağ | Job, zaman çizelgesi, saat ve log aboneliği ağ doğrulanmadan açılmaz |
+
+## Alacak piyasası (FE-08)
+
+Agent, teslim edilmiş işin alacağını (release'teki ödemeyi alma hakkı) iskontolu satar; alıcı fiyatı hemen öder, release'te escrow'un neti ona gider ([ADR 0014](../../docs/decisions/0014-alacak-piyasasi-satici-ve-alici-kurallari.md)). Yalnızca `SQUARE_PROGRAM_ID_ESCROW` gerekir; registry ve policy kimlikleri escrow config'inden gelir.
+
+| Parça | Davranış |
+|---|---|
+| Piyasa (`/app/claims`) | Zincirdeki `Listed` listelemeler (`getProgramAccounts`, `status` baytına `memcmp`), işleri ve politikalarıyla; yalnızca satılabilir olanlar (iş `Delivered`, satıcı job'un güncel agent cüzdanı), en yeni önce. Fiyat, release'teki ödeme, iskonto, kimin alabileceği, release'in ispata bağlı olup olmadığı. Alım iş sayfasında |
+| Listeleme | İş sayfasında, bağlı cüzdan job'un `agent_wallet`'ı ve iş `Delivered`'sa: fiyat `0 < fiyat < yüz değer` (`InvalidClaimPrice`), iskonto gösterilir, `list_claim`. Satıcı `Listed` listelemeyi geri çeker (`cancel_claim`; rent ödeyene döner). Cüzdan rotasyonundan kalan eski listeleme satılamaz ve bunu gösterir |
+| Onaylı alıcılar | Kök alım anında politikanın güncel hâlinden okunur. Politikasız iş ve sıfır kök kısıtsızdır (kanıt gerekmez); politikalı işte kök sıfırken alıcıya risk gösterilir: kurumun politikası onu engelliyorsa release kuruma iade eder ve ödenen fiyat kaybolur |
+| Kanıt dosyası | `square-buyer-proof` v1 JSON: küme, politika, kök, alıcı, alıcının `leaf_salt`'ı ve Merkle kanıtı; diğer alıcıların salt'larını taşımaz. Kurum politika sayfasından indirir (liste zincirdekiyle aynıyken), alıcı iş sayfasında yükler. Dosya tarayıcıda zincirdeki güncel köke karşı denetlenir; başka cüzdanın, başka politikanın ya da kümenin dosyası ve eski listeden kalan dosya ayrı mesajla reddedilir, listede olmayan cüzdana "Your wallet is not on the institution's approved buyer list." |
+| Alım | Satıcı ve işi fonlayan kurum alamaz. Alıcının screening'i temiz ve taze, USDC bakiyesi fiyata yetiyor ve kanıt geçerliyse `buy_claim` (fiyat listelemeninki; öne geçme koruması). Escrow hata kodu IDL mesajıyla ve ne yapılacağıyla (`BuyerNotEligible`, screening kodları, `ClaimPriceChanged`) |
+| Payee | Alacak satıldıysa alıcı, değilse agent cüzdanı (SDK `payeeOf` ile aynı kural); iş sayfasında "Paid to" satırı canlı güncellenir |
 
 ## Tasarım sistemi
 

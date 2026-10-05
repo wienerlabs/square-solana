@@ -42,14 +42,14 @@ export function InstitutionPolicies({ owner, policyProgramId }: { owner: string;
         : null,
     [document, secret, draft],
   );
-  const buyerRoot = useMemo(
+  const buyerTree = useMemo(
     () =>
       draft && buyersValid
         ? buildBuyerTree(draft.buyers.map((b) => ({ buyer: new PublicKey(b.buyer), leafSalt: hexToBytes(b.leafSalt) })))
-            .root
         : null,
     [draft, buyersValid],
   );
+  const buyerRoot = buyerTree?.root ?? null;
   const { update } = workspace;
   const syncVersion = useCallback(
     (version: number) => {
@@ -120,7 +120,7 @@ export function InstitutionPolicies({ owner, policyProgramId }: { owner: string;
           policyProgramId={policyProgramId}
           policyId={draft.policyId}
           commitment={commitment}
-          buyerRoot={buyerRoot}
+          buyerTree={buyerTree}
           dailyCeiling={document ? BigInt(document.dailyCeiling) : null}
           draftVersion={draft.version}
           onChainVersion={syncVersion}

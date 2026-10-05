@@ -3,7 +3,9 @@
 import { useEffect, useId, useMemo, useState } from 'react';
 import { useConnection } from '@solana/wallet-adapter-react';
 import { PublicKey } from '@solana/web3.js';
+import type { BuyerTree } from '@squaresdk/solana-policy';
 import { useNetworkGuard, useSendTransaction } from '@/components/network-guard';
+import { useWebConfig } from '@/components/providers';
 import { Address } from '@/components/ui/address';
 import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/ui/status-badge';
@@ -22,6 +24,7 @@ import { institutionAddress, policyAddress } from '@/lib/idl-pda';
 import { bytesToHex, hexToBytes } from '@/lib/policy-draft';
 import { TransactionBlockedError } from '@/lib/send-transaction';
 import { useSignatureStatus } from '@/lib/use-signature-status';
+import { BuyerProofs } from './buyer-proofs';
 
 type Load<T> = { state: 'loading' } | { state: 'ready'; value: T } | { state: 'error'; message: string };
 
@@ -40,9 +43,9 @@ interface Props {
   owner: string;
   policyProgramId: string;
   policyId: string;
-  /** Taslağın commitment'ı ve kökü; kurallar ya da liste geçersizse null. */
+  /** Taslağın commitment'ı ve alıcı ağacı; kurallar ya da liste geçersizse null. */
   commitment: Uint8Array | null;
-  buyerRoot: Uint8Array | null;
+  buyerTree: BuyerTree | null;
   /** Public günlük tavan (taban birim); kurallar geçersizse null. */
   dailyCeiling: bigint | null;
   /** Taslak sürümü; zincirdekiyle aynı tutulur (`PolicyDocument.version`). */
@@ -52,7 +55,9 @@ interface Props {
 
 /** Taslağı zincire yazar ve zincirdeki politikayı, geçmişiyle, taslakla karşılaştırır. */
 export function PolicyCommit(props: Props) {
-  const { owner, policyProgramId, policyId, commitment, buyerRoot, dailyCeiling, draftVersion, onChainVersion } = props;
+  const { owner, policyProgramId, policyId, commitment, buyerTree, dailyCeiling, draftVersion, onChainVersion } = props;
+  const buyerRoot = buyerTree?.root ?? null;
+  const { cluster } = useWebConfig();
   const { connection } = useConnection();
   const guard = useNetworkGuard();
   const send = useSendTransaction();
@@ -201,6 +206,14 @@ export function PolicyCommit(props: Props) {
           ) : (
             <p className="text-sm text-muted">This policy is not on chain yet.</p>
           )}
+
+          {onChainPolicy &&
+            policyAccount &&
+            buyerTree &&
+            buyerTree.entries.length > 0 &&
+            equal(onChainPolicy.buyerRoot, buyerTree.root) && (
+              <BuyerProofs cluster={cluster} policy={policyAccount} tree={buyerTree} />
+            )}
 
           {needsInstitution && (
             <div className="flex flex-col gap-1.5">

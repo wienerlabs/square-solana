@@ -4,6 +4,7 @@
 import { BorshCoder, EventParser, type Idl } from '@anchor-lang/core';
 import { PublicKey, SYSVAR_CLOCK_PUBKEY, type Connection } from '@solana/web3.js';
 import { SQUARE_IDLS, workHash } from '@squaresdk/solana-sdk';
+import { formatDiscount } from './claim-market';
 
 /** `Job.delivery_uri` üst sınırı (square_escrow `DELIVERY_URI_MAX_LEN`, `DeliveryUriTooLong`). */
 export const MAX_DELIVERY_URI_BYTES = 128;
@@ -42,20 +43,36 @@ export interface TimelineEntry {
 
 export interface JobTimeline {
   entries: TimelineEntry[];
-  /** Job adresine dokunan en yeni işlem (başarısızlar dahil); okunan durum bu imzaya kadardır. İşlem yoksa null. */
-  newestSignature: string | null;
+  /**
+   * İzlenen her adrese dokunan en yeni işlem (başarısızlar dahil), adrese göre; okunan durum bu imzalara
+   * kadardır. İşlem yoksa null.
+   */
+  newest: ReadonlyMap<string, string | null>;
 }
 
-/** Job hesabına dokunan son işlemlerin event'leri, eskiden yeniye. */
+/**
+ * Job'un zaman çizelgesi, eskiden yeniye: job hesabına ve alacak listelemesine dokunan son işlemlerin
+ * event'leri. Listelemenin geri çekilmesi (`cancel_claim`) job hesabına dokunmaz, yalnızca listelemeye.
+ */
 export async function readJobTimeline(
   connection: Connection,
   escrowProgramId: PublicKey,
   job: PublicKey,
+  claimListing: PublicKey,
 ): Promise<JobTimeline> {
-  const signatures = await connection.getSignaturesForAddress(job, { limit: TIMELINE_LIMIT }, 'confirmed');
-  const newestSignature = signatures[0]?.signature ?? null;
-  const ok = signatures.filter((s) => s.err === null).reverse();
-  if (ok.length === 0) return { entries: [], newestSignature };
+  const watched = [job, claimListing];
+  const lists = await Promise.all(
+    watched.map((address) => connection.getSignaturesForAddress(address, { limit: TIMELINE_LIMIT }, 'confirmed')),
+  );
+  const newest = new Map(watched.map((address, i) => [address.toBase58(), lists[i]![0]?.signature ?? null]));
+  // İki listede de geçen işlem bir kez sayılır; listeler yeniden eskiye, sıralama aynı slot içinde bunu korur.
+  const unique = new Map(lists.flat().map((s) => [s.signature, s]));
+  const ok = [...unique.values()]
+    .filter((s) => s.err === null)
+    .sort((a, b) => b.slot - a.slot)
+    .slice(0, TIMELINE_LIMIT)
+    .reverse();
+  if (ok.length === 0) return { entries: [], newest };
   const transactions = await connection.getTransactions(
     ok.map((s) => s.signature),
     { commitment: 'confirmed', maxSupportedTransactionVersion: 0 },
@@ -68,35 +85,38 @@ export async function readJobTimeline(
       event,
     })),
   );
-  return { entries, newestSignature };
+  return { entries, newest };
 }
 
-/** Job adresine dokunan en yeni işlemin imzası; işlem yoksa null. */
-export async function readNewestSignature(connection: Connection, job: PublicKey): Promise<string | null> {
-  const [newest] = await connection.getSignaturesForAddress(job, { limit: 1 }, 'confirmed');
+/** Adrese dokunan en yeni işlemin imzası; işlem yoksa null. */
+export async function readNewestSignature(connection: Connection, address: PublicKey): Promise<string | null> {
+  const [newest] = await connection.getSignaturesForAddress(address, { limit: 1 }, 'confirmed');
   return newest?.signature ?? null;
 }
 
 /**
- * Job adresinin en son görülen imzası. Log aboneliği, yoklama ve okunan zaman çizelgesi aynı imzayı
- * bildirir; `observe` yalnızca daha önce görülmemiş bir imzada true döner, böylece aynı değişiklik iki
- * kez okunmaz. Okunan durum bilinmeden (`known` false) yoklama karşılaştırma yapmaz.
+ * İzlenen adreslerin (job ve alacak listelemesi) en son görülen imzaları. Log aboneliği, yoklama ve okunan
+ * zaman çizelgesi aynı imzayı bildirir; `observe` yalnızca o adreste daha önce görülmemiş bir imzada true
+ * döner, böylece aynı değişiklik iki kez okunmaz. Okunan durum bilinmeden (`known` false) yoklama
+ * karşılaştırma yapmaz.
  */
 export class SignatureTracker {
-  private seen: string | null | undefined;
+  private readonly seen = new Map<string, string | null>();
+
+  constructor(private readonly addresses: readonly string[]) {}
 
   get known(): boolean {
-    return this.seen !== undefined;
+    return this.addresses.every((address) => this.seen.has(address));
   }
 
-  /** Okunan durumun dayandığı en yeni imza. */
-  baseline(signature: string | null): void {
-    this.seen = signature;
+  /** Okunan durumun dayandığı en yeni imzalar. */
+  baseline(newest: ReadonlyMap<string, string | null>): void {
+    for (const [address, signature] of newest) this.seen.set(address, signature);
   }
 
-  observe(signature: string | null): boolean {
-    if (signature === this.seen) return false;
-    this.seen = signature;
+  observe(address: string, signature: string | null): boolean {
+    if (this.seen.get(address) === signature) return false;
+    this.seen.set(address, signature);
     return true;
   }
 }
@@ -120,7 +140,10 @@ export function describeJobEvent(
     case 'WorkSubmitted':
       return { title: 'Work delivered', detail: str(d.delivery_uri) };
     case 'ClaimListed':
-      return { title: 'Receivable listed', detail: `for ${formatAmount(num(d.price))}` };
+      return {
+        title: 'Receivable listed',
+        detail: `for ${formatAmount(num(d.price))}, ${formatDiscount(num(d.price), num(d.face_value))} below its face value`,
+      };
     case 'ClaimBought':
       return { title: 'Receivable sold', detail: `to ${str(d.buyer)} for ${formatAmount(num(d.price))}` };
     case 'ClaimCancelled':

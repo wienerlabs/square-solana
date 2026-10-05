@@ -39,3 +39,7 @@ export function agentRecordAddress(registryProgramId: PublicKey, creator: Public
   if (id.length === 0 || id.length > 32) throw new Error(`agentId must be 1-32 bytes, got ${id.length}`);
   return find(registryProgramId, [seed('registry', 'AGENT_SEED'), creator.toBytes(), id]);
 }
+
+/** square_escrow `ClaimListing`: `["claim", job]`; job başına tek listeleme. */
+export const claimListingAddress = (escrowProgramId: PublicKey, job: PublicKey) =>
+  find(escrowProgramId, [seed('escrow', 'CLAIM_SEED'), job.toBytes()]);
