@@ -21,7 +21,7 @@ npm run fetch-ptau                     # PPoT katkı 80, 2^14 (~19 MB), sha256 v
 npm test                               # 52 test; tamper testleri gerçek Groth16 ispatı üretir
 npm run inputs                         # test-inputs/'u yeniden üretir (--check: güncel mi)
 npm run artifacts:check                # release artefaktlarını yeniden üretip karşılaştırır (Node 24)
-npm run program-proofs                 # square_verifier testlerinin gerçek ispatları (--check: geçerli mi)
+npm run program-proofs                 # program testlerinin gerçek ispatları (--squads: yalnızca BC-35'inki; --check: geçerli mi)
 scripts/clean-room.sh check            # aynısı, commit'lenmiş HEAD'in Docker'daki temiz klonunda
 ```
 
@@ -38,7 +38,7 @@ scripts/clean-room.sh check            # aynısı, commit'lenmiş HEAD'in Docker
 | `scripts/fetch-ptau.mjs` | Sabitlenmiş PPoT dosyasını indirir ve hash'ini doğrular |
 | `scripts/build.mjs` | `payment.circom` ve iki zaman damgası test devresini derler, kısıt sayısını yazar |
 | `scripts/release-artifacts.mjs` | Release artefakt hattı: `setup`, `check`, `write` (aşağıda) |
-| `scripts/program-proofs.mjs` | `tests/programs/tests/fixtures/release-proofs.json`: verifier'ın program testleri (BC-21) için yedi senaryonun gerçek ispatı (uyumlu, ret, alıcıya, başka mint, başka politika, ikinci job, güncel sayaç). Senaryolar `release-input.mjs`'in test dünyasında kurulur; testler aynı etiketlerden aynı anahtarları türetir. `--check` her ispatı doğrulama anahtarına ve yeniden hesaplanan sinyallere karşı doğrular |
+| `scripts/program-proofs.mjs` | `tests/programs/tests/fixtures/release-proofs.json`: verifier'ın program testleri (BC-21) için yedi senaryonun gerçek ispatı (uyumlu, ret, alıcıya, başka mint, başka politika, ikinci job, güncel sayaç). Senaryolar `release-input.mjs`'in test dünyasında kurulur; testler aynı etiketlerden aynı anahtarları türetir. Ayrıca `tests/programs/tests/fixtures/squads-proofs.json`: Squads vault'larıyla sekiz adım (BC-35); kurum, agent ve alıcı vault'u etiketlerden türetilen multisig adreslerinden, ispat alıcı vault'una ödeyen uyumlu release (`--squads` yalnızca bunu yazar). `--check` iki fikstürdeki her ispatı doğrulama anahtarına ve yeniden hesaplanan sinyallere karşı doğrular |
 | `scripts/clean-room.sh` | Hattı Docker'da temiz klonla çalıştırır (Node `.nvmrc`, circom 2.2.3 resmi ikilisi, sha256 doğrulanır) |
 | `scripts/groth16-solana.mjs`, `scripts/extract-vk-rust.mjs` | snarkjs → groth16-solana bayt düzeni; doğrulama anahtarı → Rust sabiti |
 | `artifacts/` | Release zkey'i, doğrulama anahtarı ve manifest (BC-20) |
