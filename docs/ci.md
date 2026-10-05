@@ -99,6 +99,21 @@ açık değil. Kural yazılıdır ve her merge'de uygulanır:
    geçmişini bozar.
 4. main'e doğrudan push edilmez.
 
+**Geçici istisna (2026-10-05'ten, Actions açılana kadar):** GitHub Actions işleri hesabın ödeme ve harcama
+limiti yüzünden başlamıyor ("The job was not started because recent account payments have failed or your
+spending limit needs to be increased"). Bu sürede 1. madde yerine PR'ın son commit'inde, main'le
+birleştirilmiş hâlinde şu kontroller yerelde yeşil olmalı ve PR'a yazılmalı:
+
+- `validate_repo`: `cargo build`, `anchor build`, `pnpm install --frozen-lockfile`, `pnpm turbo build`,
+  `cargo clippy`, gitleaks.
+- Program iş akışının adımları: `toolchain.mjs`, `rust-lint.mjs`, `idl-conformance.mjs`,
+  `cargo test --workspace --locked` ve program testleri.
+- `pnpm turbo run test`, `pnpm lint`, `pnpm license:check`, `pnpm contract:check`,
+  `node --test "scripts/**/*.test.mjs"`, `pnpm secrets:scan`.
+- Devreye dokunan PR'da `program-proofs.mjs --check`.
+
+Actions açılınca bu dönemde main'e giren commit'lerin iş akışları main'de bir kez koşturulur.
+
 Zorunlu kontroller açılabildiğinde (ücretli plan ya da public depo) her PR'da koşan `ci-ok`,
 `api-sdk-contract`, `Lisans envanteri` ve `Sır taraması (gitleaks)` doğrudan zorunlu yapılabilir. Yol
 filtreli `Programs` ve `Circuits` için GitHub, koşmayan bir zorunlu kontrolü sonsuza kadar bekler; onlar ya
