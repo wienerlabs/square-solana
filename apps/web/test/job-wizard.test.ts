@@ -1,20 +1,25 @@
 // İş açma ve fonlama (FE-06): agent başvurusu (DID ya da adres), iş tanımının kanonik biçimi ve hash'i,
 // süre ve deadline denetimi, screening kuralı ve ret açıklamaları. Ağ kullanılmaz; gerçek programlara
 // karşı create + fund PR açıklamasındaki yerel validator denemesindedir.
-import { Keypair } from '@solana/web3.js';
+import BN from 'bn.js';
+import { Connection, Keypair, type AccountInfo } from '@solana/web3.js';
 import { squareIdentity } from '@squaresdk/solana-identity';
 import { CHAIN_REFS } from '@squaresdk/solana-identity/constants';
-import { SQUARE_IDLS, specHashing } from '@squaresdk/solana-sdk';
+import { createSquareClient, SQUARE_IDLS, specHashing } from '@squaresdk/solana-sdk';
 import { describe, expect, it } from 'vitest';
 import {
+  decodeRegistryAccount,
   escrowErrorMessage,
   formatDuration,
   parseAgentRef,
   parseChallengePeriod,
   parseDeadline,
   parseSpec,
+  readAgent,
+  readScreening,
   screeningBlock,
   screeningState,
+  type EscrowSetup,
   type ScreeningState,
 } from '@/lib/job-wizard';
 
@@ -154,5 +159,70 @@ describe('sanctions screening', () => {
       `${entry(6005).msg} (${entry(6005).name}, 6005)`,
     );
     expect(escrowErrorMessage(new Error('Blockhash not found'))).toBeNull();
+  });
+});
+
+describe('registry accounts', () => {
+  // RPC yerelde dinlenmeyen bir adres: istemci kurulurken ağa gidilmez, okuma ağ hatası verir.
+  const client = createSquareClient({
+    connection: new Connection('http://127.0.0.1:9'),
+    commitment: 'confirmed',
+    programIds: { registry: registryProgram, policy: key(), verifier: key(), escrow: key() },
+  });
+  const setup: EscrowSetup = {
+    client,
+    registryProgram,
+    policyProgram: key(),
+    minChallengePeriod: 60n,
+    maxChallengePeriod: 604_800n,
+    travelRuleThreshold: 0n,
+  };
+  const coder = client.registry.program.coder.accounts;
+  const wallet = key();
+  const account = (data: Buffer, owner = registryProgram): AccountInfo<Buffer> => ({
+    data,
+    owner,
+    lamports: 1_000_000,
+    executable: false,
+  });
+
+  it('decodes the account read once, and only as its own kind', async () => {
+    const agentData = await coder.encode('agentRecord', {
+      creator: wallet,
+      owner: wallet,
+      wallet,
+      agentCardHash: Array(32).fill(0),
+      status: { active: {} },
+      registeredAt: new BN(NOW),
+      updatedAt: new BN(NOW),
+      bump: 255,
+      agentId: 'alpha-01',
+      agentCardUri: '',
+    });
+    const decoded = decodeRegistryAccount(setup, 'agentRecord', account(agentData));
+    expect(decoded?.agentId).toBe('alpha-01');
+    expect(decoded?.wallet.equals(wallet)).toBe(true);
+
+    // Başka programın hesabı, başka türde hesap ya da hesap yok: kayıt yok.
+    expect(decodeRegistryAccount(setup, 'agentRecord', account(agentData, key()))).toBeNull();
+    expect(decodeRegistryAccount(setup, 'screeningRecord', account(agentData))).toBeNull();
+    expect(decodeRegistryAccount(setup, 'agentRecord', null)).toBeNull();
+
+    const screeningData = await coder.encode('screeningRecord', {
+      wallet,
+      status: { flagged: {} },
+      sourceHash: Array(32).fill(5),
+      screenedAt: new BN(NOW - 60),
+      expiresAt: new BN(NOW + 3_600),
+      bump: 254,
+    });
+    const screening = decodeRegistryAccount(setup, 'screeningRecord', account(screeningData));
+    expect(screening && 'flagged' in screening.status).toBe(true);
+    expect(decodeRegistryAccount(setup, 'agentRecord', account(screeningData))).toBeNull();
+  });
+
+  it('reports a network failure instead of a missing record', async () => {
+    await expect(readAgent(setup, key())).rejects.toThrow();
+    await expect(readScreening(setup, wallet, NOW)).rejects.toThrow();
   });
 });
