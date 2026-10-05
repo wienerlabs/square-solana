@@ -9,6 +9,8 @@
 //! - [`squads`]: Squads v4 multisig hesabı ve vault imzacısı.
 //! - [`event`] / [`events`]: işlem loglarından Anchor event'lerini (`emit!`) çözer.
 //! - [`Executed::compute_units`]: compute unit ölçümü; [`cu`] bütçe denetimi ve rapor satırı.
+//! - [`Harness::v0_transaction`], [`Harness::create_lookup_table`], [`wire_size`]: v0 işlemi, address
+//!   lookup table'ı ve işlemin tel boyutu (BC-28).
 
 pub mod squads;
 pub mod token;
@@ -20,12 +22,16 @@ use anchor_lang::solana_program::instruction::Instruction;
 use anchor_lang::AccountDeserialize;
 use litesvm::LiteSVM;
 use solana_account::Account;
+use solana_address_lookup_table_interface::instruction::{
+    create_lookup_table, extend_lookup_table,
+};
 use solana_instruction_error::InstructionError;
 use solana_keypair::Keypair;
 use solana_loader_v3_interface::state::UpgradeableLoaderState;
-use solana_message::{Message, VersionedMessage};
+use solana_message::{v0, AddressLookupTableAccount, Message, VersionedMessage};
 use solana_signature::Signature;
 use solana_signer::Signer;
+use solana_slot_hashes::SlotHashes;
 use solana_transaction::versioned::VersionedTransaction;
 use solana_transaction_error::TransactionError;
 
@@ -217,6 +223,62 @@ impl Harness {
         self.submit(tx)
     }
 
+    /// İmzalanmış v0 işlemi (gönderilmez): ücreti `payer` öder, `tables`'taki adresler lookup ile, diğerleri
+    /// statik anahtar olarak yüklenir. Taze blockhash'le kurulur.
+    pub fn v0_transaction(
+        &mut self,
+        instructions: &[Instruction],
+        signers: &[&Keypair],
+        tables: &[AddressLookupTableAccount],
+    ) -> VersionedTransaction {
+        self.svm.expire_blockhash();
+        let message = v0::Message::try_compile(
+            &self.payer.pubkey(),
+            instructions,
+            tables,
+            self.svm.latest_blockhash(),
+        )
+        .expect("v0 mesajı derlenemedi");
+        let mut all: Vec<&Keypair> = vec![&self.payer];
+        all.extend(
+            signers
+                .iter()
+                .copied()
+                .filter(|s| s.pubkey() != self.payer.pubkey()),
+        );
+        VersionedTransaction::try_new(VersionedMessage::V0(message), &all)
+            .expect("işlem imzalanamadı")
+    }
+
+    /// Hazır (imzalanmış) işlemi gönderir.
+    pub fn send_transaction(&mut self, tx: VersionedTransaction) -> Outcome {
+        self.submit(tx)
+    }
+
+    /// Address lookup table'ı ALT programının kendi talimatlarıyla açar ve `addresses` ile doldurur
+    /// (yetkili ve ödeyen `payer`). Bir slotta eklenen adresler sonraki slottan itibaren kullanılabildiği
+    /// için saat bir slot ilerletilir.
+    pub fn create_lookup_table(&mut self, addresses: &[Pubkey]) -> AddressLookupTableAccount {
+        let recent_slot = self
+            .svm
+            .get_sysvar::<SlotHashes>()
+            .first()
+            .map(|(slot, _)| *slot)
+            .expect("SlotHashes boş");
+        let payer = self.payer.pubkey();
+        let (create, key) = create_lookup_table(payer, payer, recent_slot);
+        let extend = extend_lookup_table(key, payer, Some(payer), addresses.to_vec());
+        self.send(&[create, extend], &[])
+            .expect("address lookup table kurulamadı");
+        let mut clock = self.svm.get_sysvar::<anchor_lang::prelude::Clock>();
+        clock.slot += 1;
+        self.svm.set_sysvar(&clock);
+        AddressLookupTableAccount {
+            key,
+            addresses: addresses.to_vec(),
+        }
+    }
+
     fn submit(&mut self, tx: VersionedTransaction) -> Outcome {
         match self.svm.send_transaction(tx) {
             Ok(meta) => Ok(Executed {
@@ -304,6 +366,27 @@ fn write_upgrade_authority(data: &mut [u8], authority: Pubkey) {
     );
     data[12] = 1;
     data[13..45].copy_from_slice(authority.as_ref());
+}
+
+/// Ağ paketinin veri sınırı: bir işlemin tel boyutu bunu aşamaz.
+pub const PACKET_DATA_SIZE: usize = 1232;
+
+/// İşlemin tel boyutu (bayt): imza sayısı (kısa vektör), imzalar ve sürümlü mesaj.
+pub fn wire_size(tx: &VersionedTransaction) -> usize {
+    let signatures = tx.signatures.len();
+    let prefix = match signatures {
+        0..=0x7f => 1,
+        0x80..=0x3fff => 2,
+        _ => 3,
+    };
+    prefix + 64 * signatures + tx.message.serialize().len()
+}
+
+/// İşlemin compute unit fiyatı (micro-lamport / CU; öncelik ücreti).
+pub fn compute_unit_price(micro_lamports: u64) -> Instruction {
+    solana_compute_budget_interface::ComputeBudgetInstruction::set_compute_unit_price(
+        micro_lamports,
+    )
 }
 
 /// İşlemin compute unit sınırı (ComputeBudget programı). Varsayılan talimat başına 200 000'dir; Groth16

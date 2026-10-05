@@ -17,7 +17,7 @@ use square_escrow::state::{EscrowConfig, Job};
 use square_escrow::{EscrowParams, LinkedPrograms};
 use square_program_tests::token::{self, TOKEN_PROGRAM_ID};
 use square_program_tests::{programdata_address, Harness, Outcome};
-use square_registry::{AgentStatus, ScreeningStatus};
+use square_registry::ScreeningStatus;
 
 pub const NOW: i64 = 1_790_000_000;
 pub const HOUR: i64 = 3_600;
@@ -35,6 +35,7 @@ pub const POLICY_ID: [u8; 32] = [7; 32];
 const LAMPORTS: u64 = 1_000_000_000;
 
 mod claims;
+mod parties;
 // Alacak yardımcılarını kullanmayan test binary'leri de bu modülü içerir.
 #[allow(unused_imports)]
 pub use claims::*;
@@ -98,6 +99,10 @@ pub fn escrow_authority_address() -> Pubkey {
 
 pub fn verifier_config_address() -> Pubkey {
     Pubkey::find_program_address(&[VERIFIER_CONFIG_SEED], &square_verifier::ID).0
+}
+
+pub fn registry_config_address() -> Pubkey {
+    Pubkey::find_program_address(&[REGISTRY_CONFIG_SEED], &square_registry::ID).0
 }
 
 pub fn screening_address(wallet: &Pubkey) -> Pubkey {
@@ -191,8 +196,7 @@ impl World {
         h.set_time(NOW);
 
         let screener = Keypair::new();
-        let registry_config =
-            Pubkey::find_program_address(&[REGISTRY_CONFIG_SEED], &square_registry::ID).0;
+        let registry_config = registry_config_address();
         let ix = Instruction {
             program_id: square_registry::ID,
             accounts: square_registry::accounts::InitRegistryConfig {
@@ -297,197 +301,6 @@ impl World {
 
     pub fn balance(&self, token_account: &Pubkey) -> Option<u64> {
         token::balance(&self.h, token_account)
-    }
-
-    // ------------------------------------------------------------------ registry ve policy
-
-    pub fn register_agent(&mut self, agent_id: &str) -> Agent {
-        self.register_agent_with_wallet(agent_id, Keypair::new())
-    }
-
-    pub fn register_agent_with_wallet(&mut self, agent_id: &str, wallet: Keypair) -> Agent {
-        let owner = self.h.funded(LAMPORTS);
-        let record = agent_record_address(&owner.pubkey(), agent_id);
-        let ix = Instruction {
-            program_id: square_registry::ID,
-            accounts: square_registry::accounts::RegisterAgent {
-                payer: self.h.payer.pubkey(),
-                owner: owner.pubkey(),
-                agent_record: record,
-                system_program: anchor_lang::system_program::ID,
-            }
-            .to_account_metas(None),
-            data: square_registry::instruction::RegisterAgent {
-                agent_id: agent_id.to_string(),
-                agent_card_uri: String::new(),
-                agent_card_hash: [0; 32],
-                wallet: wallet.pubkey(),
-            }
-            .data(),
-        };
-        self.h.send(&[ix], &[&owner]).expect("register_agent");
-        Agent {
-            owner,
-            wallet,
-            record,
-        }
-    }
-
-    pub fn set_agent_status(&mut self, agent: &Agent, status: AgentStatus) -> Outcome {
-        let ix = Instruction {
-            program_id: square_registry::ID,
-            accounts: square_registry::accounts::SetAgentStatus {
-                owner: agent.owner.pubkey(),
-                agent_record: agent.record,
-            }
-            .to_account_metas(None),
-            data: square_registry::instruction::SetAgentStatus { status }.data(),
-        };
-        self.h.send(&[ix], &[&agent.owner])
-    }
-
-    pub fn deregister_agent(&mut self, agent: &Agent) -> Outcome {
-        let ix = Instruction {
-            program_id: square_registry::ID,
-            accounts: square_registry::accounts::DeregisterAgent {
-                owner: agent.owner.pubkey(),
-                agent_record: agent.record,
-            }
-            .to_account_metas(None),
-            data: square_registry::instruction::DeregisterAgent {}.data(),
-        };
-        self.h.send(&[ix], &[&agent.owner])
-    }
-
-    /// Kaydın cüzdanını değiştirir (registry `update_agent`).
-    pub fn rotate_wallet(&mut self, agent: &Agent, wallet: Pubkey) -> Outcome {
-        let ix = Instruction {
-            program_id: square_registry::ID,
-            accounts: square_registry::accounts::UpdateAgent {
-                owner: agent.owner.pubkey(),
-                agent_record: agent.record,
-            }
-            .to_account_metas(None),
-            data: square_registry::instruction::UpdateAgent {
-                agent_card_uri: String::new(),
-                agent_card_hash: [0; 32],
-                wallet,
-            }
-            .data(),
-        };
-        self.h.send(&[ix], &[&agent.owner])
-    }
-
-    pub fn screen(&mut self, wallet: &Pubkey, status: ScreeningStatus) {
-        let registry_config =
-            Pubkey::find_program_address(&[REGISTRY_CONFIG_SEED], &square_registry::ID).0;
-        let ix = Instruction {
-            program_id: square_registry::ID,
-            accounts: square_registry::accounts::RecordScreening {
-                payer: self.h.payer.pubkey(),
-                screener_authority: self.screener.pubkey(),
-                config: registry_config,
-                screening_record: screening_address(wallet),
-                system_program: anchor_lang::system_program::ID,
-            }
-            .to_account_metas(None),
-            data: square_registry::instruction::RecordScreening {
-                wallet: *wallet,
-                status,
-                source_hash: [0x5c; 32],
-            }
-            .data(),
-        };
-        let screener = self.screener.insecure_clone();
-        self.h.send(&[ix], &[&screener]).expect("record_screening");
-    }
-
-    /// `amount` USDC'si olan kurum cüzdanı.
-    pub fn institution(&mut self, amount: u64) -> Institution {
-        self.institution_with(Keypair::new(), amount)
-    }
-
-    pub fn institution_with(&mut self, key: Keypair, amount: u64) -> Institution {
-        let token_account = token::create_ata(&mut self.h, &key.pubkey(), &self.usdc);
-        let mint_authority = self.mint_authority.insecure_clone();
-        token::mint_to(
-            &mut self.h,
-            &self.usdc,
-            &mint_authority,
-            &token_account,
-            amount,
-        );
-        Institution { key, token_account }
-    }
-
-    /// `owner` için square_policy kurumu ve `policy_id` politikası.
-    pub fn policy(&mut self, owner: &Keypair, policy_id: [u8; 32]) -> PolicyAccounts {
-        self.policy_with(owner, policy_id, COMMITMENT, CEILING)
-    }
-
-    pub fn policy_with(
-        &mut self,
-        owner: &Keypair,
-        policy_id: [u8; 32],
-        commitment: [u8; 32],
-        daily_ceiling: u64,
-    ) -> PolicyAccounts {
-        let institution = institution_address(&owner.pubkey());
-        let init = Instruction {
-            program_id: square_policy::ID,
-            accounts: square_policy::accounts::InitInstitution {
-                payer: self.h.payer.pubkey(),
-                authority: owner.pubkey(),
-                institution,
-                system_program: anchor_lang::system_program::ID,
-            }
-            .to_account_metas(None),
-            data: square_policy::instruction::InitInstitution {
-                name: "Research procurement".to_string(),
-            }
-            .data(),
-        };
-        self.h.send(&[init], &[owner]).expect("init_institution");
-        let policy = policy_address(&institution, &policy_id);
-        let set = self.set_policy_ix(
-            &owner.pubkey(),
-            institution,
-            policy_id,
-            commitment,
-            daily_ceiling,
-        );
-        self.h.send(&[set], &[owner]).expect("set_policy");
-        PolicyAccounts {
-            policy,
-            institution,
-        }
-    }
-
-    pub fn set_policy_ix(
-        &self,
-        authority: &Pubkey,
-        institution: Pubkey,
-        policy_id: [u8; 32],
-        commitment: [u8; 32],
-        daily_ceiling: u64,
-    ) -> Instruction {
-        Instruction {
-            program_id: square_policy::ID,
-            accounts: square_policy::accounts::SetPolicy {
-                payer: self.h.payer.pubkey(),
-                authority: *authority,
-                institution,
-                policy: policy_address(&institution, &policy_id),
-                system_program: anchor_lang::system_program::ID,
-            }
-            .to_account_metas(None),
-            data: square_policy::instruction::SetPolicy {
-                policy_id,
-                commitment,
-                daily_ceiling,
-            }
-            .data(),
-        }
     }
 
     // ------------------------------------------------------------------ escrow

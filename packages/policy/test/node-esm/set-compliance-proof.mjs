@@ -33,7 +33,10 @@ const { transaction } = await buildSetComplianceProofTx(
   { authority: key(5), institution: key(6), policy: key(7), job: key(8), proof },
   { feePayer: key(5) },
 );
-const [ix] = transaction.message.compiledInstructions;
+// İlk talimat profilin compute unit sınırı (BC-28); verifier talimatı programına göre bulunur.
+const keys = transaction.message.staticAccountKeys;
+const verifier = client.verifier.program.programId;
+const ix = transaction.message.compiledInstructions.find((i) => keys[i.programIdIndex].equals(verifier));
 const decoded = client.verifier.program.coder.instruction.decode(Buffer.from(ix.data));
 assert.ok(decoded);
 assert.equal(decoded.name, 'setComplianceProof');

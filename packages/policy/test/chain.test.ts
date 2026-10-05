@@ -1,7 +1,7 @@
 // Zincirden witness, set_compliance_proof tx'i, uzak prover ve ispat tazeleme izleyicisi.
 import { BN, type BorshInstructionCoder } from '@anchor-lang/core';
-import { Keypair } from '@solana/web3.js';
-import type { BuiltTx } from '@squaresdk/solana-sdk';
+import { ComputeBudgetProgram, Keypair } from '@solana/web3.js';
+import { TX_COMPUTE_UNIT_LIMITS, type BuiltTx } from '@squaresdk/solana-sdk';
 import type { ProveResponse } from '@squaresdk/solana-types';
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { createRemoteProver, type Prover } from '../src/prover.js';
@@ -103,7 +103,12 @@ function decodeComplianceTx(tx: BuiltTx) {
   const decoded = (program.coder.instruction as BorshInstructionCoder).decode(Buffer.from(ix.data))!;
   const def = program.idl.instructions.find((i) => i.name === decoded.name)!;
   const accounts = Object.fromEntries(def.accounts.map((a, i) => [a.name, keys[ix.accountKeyIndexes[i]!]!.toBase58()]));
-  return { name: decoded.name, args: decoded.data as Record<string, unknown>, accounts };
+  // `SetComputeUnitLimit` (ComputeBudget talimatı 2, u32).
+  const budget = message.compiledInstructions.find(
+    (i) => keys[i.programIdIndex]!.equals(ComputeBudgetProgram.programId) && i.data[0] === 2,
+  );
+  const computeUnitLimit = budget ? Buffer.from(budget.data).readUInt32LE(1) : undefined;
+  return { name: decoded.name, args: decoded.data as Record<string, unknown>, accounts, computeUnitLimit };
 }
 
 describe('buildSetComplianceProofTx', () => {
@@ -114,8 +119,10 @@ describe('buildSetComplianceProofTx', () => {
       { authority, institution: world.institution, policy: policyAccount, job: world.job, proof },
       { feePayer },
     );
-    const { name, args, accounts } = decodeComplianceTx(tx);
+    const { name, args, accounts, computeUnitLimit } = decodeComplianceTx(tx);
     expect(name).toBe('setComplianceProof');
+    // Groth16 doğrulaması talimat başına varsayılan 200 bine yakın: sınır profilden (BC-28).
+    expect(computeUnitLimit).toBe(TX_COMPUTE_UNIT_LIMITS.setComplianceProof);
     expect(args.refusalCode).toBe(0);
     expect((args.netAmount as BN).toString()).toBe('25000000');
     expect((args.proofTimestamp as BN).toNumber()).toBe(TIMESTAMP);

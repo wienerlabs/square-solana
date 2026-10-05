@@ -11,6 +11,8 @@ on:
       - 'crates/**'
       - 'idl/**'
       - 'tests/programs/**'
+      # İşlem bütçesi testi (tx_budget.rs) SDK'nın profilini okur (BC-28).
+      - 'packages/sdk/src/tx-profile.json'
       - 'Anchor.toml'
       - 'Cargo.toml'
       - 'Cargo.lock'
@@ -29,6 +31,8 @@ on:
       - 'crates/**'
       - 'idl/**'
       - 'tests/programs/**'
+      # İşlem bütçesi testi (tx_budget.rs) SDK'nın profilini okur (BC-28).
+      - 'packages/sdk/src/tx-profile.json'
       - 'Anchor.toml'
       - 'Cargo.toml'
       - 'Cargo.lock'

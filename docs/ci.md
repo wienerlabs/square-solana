@@ -16,7 +16,7 @@ PR sayfasında görünen ad, iş akışındaki işin adıdır.
 | `contract` | `api-sdk-contract` | her PR, main | IDL'den türetilen dosyalar (`packages/types`, SDK IDL kopyaları, `docs/api/schemas`) `idl/` ile güncel: `pnpm contract:check` (BE-35) |
 | `License` | Lisans envanteri | her PR, main | Bağımlılık lisansları ve `docs/THIRD_PARTY_LICENSES.md` güncel (BC-02) |
 | `Security` | Sır taraması (gitleaks) | her PR, main, haftalık | Bütün git geçmişinde sır; kuralların testleri (BC-13) |
-| `Programs` | SBF derleme ve program testleri | programları, crate'leri, IDL'leri, Rust araç dosyalarını ya da bu iş akışının betiklerini değiştiren PR, main | Araç sürümleri, `cargo fmt`, `anchor build`, program IDL'lerinin sözleşmeyle uyumu, `cargo clippy`, birim testleri, `anchor test` (LiteSVM) (BC-12, BC-13) |
+| `Programs` | SBF derleme ve program testleri | programları, crate'leri, IDL'leri, Rust araç dosyalarını, SDK'nın işlem profilini (`packages/sdk/src/tx-profile.json`) ya da bu iş akışının betiklerini değiştiren PR, main | Araç sürümleri, `cargo fmt`, `anchor build`, program IDL'lerinin sözleşmeyle uyumu, `cargo clippy`, birim testleri, `anchor test` (LiteSVM; işlem bütçesi dahil, BC-28) (BC-12, BC-13) |
 | `Circuits` | Devre derlemesi, testleri ve release artefaktları | `circuits/` ya da verifier'ın VK dosyalarını değiştiren PR, main | circom 2.2.3 derlemesi, devre testleri (atlamasız), test girdileri ve release artefaktları güncel (BC-13) |
 | `Verifiable build` | Verifiable build (solana-verify) | main'de programları etkileyen push; elle; PR'da yalnızca kendi dosyası değişince | Programların Docker'da deterministik derlemesi ve executable hash'leri (BC-13) |
 

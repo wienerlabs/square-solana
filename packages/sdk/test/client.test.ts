@@ -3,6 +3,7 @@ import { BN, type BorshInstructionCoder, type Idl, type Program } from '@anchor-
 import { getAssociatedTokenAddressSync, TOKEN_2022_PROGRAM_ID, TOKEN_PROGRAM_ID } from '@solana/spl-token';
 import { ComputeBudgetProgram, Connection, Keypair, PublicKey, SystemProgram } from '@solana/web3.js';
 import { beforeEach, describe, expect, it } from 'vitest';
+import { TX_COMPUTE_UNIT_LIMITS, type TxKind } from '../src/budget.js';
 import { createSquareClient, type SquareClient } from '../src/client.js';
 import { specHashing } from '../src/spec.js';
 import type { BuiltTx } from '../src/types.js';
@@ -29,6 +30,22 @@ async function setProgramAccount(
   return address;
 }
 
+/** Tx'teki `SetComputeUnitLimit` talimatının değeri (ComputeBudget talimatı 2, u32); yoksa undefined. */
+function computeUnitLimit(built: BuiltTx): number | undefined {
+  const message = built.transaction.message;
+  const keys = message.staticAccountKeys;
+  const ix = message.compiledInstructions.find(
+    (i) => keys[i.programIdIndex]!.equals(ComputeBudgetProgram.programId) && i.data[0] === 2,
+  );
+  return ix ? Buffer.from(ix.data).readUInt32LE(1) : undefined;
+}
+
+/** Akışın tx'i, profili olan türde profilin sınırını taşır (BC-28); profili olmayan türde sınır eklenmez. */
+function expectComputeProfile(built: BuiltTx, name: string) {
+  const limits: Readonly<Record<string, number>> = TX_COMPUTE_UNIT_LIMITS;
+  expect(computeUnitLimit(built)).toBe(name in limits ? limits[name as TxKind] : undefined);
+}
+
 function decoded(built: BuiltTx, program: Program<Idl>) {
   const message = built.transaction.message;
   const keys = message.staticAccountKeys;
@@ -41,6 +58,7 @@ function decoded(built: BuiltTx, program: Program<Idl>) {
   expect(own).toHaveLength(1);
   const ix = own[0]!;
   const { name, data } = (program.coder.instruction as BorshInstructionCoder).decode(ix.data)!;
+  expectComputeProfile(built, name);
   const def = program.idl.instructions.find((i) => i.name === name)!;
   const accounts = Object.fromEntries(def.accounts.map((a, i) => [a.name, ix.keys[i]!.toBase58()]));
   return { name, data: plain(data) as Record<string, unknown>, accounts, all };
@@ -307,7 +325,8 @@ describe('flow', () => {
       policy: b58(policy),
     });
     expect(buy.data.merkleProof).toEqual(proof.map((p) => Array.from(p)));
-    expect(buy.all).toHaveLength(2);
+    // Compute budget, satıcının ATA'sı, alım.
+    expect(buy.all).toHaveLength(3);
 
     const cancel = decoded(
       await client.flow.cancelClaim({ seller: listing.seller, job: address }, options()),
@@ -338,7 +357,8 @@ describe('flow', () => {
       validationRecord: b58(client.pda.validationRecord(address)[0]),
       rentPayer: b58(account.rentPayer as PublicKey),
     });
-    expect(ix.all).toHaveLength(3);
+    // Compute budget, payee'nin ve kurumun ATA'sı, finalize.
+    expect(ix.all).toHaveLength(4);
   });
 
   it('finalizePayment: politikalı job → ispat kapısı hesapları; listelenmemiş alacak → payee agent', async () => {

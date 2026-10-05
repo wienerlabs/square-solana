@@ -2,7 +2,7 @@
 // Talimat ispatı ve üç sinyali taşır: refusal_code (0), net_amount (5), proof_timestamp (9); diğer
 // sinyalleri verifier hesaplardan kendisi kurar.
 import { SystemProgram, type PublicKey } from '@solana/web3.js';
-import type { BuildOptions, BuiltTx, SquareClient } from '@squaresdk/solana-sdk';
+import { withComputeProfile, type BuildOptions, type BuiltTx, type SquareClient } from '@squaresdk/solana-sdk';
 import type { ProveResponse } from '@squaresdk/solana-types';
 import BN from 'bn.js';
 
@@ -49,5 +49,6 @@ export async function buildSetComplianceProofTx(
       systemProgram: SystemProgram.programId,
     })
     .instruction();
-  return client.buildTx([ix], options);
+  // Groth16 doğrulaması ~178 bin CU: talimat başına varsayılan 200 bine yakın olduğundan sınır profilden.
+  return client.buildTx([ix], withComputeProfile(options, 'setComplianceProof'));
 }

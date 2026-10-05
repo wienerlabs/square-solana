@@ -14,7 +14,8 @@ const client = createSquareClient({
 
 const price = 2n ** 64n - 1n;
 const { transaction } = await client.flow.listClaim({ agent: key(5), job: key(6), price }, { feePayer: key(5) });
-const [ix] = transaction.message.compiledInstructions;
+const keys = transaction.message.staticAccountKeys;
+const ix = transaction.message.compiledInstructions.find((i) => keys[i.programIdIndex].equals(key(4)));
 const decoded = client.escrow.program.coder.instruction.decode(Buffer.from(ix.data));
 assert.ok(decoded);
 assert.equal(decoded.name, 'listClaim');
