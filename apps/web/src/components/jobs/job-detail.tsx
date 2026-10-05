@@ -13,7 +13,7 @@ import { StatusBadge } from '@/components/ui/status-badge';
 import { TxConfirmation } from '@/components/ui/tx-confirmation';
 import { JobClaim } from './job-claim';
 import { chainRefOf, hex } from '@/lib/agent-registration';
-import { payeeOf } from '@/lib/claim-market';
+import { payoutOf, type Payout } from '@/lib/claim-market';
 import { claimListingAddress } from '@/lib/idl-pda';
 import {
   challengeState,
@@ -39,6 +39,15 @@ type JobStatusName = keyof typeof JOB_STATUS_TONE;
 
 const iso = (unix: number) => new Date(unix * 1000).toISOString().replace(/\.\d{3}Z$/, 'Z');
 const statusOf = (job: JobAccount) => Object.keys(job.status)[0] as JobStatusName;
+
+const PAYOUT_TEXT = {
+  agent: { label: 'agent wallet', caption: 'the agent wallet' },
+  buyer: { label: 'buyer', caption: 'the buyer of the receivable' },
+  refunded: { label: 'institution', caption: 'refunded to the institution' },
+  cancelled: { label: 'institution', caption: 'cancelled; any locked USDC went back to the institution' },
+} as const;
+const payoutKey = (payout: Payout): keyof typeof PAYOUT_TEXT =>
+  payout.kind === 'institution' ? payout.reason : payout.sold ? 'buyer' : 'agent';
 
 function Row({ label, children }: { label: string; children: ReactNode }) {
   return (
@@ -223,7 +232,7 @@ export function JobDetail({ jobAddress, escrowProgramId }: { jobAddress: string;
 
   const jobStatus = statusOf(account);
   const listing = claim.state === 'ready' ? claim.value : null;
-  const payee = payeeOf(account, listing);
+  const payout = payoutOf(account, listing);
   const challengeEnd = account.challengeEnd.toNumber();
   const challenge = chainNow === null ? null : challengeState(challengeEnd, chainNow);
   const deadline = account.deadline.toNumber();
@@ -267,10 +276,8 @@ export function JobDetail({ jobAddress, escrowProgramId }: { jobAddress: string;
             )}
           </Row>
           <Row label="Paid to">
-            <Address value={payee.wallet.toBase58()} label={payee.sold ? 'buyer' : 'agent wallet'} />
-            <span className="text-caption text-muted">
-              {payee.sold ? 'the buyer of the receivable' : 'the agent wallet'}
-            </span>
+            <Address value={payout.wallet.toBase58()} label={PAYOUT_TEXT[payoutKey(payout)].label} />
+            <span className="text-caption text-muted">{PAYOUT_TEXT[payoutKey(payout)].caption}</span>
           </Row>
           <Row label="Deadline">
             <time dateTime={iso(deadline)}>{iso(deadline)}</time>

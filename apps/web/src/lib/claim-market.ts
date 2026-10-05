@@ -26,6 +26,20 @@ export function payeeOf(job: JobAccount, listing: ClaimListingAccount | null): {
     : { wallet: job.agentWallet, sold: false };
 }
 
+/**
+ * İşin USDC'sinin gittiği ya da gideceği yer: iade edilen (`Refunded`) ve iptal edilen (`Cancelled`) işte
+ * kilitli tutar kuruma döner; diğer durumlarda payee'ye gider ya da gidecektir (program arayüzü §6).
+ */
+export type Payout =
+  | { kind: 'payee'; wallet: PublicKey; sold: boolean }
+  | { kind: 'institution'; wallet: PublicKey; reason: 'refunded' | 'cancelled' };
+
+export function payoutOf(job: JobAccount, listing: ClaimListingAccount | null): Payout {
+  if ('refunded' in job.status) return { kind: 'institution', wallet: job.institution, reason: 'refunded' };
+  if ('cancelled' in job.status) return { kind: 'institution', wallet: job.institution, reason: 'cancelled' };
+  return { kind: 'payee', ...payeeOf(job, listing) };
+}
+
 /** Yüz değere göre iskonto, yüzde olarak en fazla iki ondalıkla ve aşağı yuvarlanarak: 250 / 225 → "10%". */
 export function formatDiscount(price: bigint, faceValue: bigint): string {
   if (faceValue <= 0n || price >= faceValue) return '0%';
