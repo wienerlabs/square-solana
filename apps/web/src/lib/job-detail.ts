@@ -11,6 +11,9 @@ export const MAX_DELIVERY_URI_BYTES = 128;
 /** Zaman çizelgesinde okunan en fazla işlem. */
 export const TIMELINE_LIMIT = 50;
 
+/** Job adresinin en yeni imzasının yoklanma aralığı: WebSocket aboneliği kurulamaz ya da koparsa yedek yol. */
+export const JOB_POLL_INTERVAL_MS = 5_000;
+
 const coder = new BorshCoder(SQUARE_IDLS.escrow as unknown as Idl);
 
 export interface JobEvent {
@@ -37,20 +40,27 @@ export interface TimelineEntry {
   event: JobEvent;
 }
 
+export interface JobTimeline {
+  entries: TimelineEntry[];
+  /** Job adresine dokunan en yeni işlem (başarısızlar dahil); okunan durum bu imzaya kadardır. İşlem yoksa null. */
+  newestSignature: string | null;
+}
+
 /** Job hesabına dokunan son işlemlerin event'leri, eskiden yeniye. */
 export async function readJobTimeline(
   connection: Connection,
   escrowProgramId: PublicKey,
   job: PublicKey,
-): Promise<TimelineEntry[]> {
+): Promise<JobTimeline> {
   const signatures = await connection.getSignaturesForAddress(job, { limit: TIMELINE_LIMIT }, 'confirmed');
+  const newestSignature = signatures[0]?.signature ?? null;
   const ok = signatures.filter((s) => s.err === null).reverse();
-  if (ok.length === 0) return [];
+  if (ok.length === 0) return { entries: [], newestSignature };
   const transactions = await connection.getTransactions(
     ok.map((s) => s.signature),
     { commitment: 'confirmed', maxSupportedTransactionVersion: 0 },
   );
-  return ok.flatMap((s, i) =>
+  const entries = ok.flatMap((s, i) =>
     jobEventsFromLogs(escrowProgramId, transactions[i]?.meta?.logMessages ?? [], job).map((event) => ({
       signature: s.signature,
       slot: s.slot,
@@ -58,6 +68,37 @@ export async function readJobTimeline(
       event,
     })),
   );
+  return { entries, newestSignature };
+}
+
+/** Job adresine dokunan en yeni işlemin imzası; işlem yoksa null. */
+export async function readNewestSignature(connection: Connection, job: PublicKey): Promise<string | null> {
+  const [newest] = await connection.getSignaturesForAddress(job, { limit: 1 }, 'confirmed');
+  return newest?.signature ?? null;
+}
+
+/**
+ * Job adresinin en son görülen imzası. Log aboneliği, yoklama ve okunan zaman çizelgesi aynı imzayı
+ * bildirir; `observe` yalnızca daha önce görülmemiş bir imzada true döner, böylece aynı değişiklik iki
+ * kez okunmaz. Okunan durum bilinmeden (`known` false) yoklama karşılaştırma yapmaz.
+ */
+export class SignatureTracker {
+  private seen: string | null | undefined;
+
+  get known(): boolean {
+    return this.seen !== undefined;
+  }
+
+  /** Okunan durumun dayandığı en yeni imza. */
+  baseline(signature: string | null): void {
+    this.seen = signature;
+  }
+
+  observe(signature: string | null): boolean {
+    if (signature === this.seen) return false;
+    this.seen = signature;
+    return true;
+  }
 }
 
 const str = (value: unknown) => (value instanceof PublicKey ? value.toBase58() : String(value));

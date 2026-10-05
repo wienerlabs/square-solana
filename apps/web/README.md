@@ -99,7 +99,7 @@ Herkese açık; eylemler bağlı cüzdana göre açılır. Yalnızca `SQUARE_PRO
 | Parça | Davranış |
 |---|---|
 | Job | Escrow `Job` hesabı: durum, tutar, kurum, agent (DID çözümüne bağlantı), ödeme cüzdanı, deadline, challenge süresi, politika ve sürümü, `spec_hash`, teslimde URI ve `work_hash` |
-| Zaman çizelgesi | Job hesabına dokunan son 50 işlemin loglarındaki escrow event'leri (`JobCreated` … `Finalized`, alacak ve uyuşmazlık event'leri), eskiden yeniye; yalnızca bu job'un ve escrow programının event'leri. Job adresini anan her onaylı işlemde (`onLogs`) job ve zaman çizelgesi yeniden okunur |
+| Zaman çizelgesi | Job hesabına dokunan son 50 işlemin loglarındaki escrow event'leri (`JobCreated` … `Finalized`, alacak ve uyuşmazlık event'leri), eskiden yeniye; yalnızca bu job'un ve escrow programının event'leri. Job adresini anan her onaylı işlemde job ve zaman çizelgesi yeniden okunur: log aboneliği (`onLogs`, WebSocket) anında bildirir; abonelik kurulamaz ya da koparsa job adresinin en yeni imzası 5 saniyede bir yoklanır (sekme görünürken). Aynı işlem ikisinden de gelirse bir kez okunur |
 | Challenge sayacı | `challenge_end` zincir saatine göre: Clock sysvar'ının `unix_timestamp`'i okunur (dakikada bir yeniden), aradaki saniyeler yerel saatle ilerler. Escrow'un kuralıyla `challenge_end`'te kapanır |
 | Agent | Bağlı cüzdan job'un `agent_wallet`'ıysa: fonlanmış işte `accept_job`; kabul edilmiş işte teslim dosyası tarayıcıda hash'lenir (SHA-256, SDK `workHash`; dosya yüklenmez), teslim URI'si en fazla 128 bayt, deadline'dan önce `submit_work`. Escrow hata kodu IDL'deki mesajıyla |
 | Ağ | Job, zaman çizelgesi, saat ve log aboneliği ağ doğrulanmadan açılmaz |
