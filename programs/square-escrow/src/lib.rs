@@ -1,19 +1,22 @@
 //! Square escrow programı (program arayüzü §6, §10.4). Covenant'ın escrow'undan geçmişiyle taşındı (BC-04)
-//! ve sözleşmeye göre yeniden yazılıyor. BC-22: config, iş yaşam döngüsü ve agent bağlama.
+//! ve sözleşmeye göre yeniden yazılıyor. BC-22: config, iş yaşam döngüsü ve agent bağlama. BC-23, BC-24,
+//! BC-26: permissionless finalize, keeper ücreti, ispat kapısı, itibar ve validation kaydı.
 //!
 //!   Open -(fund_job)-> Funded -(accept_job)-> Accepted -(submit_work)-> Delivered
+//!   Delivered -(finalize_payment)-> Released | Refunded
 //!   Open | Funded | Accepted (deadline sonrası) -(cancel_job)-> Cancelled
 //!
 //! İş bir registry `AgentRecord`'una ve opsiyonel bir policy'ye bağlanır; policy'nin commitment'ı, günlük
-//! tavanı ve sürümü job'a kopyalanır. Diğer programların hesapları CPI'sız okunur (`linked`). Finalize
-//! (BC-23), ispat kapısı (BC-24), alacak piyasası (BC-25), itibar (BC-26), dispute (BC-32, BC-33) ve
-//! Travel Rule commitment'ı (BC-34) kendi issue'larında eklenir.
+//! tavanı ve sürümü job'a kopyalanır. Diğer programların hesapları CPI'sız okunur (`linked`,
+//! `release_gate`); tek CPI verifier'ın `record_release`'idir. Alacak piyasası (BC-25), dispute (BC-32,
+//! BC-33) ve Travel Rule commitment'ı (BC-34) kendi issue'larında eklenir.
 use anchor_lang::prelude::*;
 
 pub mod config_rules;
 pub mod errors;
 pub mod instructions;
 pub mod linked;
+pub mod release_gate;
 pub mod state;
 
 use instructions::*;
@@ -69,6 +72,19 @@ pub mod square_escrow {
         challenge_period: u64,
     ) -> Result<()> {
         instructions::create_job::handler(ctx, spec_hash, amount, deadline, challenge_period)
+    }
+
+    /// Flow steps 6-8, permissionless crank. After `challenge_end` with no dispute:
+    /// - no policy: pay the payee (claim buyer if sold, else agent wallet) `amount - keeper fee`;
+    /// - policy: read `ReleaseProof` ["release_proof", job] owned by square_verifier. Missing ->
+    ///   `ProofRequired` (escrow waits). `Compliant` with matching payee / net / mint / daily counter
+    ///   -> pay the payee, CPI `record_release`, `ReleaseVerified`. `Refused` -> refund the net to the
+    ///   institution, `ReleaseRefused` with the reason code.
+    ///
+    /// The keeper fee is paid in every branch. Reputation goes to the agent record (not the buyer); a
+    /// `ValidationRecord` is written; the vault is closed and its rent returned to `job.rent_payer`.
+    pub fn finalize_payment(ctx: Context<FinalizePayment>) -> Result<()> {
+        instructions::finalize_payment::handler(ctx)
     }
 
     /// Flow step 3b: locks `amount` in the vault. Both parties need a fresh, clear screening record.

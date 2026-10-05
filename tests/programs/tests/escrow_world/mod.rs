@@ -5,12 +5,16 @@
 
 use anchor_lang::prelude::Pubkey;
 use anchor_lang::solana_program::instruction::Instruction;
-use anchor_lang::{InstructionData, ToAccountMetas};
+use anchor_lang::{AccountSerialize, InstructionData, ToAccountMetas};
+use solana_account::Account;
 use solana_keypair::Keypair;
 use solana_signer::Signer;
+use square_common::contract::square_escrow_contract::accounts::ClaimListing;
+use square_common::contract::square_escrow_contract::types::ClaimStatus;
 use square_common::seeds::{
-    AGENT_SEED, CONFIG_SEED, INSTITUTION_SEED, JOB_SEED, POLICY_SEED, REGISTRY_CONFIG_SEED,
-    SCREENING_SEED, VAULT_SEED,
+    AGENT_SEED, CLAIM_SEED, CONFIG_SEED, ESCROW_AUTHORITY_SEED, INSTITUTION_SEED, JOB_SEED,
+    POLICY_SEED, REGISTRY_CONFIG_SEED, REPUTATION_SEED, SCREENING_SEED, VALIDATION_SEED,
+    VAULT_SEED, VERIFIER_CONFIG_SEED,
 };
 use square_escrow::state::{EscrowConfig, Job};
 use square_escrow::{EscrowParams, LinkedPrograms};
@@ -68,6 +72,30 @@ pub fn vault_address(job: &Pubkey) -> Pubkey {
     Pubkey::find_program_address(&[VAULT_SEED, job.as_ref()], &square_escrow::ID).0
 }
 
+pub fn claim_address(job: &Pubkey) -> Pubkey {
+    Pubkey::find_program_address(&[CLAIM_SEED, job.as_ref()], &square_escrow::ID).0
+}
+
+pub fn reputation_address(agent_record: &Pubkey) -> Pubkey {
+    Pubkey::find_program_address(
+        &[REPUTATION_SEED, agent_record.as_ref()],
+        &square_escrow::ID,
+    )
+    .0
+}
+
+pub fn validation_address(job: &Pubkey) -> Pubkey {
+    Pubkey::find_program_address(&[VALIDATION_SEED, job.as_ref()], &square_escrow::ID).0
+}
+
+pub fn escrow_authority_address() -> Pubkey {
+    Pubkey::find_program_address(&[ESCROW_AUTHORITY_SEED], &square_escrow::ID).0
+}
+
+pub fn verifier_config_address() -> Pubkey {
+    Pubkey::find_program_address(&[VERIFIER_CONFIG_SEED], &square_verifier::ID).0
+}
+
 pub fn screening_address(wallet: &Pubkey) -> Pubkey {
     Pubkey::find_program_address(&[SCREENING_SEED, wallet.as_ref()], &square_registry::ID).0
 }
@@ -103,6 +131,23 @@ pub struct Agent {
 pub struct Institution {
     pub key: Keypair,
     pub token_account: Pubkey,
+}
+
+/// `finalize_payment`'ın token hesapları ve ödenecek taraf.
+#[derive(Clone, Copy)]
+pub struct Settlement {
+    /// Ödenecek taraf (agent cüzdanı ya da alacağın alıcısı); screening kaydı buna göre geçer.
+    pub payee: Pubkey,
+    pub payee_token_account: Pubkey,
+    pub institution_token_account: Pubkey,
+    pub keeper_token_account: Pubkey,
+}
+
+/// Policy'li işin ispat hesapları (square_verifier).
+#[derive(Clone, Copy)]
+pub struct GateAccounts {
+    pub release_proof: Pubkey,
+    pub operator_state: Pubkey,
 }
 
 /// square_policy'de kurum ve politika: (`Policy`, `Institution` PDA'ları).
@@ -602,6 +647,44 @@ impl World {
         }
     }
 
+    /// `finalize_payment`; `gate` policy'li işte ispat hesapları, policy'siz işte `None`.
+    pub fn finalize_ix(
+        &self,
+        keeper: &Pubkey,
+        job: &Pubkey,
+        settlement: Settlement,
+        gate: Option<GateAccounts>,
+    ) -> Instruction {
+        let state = self.job(job);
+        Instruction {
+            program_id: square_escrow::ID,
+            accounts: square_escrow::accounts::FinalizePayment {
+                keeper: *keeper,
+                config: config_address(),
+                job: *job,
+                vault: vault_address(job),
+                claim_listing: claim_address(job),
+                payee_token_account: settlement.payee_token_account,
+                institution_token_account: settlement.institution_token_account,
+                keeper_token_account: settlement.keeper_token_account,
+                mint: self.usdc,
+                payee_screening: screening_address(&settlement.payee),
+                release_proof: gate.map(|g| g.release_proof),
+                operator_state: gate.map(|g| g.operator_state),
+                verifier_config: gate.map(|_| verifier_config_address()),
+                verifier_program: gate.map(|_| square_verifier::ID),
+                escrow_authority: escrow_authority_address(),
+                agent_reputation: reputation_address(&state.agent_record),
+                validation_record: validation_address(job),
+                rent_payer: state.rent_payer,
+                token_program: TOKEN_PROGRAM_ID,
+                system_program: anchor_lang::system_program::ID,
+            }
+            .to_account_metas(None),
+            data: square_escrow::instruction::FinalizePayment {}.data(),
+        }
+    }
+
     pub fn sync_ix(&self, agent_owner: &Pubkey, job: &Pubkey, agent_record: Pubkey) -> Instruction {
         Instruction {
             program_id: square_escrow::ID,
@@ -645,5 +728,77 @@ impl World {
         let wallet = agent.wallet.insecure_clone();
         self.h.send(&[ix], &[&wallet]).expect("accept_job");
         (institution, agent, job)
+    }
+
+    /// Teslim edilmiş policy'siz iş; challenge penceresi `CHALLENGE`.
+    pub fn delivered_job(&mut self) -> (Institution, Agent, Pubkey) {
+        let (institution, agent, job) = self.accepted_job();
+        let ix = self.submit_ix(
+            &agent.wallet.pubkey(),
+            &job,
+            agent.record,
+            "ipfs://delivery",
+        );
+        let wallet = agent.wallet.insecure_clone();
+        self.h.send(&[ix], &[&wallet]).expect("submit_work");
+        (institution, agent, job)
+    }
+
+    /// `payee`'ye ödenecek settlement; keeper'ın ve payee'nin token hesapları (yoksa açılır).
+    pub fn settlement(
+        &mut self,
+        institution: &Institution,
+        keeper: &Pubkey,
+        payee: Pubkey,
+    ) -> Settlement {
+        let usdc = self.usdc;
+        Settlement {
+            payee,
+            payee_token_account: token::create_ata(&mut self.h, &payee, &usdc),
+            institution_token_account: institution.token_account,
+            keeper_token_account: token::create_ata(&mut self.h, keeper, &usdc),
+        }
+    }
+
+    pub fn finalize(&mut self, keeper: &Keypair, job: &Pubkey, settlement: Settlement) -> Outcome {
+        let ix = self.finalize_ix(&keeper.pubkey(), job, settlement, None);
+        self.h.send(&[ix], &[keeper])
+    }
+
+    /// Alacak listelemesi. `list_claim` / `buy_claim` BC-25'te gelene kadar hesap sözleşmenin düzeniyle
+    /// (escrow'a ait, `["claim", job]`) yazılır.
+    pub fn write_claim(&mut self, job: &Pubkey, buyer: Pubkey, status: ClaimStatus) {
+        let now = self.h.now();
+        let state = self.job(job);
+        let bought = matches!(status, ClaimStatus::Bought);
+        let listing = ClaimListing {
+            job: *job,
+            seller: state.agent_wallet,
+            buyer: if bought { buyer } else { Pubkey::default() },
+            rent_payer: self.h.payer.pubkey(),
+            price: state.amount / 10 * 9,
+            face_value: state.amount,
+            listed_at: now,
+            bought_at: if bought { now } else { 0 },
+            status,
+            bump: Pubkey::find_program_address(&[CLAIM_SEED, job.as_ref()], &square_escrow::ID).1,
+        };
+        let mut data = Vec::new();
+        listing.try_serialize(&mut data).unwrap();
+        let lamports = self.h.svm.minimum_balance_for_rent_exemption(data.len());
+        self.h.set_account(
+            claim_address(job),
+            Account {
+                lamports,
+                data,
+                owner: square_escrow::ID,
+                executable: false,
+                rent_epoch: 0,
+            },
+        );
+    }
+
+    pub fn claim(&self, job: &Pubkey) -> ClaimListing {
+        self.h.account(&claim_address(job)).expect("ClaimListing")
     }
 }

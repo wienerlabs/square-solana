@@ -27,5 +27,5 @@ unexpected_cfgs = { level = "warn", check-cfg = ['cfg(target_os, values("solana"
 
 [dependencies]
 square-common = { path = "../../crates/square-common" }
-anchor-lang = "1.2.0"
+anchor-lang = { version = "1.2.0", features = ["init-if-needed"] }
 anchor-spl = "1.2.0"

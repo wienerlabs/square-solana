@@ -37,7 +37,6 @@ const VK = path.join(ROOT, 'artifacts', 'verification_key.json');
 const OUT = path.join(REPO, 'tests', 'programs', 'tests', 'fixtures', 'release-proofs.json');
 
 const USDC = 1_000_000n;
-
 // tests/programs aynı etiketleri `sha256("square-solana/bc-19/" ‖ etiket)` tohumuyla anahtara çevirir.
 const LABELS = Object.freeze({
   institutionWallet: 'institution wallet',
@@ -49,8 +48,16 @@ const LABELS = Object.freeze({
 const SPECS = Object.freeze({
   a: 'job spec: market research report',
   b: 'job spec: data cleaning',
+  c: 'job spec: field survey',
 });
 const POLICY_ID = 'policy: research procurement';
+
+// Escrow tarafı: iş tutarları ve keeper ücreti. İspattaki net, escrow'un release'te ödeyeceği
+// `amount − amount × keeper_fee_bps / 10 000`'dir (program arayüzü §6).
+const KEEPER_FEE_BPS = 50n;
+const AMOUNTS = Object.freeze({ a: 25n * USDC, b: 40n * USDC, c: 150n * USDC });
+const net = (spec) => AMOUNTS[spec] - (AMOUNTS[spec] * KEEPER_FEE_BPS) / 10_000n;
+const HOUR = 3600;
 
 function scenarios() {
   const w = world();
@@ -61,14 +68,23 @@ function scenarios() {
   return {
     keys,
     list: [
-      ['compliant', 'a', { ...base }],
-      ['refused_per_tx', 'a', { ...base, netAmount: 150n * USDC }],
-      ['buyer_payee', 'a', { ...base, payee: keys.claimBuyer }],
-      ['other_mint', 'a', { ...base, mint: keys.otherMint }],
-      ['other_policy', 'a', { ...base, salts: 'other policy' }],
-      ['job_b', 'b', { ...base, netAmount: 40n * USDC }],
-      ['after_job_b', 'a', { ...base, dailySpentBefore: 40n * USDC }],
-    ].map(([name, spec, overrides]) => ({ name, spec, overrides: { ...overrides, job: job(spec) } })),
+      ['compliant', 'a', {}],
+      // Kalıcı ret: işlem başı tavan (100 USDC) aşılıyor.
+      ['refused_per_tx', 'c', {}],
+      // Geçici ya da kurumun beyanına bağlı retler: zaman penceresi (9–17 UTC) dışı, izinsiz kategori.
+      ['refused_time_window', 'a', { timestamp: TIMESTAMP + 4 * HOUR }],
+      ['refused_category', 'a', { paymentCategory: 'travel' }],
+      ['buyer_payee', 'a', { payee: keys.claimBuyer }],
+      ['other_mint', 'a', { mint: keys.otherMint }],
+      ['other_policy', 'a', { salts: 'other policy' }],
+      ['job_b', 'b', {}],
+      // B'nin release'inden sonra A: sayaç B'nin neti kadar ilerledi.
+      ['after_job_b', 'a', { dailySpentBefore: net('b') }],
+    ].map(([name, spec, overrides]) => ({
+      name,
+      spec,
+      overrides: { ...base, netAmount: net(spec), ...overrides, job: job(spec) },
+    })),
   };
 }
 
@@ -123,6 +139,8 @@ async function write() {
     seed_prefix: 'square-solana/bc-19/',
     labels: LABELS,
     specs: SPECS,
+    amounts: Object.fromEntries(Object.entries(AMOUNTS).map(([k, v]) => [k, String(v)])),
+    keeper_fee_bps: Number(KEEPER_FEE_BPS),
     timestamp: TIMESTAMP,
     policy: await policyRecord(),
     scenarios: records,
@@ -161,6 +179,11 @@ async function check() {
   const { list } = scenarios();
   const problems = [];
   if (JSON.stringify(fixture.labels) !== JSON.stringify(LABELS)) problems.push('etiketler değişmiş');
+  if (JSON.stringify(fixture.specs) !== JSON.stringify(SPECS)) problems.push('işler değişmiş');
+  if (fixture.keeper_fee_bps !== Number(KEEPER_FEE_BPS)) problems.push('keeper ücreti değişmiş');
+  for (const [spec, amount] of Object.entries(AMOUNTS)) {
+    if (fixture.amounts?.[spec] !== String(amount)) problems.push(`${spec} işinin tutarı değişmiş`);
+  }
   if (JSON.stringify(fixture.policy) !== JSON.stringify(await policyRecord())) problems.push('politika değişmiş');
   if (fixture.scenarios.length !== list.length) problems.push('senaryo sayısı farklı');
   for (const scenario of list) {

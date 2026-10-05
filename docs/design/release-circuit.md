@@ -61,6 +61,8 @@ Verifier bu sinyallerin hiçbirini ispatı yapanın beyanına bırakmamalıdır.
 
 Bit 4 ile birlikte gelen kalıcı bir bit (0, 2, 3) yine kalıcı sayılabilir. Karar BC-24'ün ADR'ındadır; devre bütün bitleri ayrı ayrı verdiği için her seçenek uygulanabilir.
 
+**Karar ([ADR 0013](../decisions/0013-release-keeper-ucreti-iade-ve-itibar.md)):** Escrow ancak kalıcı bir sebep varsa neti iade eder: bit 0, 2, 3; ispattaki sayaç 0 iken bit 1 ya da 6. Bit 4 ve 5 ile sayaç 0 değilken bit 1 ve 6 beklemeye döner (`ProofRequired`); kurum uyumlu ispat bağlayınca ödenir. Kural `square_common::release::is_final_refusal`'dadır.
+
 ## 4. Kurallar
 
 | # | Kural | Private girdiler | Public sinyaller |
