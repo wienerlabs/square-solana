@@ -2,12 +2,14 @@
 // kimlikleri escrow'un config hesabından okunur (`EscrowConfig.{registry,policy,verifier}_program`,
 // program arayüzü §4); ortamda yalnızca escrow'unki gerekir. Tx'ler SDK'nın akışıyla kurulur.
 import { Program } from '@anchor-lang/core';
-import { PublicKey, type Connection } from '@solana/web3.js';
+import { PublicKey, type AccountInfo, type Connection } from '@solana/web3.js';
 import { squareIdentity } from '@squaresdk/solana-identity';
 import {
   createSquareClient,
   SQUARE_IDLS,
   specHashing,
+  type AgentRecordAccount,
+  type ScreeningRecordAccount,
   type SquareClient,
   type SquareEscrowContract,
 } from '@squaresdk/solana-sdk';
@@ -99,11 +101,41 @@ export interface AgentSummary {
   agentCardUri: string;
 }
 
+type RegistryAccountName = 'agentRecord' | 'screeningRecord';
+type RegistryAccount<K extends RegistryAccountName> = K extends 'agentRecord'
+  ? AgentRecordAccount
+  : ScreeningRecordAccount;
+
+/**
+ * Okunmuş hesabı registry'nin coder'ıyla çözer. Hesap yoksa, registry'ye ait değilse ya da bu türde
+ * değilse (discriminator / düzen) null.
+ */
+export function decodeRegistryAccount<K extends RegistryAccountName>(
+  setup: Pick<EscrowSetup, 'client' | 'registryProgram'>,
+  name: K,
+  info: AccountInfo<Buffer> | null,
+): RegistryAccount<K> | null {
+  if (!info || !info.owner.equals(setup.registryProgram)) return null;
+  try {
+    return setup.client.registry.program.coder.accounts.decode(name, info.data) as RegistryAccount<K>;
+  } catch {
+    return null;
+  }
+}
+
+/** Hesabı tek istekle okuyup çözer; ağ hatası "kayıt yok" sayılmaz, fırlatılır. */
+async function readRegistryAccount<K extends RegistryAccountName>(
+  setup: EscrowSetup,
+  name: K,
+  address: PublicKey,
+): Promise<RegistryAccount<K> | null> {
+  const info = await setup.client.registry.program.provider.connection.getAccountInfo(address);
+  return decodeRegistryAccount(setup, name, info);
+}
+
 /** Agent kaydı; hesap yoksa ya da registry'nin `AgentRecord`'u değilse null. */
 export async function readAgent(setup: EscrowSetup, agentRecord: PublicKey): Promise<AgentSummary | null> {
-  const info = await setup.client.registry.program.provider.connection.getAccountInfo(agentRecord);
-  if (!info || !info.owner.equals(setup.registryProgram)) return null;
-  const record = await setup.client.registry.fetch('agentRecord', agentRecord).catch(() => null);
+  const record = await readRegistryAccount(setup, 'agentRecord', agentRecord);
   if (!record) return null;
   return {
     agentId: record.agentId,
@@ -148,10 +180,7 @@ export type ScreeningState =
  * yoksa `missing`, işaretliyse süresinden bağımsız `flagged`, `expires_at <= now` ise `expired`.
  */
 export async function readScreening(setup: EscrowSetup, wallet: PublicKey, now: number): Promise<ScreeningState> {
-  const address = setup.client.pda.screeningRecord(wallet)[0];
-  const info = await setup.client.registry.program.provider.connection.getAccountInfo(address);
-  if (!info || !info.owner.equals(setup.registryProgram)) return { state: 'missing' };
-  const record = await setup.client.registry.fetch('screeningRecord', address).catch(() => null);
+  const record = await readRegistryAccount(setup, 'screeningRecord', setup.client.pda.screeningRecord(wallet)[0]);
   if (!record) return { state: 'missing' };
   return screeningState(
     {

@@ -12,6 +12,7 @@ on:
       - 'programs/square-verifier/src/release_vk.rs'
       - 'programs/square-verifier/src/release_vk_vector.rs'
       - 'tests/programs/tests/fixtures/release-proofs.json'
+      - 'tests/programs/tests/fixtures/squads-proofs.json'
       - '.nvmrc'
       - '.github/workflows/circuits.yml'
   push:
@@ -21,6 +22,7 @@ on:
       - 'programs/square-verifier/src/release_vk.rs'
       - 'programs/square-verifier/src/release_vk_vector.rs'
       - 'tests/programs/tests/fixtures/release-proofs.json'
+      - 'tests/programs/tests/fixtures/squads-proofs.json'
       - '.nvmrc'
       - '.github/workflows/circuits.yml'
 

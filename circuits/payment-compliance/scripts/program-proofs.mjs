@@ -5,9 +5,10 @@
 // programların kendi instruction'larıyla açar. İspatlar commit'lenmiş release anahtarıyla
 // (artifacts/payment.zkey, programdaki SQUARE_RELEASE_VK) üretilir.
 //
-//   node scripts/program-proofs.mjs          fikstürü yazar (önce `npm run build`)
-//   node scripts/program-proofs.mjs --check  fikstürdeki her ispatı doğrulama anahtarıyla ve yeniden
-//                                            hesaplanan sinyallerle doğrular; uymazsa 1 ile çıkar
+//   node scripts/program-proofs.mjs           iki fikstürü yazar (önce `npm run build`)
+//   node scripts/program-proofs.mjs --squads  yalnızca Squads fikstürünü yazar (BC-35)
+//   node scripts/program-proofs.mjs --check   fikstürlerdeki her ispatı doğrulama anahtarıyla ve yeniden
+//                                             hesaplanan sinyallerle doğrular; uymazsa 1 ile çıkar
 //
 // Groth16 ispatı rastgeledir; --check baytları değil, ispatın bu sinyaller için geçerliliğini denetler.
 import fs from 'node:fs';
@@ -88,6 +89,116 @@ function scenarios() {
   };
 }
 
+// ------------------------------------------------------------- Squads vault'ları (BC-35)
+
+// Rol imzacıları Squads v4 vault PDA'larıdır: kurum, agent cüzdanı ve alıcı. Multisig hesaplarının
+// adresleri etiketlerden türetilir; tests/programs aynı adreslere Squads'a ait bir `Multisig` hesabı yazar
+// ve vault'u imzacı olarak kullanır (square_common::squads::vault_address). Tek senaryo akışın sekiz
+// adımını kapsar: alacak alıcı vault'una satılır, payee odur.
+const SQUADS_PROGRAM_ID = 'SQDS4ep65T869zMMBKyuUq6aD6EgTu8psMjkvj52pCf';
+const SQUADS_OUT = path.join(REPO, 'tests', 'programs', 'tests', 'fixtures', 'squads-proofs.json');
+const SQUADS_LABELS = Object.freeze({
+  institutionMultisig: 'institution multisig',
+  agentMultisig: 'agent multisig',
+  buyerMultisig: 'buyer multisig',
+  settlementMint: LABELS.settlementMint,
+});
+const SQUADS_SPEC = 'job spec: squads market research';
+const SQUADS_AMOUNT = AMOUNTS.a;
+const VAULT_INDEX = 0;
+
+const vaultOf = (multisig) =>
+  findPda(SQUADS_PROGRAM_ID, ['multisig', bs58.decode(multisig), 'vault', [VAULT_INDEX]]).address;
+
+function squadsWorld() {
+  const w = world();
+  const multisig = (key) => keyFromLabel(SQUADS_LABELS[key]);
+  const vaults = {
+    institution: vaultOf(multisig('institutionMultisig')),
+    agent: vaultOf(multisig('agentMultisig')),
+    buyer: vaultOf(multisig('buyerMultisig')),
+  };
+  const institution = findPda(w.policy, ['institution', bs58.decode(vaults.institution)]).address;
+  const job = findPda(w.escrow, ['job', bs58.decode(vaults.institution), sha256(SQUADS_SPEC)]).address;
+  const mint = keyFromLabel(SQUADS_LABELS.settlementMint);
+  const netAmount = SQUADS_AMOUNT - (SQUADS_AMOUNT * KEEPER_FEE_BPS) / 10_000n;
+  return {
+    vaults,
+    overrides: { institution, job, payee: vaults.buyer, mint, tokenWhitelist: [mint], dailySpentBefore: 0n, netAmount },
+  };
+}
+
+async function squadsFixture(record) {
+  const { overrides } = squadsWorld();
+  const defaults = await input(overrides);
+  return {
+    generator: 'circuits/payment-compliance/scripts/program-proofs.mjs --squads',
+    key: 'circuits/payment-compliance/artifacts/payment.zkey (development phase-2, BC-20)',
+    seed_prefix: 'square-solana/bc-19/',
+    squads_program: SQUADS_PROGRAM_ID,
+    vault_index: VAULT_INDEX,
+    labels: SQUADS_LABELS,
+    spec: SQUADS_SPEC,
+    amount: String(SQUADS_AMOUNT),
+    keeper_fee_bps: Number(KEEPER_FEE_BPS),
+    timestamp: TIMESTAMP,
+    policy: {
+      policy_id: POLICY_ID,
+      commitment: hex(fieldBytes(String(await policyCommitment(defaults)))),
+      daily_ceiling: defaults.daily_ceiling_in,
+    },
+    scenarios: record ? [record] : [],
+  };
+}
+
+async function squadsRecord(proof, publicSignals) {
+  const { overrides } = squadsWorld();
+  const signals = await evaluate(await input(overrides));
+  const encoded = encodeProof(proof, publicSignals);
+  return {
+    name: 'buyer_vault_payee',
+    job: 'squads',
+    payee: 'buyerVault',
+    mint: 'settlementMint',
+    net_amount: signals.net_amount,
+    refusal_code: Number(signals.refusal_code),
+    daily_spent_before: signals.daily_spent_before,
+    timestamp: Number(signals.current_unix_timestamp),
+    policy_commitment: hex(fieldBytes(signals.policy_commitment)),
+    proof_a: hex(encoded.proofA),
+    proof_b: hex(encoded.proofB),
+    proof_c: hex(encoded.proofC),
+  };
+}
+
+async function writeSquads(vk) {
+  const { overrides } = squadsWorld();
+  const { proof, publicSignals } = await snarkjs.groth16.fullProve(await input(overrides), WASM, ZKEY);
+  if (!(await snarkjs.groth16.verify(vk, publicSignals, proof))) throw new Error('squads: ispat doğrulanmadı');
+  const record = await squadsRecord(proof, publicSignals);
+  process.stdout.write(`squads ${record.name}: refusal_code ${record.refusal_code}\n`);
+  fs.writeFileSync(SQUADS_OUT, `${JSON.stringify(await squadsFixture(record), null, 2)}\n`);
+  process.stdout.write(`wrote ${path.relative(REPO, SQUADS_OUT)}\n`);
+}
+
+async function checkSquads(vk, problems) {
+  if (!fs.existsSync(SQUADS_OUT)) {
+    problems.push(`${path.relative(REPO, SQUADS_OUT)} yok`);
+    return;
+  }
+  const fixture = JSON.parse(fs.readFileSync(SQUADS_OUT, 'utf8'));
+  // Senaryo dışındaki her alan (etiketler, iş, tutar, politika) betiğin bugünkü dünyasıyla aynı olmalı.
+  const expected = await squadsFixture(null);
+  const { scenarios, ...actual } = fixture;
+  delete expected.scenarios;
+  if (JSON.stringify(actual) !== JSON.stringify(expected)) problems.push('squads: fikstürün dünyası değişmiş');
+  if (scenarios.length !== 1) problems.push('squads: senaryo sayısı farklı');
+  const signals = toArray(await evaluate(await input(squadsWorld().overrides)));
+  if (!(await snarkjs.groth16.verify(vk, signals, decodeProof(scenarios[0])))) {
+    problems.push('squads: ispat bu sinyaller ve doğrulama anahtarıyla doğrulanmıyor');
+  }
+}
+
 async function input(overrides) {
   const salts = typeof overrides.salts === 'string' ? await testSalts(overrides.salts) : null;
   return buildInput({ ...overrides, salts });
@@ -148,6 +259,7 @@ async function write() {
   fs.mkdirSync(path.dirname(OUT), { recursive: true });
   fs.writeFileSync(OUT, `${JSON.stringify(fixture, null, 2)}\n`);
   process.stdout.write(`wrote ${path.relative(REPO, OUT)}\n`);
+  await writeSquads(vk);
 }
 
 const fromHex = (text) => Array.from(Buffer.from(text, 'hex'));
@@ -197,14 +309,18 @@ async function check() {
       problems.push(`${scenario.name}: ispat bu sinyaller ve doğrulama anahtarıyla doğrulanmıyor`);
     }
   }
+  await checkSquads(vk, problems);
   if (problems.length > 0) {
-    throw new Error(`${path.relative(REPO, OUT)} güncel değil (node scripts/program-proofs.mjs):\n  ${problems.join('\n  ')}`);
+    throw new Error(`fikstürler güncel değil (node scripts/program-proofs.mjs):\n  ${problems.join('\n  ')}`);
   }
   process.stdout.write(`${path.relative(REPO, OUT)}: ${list.length} ispat geçerli\n`);
+  process.stdout.write(`${path.relative(REPO, SQUADS_OUT)}: 1 ispat geçerli\n`);
 }
 
 try {
-  await (process.argv.includes('--check') ? check() : write());
+  if (process.argv.includes('--check')) await check();
+  else if (process.argv.includes('--squads')) await writeSquads(JSON.parse(fs.readFileSync(VK, 'utf8')));
+  else await write();
 } catch (error) {
   process.stderr.write(`error: ${error.message}\n`);
   process.exitCode = 1;

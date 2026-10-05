@@ -192,6 +192,8 @@ export async function buildInput(overrides = {}) {
     dailySpentBefore: 200n * USDC,
     timestamp: TIMESTAMP,
     job: w.job,
+    // square_policy `Institution` PDA'sı (operator_id_field); Squads vault'u kurumsa onun kurumu.
+    institution: w.institution,
     stripeReceiptHash: 0n,
     ...overrides,
   };
@@ -207,7 +209,7 @@ export async function buildInput(overrides = {}) {
     blocked_addresses: pad(await Promise.all(o.blockedAddresses.map(addressField)), MAX_BLOCKED),
     allowed_categories: pad(await Promise.all(o.allowedCategories.map(categoryField)), MAX_CATEGORIES),
     payment_category: String(await categoryField(o.paymentCategory)),
-    operator_id_field: String(await addressField(w.institution)),
+    operator_id_field: String(await addressField(o.institution)),
     policy_id_field: String(await hash(splitBytes32(w.policyId))),
     policy_salts: o.salts ?? (await testSalts('default policy')),
     time_active: String(o.timeActive),
