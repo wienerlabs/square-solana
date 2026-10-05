@@ -20,7 +20,11 @@ pub struct SquadsMultisig {
 impl SquadsMultisig {
     /// Squads v4'e ait, `Multisig` discriminator'ıyla başlatılmış bir hesap.
     pub fn create(h: &mut Harness) -> Self {
-        let address = Pubkey::new_unique();
+        Self::at(h, Pubkey::new_unique())
+    }
+
+    /// [`SquadsMultisig::create`], önceden bilinen bir adreste (ör. vault'u ispat fikstürüne bağlı testler).
+    pub fn at(h: &mut Harness, address: Pubkey) -> Self {
         let mut data = MULTISIG_DISCRIMINATOR.to_vec();
         data.extend_from_slice(&[0; 32]);
         write(h, address, data, PROGRAM_ID);
