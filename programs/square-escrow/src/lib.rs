@@ -1,121 +1,121 @@
-//! Covenant — open settlement protocol for AI agents.
+//! Square escrow programı (program arayüzü §6, §10.4). Covenant'ın escrow'undan geçmişiyle taşındı (BC-04)
+//! ve sözleşmeye göre yeniden yazılıyor. BC-22: config, iş yaşam döngüsü ve agent bağlama.
 //!
-//! Optimistic escrow on Solana. Posters lock USDC, takers (agents) deliver
-//! work commitments, the challenge period runs, and payment auto-releases
-//! unless the poster raises a bonded dispute. Disputes are resolved by a
-//! whitelisted arbitrator multisig.
+//!   Open -(fund_job)-> Funded -(accept_job)-> Accepted -(submit_work)-> Delivered
+//!   Open | Funded | Accepted (deadline sonrası) -(cancel_job)-> Cancelled
 //!
-//! State machine:
-//!   Open -> Accepted -> Delivered -> (Finalized | Disputed -> Resolved)
-//!   Open/Accepted(past deadline) -> Cancelled
-
+//! İş bir registry `AgentRecord`'una ve opsiyonel bir policy'ye bağlanır; policy'nin commitment'ı, günlük
+//! tavanı ve sürümü job'a kopyalanır. Diğer programların hesapları CPI'sız okunur (`linked`). Finalize
+//! (BC-23), ispat kapısı (BC-24), alacak piyasası (BC-25), itibar (BC-26), dispute (BC-32, BC-33) ve
+//! Travel Rule commitment'ı (BC-34) kendi issue'larında eklenir.
 use anchor_lang::prelude::*;
 
+pub mod config_rules;
 pub mod errors;
 pub mod instructions;
+pub mod linked;
 pub mod state;
 
 use instructions::*;
-use state::{ARBITRATOR_COUNT, DisputeResolution};
+pub use state::{DisputeResolution, EscrowParams, LinkedPrograms, ValidationOutcome};
 
+// Kaynak programın (Covenant) adresi; Square'in program kimlikleri BC-09'da.
 declare_id!("5hstj5grBUL1BeSaPLYpgkD6n3ALasmbseRvKRFfCVNT");
+
+square_common::square_escrow_events!();
+
+// PDA seed'leri IDL'de de yayımlanır; değerler sözleşmeden (square-common).
+#[constant]
+pub const CONFIG_SEED: &[u8] = square_common::seeds::CONFIG_SEED;
+#[constant]
+pub const JOB_SEED: &[u8] = square_common::seeds::JOB_SEED;
+#[constant]
+pub const VAULT_SEED: &[u8] = square_common::seeds::VAULT_SEED;
+#[constant]
+pub const BOND_SEED: &[u8] = square_common::seeds::BOND_SEED;
+#[constant]
+pub const CLAIM_SEED: &[u8] = square_common::seeds::CLAIM_SEED;
+#[constant]
+pub const REPUTATION_SEED: &[u8] = square_common::seeds::REPUTATION_SEED;
+#[constant]
+pub const VALIDATION_SEED: &[u8] = square_common::seeds::VALIDATION_SEED;
+#[constant]
+pub const ESCROW_AUTHORITY_SEED: &[u8] = square_common::seeds::ESCROW_AUTHORITY_SEED;
 
 #[program]
 pub mod square_escrow {
     use super::*;
 
-    // ---- Protocol config ----
-
-    pub fn init_config(
-        ctx: Context<InitConfig>,
-        arbitrators: [Pubkey; ARBITRATOR_COUNT],
-        threshold: u8,
-        min_challenge_period: u64,
-        max_challenge_period: u64,
-        min_bond_bps: u16,
-        min_bond_absolute: u64,
-    ) -> Result<()> {
-        init_config::handler(
-            ctx,
-            arbitrators,
-            threshold,
-            min_challenge_period,
-            max_challenge_period,
-            min_bond_bps,
-            min_bond_absolute,
-        )
+    /// The job's agent wallet accepts a funded job; the agent record must be Active. `spec_hash`
+    /// guards against a swapped spec.
+    pub fn accept_job(ctx: Context<AgentJob>, spec_hash: [u8; 32]) -> Result<()> {
+        instructions::accept_job::handler(ctx, spec_hash)
     }
 
-    pub fn update_arbitrators(
-        ctx: Context<UpdateArbitrators>,
-        arbitrators: [Pubkey; ARBITRATOR_COUNT],
-        threshold: u8,
-    ) -> Result<()> {
-        update_arbitrators::handler(ctx, arbitrators, threshold)
+    /// The institution cancels an Open / Funded job, or an Accepted job after `deadline`; the vault
+    /// balance is refunded and the vault closed (rent to `job.rent_payer`).
+    pub fn cancel_job(ctx: Context<CancelJob>) -> Result<()> {
+        instructions::cancel_job::handler(ctx)
     }
 
-    // ---- Job lifecycle ----
-
+    /// Flow step 3a: the institution opens a job for an active registered agent and creates its empty
+    /// vault. With the optional `policy` account the job is proof-gated and snapshots the policy's
+    /// commitment, daily ceiling and version. Funds move in `fund_job`.
     pub fn create_job(
         ctx: Context<CreateJob>,
-        amount: u64,
         spec_hash: [u8; 32],
+        amount: u64,
         deadline: i64,
         challenge_period: u64,
     ) -> Result<()> {
-        create_job::handler(ctx, amount, spec_hash, deadline, challenge_period)
+        instructions::create_job::handler(ctx, spec_hash, amount, deadline, challenge_period)
     }
 
-    pub fn accept_job(ctx: Context<AcceptJob>, spec_hash: [u8; 32]) -> Result<()> {
-        accept_job::handler(ctx, spec_hash)
+    /// Flow step 3b: locks `amount` in the vault. Both parties need a fresh, clear screening record.
+    /// CCTP (DRAFT M6, BC-36): runs in the same tx after the CCTP `receive_message` that mints USDC to
+    /// the institution's token account; no separate instruction is planned.
+    pub fn fund_job(ctx: Context<FundJob>) -> Result<()> {
+        instructions::fund_job::handler(ctx)
     }
 
+    /// Creates the singleton config. Only the program upgrade authority (Squads vault) can call it.
+    /// `settlement_mint` is the only job mint (USDC); `linked` pins the registry / policy / verifier
+    /// program IDs used for account-read owner checks.
+    pub fn init_config(
+        ctx: Context<InitConfig>,
+        settlement_mint: Pubkey,
+        arbitrators: Vec<Pubkey>,
+        threshold: u8,
+        params: EscrowParams,
+        linked: LinkedPrograms,
+    ) -> Result<()> {
+        instructions::init_config::handler(
+            ctx,
+            settlement_mint,
+            arbitrators,
+            threshold,
+            params,
+            linked,
+        )
+    }
+
+    /// Flow step 4: delivery; the challenge window opens (`challenge_end = now + challenge_period`).
     pub fn submit_work(
-        ctx: Context<SubmitWork>,
+        ctx: Context<AgentJob>,
         work_hash: [u8; 32],
         delivery_uri: String,
     ) -> Result<()> {
-        submit_work::handler(ctx, work_hash, delivery_uri)
+        instructions::submit_work::handler(ctx, work_hash, delivery_uri)
     }
 
-    pub fn finalize_payment(ctx: Context<FinalizePayment>) -> Result<()> {
-        finalize_payment::handler(ctx)
+    /// The agent record owner re-points an unsettled job to the record's current wallet (after a
+    /// wallet rotation with registry `update_agent`). A sold receivable keeps paying the buyer.
+    pub fn sync_agent_wallet(ctx: Context<SyncAgentWallet>) -> Result<()> {
+        instructions::sync_agent_wallet::handler(ctx)
     }
 
-    // ---- Disputes ----
-
-    pub fn raise_dispute(
-        ctx: Context<RaiseDispute>,
-        reason_hash: [u8; 32],
-        bond: u64,
-    ) -> Result<()> {
-        raise_dispute::handler(ctx, reason_hash, bond)
-    }
-
-    pub fn resolve_dispute(
-        ctx: Context<ResolveDispute>,
-        resolution: DisputeResolution,
-    ) -> Result<()> {
-        resolve_dispute::handler(ctx, resolution)
-    }
-
-    // ---- Cancellation ----
-
-    pub fn cancel_job(ctx: Context<CancelJob>) -> Result<()> {
-        cancel_job::handler(ctx)
-    }
-
-    // ---- Covenant Credit (BNPL for pending claims) ----
-
-    pub fn list_claim(ctx: Context<ListClaim>, price: u64) -> Result<()> {
-        list_claim::handler(ctx, price)
-    }
-
-    pub fn buy_claim(ctx: Context<BuyClaim>) -> Result<()> {
-        buy_claim::handler(ctx)
-    }
-
-    pub fn cancel_claim(ctx: Context<CancelClaim>) -> Result<()> {
-        cancel_claim::handler(ctx)
+    /// Updates challenge bounds, bond, keeper fee and the M5 draft parameters.
+    pub fn update_params(ctx: Context<UpdateConfig>, params: EscrowParams) -> Result<()> {
+        instructions::update_params::handler(ctx, params)
     }
 }

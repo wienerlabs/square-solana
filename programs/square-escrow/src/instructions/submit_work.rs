@@ -1,61 +1,44 @@
 use anchor_lang::prelude::*;
-use square_common::seeds::JOB_SEED;
 
-use crate::errors::CovError;
-use crate::state::{JobEscrow, JobStatus};
+use crate::errors::EscrowError;
+use crate::instructions::agent_job::AgentJob;
+use crate::linked;
+use crate::state::{JobStatus, DELIVERY_URI_MAX_LEN};
+use crate::WorkSubmitted;
 
-#[derive(Accounts)]
-pub struct SubmitWork<'info> {
-    #[account(mut)]
-    pub taker: Signer<'info>,
+pub fn handler(ctx: Context<AgentJob>, work_hash: [u8; 32], delivery_uri: String) -> Result<()> {
+    let now = Clock::get()?.unix_timestamp;
+    let job = &ctx.accounts.job;
+    require_keys_eq!(
+        ctx.accounts.agent.key(),
+        job.agent_wallet,
+        EscrowError::AgentMismatch
+    );
+    require!(
+        job.status == JobStatus::Accepted,
+        EscrowError::InvalidStatus
+    );
+    require!(now < job.deadline, EscrowError::DeadlineExpired);
+    require!(
+        delivery_uri.len() <= DELIVERY_URI_MAX_LEN,
+        EscrowError::DeliveryUriTooLong
+    );
+    // Kabul edilmiş iş, sonradan `Inactive` olan kayıtla da teslim edilir (program arayüzü §6).
+    linked::require_registered(&linked::bound_agent(&ctx.accounts.agent_record)?)?;
+    let period = i64::try_from(job.challenge_period).map_err(|_| EscrowError::MathOverflow)?;
+    let challenge_end = now.checked_add(period).ok_or(EscrowError::MathOverflow)?;
 
-    #[account(
-        mut,
-        seeds = [JOB_SEED, poster.key().as_ref(), &job_escrow.spec_hash],
-        bump = job_escrow.bump,
-    )]
-    pub job_escrow: Box<Account<'info, JobEscrow>>,
-
-    /// CHECK: validated via PDA seeds and by matching job_escrow.poster
-    #[account(
-        constraint = poster.key() == job_escrow.poster @ CovError::Unauthorized,
-    )]
-    pub poster: AccountInfo<'info>,
-}
-
-pub fn handler(
-    ctx: Context<SubmitWork>,
-    work_hash: [u8; 32],
-    delivery_uri: String,
-) -> Result<()> {
-    let clock = Clock::get()?;
-    let challenge_end = {
-        let job = &ctx.accounts.job_escrow;
-        require!(job.status == JobStatus::Accepted, CovError::InvalidStatus);
-        require!(job.taker == ctx.accounts.taker.key(), CovError::Unauthorized);
-        require!(
-            clock.unix_timestamp < job.deadline,
-            CovError::DeadlineExpired
-        );
-        clock
-            .unix_timestamp
-            .checked_add(job.challenge_period as i64)
-            .ok_or_else(|| error!(CovError::MathOverflow))?
-    };
-
-    let job = &mut ctx.accounts.job_escrow;
+    let job = &mut ctx.accounts.job;
     job.work_hash = work_hash;
-    job.set_delivery_uri(&delivery_uri)?;
-    job.delivered_at = clock.unix_timestamp;
+    job.delivered_at = now;
     job.challenge_end = challenge_end;
     job.status = JobStatus::Delivered;
-
-    msg!(
-        "Work submitted: taker={}, work_hash={:?}, challenge_end={}",
-        job.taker,
+    emit!(WorkSubmitted {
+        job: job.key(),
         work_hash,
-        challenge_end
-    );
-
+        delivery_uri: delivery_uri.clone(),
+        challenge_end,
+    });
+    job.delivery_uri = delivery_uri;
     Ok(())
 }

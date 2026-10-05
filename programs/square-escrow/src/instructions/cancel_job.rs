@@ -1,162 +1,92 @@
 use anchor_lang::prelude::*;
-use square_common::seeds::{JOB_SEED, REPUTATION_SEED, VAULT_SEED};
-use anchor_spl::token_interface::{self, CloseAccount, Mint, TokenAccount, TokenInterface, TransferChecked};
+use anchor_spl::token_interface::{
+    self, CloseAccount, Mint, TokenAccount, TokenInterface, TransferChecked,
+};
+use square_common::seeds::{JOB_SEED, VAULT_SEED};
 
-use crate::errors::CovError;
-use crate::state::{AgentReputation, JobEscrow, JobStatus};
+use crate::errors::EscrowError;
+use crate::state::{Job, JobStatus};
+use crate::JobCancelled;
 
-/// Cancel a job and refund escrow.
-///
-/// Valid cancel paths:
-///   A. Open   : poster may always cancel (nobody has accepted yet)
-///   B. Accepted : anyone may cancel once `now > deadline` (taker missed
-///       delivery); taker is marked as `jobs_failed++` for reputation.
-///
-/// Not valid from: Delivered / Disputed / Finalized / Resolved / Cancelled.
 #[derive(Accounts)]
 pub struct CancelJob<'info> {
+    pub institution: Signer<'info>,
+    #[account(
+        mut,
+        seeds = [JOB_SEED, job.institution.as_ref(), job.spec_hash.as_ref()],
+        bump = job.bump,
+        has_one = institution @ EscrowError::Unauthorized,
+        has_one = mint @ EscrowError::MintMismatch,
+        has_one = rent_payer @ EscrowError::Unauthorized
+    )]
+    pub job: Box<Account<'info, Job>>,
+    // Kanonik vault'a sabit (Covenant guard'ı): sahte bir boş vault geçilip gerçek fon kilitlenemez.
+    #[account(mut, seeds = [VAULT_SEED, job.key().as_ref()], bump = job.vault_bump)]
+    pub vault: Box<InterfaceAccount<'info, TokenAccount>>,
+    #[account(
+        mut,
+        constraint = institution_token_account.mint == mint.key() @ EscrowError::MintMismatch,
+        constraint = institution_token_account.owner == institution.key() @ EscrowError::Unauthorized
+    )]
+    pub institution_token_account: Box<InterfaceAccount<'info, TokenAccount>>,
+    pub mint: Box<InterfaceAccount<'info, Mint>>,
+    /// CHECK: receives the vault rent; equals `job.rent_payer`.
     #[account(mut)]
-    pub signer: Signer<'info>,
-
-    #[account(
-        mut,
-        seeds = [JOB_SEED, poster.key().as_ref(), &job_escrow.spec_hash],
-        bump = job_escrow.bump,
-        close = poster,
-    )]
-    pub job_escrow: Box<Account<'info, JobEscrow>>,
-
-    /// CHECK: validated against job_escrow.poster
-    #[account(
-        mut,
-        constraint = poster.key() == job_escrow.poster @ CovError::Unauthorized,
-    )]
-    pub poster: AccountInfo<'info>,
-
-    /// Pinned to the canonical escrow PDA `[b"escrow_token", job_escrow]`
-    /// that `create_job` derives. Without the seed constraint an attacker
-    /// could pass a self-created decoy token account (same mint, authority =
-    /// job_escrow, balance 0); the handler would transfer nothing, close the
-    /// decoy, close the job PDA, and permanently strand the real escrow.
-    #[account(
-        mut,
-        seeds = [VAULT_SEED, job_escrow.key().as_ref()],
-        bump,
-        constraint = escrow_token_account.owner == job_escrow.key(),
-        constraint = escrow_token_account.mint == job_escrow.token_mint @ CovError::MintMismatch,
-    )]
-    pub escrow_token_account: Box<InterfaceAccount<'info, TokenAccount>>,
-
-    #[account(
-        mut,
-        constraint = poster_token_account.owner == poster.key(),
-        constraint = poster_token_account.mint == escrow_token_account.mint,
-    )]
-    pub poster_token_account: Box<InterfaceAccount<'info, TokenAccount>>,
-
-    #[account(
-        init_if_needed,
-        payer = signer,
-        space = AgentReputation::LEN,
-        seeds = [REPUTATION_SEED, job_escrow.taker.as_ref()],
-        bump,
-    )]
-    pub taker_reputation: Box<Account<'info, AgentReputation>>,
-
-    #[account(address = job_escrow.token_mint @ CovError::MintMismatch)]
-    pub token_mint: Box<InterfaceAccount<'info, Mint>>,
+    pub rent_payer: UncheckedAccount<'info>,
     pub token_program: Interface<'info, TokenInterface>,
-    pub system_program: Program<'info, System>,
 }
 
 pub fn handler(ctx: Context<CancelJob>) -> Result<()> {
-    let clock = Clock::get()?;
-
-    let (path_a, path_b) = {
-        let job = &ctx.accounts.job_escrow;
-
-        let path_a = job.status == JobStatus::Open
-            && ctx.accounts.signer.key() == job.poster;
-
-        let path_b = job.status == JobStatus::Accepted
-            && clock.unix_timestamp > job.deadline
-            && (ctx.accounts.signer.key() == job.poster
-                || ctx.accounts.signer.key() == job.taker);
-
-        if !path_a && !path_b {
-            // Produce specific errors for better UX
-            match job.status {
-                JobStatus::Open => return Err(error!(CovError::Unauthorized)),
-                JobStatus::Accepted => return Err(error!(CovError::DeadlineNotExpired)),
-                _ => return Err(error!(CovError::InvalidStatus)),
-            }
-        }
-
-        (path_a, path_b)
-    };
-
-    // Build PDA signer seeds
-    let job = &ctx.accounts.job_escrow;
-    let poster_key = ctx.accounts.poster.key();
-    let spec_hash = job.spec_hash;
-    let bump = job.bump;
-    let seeds: &[&[u8]] = &[JOB_SEED, poster_key.as_ref(), spec_hash.as_ref(), &[bump]];
-    let signer_seeds = &[seeds];
-
-    // 1. Transfer escrow balance back to poster
-    let escrow_balance = ctx.accounts.escrow_token_account.amount;
-    if escrow_balance > 0 {
-        let transfer_ctx = CpiContext::new_with_signer(
-            ctx.accounts.token_program.key(),
-            TransferChecked {
-                from: ctx.accounts.escrow_token_account.to_account_info(),
-                mint: ctx.accounts.token_mint.to_account_info(),
-                to: ctx.accounts.poster_token_account.to_account_info(),
-                authority: ctx.accounts.job_escrow.to_account_info(),
-            },
-            signer_seeds,
-        );
-        token_interface::transfer_checked(transfer_ctx, escrow_balance, ctx.accounts.token_mint.decimals)?;
+    let now = Clock::get()?.unix_timestamp;
+    let accounts = &ctx.accounts;
+    let job = &accounts.job;
+    match job.status {
+        JobStatus::Open | JobStatus::Funded => {}
+        JobStatus::Accepted => require!(now > job.deadline, EscrowError::DeadlineNotExpired),
+        _ => return err!(EscrowError::InvalidStatus),
     }
 
-    // 2. Close escrow token account, rent refund to poster
-    let close_ctx = CpiContext::new_with_signer(
-        ctx.accounts.token_program.key(),
+    let bump = [job.bump];
+    let seeds: &[&[u8]] = &[
+        JOB_SEED,
+        job.institution.as_ref(),
+        job.spec_hash.as_ref(),
+        &bump,
+    ];
+    let signer = &[seeds];
+    let refunded_amount = accounts.vault.amount;
+    if refunded_amount > 0 {
+        token_interface::transfer_checked(
+            CpiContext::new_with_signer(
+                accounts.token_program.key(),
+                TransferChecked {
+                    from: accounts.vault.to_account_info(),
+                    mint: accounts.mint.to_account_info(),
+                    to: accounts.institution_token_account.to_account_info(),
+                    authority: job.to_account_info(),
+                },
+                signer,
+            ),
+            refunded_amount,
+            accounts.mint.decimals,
+        )?;
+    }
+    token_interface::close_account(CpiContext::new_with_signer(
+        accounts.token_program.key(),
         CloseAccount {
-            account: ctx.accounts.escrow_token_account.to_account_info(),
-            destination: ctx.accounts.poster.to_account_info(),
-            authority: ctx.accounts.job_escrow.to_account_info(),
+            account: accounts.vault.to_account_info(),
+            destination: accounts.rent_payer.to_account_info(),
+            authority: job.to_account_info(),
         },
-        signer_seeds,
-    );
-    token_interface::close_account(close_ctx)?;
+        signer,
+    ))?;
 
-    // 3. Path B: mark taker as failed
-    if path_b {
-        let reputation = &mut ctx.accounts.taker_reputation;
-        if reputation.address == Pubkey::default() {
-            reputation.address = ctx.accounts.job_escrow.taker;
-            reputation.bump = ctx.bumps.taker_reputation;
-        }
-        reputation.jobs_failed = reputation
-            .jobs_failed
-            .checked_add(1)
-            .ok_or_else(|| error!(CovError::MathOverflow))?;
-        if reputation.first_job_at == 0 {
-            reputation.first_job_at = clock.unix_timestamp;
-        }
-    }
-
-    // 4. Mark job cancelled (account is being closed via `close = poster`)
-    let job = &mut ctx.accounts.job_escrow;
+    let job = &mut ctx.accounts.job;
     job.status = JobStatus::Cancelled;
-
-    msg!(
-        "Job cancelled: path_a={}, path_b={}, signer={}",
-        path_a,
-        path_b,
-        ctx.accounts.signer.key()
-    );
-
+    job.settled_at = now;
+    emit!(JobCancelled {
+        job: job.key(),
+        refunded_amount,
+    });
     Ok(())
 }

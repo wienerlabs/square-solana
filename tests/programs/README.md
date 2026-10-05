@@ -49,9 +49,10 @@ anahtarlar kullanılmalıdır (BC-29).
 
 ## Testler (`tests/`)
 
-`square_registry` (BC-15, BC-27) ve `square_policy` (BC-17) sözleşme arayüzündedir. Diğerleri henüz kaynak
-projelerin arayüzündedir (Aperture verifier, Covenant escrow); sözleşmeye (`idl/`) taşındıkça testleri de
-taşınır: BC-21, BC-22.
+`square_registry` (BC-15, BC-27), `square_policy` (BC-17, BC-18) ve `square_escrow`'un iş yaşam döngüsü
+(BC-22) sözleşme arayüzündedir. Verifier henüz Aperture'ın arayüzündedir; sözleşmeye (`idl/`) taşınınca
+testleri de taşınır: BC-21. Escrow testleri registry ve policy programlarını da yükler; agent kaydı,
+screening, kurum ve politika programların kendi instruction'larıyla kurulur (`escrow_world/`).
 
 | Dosya | Kapsam |
 |---|---|
@@ -59,4 +60,5 @@ taşınır: BC-21, BC-22.
 | `screening.rs` | Registry config'ini yalnızca yükseltme yetkilisinin kurması; screening kaydını yalnızca screener'ın yazması, üzerine yazma, screener ve ömür rotasyonu; escrow okumasının (`square_common::screening`) programın yazdığı hesapla temiz / bayat / işaretli / başka cüzdan ayrımı |
 | `policy.rs` | Kurum ve politika commitment'ı (yalnızca commitment ve public tavan, sabit hesap boyutu, event'ler); her güncellemede sürüm artışı; kapalı politikanın güncellenmemesi; tavan 0, uzun ad ve yabancı imzacı reddi; Squads'a ait olmayan, `Multisig` olmayan ya da argümanla uyuşmayan hesabın reddi; multisig bağlanınca yalnızca vault PDA'sının yetkili olması, vault'un yeniden bağlaması ve eski vault'un reddi; alıcı listesi kökü (BC-18): yalnızca güncel yetkili yayımlar, kapalı politikada ret, `BuyerRootCommitted` ve yayımlanan köke karşı kanıt doğrulaması |
 | `verifier.rs` | Günlük sayacın ayarlanan saatte UTC gün başına bağlanması |
-| `escrow.rs` | Yükseltme yetkilisinin config'i kurması; USDC'yle iş açma, kabul, teslim; challenge penceresi bitmeden (son saniye dahil) finalize reddi, saat pencerenin sonuna gelince ödeme |
+| `escrow.rs` | Config'i yalnızca yükseltme yetkilisinin kurması ve parametre / arbitrator seti doğrulaması; `update_params`'ı yalnızca admin; `create_job`: rent'i rol imzacısından ayrı `payer` öder, iş kayıtlı ve `Active` agent'a bağlanır (registry'ye ait olmayan, `Inactive`, silinmiş kayıt reddi), policy anlık görüntüsü, policy'nin ve kurumunun owner / PDA / yetkili / etkinlik denetimi, Squads vault'u kurum olarak, tek settlement mint'i, sahte vault reddi |
+| `escrow_lifecycle.rs` | `fund_job`: iki tarafın temiz ve taze screening'i (kayıt yok / işaretli / bayat), başkasının token hesabı, başka mint, Travel Rule eşiği, deadline; fonlanmamış işin kabul edilememesi; kabulü ve teslimi yalnızca job'a bağlı agent cüzdanı yapar (başka imzacı, başka agent'ın kaydı, farklı spec, `Inactive` kabul edemez ama teslim eder, silinmiş kayıt teslim edemez, deadline, URI sınırı), challenge penceresi; `cancel_job`: iade, vault'un kapanıp rent'inin `rent_payer`'a dönmesi, yetkisiz kurum, sahte vault, kabul edilmiş işte deadline, teslim edilmiş işte ret; `sync_agent_wallet`: cüzdan rotasyonunda job'u yalnızca kayıt sahibi taşır |

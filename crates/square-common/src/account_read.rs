@@ -65,6 +65,23 @@ pub fn read_pda<T: AccountDeserialize>(
     deserialize(info)
 }
 
+/// Owner'ı `owner` olan hesabı `T` olarak okur; adresi doğrulamaz. Seed'leri hesabın kendi alanlarında
+/// olan kayıtlar için (ör. `AgentRecord`: `creator`, `agent_id`, `bump`): okuyan, adresi ardından bu
+/// alanlarla [`verify_pda_with_bump`]'tan geçirir.
+pub fn read_owned<T: AccountDeserialize>(info: &AccountInfo, owner: &Pubkey) -> ReadResult<T> {
+    if info.owner != owner {
+        return Err(AccountReadError::WrongOwner);
+    }
+    deserialize(info)
+}
+
+/// Adresi daha önce owner ve seed'leriyle doğrulanıp okuyanın kendi hesabına bağlanmış bir hesabı
+/// (ör. `create_job`'da doğrulanan `job.agent_record`) `T` olarak çözer. Owner ve adres yeniden
+/// denetlenmez: bağlayan hesap, adresin eşleştiğini kısıtla sağlamalıdır.
+pub fn read_bound<T: AccountDeserialize>(info: &AccountInfo) -> ReadResult<T> {
+    deserialize(info)
+}
+
 /// [`read_pda`] ile aynı; bump bilindiği için adres `create_program_address` ile doğrulanır.
 pub fn read_pda_with_bump<T: AccountDeserialize>(
     info: &AccountInfo,
@@ -180,6 +197,50 @@ mod tests {
             verify_pda(&foreign, &program_id(), seeds),
             Err(AccountReadError::WrongAddress)
         );
+    }
+
+    #[test]
+    fn reads_owned_account_then_verifies_its_own_seeds() {
+        let inst = institution();
+        let seeds: &[&[u8]] = &[OPERATOR_STATE_SEED, inst.as_ref()];
+        let (address, bump) = Pubkey::find_program_address(seeds, &program_id());
+        let read = with_account(address, program_id(), operator_state(bump), |info| {
+            read_owned::<OperatorState>(info, &program_id())
+        })
+        .unwrap();
+        // Seed'ler okunan kaydın alanlarından.
+        assert_eq!(
+            verify_pda_with_bump(
+                &address,
+                &program_id(),
+                &[OPERATOR_STATE_SEED, read.institution.as_ref()],
+                read.bump
+            ),
+            Ok(())
+        );
+        let other = Pubkey::new_from_array([8; 32]);
+        let result = with_account(address, other, operator_state(bump), |info| {
+            read_owned::<OperatorState>(info, &program_id())
+        });
+        assert_eq!(result.unwrap_err(), AccountReadError::WrongOwner);
+        let result = with_account(address, program_id(), vec![0; 3], |info| {
+            read_owned::<OperatorState>(info, &program_id())
+        });
+        assert_eq!(result.unwrap_err(), AccountReadError::InvalidData);
+    }
+
+    #[test]
+    fn reads_bound_account_by_discriminator_only() {
+        let other = Pubkey::new_from_array([8; 32]);
+        let read = with_account(institution(), other, operator_state(1), |info| {
+            read_bound::<OperatorState>(info)
+        })
+        .unwrap();
+        assert_eq!(read.daily_spent, 125_000_000);
+        let result = with_account(institution(), other, operator_state(1), |info| {
+            read_bound::<VerifierConfig>(info)
+        });
+        assert_eq!(result.unwrap_err(), AccountReadError::InvalidData);
     }
 
     #[test]

@@ -9,7 +9,7 @@ import {
   describeDiff,
   firstDifference,
 } from './idl-conformance.mjs';
-import { PROGRAMS } from './programs.mjs';
+import { PROGRAMS, SECTIONS } from './programs.mjs';
 
 const readIdl = (name) => JSON.parse(readFileSync(new URL(`../../idl/${name}.json`, import.meta.url), 'utf8'));
 const policy = () => readIdl('square_policy_contract');
@@ -167,13 +167,28 @@ test('liste girdileri doğrulanıyor', () => {
   }
 });
 
-test('repo listesi geçerli: her sözleşme IDL bir programa bağlı', () => {
+/** Sözleşmeden `pending` öğeleri çıkarılmış IDL: listeye uyan bir programın derlenmiş IDL'i. */
+function withoutPending(idl, pending = []) {
+  const copy = structuredClone(idl);
+  for (const entry of pending) {
+    for (const section of SECTIONS) {
+      const names = new Set(entry[section] ?? []);
+      if (names.size > 0) copy[section] = copy[section].filter((item) => !names.has(item.name));
+    }
+  }
+  return copy;
+}
+
+test('repo listesi geçerli: her sözleşme IDL bir programa bağlı, pending öğeler sözleşmede', () => {
   const contractNames = PROGRAMS.map((p) => p.contract);
   const { errors } = checkPrograms({
     programs: PROGRAMS,
     anchorNames: PROGRAMS.map((p) => p.name),
     contractNames,
-    readBuilt: (name) => readIdl(PROGRAMS.find((p) => p.name === name).contract),
+    readBuilt: (name) => {
+      const program = PROGRAMS.find((p) => p.name === name);
+      return withoutPending(readIdl(program.contract), program.pending);
+    },
     readContract: readIdl,
   });
   // Legacy programlar sözleşmenin kendisiyle beslenince "artık contract yap" hatası verir; başka hata yok.
