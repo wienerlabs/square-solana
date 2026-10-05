@@ -1,41 +1,34 @@
 use anchor_lang::prelude::*;
-use square_common::seeds::JOB_SEED;
 
-use crate::errors::CovError;
-use crate::state::{JobEscrow, JobStatus};
+use crate::errors::EscrowError;
+use crate::instructions::agent_job::AgentJob;
+use crate::linked;
+use crate::state::JobStatus;
+use crate::JobAccepted;
 
-#[derive(Accounts)]
-#[instruction(spec_hash: [u8; 32])]
-pub struct AcceptJob<'info> {
-    #[account(mut)]
-    pub taker: Signer<'info>,
+pub fn handler(ctx: Context<AgentJob>, spec_hash: [u8; 32]) -> Result<()> {
+    let now = Clock::get()?.unix_timestamp;
+    let job = &ctx.accounts.job;
+    require_keys_eq!(
+        ctx.accounts.agent.key(),
+        job.agent_wallet,
+        EscrowError::AgentMismatch
+    );
+    match job.status {
+        JobStatus::Funded => {}
+        JobStatus::Open => return err!(EscrowError::JobNotFunded),
+        _ => return err!(EscrowError::InvalidStatus),
+    }
+    require!(job.spec_hash == spec_hash, EscrowError::SpecHashMismatch);
+    require!(now < job.deadline, EscrowError::DeadlineExpired);
+    linked::require_active(&linked::bound_agent(&ctx.accounts.agent_record)?)?;
 
-    #[account(
-        mut,
-        seeds = [JOB_SEED, poster.key().as_ref(), &spec_hash],
-        bump = job_escrow.bump,
-    )]
-    pub job_escrow: Box<Account<'info, JobEscrow>>,
-
-    /// CHECK: validated via PDA seeds and by matching job_escrow.poster
-    #[account(
-        constraint = poster.key() == job_escrow.poster @ CovError::Unauthorized,
-    )]
-    pub poster: AccountInfo<'info>,
-}
-
-pub fn handler(ctx: Context<AcceptJob>, spec_hash: [u8; 32]) -> Result<()> {
-    let job = &mut ctx.accounts.job_escrow;
-    let clock = Clock::get()?;
-
-    require!(job.status == JobStatus::Open, CovError::InvalidStatus);
-    require!(job.spec_hash == spec_hash, CovError::SpecHashMismatch);
-    require!(clock.unix_timestamp < job.deadline, CovError::DeadlineExpired);
-
-    job.taker = ctx.accounts.taker.key();
+    let job = &mut ctx.accounts.job;
     job.status = JobStatus::Accepted;
-
-    msg!("Job accepted by taker={}", job.taker);
-
+    emit!(JobAccepted {
+        job: job.key(),
+        agent_record: job.agent_record,
+        agent_wallet: job.agent_wallet,
+    });
     Ok(())
 }

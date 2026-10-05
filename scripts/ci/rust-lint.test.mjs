@@ -14,8 +14,16 @@ const members = [
 test('legacy programlar katı kapsamın dışında, crates/* katı', () => {
   const scope = classifyMembers(members, PROGRAMS);
   assert.deepEqual(scope.errors, []);
-  assert.deepEqual(scope.strict, ['square-common', 'square-policy', 'square-registry']);
-  assert.deepEqual(scope.legacy, ['square-escrow', 'verifier']);
+  const legacy = PROGRAMS.filter((p) => p.status === 'legacy').map((p) => p.crate);
+  assert.deepEqual(scope.legacy, [...legacy].sort());
+  assert.deepEqual(
+    scope.strict,
+    members
+      .map((m) => m.name)
+      .filter((name) => !legacy.includes(name))
+      .sort(),
+  );
+  assert.ok(scope.strict.includes('square-common'));
 });
 
 test("listede olmayan program crate'i ve workspace'te olmayan program hata", () => {

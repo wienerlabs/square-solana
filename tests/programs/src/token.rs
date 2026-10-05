@@ -77,15 +77,16 @@ pub fn mint_to(
     h.send(&[ix], &[authority]).expect("basım yapılamadı");
 }
 
-/// Token hesabının bakiyesi (taban birim). Hesap yoksa ya da kapatılmışsa None.
-pub fn balance(h: &Harness, token_account: &Pubkey) -> Option<u64> {
-    let account = h.raw_account(token_account)?;
+/// Token hesabının durumu (sahip, mint, bakiye). Hesap yoksa ya da kapatılmışsa None.
+pub fn token_account(h: &Harness, address: &Pubkey) -> Option<TokenAccount> {
+    let account = h.raw_account(address)?;
     if account.data.is_empty() {
         return None;
     }
-    Some(
-        TokenAccount::unpack(&account.data)
-            .expect("token hesabı çözülemedi")
-            .amount,
-    )
+    Some(TokenAccount::unpack(&account.data).expect("token hesabı çözülemedi"))
+}
+
+/// Token hesabının bakiyesi (taban birim). Hesap yoksa ya da kapatılmışsa None.
+pub fn balance(h: &Harness, token_account: &Pubkey) -> Option<u64> {
+    self::token_account(h, token_account).map(|account| account.amount)
 }

@@ -1,7 +1,11 @@
+//! square_escrow hata kodları (program arayüzü §10.4). Sıra sözleşmedir: kodlar 6000'den başlar ve
+//! istemciler hatayı (program kimliği, kod) çiftiyle eşler.
+
 use anchor_lang::prelude::*;
 
 #[error_code]
-pub enum CovError {
+pub enum EscrowError {
+    // ---- job lifecycle (Covenant guards kept) ----
     #[msg("Job is not in the required status for this operation")]
     InvalidStatus,
     #[msg("Job deadline has passed")]
@@ -20,48 +24,87 @@ pub enum CovError {
     DeliveryUriTooLong,
     #[msg("Challenge period has not expired yet")]
     ChallengePeriodNotExpired,
+    #[msg("Token mint is not the settlement mint or the job mint")]
+    MintMismatch,
+    #[msg("Math overflow")]
+    MathOverflow,
+    #[msg("Job is not funded")]
+    JobNotFunded,
+    // ---- agent binding / screening ----
+    #[msg("Agent record is not a registered square_registry account")]
+    AgentNotRegistered,
+    #[msg("Agent record is not active")]
+    AgentInactive,
+    #[msg("Signer does not match the job's agent wallet")]
+    AgentMismatch,
+    #[msg("Screening record missing or not owned by square_registry")]
+    ScreeningRequired,
+    #[msg("Screening record has expired")]
+    ScreeningExpired,
+    #[msg("Wallet is flagged by sanctions screening")]
+    ScreeningFlagged,
+    // ---- disputes ----
     #[msg("Challenge window has already closed")]
     DisputeWindowClosed,
     #[msg("Dispute is already active on this job")]
     DisputeAlreadyActive,
-    #[msg("No dispute active for this job")]
+    #[msg("This job already had a dispute")]
+    DisputeAlreadyRaised,
+    #[msg("No active dispute on this job")]
     NoActiveDispute,
     #[msg("Insufficient dispute bond provided")]
     InsufficientBond,
-    #[msg("Signer is not a whitelisted arbitrator")]
+    #[msg("Signer is not an active arbitrator")]
     NotArbitrator,
-    #[msg("Arbitrator has already approved this resolution")]
-    AlreadyApproved,
-    #[msg("Dispute resolution requires approval from multiple arbitrators")]
-    InsufficientApprovals,
-    #[msg("Pending resolution does not match requested resolution")]
+    #[msg("Arbitrator has already voted on this dispute")]
+    AlreadyVoted,
+    #[msg("Vote does not match the pending resolution")]
     ResolutionMismatch,
-    #[msg("Split resolution amount exceeds escrow balance")]
+    #[msg("Dispute has not reached the arbitrator threshold")]
+    ResolutionNotDecided,
+    #[msg("Split amount exceeds the escrowed amount")]
     InvalidSplitAmount,
-    #[msg("Protocol config already initialized")]
-    ConfigAlreadyInitialized,
-    #[msg("Protocol config not initialized")]
-    ConfigNotInitialized,
-    #[msg("Arbitrator threshold must be between 2 and ARBITRATOR_COUNT")]
+    #[msg("Threshold must satisfy 2 <= M <= N")]
     InvalidThreshold,
-    #[msg("Math overflow")]
-    MathOverflow,
-    #[msg("Token mint does not match the escrow's original mint")]
-    MintMismatch,
-
-    // ---- Covenant Credit (claim listings) ----
-    #[msg("Claim listing price must be greater than zero and less than the escrow face value")]
+    #[msg("Arbitrator set exceeds MAX_ARBITRATORS or contains duplicates")]
+    InvalidArbitratorSet,
+    #[msg("Dispute deadline has not passed yet")]
+    DisputeNotExpired,
+    // ---- claim market ----
+    #[msg("Claim price must be greater than zero and less than the face value")]
     InvalidClaimPrice,
-    #[msg("Claim listing already exists for this job")]
-    ClaimListingAlreadyExists,
     #[msg("Claim listing is not in the required status for this operation")]
     InvalidClaimStatus,
-    #[msg("Claim listing references a different JobEscrow")]
+    #[msg("Claim listing references a different job")]
     ClaimListingMismatch,
-    #[msg("A bought claim listing exists; payment must route to the buyer (pass the ClaimListing account)")]
+    #[msg("A bought claim exists; payment must route to the buyer")]
     ClaimListingRequired,
-    #[msg("Only the original seller may cancel this listing")]
+    #[msg("Only the seller may cancel this listing")]
     NotClaimSeller,
-    #[msg("Buyer may not be the same wallet as the seller")]
+    #[msg("Buyer may not be the seller")]
     BuyerIsSeller,
+    #[msg("Buyer is not in the institution's approved buyer set")]
+    BuyerNotEligible,
+    #[msg("Listing price differs from the expected price")]
+    ClaimPriceChanged,
+    // ---- proof gate / keeper ----
+    #[msg("Policy job: a release proof must be bound before release")]
+    ProofRequired,
+    #[msg("Release proof has the wrong owner, seeds or job")]
+    InvalidReleaseProof,
+    #[msg("Release proof is stale (payee, net amount, mint or daily counter changed)")]
+    StaleReleaseProof,
+    #[msg("Policy account does not match the job policy")]
+    PolicyMismatch,
+    #[msg("Policy is not active")]
+    PolicyInactive,
+    #[msg("Keeper fee exceeds the allowed maximum")]
+    InvalidKeeperFee,
+    #[msg("Account owner does not match the linked program in the config")]
+    LinkedProgramMismatch,
+    // ---- drafts (M5) ----
+    #[msg("Proof timeout has not passed yet")]
+    ProofTimeoutNotReached,
+    #[msg("Travel Rule commitment required above the threshold")]
+    TravelRuleCommitmentRequired,
 }
