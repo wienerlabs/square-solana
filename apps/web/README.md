@@ -9,6 +9,7 @@ Square'in web uygulaması: Next.js 16 (App Router), React 19, Tailwind CSS 4 ve 
 | `/app/policy` | Kurumun harcama politikası: sır, kural editörü, alıcı listesi, zincire gidecek değerler (FE-04) |
 | `/app/agent` | Agent kaydı: kimlik, DID ve kayıt adresi tx'ten önce, kartın indirilip doğrulanması, `register_agent` (FE-05) |
 | `/app/did` | did:aip çözümü: kayıt zincirden, kart kendi adresinden; DID belgesi ve meta verisi. `?did=` ile paylaşılır (FE-05) |
+| `/app/jobs/new` | İş açma ve fonlama: agent, tutar, deadline, challenge süresi, politika bağlama, iş tanımı ve hash'i, iki tarafın screening'i, `create_job` + `fund_job` (FE-06) |
 | `/design` | Bileşen kataloğu |
 | `/healthz` | Sağlık kontrolü (Railway) |
 
@@ -74,6 +75,21 @@ kimliğinden türetilir. did:aip v1 programının kimliği (`CgchXu…Vbc`) redd
 | Çözüm | `@squaresdk/solana-identity`'nin `resolveDid`'i uygulamanın bağlantısıyla: başka bir ağın DID'i `unsupportedChain`. Kart durumu (doğrulandı, yok, ulaşılamadı, hash uyuşmuyor, geçersiz), sahip, agent cüzdanı, kayıt ve güncelleme zamanı, okunan slot, servisler ve DID belgesi |
 
 Profil sayfasındaki itibar, validation geçmişi ve işler ile agent dizini, indexer ve API'yi (BE-14, BE-18) bekliyor.
+
+## İş açma ve fonlama (FE-06)
+
+Institution rolündeki cüzdan için; yalnızca `SQUARE_PROGRAM_ID_ESCROW` gerekir. Registry, policy ve verifier
+programlarının kimlikleri, challenge süresi sınırları ve settlement mint'i escrow'un `EscrowConfig`
+hesabından okunur (program arayüzü §4). Tx'ler SDK'nın akışıyla (`flow.createJob`, `flow.fundJob`) kurulur.
+
+| Parça | Davranış |
+|---|---|
+| Agent | did:aip v2 Solana DID'i ya da `AgentRecord` adresi. DID bu ağın ve escrow'un okuduğu registry'nin olmalı; kayıt zincirden okunur, yalnızca etkin agent iş alır. Ödeme kaydın `wallet`'ına |
+| Şartlar | Tutar USDC olarak (mint'in ondalığıyla), deadline yerel saatle, challenge süresi dakika olarak config'in sınırlarında. Politika, bu tarayıcıda commit edilmiş etkin politikalardan seçilir (FE-04); bağlanırsa release ispata bağlanır. Tutar politikanın public tavanını aşarsa uyarı |
+| İş tanımı | JSON nesnesi; A2A ile agent'a gider, zincire yalnızca RFC 8785 kanonik biçiminin SHA-256'sı (`spec_hash`). Job adresi kurum + hash'ten türer; aynı tanımla açılmış iş varsa durumu gösterilir ve fonlanabilir |
+| Screening | Kurumun ve agent cüzdanının `ScreeningRecord`'u, escrow'un kuralıyla (`square_common::screening`): kayıt yok, işaretli, süresi dolmuş. Biri temiz değilse fonlama kapanır ve hangi cüzdanın neden kapattığı yazılır; program yine reddederse `ScreeningRequired` / `ScreeningExpired` / `ScreeningFlagged` aynı açıklamayla gösterilir, iş açık kalır |
+| Fonlama | Kurumun USDC bakiyesi yetmiyorsa ya da tutar Travel Rule eşiğindeyse (BC-34) fonlama kapanır |
+| Tx | İki tx, kurum cüzdanının imzasıyla: `create_job` (iş ve vault), `fund_job` (tutar vault'a). Escrow hata kodu IDL'deki mesajıyla. Hesaplar ağ doğrulanmadan okunmaz |
 
 ## Tasarım sistemi
 

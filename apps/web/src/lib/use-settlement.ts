@@ -43,12 +43,16 @@ export type TokenBalance =
   | { state: 'ready'; account: string; amount: bigint | null }
   | { state: 'error'; message: string };
 
-/** Sahibin settlement token bakiyesi (associated token account); hesap değişince güncellenir. */
-export function useTokenBalance(owner: PublicKey, token: SettlementToken): TokenBalance {
+/**
+ * Sahibin settlement token bakiyesi (associated token account); hesap değişince güncellenir. Token henüz
+ * bilinmiyorsa (`null`) okunmaz, `loading` kalır.
+ */
+export function useTokenBalance(owner: PublicKey, token: SettlementToken | null): TokenBalance {
   const { connection } = useConnection();
   const [balance, setBalance] = useState<TokenBalance>({ state: 'loading' });
 
   useEffect(() => {
+    if (!token) return;
     let active = true;
     const account = settlementAccount(owner, token);
     const update = (info: Parameters<typeof tokenAmount>[1]) =>
