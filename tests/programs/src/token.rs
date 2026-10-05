@@ -19,7 +19,12 @@ pub const USDC_DECIMALS: u8 = 6;
 
 /// `authority`'nin bastığı yeni bir mint.
 pub fn create_mint(h: &mut Harness, authority: &Pubkey, decimals: u8) -> Pubkey {
-    let mint = Keypair::new();
+    create_mint_at(h, &Keypair::new(), authority, decimals)
+}
+
+/// Adresi `mint` anahtarı olan mint: adresi önceden bilinmesi gereken fikstürler için (ör. release
+/// ispatının mint sinyali).
+pub fn create_mint_at(h: &mut Harness, mint: &Keypair, authority: &Pubkey, decimals: u8) -> Pubkey {
     let rent = h.svm.minimum_balance_for_rent_exemption(Mint::LEN);
     let create = solana_system_interface::instruction::create_account(
         &h.payer.pubkey(),
@@ -36,7 +41,7 @@ pub fn create_mint(h: &mut Harness, authority: &Pubkey, decimals: u8) -> Pubkey 
         decimals,
     )
     .expect("initialize_mint2");
-    h.send(&[create, init], &[&mint])
+    h.send(&[create, init], &[mint])
         .expect("mint oluşturulamadı");
     mint.pubkey()
 }

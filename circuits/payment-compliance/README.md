@@ -21,10 +21,11 @@ npm run fetch-ptau                     # PPoT katkı 80, 2^14 (~19 MB), sha256 v
 npm test                               # 52 test; tamper testleri gerçek Groth16 ispatı üretir
 npm run inputs                         # test-inputs/'u yeniden üretir (--check: güncel mi)
 npm run artifacts:check                # release artefaktlarını yeniden üretip karşılaştırır (Node 24)
+npm run program-proofs                 # square_verifier testlerinin gerçek ispatları (--check: geçerli mi)
 scripts/clean-room.sh check            # aynısı, commit'lenmiş HEAD'in Docker'daki temiz klonunda
 ```
 
-`npm test`, derleme yoksa devre testlerini, PPoT dosyası yoksa tamper testlerini atlar ve sebebini yazar. CI'da (`CIRCUIT_TESTS_STRICT=1`, [`circuits.yml`](../../.github/workflows/circuits.yml)) atlamaz, düşer; CI ayrıca `inputs:check` ve `artifacts:check`'i koşturur.
+`npm test`, derleme yoksa devre testlerini, PPoT dosyası yoksa tamper testlerini atlar ve sebebini yazar. CI'da (`CIRCUIT_TESTS_STRICT=1`, [`circuits.yml`](../../.github/workflows/circuits.yml)) atlamaz, düşer; CI ayrıca `inputs:check`, `artifacts:check` ve `program-proofs:check`'i koşturur.
 
 ## Dosyalar
 
@@ -37,6 +38,7 @@ scripts/clean-room.sh check            # aynısı, commit'lenmiş HEAD'in Docker
 | `scripts/fetch-ptau.mjs` | Sabitlenmiş PPoT dosyasını indirir ve hash'ini doğrular |
 | `scripts/build.mjs` | `payment.circom` ve iki zaman damgası test devresini derler, kısıt sayısını yazar |
 | `scripts/release-artifacts.mjs` | Release artefakt hattı: `setup`, `check`, `write` (aşağıda) |
+| `scripts/program-proofs.mjs` | `tests/programs/tests/fixtures/release-proofs.json`: verifier'ın program testleri (BC-21) için yedi senaryonun gerçek ispatı (uyumlu, ret, alıcıya, başka mint, başka politika, ikinci job, güncel sayaç). Senaryolar `release-input.mjs`'in test dünyasında kurulur; testler aynı etiketlerden aynı anahtarları türetir. `--check` her ispatı doğrulama anahtarına ve yeniden hesaplanan sinyallere karşı doğrular |
 | `scripts/clean-room.sh` | Hattı Docker'da temiz klonla çalıştırır (Node `.nvmrc`, circom 2.2.3 resmi ikilisi, sha256 doğrulanır) |
 | `scripts/groth16-solana.mjs`, `scripts/extract-vk-rust.mjs` | snarkjs → groth16-solana bayt düzeni; doğrulama anahtarı → Rust sabiti |
 | `artifacts/` | Release zkey'i, doğrulama anahtarı ve manifest (BC-20) |
@@ -66,7 +68,7 @@ Hat (`scripts/release-artifacts.mjs`):
   - zkey'den çıkarılan doğrulama anahtarı ve Rust sabiti.
 
   Bir fark hata verir. r1cs ve wasm macOS (circom kaynaktan) ile Linux'ta (resmi ikili) aynı hash'i verir.
-- `write [--vector]`: mevcut zkey'den doğrulama anahtarını, Rust dosyasını ve manifest'i yazar. `--vector`, `release_vk_vector.rs`'teki gerçek ispatı yeniler; `cargo test -p verifier` bu ispatı programın kullandığı groth16-solana ile doğrular.
+- `write [--vector]`: mevcut zkey'den doğrulama anahtarını, Rust dosyasını ve manifest'i yazar. `--vector`, `release_vk_vector.rs`'teki gerçek ispatı yeniler; `cargo test -p square-verifier` bu ispatı programın kullandığı groth16-solana ile doğrular.
 
 Hat `.nvmrc`'deki Node sürümüyle (24) çalışır. snarkjs 0.7.6'nın zkey doğrulaması ptau dosyasını açıp kapatmıyor; Node 24 bunu uyarıyla geçer, Node 26 ise hata fırlatır.
 

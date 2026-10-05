@@ -10,6 +10,7 @@
 //! - [`screening`]: sanctions screening kaydının temiz ve taze olması (escrow fonlama, alacak, release).
 //! - [`squads`]: Squads v4 multisig hesabının doğrulanması ve vault PDA'sı.
 //! - [`merkle`]: onaylı alıcı listesinin yaprağı ve Merkle kanıtı doğrulaması (escrow `buy_claim`).
+//! - [`release`]: release ispatının tazeliği ve günlük sayacın gün dönümü (ADR 0012).
 //! - [`events`]: sözleşme event'leri ve programların bunları `#[event]` olarak tanımlayan makroları.
 
 pub mod account_read;
@@ -17,6 +18,7 @@ pub mod constants;
 pub mod contract;
 pub mod events;
 pub mod merkle;
+pub mod release;
 pub mod roles;
 pub mod screening;
 pub mod seeds;

@@ -48,7 +48,7 @@ pub fn linked() -> LinkedPrograms {
     LinkedPrograms {
         registry_program: square_registry::ID,
         policy_program: square_policy::ID,
-        verifier_program: verifier::ID,
+        verifier_program: square_verifier::ID,
     }
 }
 
@@ -123,6 +123,12 @@ pub struct World {
 impl World {
     /// Programlar yüklü, registry config'i kurulu, escrow config'i kurulmamış.
     pub fn deployed(sigverify: bool) -> Self {
+        Self::deployed_with_mint(sigverify, &Keypair::new())
+    }
+
+    /// [`World::deployed`]; settlement mint'i `mint` anahtarının adresinde (adresi önceden bilinmesi
+    /// gereken fikstürler için, ör. release ispatının mint sinyali).
+    pub fn deployed_with_mint(sigverify: bool, mint: &Keypair) -> Self {
         let mut h = if sigverify {
             Harness::new()
         } else {
@@ -157,7 +163,8 @@ impl World {
         h.send(&[ix], &[&admin]).expect("init_registry_config");
 
         let mint_authority = Keypair::new();
-        let usdc = token::create_usdc_mint(&mut h, &mint_authority.pubkey());
+        let usdc =
+            token::create_mint_at(&mut h, mint, &mint_authority.pubkey(), token::USDC_DECIMALS);
         Self {
             h,
             admin,
@@ -169,7 +176,11 @@ impl World {
 
     /// Escrow config'i de kurulmuş dünya.
     pub fn new(sigverify: bool) -> Self {
-        let mut w = Self::deployed(sigverify);
+        Self::configured(Self::deployed(sigverify))
+    }
+
+    /// Escrow config'ini kurar (3 arbitrator, M = 2, [`params`]).
+    pub fn configured(mut w: Self) -> Self {
         let ix = w.init_config_ix(
             &w.admin.pubkey(),
             w.usdc,
@@ -242,8 +253,11 @@ impl World {
     // ------------------------------------------------------------------ registry ve policy
 
     pub fn register_agent(&mut self, agent_id: &str) -> Agent {
+        self.register_agent_with_wallet(agent_id, Keypair::new())
+    }
+
+    pub fn register_agent_with_wallet(&mut self, agent_id: &str, wallet: Keypair) -> Agent {
         let owner = self.h.funded(LAMPORTS);
-        let wallet = Keypair::new();
         let record = agent_record_address(&owner.pubkey(), agent_id);
         let ix = Instruction {
             program_id: square_registry::ID,
@@ -341,7 +355,10 @@ impl World {
 
     /// `amount` USDC'si olan kurum cüzdanı.
     pub fn institution(&mut self, amount: u64) -> Institution {
-        let key = Keypair::new();
+        self.institution_with(Keypair::new(), amount)
+    }
+
+    pub fn institution_with(&mut self, key: Keypair, amount: u64) -> Institution {
         let token_account = token::create_ata(&mut self.h, &key.pubkey(), &self.usdc);
         let mint_authority = self.mint_authority.insecure_clone();
         token::mint_to(
@@ -356,6 +373,16 @@ impl World {
 
     /// `owner` için square_policy kurumu ve `policy_id` politikası.
     pub fn policy(&mut self, owner: &Keypair, policy_id: [u8; 32]) -> PolicyAccounts {
+        self.policy_with(owner, policy_id, COMMITMENT, CEILING)
+    }
+
+    pub fn policy_with(
+        &mut self,
+        owner: &Keypair,
+        policy_id: [u8; 32],
+        commitment: [u8; 32],
+        daily_ceiling: u64,
+    ) -> PolicyAccounts {
         let institution = institution_address(&owner.pubkey());
         let init = Instruction {
             program_id: square_policy::ID,
@@ -373,7 +400,13 @@ impl World {
         };
         self.h.send(&[init], &[owner]).expect("init_institution");
         let policy = policy_address(&institution, &policy_id);
-        let set = self.set_policy_ix(&owner.pubkey(), institution, policy_id);
+        let set = self.set_policy_ix(
+            &owner.pubkey(),
+            institution,
+            policy_id,
+            commitment,
+            daily_ceiling,
+        );
         self.h.send(&[set], &[owner]).expect("set_policy");
         PolicyAccounts {
             policy,
@@ -386,6 +419,8 @@ impl World {
         authority: &Pubkey,
         institution: Pubkey,
         policy_id: [u8; 32],
+        commitment: [u8; 32],
+        daily_ceiling: u64,
     ) -> Instruction {
         Instruction {
             program_id: square_policy::ID,
@@ -399,8 +434,8 @@ impl World {
             .to_account_metas(None),
             data: square_policy::instruction::SetPolicy {
                 policy_id,
-                commitment: COMMITMENT,
-                daily_ceiling: CEILING,
+                commitment,
+                daily_ceiling,
             }
             .data(),
         }

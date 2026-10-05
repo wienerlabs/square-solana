@@ -10,7 +10,9 @@
     "inputs:check": "node scripts/generate_test_inputs.mjs --check",
     "test": "node --test \"test/*.test.mjs\"",
     "artifacts:check": "node scripts/release-artifacts.mjs check",
-    "artifacts:setup": "node scripts/release-artifacts.mjs setup"
+    "artifacts:setup": "node scripts/release-artifacts.mjs setup",
+    "program-proofs": "node scripts/program-proofs.mjs",
+    "program-proofs:check": "node scripts/program-proofs.mjs --check"
   },
   "keywords": [],
   "author": "",

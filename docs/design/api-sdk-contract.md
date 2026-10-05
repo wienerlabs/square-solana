@@ -1,6 +1,6 @@
 # API ve SDK sözleşmesi
 
-**Sözleşme sürümü:** v0.9.0 (taslak) · **Issue:** BE-35 (#102), BC-47 (#119), BE-07 (#39), BE-08 (#40), BE-09 (#41), BE-10 (#42), BE-11 (#44), BC-02 (#2), BE-17 (#50), BC-08 (#8), BC-17 (#25), BC-15 (#24) · **Dayandığı program sözleşmesi:** BC-44 v0.4.0 ([program-interface.md](program-interface.md))
+**Sözleşme sürümü:** v0.9.1 (taslak) · **Issue:** BE-35 (#102), BC-47 (#119), BE-07 (#39), BE-08 (#40), BE-09 (#41), BE-10 (#42), BE-11 (#44), BC-02 (#2), BE-17 (#50), BC-08 (#8), BC-17 (#25), BC-15 (#24), BC-21 (#29) · **Dayandığı program sözleşmesi:** BC-44 v0.4.1 ([program-interface.md](program-interface.md))
 
 Bu doküman Square'in HTTP API'sini ve TypeScript paketlerinin dış yüzeyini sabitler. Frontend (FE-24 veri katmanı) ve servisler (BE-18 API, BE-14 indexer, BE-15 keeper, BE-11 prover) bu sözleşmeye göre geliştirir. `@squaresdk/solana-sdk`'nin zincir tarafı BE-08, `@squaresdk/solana-identity` BE-09, `@squaresdk/solana-policy` BE-10 ile uygulandı; REST client'ın uygulaması BE-18'de. Paketlerde mock, placeholder gövde ya da sabit adres yoktur (proje kuralı).
 
@@ -131,6 +131,7 @@ Tüm `/v1` yanıtları `{ success, data, error, meta }` biçimindedir. `meta.req
 | Sürüm | Değişiklik | Issue / PR |
 |---|---|---|
 | v0.1.0 | İlk taslak: 28 operasyonluk OpenAPI 3.1 spec; IDL'den üretilen zod ve JSON Schema'lar; 4 paketin gövdesiz imzaları; hizalama testleri ve CI | BE-35 (#102) |
+| v0.9.1 | Program sözleşmesi v0.4.1'e dayanır: `set_compliance_proof`'un argüman dokümanları talimatın dokümanına taşındı (SDK IDL kopyaları ve şemalar yeniden üretildi). Tipler, imzalar ve HTTP yüzeyi değişmedi | BC-21 (#29) |
 | v0.9.0 | Program sözleşmesi v0.4.0'a dayanır: registry hatası 6007 `AgentCardHashInvalid`, 6000 `AgentIdInvalid`'ın mesajı (SDK IDL tipleri ve şemalar yeniden üretildi). HTTP yüzeyi değişmedi | BC-15 (#24) |
 | v0.8.0 | Program sözleşmesi v0.3.0'a dayanır: `set_institution_multisig` hesaplarına `squads_multisig` eklendi (SDK IDL tipleri yeniden üretildi), policy hata 6004 `InvalidSquadsMultisig`. HTTP yüzeyi değişmedi | BC-17 (#25) |
 | v0.7.0 | Tek Anchor sürümü 1.2.0 (BC-08, ADR 0007): sdk, identity, policy ve a2a `@coral-xyz/anchor` 0.31.1 yerine `@anchor-lang/core` 1.2.0'a bağlı; SDK'nın dışa verdiği Anchor tipleri (`Program`, `Idl`, IDL'den türetilen tipler) bu paketten. SDK'nın IDL tiplerinde noktalı `path`'ler Anchor 1.2.0 gibi parça parça camelCase (`release_proof.job` → `releaseProof.job`). HTTP yüzeyi değişmedi | BC-08 (#8) |

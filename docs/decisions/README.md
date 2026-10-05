@@ -16,6 +16,7 @@ Mimari karar kayıtları (ADR). Her karar ayrı bir dosyada, sıra numarasıyla 
 | [0009](0009-tek-postgres-ve-prisma.md) | Veritabanı: tek Postgres ve Prisma | BE-06 (#20) |
 | [0010](0010-cuzdan-wallet-adapter-react.md) | Cüzdan bağlantısı: `@solana/wallet-adapter-react` | BE-06 (#20) |
 | [0011](0011-monorepo-araclari-pnpm-ve-turborepo.md) | Monorepo araçları: pnpm workspaces ve Turborepo | BE-06 (#20) |
+| [0012](0012-ispat-tazeligi-ve-gunluk-sayac.md) | Release ispatının tazeliği ve günlük sayacın yalnızca release'te ilerlemesi | BC-21 (#29) |
 
 ## §12 kararlarının karşılığı
 

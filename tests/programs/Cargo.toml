@@ -16,6 +16,7 @@ anchor-lang = "1.2.0"
 base64 = "0.22"
 litesvm = "0.16.0"
 solana-account = "4"
+solana-compute-budget-interface = "3"
 solana-instruction-error = "2"
 solana-keypair = "3"
 solana-loader-v3-interface = "8"
@@ -31,7 +32,10 @@ spl-token-interface = "2"
 square-common = { path = "../../crates/square-common" }
 
 [dev-dependencies]
+# Verifier testlerinin release ispatı fikstürü (tests/fixtures/release-proofs.json).
+serde_json = "1"
+solana-sha256-hasher = "3"
 square-registry = { path = "../../programs/square-registry", features = ["no-entrypoint"] }
 square-policy = { path = "../../programs/square-policy", features = ["no-entrypoint"] }
 square-escrow = { path = "../../programs/square-escrow", features = ["no-entrypoint"] }
-verifier = { path = "../../programs/square-verifier", features = ["no-entrypoint"] }
+square-verifier = { path = "../../programs/square-verifier", features = ["no-entrypoint"] }
