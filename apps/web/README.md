@@ -10,7 +10,7 @@ Square'in web uygulaması: Next.js 16 (App Router), React 19, Tailwind CSS 4 ve 
 | `/app/agent` | Agent kaydı: kimlik, DID ve kayıt adresi tx'ten önce, kartın indirilip doğrulanması, `register_agent` (FE-05) |
 | `/app/did` | did:aip çözümü: kayıt zincirden, kart kendi adresinden; DID belgesi ve meta verisi. `?did=` ile paylaşılır (FE-05) |
 | `/app/jobs/new` | İş açma ve fonlama: agent, tutar, deadline, challenge süresi, politika bağlama, iş tanımı ve hash'i, iki tarafın screening'i, `create_job` + `fund_job` (FE-06) |
-| `/app/jobs/[job]` | İş detayı: zincirdeki job, event'lerden canlı zaman çizelgesi, zincir saatine göre challenge sayacı; agent cüzdanı için kabul ve teslim (FE-07); alacağın listelenmesi, geri çekilmesi ve onaylı alıcının alımı, payee (FE-08) |
+| `/app/jobs/[job]` | İş detayı: zincirdeki job, event'lerden canlı zaman çizelgesi, zincir saatine göre challenge sayacı; agent cüzdanı için kabul ve teslim (FE-07); alacağın listelenmesi, geri çekilmesi ve onaylı alıcının alımı, payee (FE-08); uyum ispatının durumu, kurumun ispatı üretip bağlaması (FE-09) |
 | `/app/claims` | Alacak piyasası: satıştaki alacaklar, fiyat, iskonto, kimin alabileceği (FE-08) |
 | `/design` | Bileşen kataloğu |
 | `/healthz` | Sağlık kontrolü (Railway) |
@@ -23,6 +23,7 @@ Değerler ortamdan gelir ve kök layout'ta **istek anında, sunucuda** okunur (`
 |---|---|
 | `SQUARE_SOLANA_CLUSTER` | `devnet`, `testnet`, `mainnet-beta` ya da `localnet` |
 | `SQUARE_SOLANA_RPC_URL` | O cluster'ın JSON-RPC ucu; `https` (yalnızca `localnet` için `http`). WebSocket ucu web3.js tarafından bundan türetilir |
+| `SQUARE_PROVER_URL` | İsteğe bağlı: release ispatını üreten prover servisinin kök adresi ([`apps/prover`](../prover/README.md)); `https` (yalnızca `localnet` için `http`). Tanımlı değilse kurum iş sayfasında ispat üretemez, ispatın durumu yine görünür. Prover'ın `CORS_ORIGINS`'i web'in adresini içermeli |
 | `SQUARE_PROGRAM_ID_{REGISTRY,POLICY,VERIFIER,ESCROW}` | İsteğe bağlı: programların o cluster'daki adresi (db ile aynı adlar; IDL'deki adres kullanılmaz). Tanımlı olan program landing'de adresi ve zincirdeki deploy durumuyla, tanımlı olmayan "Not configured" olarak görünür. USDC bakiyesi escrow'un config'inden okunduğu için `ESCROW` gerekir. Geçersiz bir değer yapılandırma hatasıdır |
 
 RPC adresi istemci bileşenine (`ConnectionProvider`) gider, yani tarayıcıya iner: ekranda yalnızca host gösterilse de sayfa yükünde görünür. İçinde API anahtarı olan bir RPC kullanılacaksa ya alan adıyla kısıtlanmış (domain allowlist'li) bir anahtar ya da anahtarı sunucuda tutan bir vekil gerekir.
@@ -118,6 +119,18 @@ Agent, teslim edilmiş işin alacağını (release'teki ödemeyi alma hakkı) is
 | Kanıt dosyası | `square-buyer-proof` v1 JSON: küme, politika, kök, alıcı, alıcının `leaf_salt`'ı ve Merkle kanıtı; diğer alıcıların salt'larını taşımaz. Kurum politika sayfasından indirir (liste zincirdekiyle aynıyken), alıcı iş sayfasında yükler. Dosya tarayıcıda zincirdeki güncel köke karşı denetlenir; başka cüzdanın, başka politikanın ya da kümenin dosyası ve eski listeden kalan dosya ayrı mesajla reddedilir, listede olmayan cüzdana "Your wallet is not on the institution's approved buyer list." |
 | Alım | Satıcı ve işi fonlayan kurum alamaz. Alıcının screening'i temiz ve taze, USDC bakiyesi fiyata yetiyor ve kanıt geçerliyse `buy_claim` (fiyat listelemeninki; öne geçme koruması). Escrow hata kodu IDL mesajıyla ve ne yapılacağıyla (`BuyerNotEligible`, screening kodları, `ClaimPriceChanged`) |
 | Payee | Alacak satıldıysa alıcı, değilse agent cüzdanı (SDK `payeeOf` ile aynı kural); iş sayfasında "Paid to" satırı canlı güncellenir |
+
+## Uyum ispatı ve release durumu (FE-09)
+
+Politikaya bağlı işte escrow, kurumun bağladığı release ispatına (`ReleaseProof`, square_verifier) göre öder, iade eder ya da bekler ([ADR 0012](../../docs/decisions/0012-ispat-tazeligi-ve-gunluk-sayac.md), [ADR 0013](../../docs/decisions/0013-release-keeper-ucreti-iade-ve-itibar.md)). İş sayfasının "Compliance proof" bölümü:
+
+| Parça | Davranış |
+|---|---|
+| Durum | Herkese açık. İspat yoksa finalize bekler (`ProofRequired`). Varsa: karar, ret sebepleri (ret kodunun bitleri, [release-circuit.md](../../docs/design/release-circuit.md) §3), ispatın anı, payee, net ve günlük sayaç; escrow'un şimdi finalize'da ne yapacağı: ödeme, kesin retle kuruma iade (bit 0, 2, 3; sayaç 0 iken bit 1, 6) ya da bekleme |
+| Tazelik | Zincir saatine göre, escrow'un `check_fresh`'iyle aynı kural: payee (alacak satıldıysa alıcı), net (`amount − keeper ücreti`) ve mint release'inkiyle aynı, release ispatın UTC gününde ve kurumun sayacının etkin değeri ispattakiyle aynı. Bayatsa sebepleri (`StaleReleaseProof`); tazeyse geçerli olduğu son an (UTC gününün sonu) |
+| İspat üretme | Bağlı cüzdan işi fonlayan kurumsa ve iş `Delivered` / `Disputed`'sa. Politika ve sır FE-04'ün bu tarayıcıdaki çalışma alanından okunur; job'un snapshot'ıyla (commitment, public tavan) aynı olmalı. Witness zincir saatiyle kurulur (`buildReleaseWitness`), ispatı prover servisi üretir (`createRemoteProver`, `x-api-key`; anahtar yalnızca sayfada tutulur). Beklenen artefakt sürümü devrenin manifest'indeki zkey SHA-256'sı. Prover'ı işleten politikayı görür; sayfa bunu söyler. snarkjs (GPL-3.0) yalnızca `apps/prover`'da çalışır |
+| Bağlama | Kurum ispatın kararını (uyumlu ya da ret sebepleri, kesin mi geçici mi) görüp `set_compliance_proof`'la bağlar. İspatın anı bağlamada zincir saatine en fazla 600 s uzak olmalı; sayfa kalan süreyi gösterir, süre geçince yenisini ister. Squads vault'a bağlı kurumda bağlama vault işlemidir, sayfa bunu söyler. Verifier hata kodu IDL mesajıyla |
+| Zaman çizelgesi | `ReleaseVerified` (payee ve net), `ReleaseRefused` (iade ve sebepleri) |
 
 ## Tasarım sistemi
 

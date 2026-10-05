@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { TxConfirmation } from '@/components/ui/tx-confirmation';
 import { JobClaim } from './job-claim';
+import { JobRelease } from './job-release';
 import { chainRefOf, hex } from '@/lib/agent-registration';
 import { payoutOf, type Payout } from '@/lib/claim-market';
 import { claimListingAddress } from '@/lib/idl-pda';
@@ -330,6 +331,16 @@ export function JobDetail({ jobAddress, escrowProgramId }: { jobAddress: string;
           )}
         </section>
       )}
+
+      <JobRelease
+        escrow={escrow}
+        jobKey={jobKey}
+        account={account}
+        listing={listing}
+        chainNow={chainNow}
+        revision={revision}
+        formatAmount={formatAmount}
+      />
 
       <JobClaim
         escrow={escrow}

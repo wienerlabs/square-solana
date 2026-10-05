@@ -10,6 +10,7 @@ export type Cluster = (typeof CLUSTERS)[number];
 export const ENV_VARS = {
   cluster: 'SQUARE_SOLANA_CLUSTER',
   rpcUrl: 'SQUARE_SOLANA_RPC_URL',
+  proverUrl: 'SQUARE_PROVER_URL',
 } as const;
 
 export const PROGRAMS = ['registry', 'policy', 'verifier', 'escrow'] as const;
@@ -29,6 +30,8 @@ export interface WebConfig {
   rpcUrl: string;
   /** Yapılandırılmış program kimlikleri. Şimdilik isteğe bağlı: tanımlı olmayan program "yapılandırılmamış" görünür. */
   programIds: Partial<Record<ProgramName, string>>;
+  /** İsteğe bağlı: release ispatını üreten prover servisinin kök adresi (`apps/prover`, FE-09). */
+  proverUrl?: string;
 }
 
 export type WebConfigResult = { ok: true; config: WebConfig } | { ok: false; errors: string[] };
@@ -44,21 +47,11 @@ export function parseWebConfig(env: Readonly<Record<string, string | undefined>>
   else if (!isCluster(cluster))
     errors.push(`${ENV_VARS.cluster} must be one of ${CLUSTERS.join(', ')}; got "${cluster}"`);
 
-  if (!rpcUrl) {
-    errors.push(`${ENV_VARS.rpcUrl} is not set`);
-  } else {
-    let url: URL | null = null;
-    try {
-      url = new URL(rpcUrl);
-    } catch {
-      errors.push(`${ENV_VARS.rpcUrl} is not a valid URL`);
-    }
-    if (url && url.protocol !== 'https:' && url.protocol !== 'http:') {
-      errors.push(`${ENV_VARS.rpcUrl} must use https (or http for localnet); got ${url.protocol}`);
-    } else if (url?.protocol === 'http:' && cluster !== 'localnet') {
-      errors.push(`${ENV_VARS.rpcUrl} must use https unless ${ENV_VARS.cluster} is localnet`);
-    }
-  }
+  if (!rpcUrl) errors.push(`${ENV_VARS.rpcUrl} is not set`);
+  else errors.push(...urlProblems(ENV_VARS.rpcUrl, rpcUrl, cluster));
+
+  const proverUrl = env[ENV_VARS.proverUrl]?.trim() || undefined;
+  if (proverUrl) errors.push(...urlProblems(ENV_VARS.proverUrl, proverUrl, cluster));
 
   const programIds: Partial<Record<ProgramName, string>> = {};
   for (const program of PROGRAMS) {
@@ -70,7 +63,24 @@ export function parseWebConfig(env: Readonly<Record<string, string | undefined>>
   }
 
   if (errors.length > 0 || !isCluster(cluster)) return { ok: false, errors };
-  return { ok: true, config: { cluster, rpcUrl, programIds } };
+  return { ok: true, config: { cluster, rpcUrl, programIds, ...(proverUrl && { proverUrl }) } };
+}
+
+/** https adresi; http yalnızca localnet'te (tarayıcı adrese doğrudan gider). */
+function urlProblems(variable: string, value: string, cluster: string): string[] {
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    return [`${variable} is not a valid URL`];
+  }
+  if (url.protocol !== 'https:' && url.protocol !== 'http:') {
+    return [`${variable} must use https (or http for localnet); got ${url.protocol}`];
+  }
+  if (url.protocol === 'http:' && cluster !== 'localnet') {
+    return [`${variable} must use https unless ${ENV_VARS.cluster} is localnet`];
+  }
+  return [];
 }
 
 /** 32 baytlık, kanonik base58 yazılmış bir Solana adresi mi? */

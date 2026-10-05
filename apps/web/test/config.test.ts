@@ -75,6 +75,32 @@ describe('program ids', () => {
   });
 });
 
+describe('prover', () => {
+  it('is optional and follows the RPC rules', () => {
+    expect(parseWebConfig({ ...valid, SQUARE_PROVER_URL: ' https://prover.example.org ' })).toEqual({
+      ok: true,
+      config: {
+        cluster: 'devnet',
+        rpcUrl: 'https://rpc.example.org/v1?api-key=secret',
+        programIds: {},
+        proverUrl: 'https://prover.example.org',
+      },
+    });
+    expect(parseWebConfig({ ...valid, SQUARE_PROVER_URL: '' })).toEqual(parseWebConfig(valid));
+    const insecure = parseWebConfig({ ...valid, SQUARE_PROVER_URL: 'http://prover.example.org' });
+    expect(insecure.ok === false && insecure.errors).toEqual([
+      'SQUARE_PROVER_URL must use https unless SQUARE_SOLANA_CLUSTER is localnet',
+    ]);
+    expect(
+      parseWebConfig({
+        SQUARE_SOLANA_CLUSTER: 'localnet',
+        SQUARE_SOLANA_RPC_URL: 'http://127.0.0.1:8899',
+        SQUARE_PROVER_URL: 'http://127.0.0.1:8787',
+      }).ok,
+    ).toBe(true);
+  });
+});
+
 describe('display helpers', () => {
   it('shows only the RPC host, never its path, query or credentials', () => {
     expect(rpcLabel('https://user:pass@rpc.example.org:8443/v1?api-key=secret')).toBe('rpc.example.org:8443');
