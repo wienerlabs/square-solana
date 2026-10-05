@@ -1,6 +1,6 @@
 # Program arayüz sözleşmesi
 
-**Sözleşme sürümü:** v0.4.1 (taslak) · **Issue:** BC-44 (#101), BC-47 (#119), BE-10 (#42), BC-17 (#25), BC-15 (#24), BC-21 (#29) · **IDL'ler:** [`idl/`](../../idl/)
+**Sözleşme sürümü:** v0.4.2 (taslak) · **Issue:** BC-44 (#101), BC-47 (#119), BE-10 (#42), BC-17 (#25), BC-15 (#24), BC-21 (#29), BC-34 (#71) · **IDL'ler:** [`idl/`](../../idl/)
 
 Bu doküman Square'in dört Solana programının (`square_registry`, `square_policy`, `square_verifier`, `square_escrow`) dış arayüzünü sabitler: instruction adları ve argümanları, hesap sırası ve imzacılar, account düzenleri, PDA seed'leri, event'ler ve hata kodları. Backend (BE-35 API/SDK sözleşmesi, servisler) ve frontend (FE-24 veri katmanı) bu sözleşmeye göre geliştirir. Gerçek programlar `programs/` altında taşındıkça ve değiştikçe bu arayüze uyar; uyum BC-13 ile CI'da denetlenir.
 
@@ -59,7 +59,7 @@ Bir program gerçek uygulamasına kavuştuğunda, o programın `anchor build` il
 | 1 | Kurum | `init_institution`, (opsiyonel `set_institution_multisig`), `set_policy(policy_id, commitment, daily_ceiling)` | policy | — |
 | 2 | Agent | `register_agent(agent_id, agent_card_uri, agent_card_hash, wallet)`; `did:aip` olarak çözümlenir (BC-14) | registry | — |
 | 3 | Screener | `record_screening(wallet, status, source_hash)`: kurum, agent ve alıcı cüzdanları için | registry | — |
-| 3 | Kurum | `create_job(spec_hash, amount, deadline, challenge_period)` + opsiyonel `policy` (snapshot alınır) → (taslak `commit_travel_rule`) → `fund_job` | escrow | `AgentRecord`, `Policy`, `Institution`, iki `ScreeningRecord` |
+| 3 | Kurum | `create_job(spec_hash, amount, deadline, challenge_period)` + opsiyonel `policy` (snapshot alınır) → `commit_travel_rule` (eşiğe eşit ya da üstündeki işte zorunlu) → `fund_job` | escrow | `AgentRecord`, `Policy`, `Institution`, iki `ScreeningRecord` |
 | 4 | Agent | `accept_job(spec_hash)`, `submit_work(work_hash, delivery_uri)` | escrow | `AgentRecord` |
 | 5 | Kurum | `set_buyer_root(buyer_root)` | policy | — |
 | 5 | Agent / alıcı | `list_claim(price)`, `buy_claim(price, leaf_salt, merkle_proof)`, `cancel_claim` | escrow | `Policy.buyer_root`, alıcı `ScreeningRecord` |
@@ -172,7 +172,7 @@ Aşağıdakiler sözleşmede **taslak** olarak yer alır; ayrıntılar ilgili is
 | M-of-N arbitration | `update_arbitrators(arbitrators: Vec<Pubkey>, threshold)`; N ≤ 7, 2 ≤ M ≤ N; `arbitrator_set_version` ve dispute'taki snapshot'ı; `ArbitratorsUpdated`, `DisputeVote`, `DisputeDecided` | BC-32 |
 | Dispute timeout | `EscrowParams.dispute_timeout_secs`, `DisputeInfo.deadline`, permissionless `lapse_dispute`: bond iade edilir, dispute düşer, iş `Delivered`'a döner ve normal finalize yolundan çözülür; `DisputeLapsed`, `DisputeNotExpired` | BC-33 |
 | İspatsız bekleme | `EscrowParams.proof_timeout_secs`, `escalate_missing_proof`: policy'li işte `challenge_end + proof_timeout_secs` sonrasında bağlı ispat yoksa agent bond'suz dispute açar; `MissingProofEscalated`, `ProofTimeoutNotReached` | BC-24, BC-33 |
-| Travel Rule | `EscrowParams.travel_rule_threshold` (0 = kapalı), `commit_travel_rule(commitment)`, `Job.travel_rule_commitment`, `TravelRuleCommitted`, `TravelRuleCommitmentRequired` | BC-34 |
+| Travel Rule | `EscrowParams.travel_rule_threshold` (0 = kapalı), `commit_travel_rule(commitment)`, `Job.travel_rule_commitment`, `TravelRuleCommitted`, `TravelRuleCommitmentRequired` | BC-34: v0.4.2'de kesinleşti ([ADR 0015](../decisions/0015-travel-rule-commitment-ve-esik.md)) |
 | CCTP fonlama | Ayrı instruction yok: CCTP `receive_message` USDC'yi kurumun token hesabına mint eder, aynı tx'te `fund_job` çalışır | BC-36 |
 | Stripe MPP | `verify_mpp_payment_proof` (Ed25519 precompile + Sysvar Instructions), `update_mpp_authority`, `VerifierConfig.mpp_authority`, `MppPaymentVerified` | BC-37 |
 
@@ -459,4 +459,5 @@ IDL'den üretilmiştir; instruction'lar alfabetik sıradadır. "(w)" yazılabili
 | v0.3.0 | `set_institution_multisig` multisig hesabını da alır (`squads_multisig`, salt okunur): program, hesabın Squads v4'e ait ve başlatılmış bir `Multisig` olduğunu doğrular; yanlış ya da var olmayan bir multisig bağlanıp kurum kilitlenemez. Hata 6004 `InvalidMultisigVault` → `InvalidSquadsMultisig` ("Account is not an initialized Squads v4 multisig"); kodlar ve sıraları değişmedi. Program ilk kez bu arayüzle yazıldı (BC-17); IDL'i `set_buyer_root` (BC-18) dışında sözleşmeyle aynı | BC-17 (#25) |
 | v0.4.0 | Registry'nin agent kuralları did:aip v2 Solana profili §4.2'yle hizalandı. `AgentIdInvalid` (6000) kimliğin alfabesini de kapsar: `[A-Za-z0-9_-]{1,32}`. Yeni hata 6007 `AgentCardHashInvalid`: kart hash'i tam olarak URI boşken sıfırdır (§4.2/4; dolu URI'nin hash'i kartın SHA-256'sıdır). `transfer_agent_ownership` `wallet`'ı yeni sahibe sıfırlar (§4.2/5), dokümanı buna göre. Mevcut kodlar ve sıraları değişmedi. Program ilk kez bu arayüzle yazıldı (BC-15); IDL'i `init_registry_config`, `update_registry_config`, `record_screening` ve `RegistryConfig` / `ScreeningRecord` (BC-27) dışında sözleşmeyle aynı | BC-15 (#24) |
 | v0.4.1 | Yalnızca doküman: `set_compliance_proof`'un `refusal_code`, `net_amount` ve `proof_timestamp` argümanlarındaki doküman satırları talimatın dokümanına taşındı. Rust fonksiyon argümanları doküman taşıyamadığı için Anchor argümana doküman üretemez; v0.2.0'da IDL'e elle yazılan bu satırları hiçbir program üretemiyordu. Argümanlar, tipleri ve sıraları değişmedi. Verifier ilk kez bu arayüzle yazıldı (BC-21); IDL'i `verify_mpp_payment_proof` ve `update_mpp_authority` (BC-37) dışında sözleşmeyle aynı | BC-21 (#29) |
+| v0.4.2 | Yalnızca doküman: Travel Rule yüzeyi taslaktan çıktı ([ADR 0015](../decisions/0015-travel-rule-commitment-ve-esik.md)). `commit_travel_rule` yalnızca `Open` işe bağlar ve `fund_job`'a kadar değiştirilebilir; `EscrowParams.travel_rule_threshold`, `Job.travel_rule_commitment` ve `TravelRuleCommitted` dokümanları buna göre. Alanlar, talimat, event ve kodlar değişmedi. Escrow'un IDL'i dispute talimatları (BC-32, BC-33) dışında sözleşmeyle aynı | BC-34 (#71) |
 | v0.1.1 | Gövdesiz stub programlar (`interfaces/`) kaldırıldı; sözleşmenin tek kaynağı `idl/*.json` (proje kuralı: placeholder yok). Stub'a ait `NotImplemented` hata girdileri IDL'den çıktı; diğer kodların sırası değişmedi. Toplam: 38 instruction, 13 account, 40 event, 71 hata kodu | BC-47 (#119) |

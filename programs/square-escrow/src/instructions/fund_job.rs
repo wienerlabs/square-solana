@@ -1,6 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token_interface::{self, Mint, TokenAccount, TokenInterface, TransferChecked};
 use square_common::seeds::{CONFIG_SEED, JOB_SEED, SCREENING_SEED, VAULT_SEED};
+use square_common::travel_rule;
 
 use crate::errors::EscrowError;
 use crate::linked;
@@ -52,10 +53,11 @@ pub fn handler(ctx: Context<FundJob>) -> Result<()> {
     let job = &accounts.job;
     require!(job.status == JobStatus::Open, EscrowError::InvalidStatus);
     require!(now < job.deadline, EscrowError::DeadlineExpired);
-    // Travel Rule eşiği (BC-34): eşik açıksa ve tutar eşiğin üstündeyse önce commitment bağlanır.
-    let threshold = accounts.config.params.travel_rule_threshold;
+    // Travel Rule eşiği (ADR 0015): eşik açıksa ve tutar eşiğe eşit ya da üstündeyse önce commitment
+    // bağlanır.
     require!(
-        threshold == 0 || job.amount < threshold || job.travel_rule_commitment != [0; 32],
+        !travel_rule::required(job.amount, accounts.config.params.travel_rule_threshold)
+            || travel_rule::is_bound(&job.travel_rule_commitment),
         EscrowError::TravelRuleCommitmentRequired
     );
     let registry = &accounts.config.registry_program;

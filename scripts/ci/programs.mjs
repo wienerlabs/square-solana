@@ -48,7 +48,6 @@ export const PROGRAMS = Object.freeze([
         instructions: ['raise_dispute', 'resolve_dispute', 'execute_resolution', 'update_arbitrators'],
       },
       { issue: 'BC-33 (#70)', instructions: ['lapse_dispute', 'escalate_missing_proof'] },
-      { issue: 'BC-34 (#71)', instructions: ['commit_travel_rule'] },
     ],
   },
 ]);

@@ -12,7 +12,8 @@ IDL'i sözleşme IDL'iyle (`idl/square_escrow_contract.json`) aynıdır, henüz 
 | `init_config` | Tekil `EscrowConfig`'i açar; yalnızca programın yükseltme yetkilisi (`program` + `program_data`). Tek settlement mint'i (USDC), arbitrator seti (en fazla 7, `2 <= M <= N`), parametreler, okunan programların kimlikleri |
 | `update_params` | Challenge sınırları, bond, keeper ücreti ve taslak parametreler; yalnızca `admin` |
 | `create_job` | İşi ve boş vault'unu açar. Agent kaydı registry'ye ait, PDA'sı doğru ve `Active` olmalı; `wallet`'ı job'a kopyalanır. Opsiyonel `policy` + `policy_institution`: policy programına ait, etkin, imzacı kurumun güncel yetkilisi (multisig bağlıysa vault'u); commitment, günlük tavan ve sürüm job'a kopyalanır. Rent'i `payer` öder |
-| `fund_job` | `amount`'u kurumun token hesabından vault'a kilitler. Kurumun ve `job.agent_wallet`'ın screening kaydı temiz ve taze olmalı; Travel Rule eşiği açıksa commitment bağlanmış olmalı |
+| `commit_travel_rule` | Kurum `Open` işe Travel Rule kaydının salt'lı commitment'ını bağlar (zincirde yalnızca 32 bayt); fonlamaya kadar değiştirilebilir, sıfır commitment bağlanamaz |
+| `fund_job` | `amount`'u kurumun token hesabından vault'a kilitler. Kurumun ve `job.agent_wallet`'ın screening kaydı temiz ve taze olmalı; eşik açıksa ve tutar eşiğe eşit ya da üstündeyse Travel Rule commitment'ı bağlanmış olmalı |
 | `accept_job` | Fonlanmış işi job'un agent cüzdanı kabul eder; kayıt `Active`, spec hash aynı, deadline geçmemiş |
 | `submit_work` | Teslim: `work_hash`, `delivery_uri` (en fazla 128 bayt); challenge penceresi açılır (`challenge_end = now + challenge_period`). Kabul edilmiş iş `Inactive` kayıtla da teslim edilir, silinmiş kayıtla edilmez |
 | `cancel_job` | Kurum `Open` / `Funded` işi, ya da deadline'ı geçmiş `Accepted` işi iptal eder: vault bakiyesi kuruma döner, vault kapanır, rent'i `job.rent_payer`'a |
@@ -23,7 +24,7 @@ IDL'i sözleşme IDL'iyle (`idl/square_escrow_contract.json`) aynıdır, henüz 
 | `finalize_payment` | Permissionless: `challenge_end`'den sonra teslim edilmiş işi kapatır. Keeper ücreti (en çok 100 bps) her dalda çağırana. Policy'siz işte ve uyumlu ispatta net payee'ye (satılmış alacakta alıcıya), kesin retta kuruma; ispat yoksa ya da ret geçiciyse `ProofRequired`, bayatsa `StaleReleaseProof` ile bekler. Payee screening'i ödemeden önce. Policy'li işte verifier'ın `record_release` CPI'ı. İtibar agent kaydına, `ValidationRecord`, alacak `Settled` / `Defaulted`, vault kapanır |
 
 ```
-Open -(fund_job)-> Funded -(accept_job)-> Accepted -(submit_work)-> Delivered
+Open (-(commit_travel_rule)) -(fund_job)-> Funded -(accept_job)-> Accepted -(submit_work)-> Delivered
 Delivered -(finalize_payment)-> Released | Refunded
 Open | Funded | Accepted (deadline sonrası) -(cancel_job)-> Cancelled
 
@@ -46,19 +47,21 @@ Listed -(cancel_claim)-> kapanır; finalize_payment: Listed | Bought -> Settled 
 - **Alacak piyasası:** satıcı, alıcı ve onaylı liste kuralları
   [ADR 0014](../../docs/decisions/0014-alacak-piyasasi-satici-ve-alici-kurallari.md)'te; Merkle kanıtı
   `square_common::merkle` ile doğrulanır. Satılmış alacakta payee alıcıdır, itibar agent kaydında kalır.
-- **Sonraki issue'lar:** dispute akışı BC-32 ve BC-33 (taslak `escalate_missing_proof` dahil), Travel Rule
-  commitment'ı BC-34. Covenant'ın bu talimatları yeni `Job` düzenine uymadığı için kaldırıldı; geçmişte
-  durur.
+- **Travel Rule:** commitment'ın tanımı, eşik ve bağlama kuralları
+  [ADR 0015](../../docs/decisions/0015-travel-rule-commitment-ve-esik.md)'te; hesaplama
+  `square_common::travel_rule` (SDK'da `travelRule`).
+- **Sonraki issue'lar:** dispute akışı BC-32 ve BC-33 (taslak `escalate_missing_proof` dahil). Covenant'ın
+  bu talimatları yeni `Job` düzenine uymadığı için kaldırıldı; geçmişte durur.
 
 ## Testler
 
 ```bash
 anchor build
-cargo test --manifest-path tests/programs/Cargo.toml --test escrow --test escrow_lifecycle --test claim --test finalize --test release_gate
+cargo test --manifest-path tests/programs/Cargo.toml --test escrow --test escrow_lifecycle --test travel_rule --test claim --test finalize --test release_gate
 ```
 
 Testler [`tests/programs/tests/`](../../tests/programs/tests/)'tedir: `escrow.rs`, `escrow_lifecycle.rs`,
-`claim.rs`, `finalize.rs`, `release_gate.rs`. Derlenmiş escrow, registry, policy ve verifier programlarını LiteSVM'de
+`travel_rule.rs`, `claim.rs`, `finalize.rs`, `release_gate.rs`. Derlenmiş escrow, registry, policy ve verifier programlarını LiteSVM'de
 çalıştırır. Agent kaydı, screening, kurum ve politika programların kendi instruction'larıyla, USDC SPL Token
 programıyla kurulur. İspat kapısı testlerinin ispatları gerçek Groth16 ispatlarıdır.
 

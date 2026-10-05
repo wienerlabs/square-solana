@@ -363,6 +363,24 @@ impl World {
         )
     }
 
+    /// Kurumun `commit_travel_rule`'ü.
+    pub fn commit_travel_rule_ix(
+        &self,
+        institution: &Pubkey,
+        job: &Pubkey,
+        commitment: [u8; 32],
+    ) -> Instruction {
+        Instruction {
+            program_id: square_escrow::ID,
+            accounts: square_escrow::accounts::InstitutionJob {
+                institution: *institution,
+                job: *job,
+            }
+            .to_account_metas(None),
+            data: square_escrow::instruction::CommitTravelRule { commitment }.data(),
+        }
+    }
+
     pub fn fund_job_ix(&self, institution: &Institution, job: &Pubkey) -> Instruction {
         self.fund_job_ix_with(
             &institution.key.pubkey(),

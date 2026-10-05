@@ -1,0 +1,65 @@
+{
+  "domain": "square/travel-rule/v1",
+  "vectors": [
+    {
+      "label": "basic",
+      "job": "6MZmsjQeC4w2wmPUUJzuf6PYJd4inrsNdQNEDL3wsJne",
+      "salt": "11710d7d2588647a734276e74e89273da416f5366637c309d3d26bb5b1d6fdaf",
+      "record": {
+        "originator": {
+          "name": "Example Research Ltd",
+          "account": "institution-wallet"
+        },
+        "beneficiary": {
+          "name": "Example Agent Operator",
+          "account": "agent-wallet"
+        },
+        "amount": "1000000000",
+        "asset": "USDC"
+      },
+      "canonical": "{\"amount\":\"1000000000\",\"asset\":\"USDC\",\"beneficiary\":{\"account\":\"agent-wallet\",\"name\":\"Example Agent Operator\"},\"originator\":{\"account\":\"institution-wallet\",\"name\":\"Example Research Ltd\"}}",
+      "recordDigest": "f03e5182542b2b3ba90c4eed8ba65832e827a02f3de52a0c4a742bea59091850",
+      "commitment": "d8eda73430400d61b49a68023e7954be8f71520c29583836b2e334a74311b4e8"
+    },
+    {
+      "label": "unicode-and-order",
+      "job": "8pNDTsV9KgPEg4vLd41ghSLXvrmUDYpcidLbGae3aTK7",
+      "salt": "d7a24e8664d7c5f230aa40d0022ddc4d708b455977f08ff481ecc3c3b0fda4e1",
+      "record": {
+        "beneficiary": {
+          "name": "Ağ Ölçüm Şirketi",
+          "country": "TR"
+        },
+        "originator": {
+          "name": "Zürich Lab",
+          "country": "CH",
+          "identifiers": [
+            "LEI-0001",
+            "VAT-42"
+          ]
+        },
+        "amount": "250000000",
+        "asset": "USDC"
+      },
+      "canonical": "{\"amount\":\"250000000\",\"asset\":\"USDC\",\"beneficiary\":{\"country\":\"TR\",\"name\":\"Ağ Ölçüm Şirketi\"},\"originator\":{\"country\":\"CH\",\"identifiers\":[\"LEI-0001\",\"VAT-42\"],\"name\":\"Zürich Lab\"}}",
+      "recordDigest": "3933bcdc5b8d9d4483b08fa92e8467e15fdfbb14b128c231173a3e018f0044e5",
+      "commitment": "8d9b75ff05b135db8e760acf0f7ce898e34c80c3dd0f50daf115d66229d048ad"
+    },
+    {
+      "label": "minimal",
+      "job": "9UxU2GVK9itieVEUkTSehaGuQxSwrLXHqMSHSRCVf2io",
+      "salt": "1945d73f03131fc2a15a4a9d46426463146c87ed4c75cdcdaba7ebec1b5976eb",
+      "record": {
+        "originator": {
+          "name": "A"
+        },
+        "beneficiary": {
+          "name": "B"
+        }
+      },
+      "canonical": "{\"beneficiary\":{\"name\":\"B\"},\"originator\":{\"name\":\"A\"}}",
+      "recordDigest": "d66c5983f01ce2b15347d821cc3c1205e653b490fd0b3360ae12cfebe18f214e",
+      "commitment": "cb1f98bcd92a446647bdab909ca225a9a14d79616f0eed531f9a93ddc64fa5a1"
+    }
+  ]
+}

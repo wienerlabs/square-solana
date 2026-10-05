@@ -64,6 +64,14 @@ export interface SquareFlow {
     },
     options: BuildOptions,
   ): Promise<BuiltTx & { job: PublicKey; specHash: Uint8Array }>;
+  /**
+   * Adım 3: Travel Rule commitment'ı (ADR 0015). `Open` işe bağlanır, fonlamaya kadar değiştirilebilir;
+   * eşiği aşan iş onsuz fonlanmaz. Commitment `travelRule.commitment` ile hesaplanır.
+   */
+  commitTravelRule(
+    params: { institution: PublicKey; job: PublicKey; commitment: Uint8Array },
+    options: BuildOptions,
+  ): Promise<BuiltTx>;
   /** Adım 3b: fonlama (iki tarafın screening kaydı okunur). */
   fundJob(
     params: { institution: PublicKey; job: PublicKey; institutionTokenAccount: PublicKey },
