@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useId, useMemo, useState, type ReactNode } from 'react';
 import { useConnection } from '@solana/wallet-adapter-react';
 import { PublicKey } from '@solana/web3.js';
@@ -524,6 +525,11 @@ export function JobWizard({ owner, escrowProgramId }: { owner: string; escrowPro
                 <dd className="flex items-center gap-2">
                   <Address value={jobAddress} label="job" />
                   {existingJob && <StatusBadge tone="info">{statusLabel(existingJob.status)}</StatusBadge>}
+                  {existingJob && (
+                    <Link href={`/app/jobs/${jobAddress}`} className="text-link underline">
+                      Open the job
+                    </Link>
+                  )}
                 </dd>
               </div>
             )}
