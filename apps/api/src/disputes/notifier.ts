@@ -171,38 +171,57 @@ export function createNotifier(deps: {
 
   async function enqueueDeadlines(now: Date): Promise<number> {
     const seconds = BigInt(Math.floor(now.getTime() / 1000));
-    const due = await db.dispute.findMany({
-      where: { jobStatus: 'disputed', deadline: { gt: seconds, lte: seconds + BigInt(deps.deadlineWarningSeconds) } },
-      orderBy: { deadline: 'asc' },
-      take: deps.batchSize,
-    });
+    const window = { gt: seconds, lte: seconds + BigInt(deps.deadlineWarningSeconds) };
+    const dueAfter = (after: { deadline: bigint; job: string } | null) =>
+      db.dispute.findMany({
+        where: {
+          jobStatus: 'disputed',
+          deadline: window,
+          ...(after && {
+            OR: [{ deadline: { gt: after.deadline } }, { deadline: after.deadline, job: { gt: after.job } }],
+          }),
+        },
+        orderBy: [{ deadline: 'asc' }, { job: 'asc' }],
+        take: deps.batchSize,
+      });
+    const keyOf = (dispute: { job: string; raisedAt: bigint }) => `deadline:${dispute.job}:${dispute.raisedAt}`;
+    let due = await dueAfter(null);
     if (due.length === 0) return 0;
     const { set, rows } = await subscribers('dispute.deadline');
     let enqueued = 0;
-    for (const dispute of due) {
-      // Güncel sayımda oy vermiş arbitrator'a hatırlatma gitmez.
-      const targets = rows.filter((row) => {
-        const index = set.arbitrators.indexOf(row.wallet);
-        return !hasVoted(
-          { approvalMask: dispute.approvalMask, arbitratorSetVersion: Number(dispute.arbitratorSetVersion) },
-          index,
-          set.version,
-        );
+    let warned = 0;
+    while (due.length > 0 && rows.length > 0) {
+      const queued = await db.notificationDelivery.findMany({
+        where: { eventKey: { in: due.map(keyOf) }, webhookId: { in: rows.map((row) => row.id) } },
+        select: { eventKey: true, webhookId: true },
       });
-      const notification = ArbitrationNotificationSchema.parse({
-        type: 'dispute.deadline',
-        timestamp: Math.floor(now.getTime() / 1000),
-        job: dispute.job,
-        deadline: Number(dispute.deadline),
-        event: null,
-      });
-      enqueued += await enqueue(
-        targets,
-        `deadline:${dispute.job}:${dispute.raisedAt}`,
-        'dispute.deadline',
-        notification,
-        now,
-      );
+      const already = new Set(queued.map((row) => `${row.webhookId} ${row.eventKey}`));
+      for (const dispute of due) {
+        const eventKey = keyOf(dispute);
+        // Güncel sayımda oy vermiş arbitrator'a hatırlatma gitmez.
+        const targets = rows.filter((row) => {
+          if (already.has(`${row.id} ${eventKey}`)) return false;
+          const index = set.arbitrators.indexOf(row.wallet);
+          return !hasVoted(
+            { approvalMask: dispute.approvalMask, arbitratorSetVersion: Number(dispute.arbitratorSetVersion) },
+            index,
+            set.version,
+          );
+        });
+        if (targets.length === 0) continue;
+        const notification = ArbitrationNotificationSchema.parse({
+          type: 'dispute.deadline',
+          timestamp: Math.floor(now.getTime() / 1000),
+          job: dispute.job,
+          deadline: Number(dispute.deadline),
+          event: null,
+        });
+        enqueued += await enqueue(targets, eventKey, 'dispute.deadline', notification, now);
+        warned += 1;
+        if (warned === deps.batchSize) return enqueued;
+      }
+      if (due.length < deps.batchSize) break;
+      due = await dueAfter(due[due.length - 1]!);
     }
     return enqueued;
   }

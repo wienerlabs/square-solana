@@ -84,7 +84,7 @@ const setPanel = (members: Wallet[], version = 1) =>
     stack.client.pda.escrowConfig()[0],
   );
 
-function notifier(maxAttempts = 3): Notifier {
+function notifier(maxAttempts = 3, batchSize = 50): Notifier {
   // Test alıcısı yerel adrestedir: SSRF denetimi yalnızca burada özel adrese izin verir.
   const safeFetch = createSafeFetch({
     allowHttp: true,
@@ -98,7 +98,7 @@ function notifier(maxAttempts = 3): Notifier {
     box: stack.box,
     arbitrators: stack.arbitrators,
     send: async (url, init) => ({ status: (await safeFetch(url, init)).status }),
-    batchSize: 50,
+    batchSize,
     maxAttempts,
     backoff: BACKOFF,
     deadlineWarningSeconds: WARNING,
@@ -272,6 +272,22 @@ describe('bildirim', () => {
       deadline: NOW + WARNING - 10,
       event: null,
     });
+    expect(await run.runOnce()).toMatchObject({ enqueued: 0, delivered: 0 });
+  });
+
+  it('turun sınırını aşan son tarih uyarıları sonraki turda sıradaki dispute’lara gider', async () => {
+    await subscribe(panel[1]!, '/b');
+    const first = await disputedJob({ deadline: new BN(NOW + WARNING - 30) });
+    const second = await disputedJob({ deadline: new BN(NOW + WARNING - 20) });
+    const third = await disputedJob({ deadline: new BN(NOW + WARNING - 10) });
+    const jobsOf = (entries: Received[]) =>
+      entries.map((entry) => ArbitrationNotificationSchema.parse(JSON.parse(entry.body)).job).sort();
+    const run = notifier(3, 2);
+    expect(await run.runOnce()).toMatchObject({ enqueued: 2, delivered: 2 });
+    expect(jobsOf(received)).toEqual([first.address, second.address].sort());
+    received.length = 0;
+    expect(await run.runOnce()).toMatchObject({ enqueued: 1, delivered: 1 });
+    expect(jobsOf(received)).toEqual([third.address]);
     expect(await run.runOnce()).toMatchObject({ enqueued: 0, delivered: 0 });
   });
 

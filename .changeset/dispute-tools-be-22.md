@@ -9,7 +9,7 @@
 
 Uyuşmazlık araçları (BE-22, API sözleşmesi v0.20.0).
 
-`@squaresdk/solana-api`: dispute kanıtı (`reason_hash` ↔ özel depodaki kanıt; kurum, agent cüzdanı / sahibi ve aktif arbitrator'lar yükler ve okur), arbitrator kuyruğu, ön denetimli `resolve_dispute` tx'i, arbitrator webhook abonelikleri ve Standard Webhooks imzalı bildirim outbox'ı (yeniden deneme, kiralama, son tarih uyarısı).
+`@squaresdk/solana-api`: dispute kanıtı (`reason_hash` ↔ özel depodaki kanıt; kurum, agent cüzdanı / sahibi ve aktif arbitrator'lar yükler ve okur), arbitrator kuyruğu, ön denetimli `resolve_dispute` tx'i, arbitrator webhook abonelikleri ve Standard Webhooks imzalı bildirim outbox'ı (yeniden deneme, kiralama, son tarih uyarısı; turun sınırını aşan uyarılar sonraki turlarda sırayla gider).
 
 `@squaresdk/solana-keeper`: son tarihi geçmiş dispute'ların `lapse_dispute` crank'i; günlük ve metrikler talimatla (`action`) ayrılır.
 
