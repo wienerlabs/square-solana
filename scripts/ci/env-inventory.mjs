@@ -16,7 +16,7 @@ const DOC = join(ROOT, 'docs', 'environments.md');
 
 /** Değeri sızarsa yetki ya da fon kaybettiren değişkenler. */
 const SECRET =
-  /(SECRET|PASSWORD|TOKEN|DATABASE_URL|KEYPAIR(_BASE58)?$|API_KEY$|ACCESS_KEY_ID$|SECRET_BOX_KEYS$|ALERT_WEBHOOK_URL$|RPC_URLS?$)/;
+  /(SECRET|PASSWORD|TOKEN|DATABASE_URL|KEYPAIR(_BASE58)?$|API_KEY$|ACCESS_KEY_ID$|_KEYS$|ALERT_WEBHOOK_URL$|RPC_URLS?$)/;
 /** Adı benzese de secret olmayanlar: hash'ler, dosya yolları, anahtar kimlikleri, herkese açık anahtarlar. */
 const NOT_SECRET = /(_SHA256$|_PATH$|_ACTIVE_KEY$|PUBLISHABLE_KEY$)/;
 

@@ -38,7 +38,7 @@ Her servis bir Railway servisidir; derleme ve sağlık denetimi `apps/<servis>/r
 
 ### api
 
-`apps/api/.env.example` · 49 değişken, 7 secret
+`apps/api/.env.example` · 53 değişken, 8 secret
 
 | Değişken | Bölüm | Secret | Not |
 |---|---|---|---|
@@ -84,6 +84,10 @@ Her servis bir Railway servisidir; derleme ve sağlık denetimi `apps/<servis>/r
 | `API_PROVER_URL` | Prover vekili (zorunlu) |  |  |
 | `API_PROVER_API_KEY` | Prover vekili (zorunlu) | **secret** | API'nin prover'a gönderdiği servis anahtarı (prover'ın PROVER_API_KEY_SHA256 listesinde) |
 | `API_PROVER_TIMEOUT_MS` | Prover vekili (zorunlu) |  |  |
+| `API_TRAVEL_RULE_KEYS` | Travel Rule (zorunlu, BE-23) | **secret** | Ana anahtar halkası: virgülle kimlik:base64 (her anahtar 32 bayt; ör. openssl rand -base64 32). Secret yöneticisinden verilir, repoya yazılmaz. |
+| `API_TRAVEL_RULE_ACTIVE_KEY_ID` | Travel Rule (zorunlu, BE-23) |  | Yeni kayıtları ve yeniden sarmayı yapan anahtarın kimliği (halkada olmalı) |
+| `API_TRAVEL_RULE_RETENTION_DAYS` | Travel Rule (zorunlu, BE-23) |  | Kaydın son yazmadan sonra saklandığı gün sayısı (hukuki karar) |
+| `API_TRAVEL_RULE_MAINTENANCE_INTERVAL_SECONDS` | Travel Rule (zorunlu, BE-23) |  | Silme ve yeniden sarma aralığı |
 | `API_ALERT_ERRORS` | Alarmlar (zorunlu) |  |  |
 | `API_ALERT_ERROR_WINDOW_SECONDS` | Alarmlar (zorunlu) |  |  |
 | `LOG_LEVEL` | Gözlemlenebilirlik (servislerde ortak, zorunlu) |  | debug \| info \| warn \| error |
@@ -175,7 +179,7 @@ Her servis bir Railway servisidir; derleme ve sağlık denetimi `apps/<servis>/r
 
 ### indexer
 
-`apps/indexer/.env.example` · 22 değişken, 3 secret
+`apps/indexer/.env.example` · 23 değişken, 3 secret
 
 | Değişken | Bölüm | Secret | Not |
 |---|---|---|---|
@@ -193,6 +197,7 @@ Her servis bir Railway servisidir; derleme ve sağlık denetimi `apps/<servis>/r
 | `INDEXER_WEBHOOK_MAX_PENDING` | Helius webhook (isteğe bağlı) |  |  |
 | `INDEXER_WEBHOOK_PENDING_TTL_SECONDS` | Helius webhook (isteğe bağlı) |  |  |
 | `INDEXER_ALERT_STALL_SECONDS` | Alarmlar (zorunlu) |  |  |
+| `INDEXER_ALERT_LAG_SLOTS` | Alarmlar (zorunlu) |  |  |
 | `INDEXER_ALERT_DRIFT` | Alarmlar (zorunlu) |  |  |
 | `INDEXER_ALERT_ERRORS` | Alarmlar (zorunlu) |  |  |
 | `INDEXER_ALERT_ERROR_WINDOW_SECONDS` | Alarmlar (zorunlu) |  |  |
@@ -204,7 +209,7 @@ Her servis bir Railway servisidir; derleme ve sağlık denetimi `apps/<servis>/r
 
 ### keeper
 
-`apps/keeper/.env.example` · 25 değişken, 4 secret
+`apps/keeper/.env.example` · 26 değişken, 4 secret
 
 | Değişken | Bölüm | Secret | Not |
 |---|---|---|---|
@@ -226,6 +231,7 @@ Her servis bir Railway servisidir; derleme ve sağlık denetimi `apps/<servis>/r
 | `KEEPER_MAX_COMPUTE_UNIT_PRICE` | Kârlılık ve priority fee (zorunlu) |  |  |
 | `KEEPER_ALERT_MIN_BALANCE_LAMPORTS` | Alarmlar (zorunlu) |  |  |
 | `KEEPER_ALERT_STALL_SECONDS` | Alarmlar (zorunlu) |  |  |
+| `KEEPER_ALERT_DUE_SECONDS` | Alarmlar (zorunlu) |  |  |
 | `KEEPER_ALERT_ERRORS` | Alarmlar (zorunlu) |  |  |
 | `KEEPER_ALERT_ERROR_WINDOW_SECONDS` | Alarmlar (zorunlu) |  |  |
 | `LOG_LEVEL` | Gözlemlenebilirlik (servislerde ortak, zorunlu) |  | debug \| info \| warn \| error |
@@ -286,9 +292,9 @@ Her servis bir Railway servisidir; derleme ve sağlık denetimi `apps/<servis>/r
 | `SCREENER_OFAC_MAX_AGE_SECONDS` | OFAC SDN listesi (zorunlu) |  | Son başarılı indirmenin üstünden bu kadar saniye geçerse tarama yapılmaz (REFRESH'ten büyük) |
 | `SCREENER_OFAC_TIMEOUT_MS` | OFAC SDN listesi (zorunlu) |  |  |
 | `SCREENER_OFAC_MAX_BYTES` | OFAC SDN listesi (zorunlu) |  |  |
-| `SCREENER_CHAINALYSIS_API_KEY` | Chainalysis sanctions API (isteğe bağlı, ADR 0017; anahtar SECRET) | **secret** | Boşsa yalnızca OFAC listesi taranır. Anahtar verilince URL ve süre zorunlu. |
-| `SCREENER_CHAINALYSIS_URL` | Chainalysis sanctions API (isteğe bağlı, ADR 0017; anahtar SECRET) |  | ör. https://public.chainalysis.com |
-| `SCREENER_CHAINALYSIS_TIMEOUT_MS` | Chainalysis sanctions API (isteğe bağlı, ADR 0017; anahtar SECRET) |  |  |
+| `SCREENER_CHAINALYSIS_API_KEY` | Chainalysis sanctions API (isteğe bağlı, ADR 0020; anahtar SECRET) | **secret** | Boşsa yalnızca OFAC listesi taranır. Anahtar verilince URL ve süre zorunlu. |
+| `SCREENER_CHAINALYSIS_URL` | Chainalysis sanctions API (isteğe bağlı, ADR 0020; anahtar SECRET) |  | ör. https://public.chainalysis.com |
+| `SCREENER_CHAINALYSIS_TIMEOUT_MS` | Chainalysis sanctions API (isteğe bağlı, ADR 0020; anahtar SECRET) |  |  |
 | `SCREENER_RENEW_INTERVAL_SECONDS` | TTL yenileme (zorunlu) |  |  |
 | `SCREENER_RENEW_MARGIN_SECONDS` | TTL yenileme (zorunlu) |  | expires_at'a bu kadar saniye kalan kayıt yeniden taranır (zincirdeki screening_ttl_secs'ten küçük) |
 | `SCREENER_RENEW_BATCH` | TTL yenileme (zorunlu) |  |  |
