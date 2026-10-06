@@ -2,37 +2,53 @@
   "name": "@squaresdk/solana-mcp",
   "version": "0.1.0",
   "private": true,
-  "description": "Model Context Protocol server for Covenant — the agent-to-agent settlement layer on Solana. Lets any MCP-speaking agent discover work, read jobs, and inspect the live settlement state. Stripe for AI agents.",
+  "description": "İki yönlü MCP: Square MCP sunucusu (okuma ve imza akışlı yazma araçları, zincirden) ve agent'lar için havuzlu MCP istemcisi; BE-28",
   "license": "Apache-2.0",
   "type": "module",
-  "main": "dist/server.js",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./client": {
+      "types": "./dist/client/pool.d.ts",
+      "import": "./dist/client/pool.js",
+      "default": "./dist/client/pool.js"
+    }
+  },
   "bin": {
-    "covenant-mcp": "dist/server.js"
+    "square-mcp": "dist/bin.js"
   },
   "files": [
     "dist",
-    "src",
     "README.md"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.json",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run --coverage"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.12.0",
-    "zod": "^3.23.8"
+    "@anchor-lang/core": "1.2.0",
+    "@modelcontextprotocol/sdk": "^1.32.0",
+    "@solana/spl-token": "^0.4.15",
+    "@solana/web3.js": "^1.99.0",
+    "@squaresdk/solana-identity": "workspace:*",
+    "@squaresdk/solana-sdk": "workspace:*",
+    "@squaresdk/solana-types": "workspace:*",
+    "bs58": "^6.0.0",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
-    "@types/node": "^24.0.0"
+    "@squaresdk/solana-config": "workspace:*",
+    "@types/node": "^24.0.0",
+    "@vitest/coverage-v8": "^5.0.3",
+    "vitest": "^5.0.3"
   },
-  "keywords": [
-    "mcp",
-    "model-context-protocol",
-    "solana",
-    "ai-agents",
-    "settlement",
-    "escrow",
-    "covenant",
-    "x402"
-  ]
+  "engines": {
+    "node": ">=24"
+  }
 }
