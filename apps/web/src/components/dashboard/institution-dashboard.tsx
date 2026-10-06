@@ -15,13 +15,13 @@ import {
   jobTotals,
   percentOf,
   readInstitutionOverview,
+  readPanelEscrow,
   type InstitutionOverview,
 } from '@/lib/dashboards';
 import { readChainTime } from '@/lib/job-detail';
-import { readEscrowSetup } from '@/lib/job-wizard';
+import type { SettlementToken } from '@/lib/settlement';
 import { squareApi } from '@/lib/square-api';
 import { JOB_STATUS_TONE, statusLabel } from '@/lib/status';
-import { useSettlementToken } from '@/lib/use-settlement';
 import { JobsTable } from './jobs-table';
 import { AddressLink, counted, iso, Notice, Row, Section, Stat, usdcFormatter, type Load } from './parts';
 import { Prerequisites, type PanelContext } from './prerequisites';
@@ -38,13 +38,11 @@ export default function InstitutionDashboard({ owner }: { owner: string }) {
 interface Snapshot {
   overview: InstitutionOverview;
   chainNow: number;
+  token: SettlementToken;
 }
 
 function InstitutionPanel({ owner, apiUrl, escrowProgramId }: { owner: string } & PanelContext) {
   const { connection } = useConnection();
-  const settlement = useSettlementToken(escrowProgramId);
-  const token = settlement.state === 'ready' ? settlement.token : null;
-  const usdc = usdcFormatter(token);
   const [revision, setRevision] = useState(0);
   const [snapshot, setSnapshot] = useState<Load<Snapshot>>({ state: 'loading' });
 
@@ -52,13 +50,12 @@ function InstitutionPanel({ owner, apiUrl, escrowProgramId }: { owner: string } 
     let active = true;
     setSnapshot({ state: 'loading' });
     const read = async (): Promise<Snapshot> => {
-      const lookup = await readEscrowSetup(connection, new PublicKey(escrowProgramId));
-      if (lookup.state !== 'ready') throw new Error('The escrow is not initialized on this network yet.');
+      const { setup, token } = await readPanelEscrow(connection, new PublicKey(escrowProgramId));
       const [overview, chainNow] = await Promise.all([
-        readInstitutionOverview(squareApi(apiUrl), lookup.setup, new PublicKey(owner)),
+        readInstitutionOverview(squareApi(apiUrl), setup, new PublicKey(owner)),
         readChainTime(connection),
       ]);
-      return { overview, chainNow };
+      return { overview, chainNow, token };
     };
     read().then(
       (value) => active && setSnapshot({ state: 'ready', value }),
@@ -90,9 +87,9 @@ function InstitutionPanel({ owner, apiUrl, escrowProgramId }: { owner: string } 
     );
   }
 
-  const { overview, chainNow } = snapshot.value;
-  const mint = token?.mint.toBase58() ?? null;
-  const totals = mint ? jobTotals(overview.jobs.items, mint) : null;
+  const { overview, chainNow, token } = snapshot.value;
+  const usdc = usdcFormatter(token);
+  const totals = jobTotals(overview.jobs.items, token.mint.toBase58());
   const usage = dailyUsage(overview.operator, chainNow, overview.policies.items);
 
   const policyColumns: readonly Column<PolicyView>[] = [
@@ -202,30 +199,28 @@ function InstitutionPanel({ owner, apiUrl, escrowProgramId }: { owner: string } 
             </Link>
           </p>
         )}
-        {totals && (
-          <dl className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <Stat
-              label="In escrow"
-              value={usdc(totals.escrowed)}
-              detail={`${counted(
-                ESCROWED_STATUSES.reduce((sum, status) => sum + totals.counts[status], 0),
-                'funded job',
-              )} not yet paid or refunded`}
-            />
-            <Stat
-              label="Released"
-              value={usdc(totals.released)}
-              detail={`${counted(totals.counts.released, 'job')} paid out`}
-            />
-            <Stat label="Not funded" value={totals.counts.open} detail="jobs opened without funds" />
-            <Stat
-              label="Refunded or cancelled"
-              value={totals.counts.refunded + totals.counts.cancelled}
-              detail="jobs whose USDC went back to the institution"
-            />
-          </dl>
-        )}
-        {totals && totals.otherMint > 0 && (
+        <dl className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <Stat
+            label="In escrow"
+            value={usdc(totals.escrowed)}
+            detail={`${counted(
+              ESCROWED_STATUSES.reduce((sum, status) => sum + totals.counts[status], 0),
+              'funded job',
+            )} not yet paid or refunded`}
+          />
+          <Stat
+            label="Released"
+            value={usdc(totals.released)}
+            detail={`${counted(totals.counts.released, 'job')} paid out`}
+          />
+          <Stat label="Not funded" value={totals.counts.open} detail="jobs opened without funds" />
+          <Stat
+            label="Refunded or cancelled"
+            value={totals.counts.refunded + totals.counts.cancelled}
+            detail="jobs whose USDC went back to the institution"
+          />
+        </dl>
+        {totals.otherMint > 0 && (
           <p className="mt-3 text-caption text-muted">
             {counted(totals.otherMint, 'job')} in another mint than the settlement mint; not in the totals.
           </p>

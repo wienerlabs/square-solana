@@ -9,11 +9,10 @@ import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { Table, type Column } from '@/components/ui/table';
 import { formatDiscount } from '@/lib/claim-market';
-import { buyerTotals, readBuyerClaims, type Listing } from '@/lib/dashboards';
-import { readEscrowSetup } from '@/lib/job-wizard';
+import { buyerTotals, readBuyerClaims, readPanelEscrow, type Listing } from '@/lib/dashboards';
+import type { SettlementToken } from '@/lib/settlement';
 import { squareApi } from '@/lib/square-api';
 import { CLAIM_STATUS_TONE, statusLabel } from '@/lib/status';
-import { useSettlementToken } from '@/lib/use-settlement';
 import { AddressLink, counted, iso, Notice, Section, Stat, usdcFormatter, type Load } from './parts';
 import { Prerequisites, type PanelContext } from './prerequisites';
 
@@ -25,13 +24,11 @@ export default function BuyerDashboard({ owner }: { owner: string }) {
 interface Snapshot {
   claims: Listing<ClaimView>;
   keeperFeeBps: number;
+  token: SettlementToken;
 }
 
 function BuyerPanel({ owner, apiUrl, escrowProgramId }: { owner: string } & PanelContext) {
   const { connection } = useConnection();
-  const settlement = useSettlementToken(escrowProgramId);
-  const token = settlement.state === 'ready' ? settlement.token : null;
-  const usdc = usdcFormatter(token);
   const [revision, setRevision] = useState(0);
   const [snapshot, setSnapshot] = useState<Load<Snapshot>>({ state: 'loading' });
 
@@ -39,9 +36,8 @@ function BuyerPanel({ owner, apiUrl, escrowProgramId }: { owner: string } & Pane
     let active = true;
     setSnapshot({ state: 'loading' });
     const read = async (): Promise<Snapshot> => {
-      const lookup = await readEscrowSetup(connection, new PublicKey(escrowProgramId));
-      if (lookup.state !== 'ready') throw new Error('The escrow is not initialized on this network yet.');
-      return { claims: await readBuyerClaims(squareApi(apiUrl), owner), keeperFeeBps: lookup.setup.keeperFeeBps };
+      const { setup, token } = await readPanelEscrow(connection, new PublicKey(escrowProgramId));
+      return { claims: await readBuyerClaims(squareApi(apiUrl), owner), keeperFeeBps: setup.keeperFeeBps, token };
     };
     read().then(
       (value) => active && setSnapshot({ state: 'ready', value }),
@@ -78,7 +74,8 @@ function BuyerPanel({ owner, apiUrl, escrowProgramId }: { owner: string } & Pane
     );
   }
 
-  const { claims, keeperFeeBps } = snapshot.value;
+  const { claims, keeperFeeBps, token } = snapshot.value;
+  const usdc = usdcFormatter(token);
   const totals = buyerTotals(claims.items, keeperFeeBps);
   const columns: readonly Column<ClaimView>[] = [
     {

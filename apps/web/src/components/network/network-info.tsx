@@ -123,9 +123,6 @@ export function NetworkInfo() {
       authorities.set(loaded.value.authority, [...(authorities.get(loaded.value.authority) ?? []), name]);
     }
   }
-  const escrowConfig =
-    configs.escrow?.state === 'ready' && configs.escrow.value.state === 'ready' ? configs.escrow.value.value : null;
-
   return (
     <div className="grid gap-6">
       <div className="grid gap-6 md:grid-cols-2">
@@ -152,11 +149,7 @@ export function NetworkInfo() {
           authorities={authorities}
         />
       ))}
-      <LookupTableSection
-        address={lookupTable}
-        programIds={programIds}
-        settlementMint={escrowConfig ? (escrowConfig.settlement_mint as PublicKey) : null}
-      />
+      <LookupTableSection address={lookupTable} programIds={programIds} escrowConfig={configs.escrow} />
       {apiUrl ? (
         <ApiSection apiUrl={apiUrl} />
       ) : (
@@ -399,14 +392,25 @@ interface TableRow {
   label: string | null;
 }
 
+/** ALT'ın beklenen içeriği neden karşılaştırılamıyor; karşılaştırılabiliyorsa null. */
+function comparisonGap(allIds: boolean, escrowConfig: Load<ConfigAccount> | undefined): string | null {
+  if (!allIds) return 'Configure all four program IDs to compare it with the SDK.';
+  if (!escrowConfig || escrowConfig.state === 'loading') return 'Reading the escrow config (settlement mint)…';
+  if (escrowConfig.state === 'error') return 'The escrow config could not be read, so the contents are not compared.';
+  if (escrowConfig.value.state === 'uninitialized') {
+    return 'The escrow config is not initialized, so the settlement mint and the expected contents are unknown.';
+  }
+  return null;
+}
+
 function LookupTableSection({
   address,
   programIds,
-  settlementMint,
+  escrowConfig,
 }: {
   address: string | undefined;
   programIds: Partial<Record<ProgramName, string>>;
-  settlementMint: PublicKey | null;
+  escrowConfig: Load<ConfigAccount> | undefined;
 }) {
   const { connection } = useConnection();
   const [table, setTable] = useState<Load<LookupTableState | null>>({ state: 'loading' });
@@ -424,6 +428,11 @@ function LookupTableSection({
   }, [connection, address]);
 
   const allIds = PROGRAMS.every((name) => programIds[name]);
+  const gap = comparisonGap(allIds, escrowConfig);
+  const settlementMint =
+    escrowConfig?.state === 'ready' && escrowConfig.value.state === 'ready'
+      ? (escrowConfig.value.value.settlement_mint as PublicKey)
+      : null;
   const expected = useMemo(
     () =>
       allIds && settlementMint
@@ -534,13 +543,7 @@ function LookupTableSection({
           </span>
         </Row>
         <Row label="Contents">
-          {!expected && (
-            <span className="text-muted">
-              {allIds
-                ? 'Waiting for the escrow config (settlement mint)…'
-                : 'Configure all four program IDs to compare it with the SDK.'}
-            </span>
-          )}
+          {!expected && gap && <span className="text-muted">{gap}</span>}
           {check?.matches && (
             <StatusBadge tone="success">Matches the {expected!.length} addresses the SDK expects</StatusBadge>
           )}

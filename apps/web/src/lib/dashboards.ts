@@ -3,7 +3,7 @@
 // (`listJobs`), politikalar (`listPolicies`), agent'lar (`listAgents`), alacaklar (`listClaims`). Kurumun hesabı,
 // günlük sayacı (`OperatorState`) ve zincir saati zincirden okunur: sayaç her release'te değişir, günü UTC'de
 // döner (ADR 0012).
-import type { PublicKey } from '@solana/web3.js';
+import type { Connection, PublicKey } from '@solana/web3.js';
 import type { SquareApi } from '@squaresdk/solana-sdk';
 import {
   dailySpentAt,
@@ -22,7 +22,9 @@ import type {
   PolicyView,
 } from '@squaresdk/solana-types';
 import { sameNetwork } from './agent-directory';
-import type { EscrowSetup } from './job-wizard';
+import { readEscrowSetup, type EscrowSetup } from './job-wizard';
+import type { SettlementToken } from './settlement';
+import { readSettlementToken } from './settlement-config';
 import { unwrap } from './square-api';
 
 /** API'nin sayfa üst sınırı (`limit` 1–200). */
@@ -50,6 +52,24 @@ export async function readListing<T>(
       return { items: items.slice(0, DASHBOARD_MAX_ITEMS), total };
     }
   }
+}
+
+/**
+ * Panellerin escrow okuması: config'ten program kimlikleri ve keeper ücreti, settlement mint'i ve ondalığı. Panel
+ * ya hepsiyle ya da bir hatayla görünür; tutarlar mint okunmadan gösterilmez.
+ */
+export async function readPanelEscrow(
+  connection: Connection,
+  escrowProgramId: PublicKey,
+): Promise<{ setup: EscrowSetup; token: SettlementToken }> {
+  const [lookup, settlement] = await Promise.all([
+    readEscrowSetup(connection, escrowProgramId),
+    readSettlementToken(connection, escrowProgramId),
+  ]);
+  if (lookup.state !== 'ready' || settlement.state !== 'ready') {
+    throw new Error('The escrow is not initialized on this network yet.');
+  }
+  return { setup: lookup.setup, token: settlement.token };
 }
 
 /** İşler, indexer'ın sırasıyla: oluşturulma zamanı yeniden eskiye, eşitlikte adres. */
