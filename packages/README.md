@@ -23,7 +23,7 @@ kopyaları `pnpm license:write` yazar, `pnpm license:check` denetler.
 | [`x402/`](x402/) | `@squaresdk/solana-x402` | x402 v2 geçidi (resmi `@x402/*` üzerine): Solana exact şeması, kendi ya da harici facilitator ([ADR 0018](../docs/decisions/0018-x402-facilitator.md)), kalıcı tekrar koruması, ücretli Express route'u, portal tanımından ücretli route (`paidRouteFromDefinition`, [ADR 0023](../docs/decisions/0023-x402-ucretli-uc-nokta-tanimlari.md)), ödeyen `fetch` | [BE-24], [FE-22] |
 | [`mcp/`](mcp/) | `@squaresdk/solana-mcp` | Square MCP sunucusu (okuma ve imzasız tx hazırlayan yazma tool'ları, stdio ve Streamable HTTP) + agent'lar için havuzlu MCP istemcisi (`/client`) | [BE-28] |
 | [`hosted/`](hosted/) | `@squaresdk/solana-hosted` | konfigürasyondan çalışan kurum agent'ı (`square-hosted`): capability başına yalnızca izinli MCP tool'larını gören Claude çalıştırması, kurum politikası altında delegasyon, ispat bağlama ve dispute crank'i ([ADR 0022](../docs/decisions/0022-hosted-agent-calisma-zamani-izolasyonu.md)) | [BE-29] |
-| `cli/` | `@squaresdk/solana-cli` | komut satırı aracı | [BE-30] |
+| [`cli/`](cli/) | `@squaresdk/solana-cli` | komut satırı aracı `squaresdk-solana`: 8 adım, uyuşmazlık, did:aip çözümü; JSON çıktı, küme ve keypair yapılandırması ([referans](../docs/cli.md), [ADR 0025](../docs/decisions/0025-cli-komut-adi-ve-yapilandirma.md)) | [BE-30] |
 
 `mcp/` (covenant `mcp/`) ve `agent-sdk/` (aip-beta `packages/agent-sdk`) kaynak projelerden
 geçmişleriyle taşındı [BE-02]. `agent-sdk/` BE-19'da (Apache-2.0; kaynağın MIT bildirimi
