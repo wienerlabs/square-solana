@@ -13,6 +13,7 @@ import { StatusBadge } from '@/components/ui/status-badge';
 import { TxConfirmation } from '@/components/ui/tx-confirmation';
 import { JobClaim } from './job-claim';
 import { JobRelease } from './job-release';
+import { JobTravelRule } from './job-travel-rule';
 import { chainRefOf, hex } from '@/lib/agent-registration';
 import { payoutOf, type Payout } from '@/lib/claim-market';
 import { claimListingAddress } from '@/lib/idl-pda';
@@ -34,6 +35,7 @@ import { formatUnits } from '@/lib/settlement';
 import { JOB_STATUS_TONE, statusLabel } from '@/lib/status';
 import { useSettlementToken } from '@/lib/use-settlement';
 import { useSignatureStatus } from '@/lib/use-signature-status';
+import { useTravelRuleVault } from '@/lib/use-travel-rule-vault';
 
 type Load<T> = { state: 'loading' } | { state: 'ready'; value: T } | { state: 'error'; message: string };
 type JobStatusName = keyof typeof JOB_STATUS_TONE;
@@ -181,6 +183,9 @@ export function JobDetail({ jobAddress, escrowProgramId }: { jobAddress: string;
   // Agent eylemleri: yalnızca job'un agent cüzdanı.
   const account = job.state === 'ready' ? job.value : null;
   const isAgent = Boolean(account && publicKey?.equals(account.agentWallet));
+  // Travel Rule kayıtları işi açan kurumun bu tarayıcıdaki şifreli deposunda (FE-18).
+  const institutionKey = account && publicKey?.equals(account.institution) ? publicKey : null;
+  const vault = useTravelRuleVault(institutionKey?.toBase58() ?? null);
   const fileId = useId();
   const uriId = useId();
   const [deliveryUri, setDeliveryUri] = useState('');
@@ -331,6 +336,22 @@ export function JobDetail({ jobAddress, escrowProgramId }: { jobAddress: string;
           )}
         </section>
       )}
+
+      <JobTravelRule
+        setup={escrow}
+        jobAddress={jobAddress}
+        job={{
+          status: jobStatus,
+          amount: BigInt(account.amount.toString()),
+          mint: account.mint,
+          agentWallet: account.agentWallet,
+          commitment: Uint8Array.from(account.travelRuleCommitment),
+        }}
+        institution={institutionKey}
+        vault={vault}
+        formatAmount={formatAmount}
+        onConfirmed={refresh}
+      />
 
       <JobRelease
         escrow={escrow}
