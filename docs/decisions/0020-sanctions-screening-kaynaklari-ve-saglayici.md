@@ -1,4 +1,4 @@
-# ADR 0017: Sanctions screening kaynakları ve sağlayıcı seçimi
+# ADR 0020: Sanctions screening kaynakları ve sağlayıcı seçimi
 
 - **Durum:** Kabul edildi
 - **Issue:** BE-16 (#49)

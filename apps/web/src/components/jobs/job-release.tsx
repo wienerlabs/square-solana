@@ -25,7 +25,6 @@ import { loadDrafts, loadSecret } from '@/lib/policy-local';
 import {
   policyMaterialFor,
   proverErrorMessage,
-  readReleaseState,
   refusalReasons,
   RELEASE_ARTIFACT_VERSION,
   releaseOutlook,
@@ -79,35 +78,21 @@ export function JobRelease({
   jobKey,
   account,
   listing,
+  release: state,
   chainNow,
-  revision,
   formatAmount,
 }: {
   escrow: EscrowSetup;
   jobKey: PublicKey;
   account: JobAccount;
   listing: ClaimListingAccount | null;
+  /** İş detayının okuduğu ispat durumu (`readReleaseState`); finalize paneliyle ortak. */
+  release: Load<ReleaseState>;
   chainNow: number | null;
-  revision: number;
   formatAmount(base: bigint): string;
 }) {
   const { publicKey } = useWallet();
-  const [state, setState] = useState<Load<ReleaseState>>({ state: 'loading' });
-  const gated = account.policy !== null;
-
-  useEffect(() => {
-    if (!gated) return;
-    let active = true;
-    readReleaseState(escrow, jobKey, account).then(
-      (value) => active && setState({ state: 'ready', value }),
-      (error: Error) => active && setState({ state: 'error', message: error.message }),
-    );
-    return () => {
-      active = false;
-    };
-  }, [gated, escrow, jobKey, account, revision]);
-
-  if (!gated) return null;
+  if (account.policy === null) return null;
   const status = Object.keys(account.status)[0];
   const bindable = status === 'delivered' || status === 'disputed';
   const outlook =

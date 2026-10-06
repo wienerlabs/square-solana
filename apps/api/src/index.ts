@@ -27,12 +27,16 @@ import { createNotifier, createNotifierMetrics } from './disputes/notifier.js';
 import { createParties } from './disputes/parties.js';
 import { createWebhookService } from './disputes/webhooks.js';
 import { startLoop } from './loop.js';
+import { createInstitutionAuthority } from './institution-authority.js';
 import { loadOpenApi } from './openapi.js';
 import { packageInfo } from './package-info.js';
 import { createPolicyMetaService } from './policy-meta.js';
 import { loadProgramIds } from './programs.js';
 import { createProverProxy } from './prover.js';
 import { createDeliveryStore, createEvidenceStore } from './storage.js';
+import { createKeyring } from './travel-rule/crypto.js';
+import { startTravelRuleMaintenance } from './travel-rule/maintenance.js';
+import { createTravelRuleService } from './travel-rule/service.js';
 import { createTxBuilder } from './tx.js';
 
 const MS_PER_SECOND = 1000;
@@ -83,6 +87,14 @@ async function main(): Promise<void> {
     allowHttp: config.notify.allowInsecure,
     allowPrivateAddresses: config.notify.allowInsecure,
   };
+  const authority = createInstitutionAuthority({ db, connection });
+  const travelRule = createTravelRuleService({
+    db,
+    client,
+    authority,
+    keyring: createKeyring(config.travelRule.keys, config.travelRule.activeKeyId),
+    retentionSeconds: config.travelRule.retentionSeconds,
+  });
   const rateStore = createPrismaRateLimitStore(db);
   const window = (limit: number) =>
     createRateLimiter({ store: rateStore, rule: { limit, windowSeconds: config.rateLimit.windowSeconds } });
@@ -137,13 +149,14 @@ async function main(): Promise<void> {
       chainRef,
       publicBaseUrl: config.publicBaseUrl,
     }),
-    policyMeta: createPolicyMetaService({ db, connection }),
+    policyMeta: createPolicyMetaService({ db, authority }),
     tx,
     evidence,
     arbitration: createArbitrationService({ db, read, client, tx, arbitrators, evidence }),
     webhooks: createWebhookService({ db, box, arbitrators, urlPolicy }),
     evidenceMaxBytes: config.evidence.maxBytes,
     prover: createProverProxy(config.prover),
+    travelRule,
     limiters: { read: window(config.rateLimit.read), write: window(config.rateLimit.write) },
     openapi,
     health,
@@ -189,6 +202,12 @@ async function main(): Promise<void> {
       log.error('notifier_failed', { error });
     },
   });
+  const stopMaintenance = startTravelRuleMaintenance({
+    run: () => travelRule.maintain(),
+    intervalMs: config.travelRule.maintenanceIntervalSeconds * MS_PER_SECOND,
+    log,
+    onError: () => errors.record(),
+  });
   log.info('listening', {
     version: packageInfo.version,
     contractVersion: openapi.info.version,
@@ -202,6 +221,7 @@ async function main(): Promise<void> {
     log.info('shutdown', { signal });
     stopAlarms();
     await stopNotifier();
+    await stopMaintenance();
     await Promise.all(servers.map(close));
     await db.$disconnect();
     process.exit(0);

@@ -28,10 +28,13 @@ import { createArbitrators, type Arbitrators } from '../../src/disputes/arbitrat
 import { createEvidenceService } from '../../src/disputes/evidence.js';
 import { createParties } from '../../src/disputes/parties.js';
 import { createWebhookService } from '../../src/disputes/webhooks.js';
+import { createInstitutionAuthority } from '../../src/institution-authority.js';
 import type { OpenApiDocument } from '../../src/openapi.js';
 import { createPolicyMetaService } from '../../src/policy-meta.js';
 import { createProverProxy } from '../../src/prover.js';
 import { createDeliveryStore, createEvidenceStore } from '../../src/storage.js';
+import { createKeyring, type Keyring } from '../../src/travel-rule/crypto.js';
+import { createTravelRuleService, type TravelRuleService } from '../../src/travel-rule/service.js';
 import { createTxBuilder } from '../../src/tx.js';
 import { FixtureRpc, startRpc } from './rpc.js';
 
@@ -62,6 +65,7 @@ export interface Stack {
   /** Webhook sırlarının kutusu ve arbitrator seti (bildirim testleri gönderiyi bunlarla kurar). */
   readonly box: SecretBox;
   readonly arbitrators: Arbitrators;
+  readonly travelRule: TravelRuleService;
   /** İç ve bağımlılık hataları (alarm penceresi). */
   readonly errors: { count(): number };
   api(auth?: { session?: string; apiKey?: string }): SquareApi;
@@ -85,6 +89,8 @@ export async function startStack(options: {
   clock?: () => number;
   /** Paylaşılan veritabanı yerine başka bir adres (ör. ulaşılamayan veritabanı testi). */
   databaseUrl?: string;
+  /** Travel Rule ana anahtar halkası ve saklama süresi. */
+  travelRule?: { keyring: Keyring; retentionSeconds: number };
 }): Promise<Stack> {
   const db = createDatabaseClient({ connectionString: options.databaseUrl ?? inject('databaseUrl') });
   const s3 = inject('s3');
@@ -117,6 +123,15 @@ export async function startStack(options: {
     secretAccessKey: s3.secretAccessKey,
     forcePathStyle: true,
     publicBaseUrl: deliveryBaseUrl,
+  });
+  const authority = createInstitutionAuthority({ db, connection });
+  const travelRule = createTravelRuleService({
+    db,
+    client,
+    authority,
+    keyring: options.travelRule?.keyring ?? createKeyring(new Map([['test', randomBytes(32)]]), 'test'),
+    retentionSeconds: options.travelRule?.retentionSeconds ?? 86_400,
+    ...(options.clock ? { clock: options.clock } : {}),
   });
   const rateStore = createPrismaRateLimitStore(db);
   const limits = options.rateLimit ?? { read: 1_000, write: 1_000 };
@@ -178,7 +193,7 @@ export async function startStack(options: {
       chainRef: CHAIN_REF,
       publicBaseUrl: PUBLIC_BASE_URL,
     }),
-    policyMeta: createPolicyMetaService({ db, connection }),
+    policyMeta: createPolicyMetaService({ db, authority }),
     tx,
     evidence,
     arbitration: createArbitrationService({
@@ -198,6 +213,7 @@ export async function startStack(options: {
     }),
     evidenceMaxBytes: options.evidenceMaxBytes ?? 1024 * 1024,
     prover: createProverProxy({ url: proverUrl, apiKey: 'prover-service-key', timeoutMs: 2_000 }),
+    travelRule,
     limiters: { read: window(limits.read), write: window(limits.write) },
     openapi: options.openapi,
     health,
@@ -220,6 +236,7 @@ export async function startStack(options: {
     client,
     box,
     arbitrators,
+    travelRule,
     errors,
     api: (auth) => createApiClient({ baseUrl: url, ...(auth ? { auth } : {}) }),
     async close() {

@@ -37,6 +37,12 @@ import type {
   Session,
   SessionRequest,
   SquareProgram,
+  TravelRuleAccess,
+  TravelRuleDisclosure,
+  TravelRuleGrant,
+  TravelRuleGrantCreate,
+  TravelRulePut,
+  TravelRuleStatus,
   TxRequest,
   UnsignedTx,
 } from '@squaresdk/solana-types';
@@ -105,6 +111,14 @@ export interface SquareApi {
     query?: PageParams & { job?: Address; outcome?: KeeperAction['outcome'] },
   ): Promise<ApiEnvelope<KeeperAction[]>>;
 
+  /** Travel Rule kaydını şifreli saklar; `commitTravelRule`'un commitment'ı döner (kurumun yetkilisi, oturum). */
+  putTravelRule(job: Address, body: TravelRulePut): Promise<ApiEnvelope<TravelRuleStatus>>;
+  /** Kaydı ve salt'ı döner (kurumun yetkilisi ya da izinli cüzdan); okuma erişim kaydına yazılır. */
+  getTravelRule(job: Address): Promise<ApiEnvelope<TravelRuleDisclosure>>;
+  createTravelRuleGrant(job: Address, body: TravelRuleGrantCreate): Promise<ApiEnvelope<TravelRuleGrant>>;
+  deleteTravelRuleGrant(job: Address, grantee: Address): Promise<void>;
+  listTravelRuleAccess(job: Address, query?: PageParams): Promise<ApiEnvelope<TravelRuleAccess[]>>;
+
   prepareTx(body: TxRequest): Promise<ApiEnvelope<UnsignedTx>>;
   prove(body: ProveRequest): Promise<ApiEnvelope<ProveResponse>>;
   getHealth(): Promise<Health>;
@@ -145,6 +159,11 @@ export const API_OPERATIONS = [
   'getScreening',
   'listEvents',
   'listKeeperActions',
+  'putTravelRule',
+  'getTravelRule',
+  'createTravelRuleGrant',
+  'deleteTravelRuleGrant',
+  'listTravelRuleAccess',
   'prepareTx',
   'prove',
   'getHealth',

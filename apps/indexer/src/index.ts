@@ -79,6 +79,7 @@ async function main(): Promise<void> {
     rules: indexerAlarmRules({
       lastPollAt: () => poller.lastSuccessAt(),
       startedAt,
+      syncLag: () => poller.syncLag(),
       lastDrift: () => reconciler.lastDrift(),
       errors,
       thresholds: config.alerts,

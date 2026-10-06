@@ -7,11 +7,14 @@ import {
   JobStatusSchema,
   ReleaseVerdictSchema,
   ScreeningStatusSchema,
+  ValidationOutcomeSchema,
   type AgentStatus,
   type ClaimStatus,
   type JobStatus,
+  type KeeperAction,
   type ReleaseVerdict,
   type ScreeningStatus,
+  type ValidationOutcome,
 } from '@squaresdk/solana-types';
 import type { Tone } from '@/components/ui/status-badge';
 
@@ -50,6 +53,21 @@ export const SCREENING_STATUS_TONE = {
   flagged: 'danger',
 } as const satisfies Record<ScreeningStatus, Tone>;
 
+export const VALIDATION_OUTCOME_TONE = {
+  verified: 'success',
+  refused: 'danger',
+  noGate: 'neutral',
+  noPayout: 'warning',
+} as const satisfies Record<ValidationOutcome, Tone>;
+
+/** Keeper günlüğündeki denemenin sonucu (API, `KeeperOutcome`); zincir durumu değildir, katalogda yoktur. */
+export const KEEPER_OUTCOME_TONE = {
+  submitted: 'info',
+  confirmed: 'success',
+  skipped: 'neutral',
+  failed: 'danger',
+} as const satisfies Record<KeeperAction['outcome'], Tone>;
+
 /** `noGate` → "No gate", `released` → "Released". */
 export function statusLabel(value: string): string {
   const words = value.replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase();
@@ -80,4 +98,10 @@ export const STATUS_SETS: readonly StatusSet[] = [
   set('Release proof', 'square_verifier · ReleaseProof.verdict', ReleaseVerdictSchema.options, RELEASE_VERDICT_TONE),
   set('Agent', 'square_registry · AgentRecord.status', AgentStatusSchema.options, AGENT_STATUS_TONE),
   set('Screening', 'square_registry · ScreeningRecord.status', ScreeningStatusSchema.options, SCREENING_STATUS_TONE),
+  set(
+    'Validation',
+    'square_escrow · ValidationRecord.outcome',
+    ValidationOutcomeSchema.options,
+    VALIDATION_OUTCOME_TONE,
+  ),
 ];

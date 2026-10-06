@@ -99,6 +99,7 @@ async function main(): Promise<void> {
         return rounds.includes(null) ? null : Math.min(...(rounds as number[]));
       },
       lastBalance: () => crank.lastBalance(),
+      oldestDueSeconds: () => crank.oldestDueSeconds(),
       startedAt,
       errors,
       thresholds: config.alerts,

@@ -273,6 +273,44 @@ describe('imleç ve sayfalama', () => {
       later,
     );
   });
+
+  it('senkron gecikmesi okunamayan tx’te büyür; canlı tx’in gecikmesi ölçülür, backfill ölçülmez', async () => {
+    let now = 0;
+    const stack = await createStack(db.client, [server.url], { clock: () => now * 1000 });
+    const delays = async () => {
+      const values = (await stack.metrics.ingestDelay.get()).values;
+      const value = (suffix: string) =>
+        values.find((entry) => entry.metricName === `indexer_ingest_delay_seconds_${suffix}`)!.value;
+      return { count: value('count'), sum: value('sum') };
+    };
+    const blockTime = (signature: string) => chain.txs.find((tx) => tx.signature === signature)!.blockTime!;
+
+    const history = world.tx({ program: 'policy' });
+    now = blockTime(history) + 86_400;
+    chain.slot = 2_000;
+    expect(await stack.poller.runOnce()).toBe(1);
+    expect(stack.poller.syncLag()).toBe(0);
+    expect(await delays()).toEqual({ count: 0, sum: 0 });
+
+    const live = world.tx({ program: 'policy' });
+    now = blockTime(live) + 20;
+    chain.slot = 2_100;
+    expect(await stack.poller.runOnce()).toBe(1);
+    expect(stack.poller.syncLag()).toBe(0);
+    expect(await delays()).toEqual({ count: 1, sum: 20 });
+
+    const late = world.tx({ program: 'policy' });
+    chain.unavailable.add(late);
+    chain.slot = 2_300;
+    expect(await stack.poller.runOnce()).toBe(0);
+    expect(stack.poller.syncLag()).toBe(200);
+    expect(await stack.metrics.registry.metrics()).toContain('indexer_sync_lag_slots{service="indexer-test"} 200');
+
+    chain.unavailable.delete(late);
+    chain.slot = 2_400;
+    expect(await stack.poller.runOnce()).toBe(1);
+    expect(stack.poller.syncLag()).toBe(0);
+  });
 });
 
 describe('uzlaştırma', () => {

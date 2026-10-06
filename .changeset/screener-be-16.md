@@ -3,7 +3,7 @@
 '@squaresdk/solana-db': minor
 ---
 
-Sanctions screening servisi (BE-16, ADR 0017).
+Sanctions screening servisi (BE-16, ADR 0020).
 
 `@squaresdk/solana-screener`: ilk sürüm. Cüzdanı OFAC SDN listesi ("Digital Currency Address - SOL") ve
 yapılandırılmışsa Chainalysis sanctions API ile tarar; kaynaklardan biri işaretlerse karar `flagged`. Karar

@@ -131,6 +131,7 @@ anchor test --validator legacy --skip-build            # program testleri (LiteS
 node scripts/ci/program-coverage.mjs                   # test kapsamı (escrow kapısı %80, BC-29)
 pnpm contract:check                     # IDL'den türetilen dosyalar
 pnpm secrets:scan                       # gitleaks, bütün geçmiş
+node scripts/ci/monitoring.mjs          # izleme kuralları ve pano ↔ servis metrikleri (docs/slo.md)
 node --test "scripts/ci/*.test.mjs"     # CI betiklerinin testleri
 cd circuits/payment-compliance && CIRCUIT_TESTS_STRICT=1 npm test   # devre testleri, atlamasız
 pnpm --filter @squaresdk/solana-smoke smoke:localnet                # uçtan uca smoke (anchor build ve devre derlemesinden sonra)

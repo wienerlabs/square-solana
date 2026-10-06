@@ -1,4 +1,4 @@
-// Chainalysis sanctions screening API'si (ADR 0017): `GET <taban>/api/v1/address/<adres>`, `X-API-Key`
+// Chainalysis sanctions screening API'si (ADR 0020): `GET <taban>/api/v1/address/<adres>`, `X-API-Key`
 // başlığı. Yanıt `{ identifications: [{ category, name, description, url }] }`; boş dizi adresin yaptırım
 // listelerinde olmadığını, dolu dizi listede olduğunu gösterir. Kanıt yanıt gövdesinin SHA-256'sı ve
 // eşleşmelerin kategori ve adıdır. 2xx dışı yanıt, zaman aşımı ya da şemaya uymayan gövde kaynağın karar

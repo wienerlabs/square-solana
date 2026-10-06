@@ -23,9 +23,10 @@ export type ProcessResult = 'indexed' | 'failed' | 'pending';
 export interface Pipeline {
   /**
    * İmzayı işler. Tx kesinleşmemişse (`getTransaction` finalized'da bulamazsa) `pending`; hiçbir şey yazılmaz.
-   * `cursor` verilirse imleç aynı transaction'da ilerler.
+   * `cursor` verilirse imleç aynı transaction'da ilerler. `backfill` taramada geçmiş tx'tir: blok zamanından
+   * bu yana geçen süre gecikme ölçümüne (`indexer_ingest_delay_seconds`) girmez.
    */
-  process(signature: string, cursor?: CursorPosition): Promise<ProcessResult>;
+  process(signature: string, cursor?: CursorPosition, backfill?: boolean): Promise<ProcessResult>;
   /** Veritabanı yazmalarını sıraya koyar: aynı anda tek yazma transaction'ı. */
   exclusive<T>(work: (tx: Tx) => Promise<T>): Promise<T>;
 }
@@ -50,7 +51,7 @@ export function createPipeline(deps: {
 
   return {
     exclusive,
-    async process(signature, cursor) {
+    async process(signature, cursor, backfill = false) {
       const tx = await chain.transaction(signature);
       if (!tx) {
         metrics.transactions.inc({ result: 'pending' });
@@ -89,6 +90,9 @@ export function createPipeline(deps: {
       });
       for (const event of events) metrics.events.inc({ program: event.program });
       metrics.transactions.inc({ result: 'indexed' });
+      if (!backfill && tx.blockTime !== null) {
+        metrics.ingestDelay.observe(Math.max(0, clock() / 1000 - tx.blockTime));
+      }
       log.debug('indexed', {
         signature,
         slot: tx.slot,
