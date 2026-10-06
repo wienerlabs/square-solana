@@ -196,6 +196,24 @@ export function describeJobEvent(
       return { title: 'Missing proof escalated', detail: `by the agent wallet ${str(d.agent_wallet)}, without a bond` };
     case 'ValidationRecorded':
       return { title: 'Validation recorded' };
+    // Verifier event'leri: zaman çizelgesi API'den (indexer) okununca gelir.
+    case 'ComplianceProofSet': {
+      const verdict = typeof d.verdict === 'string' ? d.verdict : Object.keys(d.verdict ?? {})[0];
+      return verdict === 'compliant'
+        ? {
+            title: 'Compliance proof bound: compliant',
+            detail: `${formatAmount(num(d.net_amount))} to ${str(d.payee)}`,
+          }
+        : {
+            title: 'Compliance proof bound: refused',
+            detail: refusalReasons(Number(d.refusal_code)).join('; '),
+          };
+    }
+    case 'ReleaseRecorded':
+      return {
+        title: 'Release recorded by the verifier',
+        detail: `${formatAmount(num(d.net_amount))}; the institution's daily spend is now ${formatAmount(num(d.daily_spent))}`,
+      };
     case 'ReputationRecorded':
       return { title: 'Reputation recorded' };
     default:

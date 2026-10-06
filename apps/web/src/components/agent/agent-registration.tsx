@@ -4,7 +4,10 @@ import Link from 'next/link';
 import { useEffect, useId, useMemo, useState, type ReactNode } from 'react';
 import { useConnection } from '@solana/wallet-adapter-react';
 import { PublicKey } from '@solana/web3.js';
+import type { AgentCard } from '@squaresdk/solana-types';
+import { useApiSession } from '@/components/api-session';
 import { useNetworkGuard, useSendTransaction } from '@/components/network-guard';
+import { useWebConfig } from '@/components/providers';
 import { Address, Did } from '@/components/ui/address';
 import { Button } from '@/components/ui/button';
 import { CopyButton } from '@/components/ui/copy-button';
@@ -15,13 +18,15 @@ import {
   agentIdProblem,
   buildRegisterAgentTx,
   cardUriProblem,
+  checkHostedCard,
   fetchAndCheckCard,
   hex,
+  hostingProblem,
   registryErrorMessage,
   ZERO_HASH,
   type CardCheck,
 } from '@/lib/agent-registration';
-import { isAddress } from '@/lib/config';
+import { ENV_VARS, isAddress } from '@/lib/config';
 import { TransactionBlockedError } from '@/lib/send-transaction';
 import { useSignatureStatus } from '@/lib/use-signature-status';
 
@@ -64,12 +69,16 @@ function Field({
 type RecordLookup =
   { state: 'checking' } | { state: 'free' } | { state: 'taken' } | { state: 'error'; message: string };
 type CardState = { state: 'idle' } | { state: 'checking' } | ({ uri: string } & CardCheck);
+/** Square API'de barındırılan kart: hangi kayıt girdisi için barındırıldığıyla. */
+type HostedCard = { uri: string; hash: Uint8Array; card: AgentCard; registrationKey: string };
 
 /** Bağlı cüzdanın (owner ve creator) agent kaydı: `register_agent`, akışın 2. adımı. */
 export function AgentRegistration({ owner, registryProgramId }: { owner: string; registryProgramId: string }) {
   const { connection } = useConnection();
   const guard = useNetworkGuard();
   const send = useSendTransaction();
+  const { apiUrl } = useWebConfig();
+  const apiSession = useApiSession();
   const ownerKey = useMemo(() => new PublicKey(owner), [owner]);
   const registry = useMemo(() => new PublicKey(registryProgramId), [registryProgramId]);
 
@@ -77,6 +86,10 @@ export function AgentRegistration({ owner, registryProgramId }: { owner: string;
   const [cardUri, setCardUri] = useState('');
   const [wallet, setWallet] = useState(owner);
   const [card, setCard] = useState<CardState>({ state: 'idle' });
+  const [cardText, setCardText] = useState('');
+  const [hosted, setHosted] = useState<HostedCard | null>(null);
+  const [hosting, setHosting] = useState(false);
+  const [hostError, setHostError] = useState<string | null>(null);
   const [lookup, setLookup] = useState<RecordLookup | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -125,8 +138,35 @@ export function AgentRegistration({ owner, registryProgramId }: { owner: string;
     setCard({ uri, ...(await fetchAndCheckCard(uri, identity.registration)) });
   };
 
+  // Barındırılan kart yalnızca URI'si alanda duruyorsa ve aynı kayıt girdisi içinse geçerli.
+  const hostedCard = hosted && hosted.uri === cardUri && hosted.registrationKey === registrationKey ? hosted : null;
   const verified = card.state === 'verified' && card.uri === cardUri ? card : null;
-  const cardHash = cardUri === '' ? ZERO_HASH : (verified?.hash ?? null);
+  const cardHash = cardUri === '' ? ZERO_HASH : (hostedCard?.hash ?? verified?.hash ?? null);
+  const shownCard = hostedCard?.card ?? verified?.card ?? null;
+  const draft = identity && cardText.trim() !== '' ? checkHostedCard(cardText, identity.registration) : null;
+
+  // Kart API'de, oturumla barındırılır (kayıttan önce: `agentId` ile); dönen hash tarayıcıdakiyle aynıysa URI alana gelir.
+  const hostCard = async () => {
+    if (!identity || draft?.state !== 'ready' || !registrationKey) return;
+    setHosting(true);
+    setHostError(null);
+    try {
+      const result = await apiSession.call((api) =>
+        api.putAgentCard(identity.agentRecord.toBase58(), draft.card, { agentId }),
+      );
+      const problem = hostingProblem(result, draft.hash);
+      if (problem) {
+        setHostError(problem);
+        return;
+      }
+      setHosted({ uri: result.agentCardUri, hash: draft.hash, card: draft.card, registrationKey });
+      setCardUri(result.agentCardUri);
+    } catch (error) {
+      setHostError((error as Error).message);
+    } finally {
+      setHosting(false);
+    }
+  };
   const ready =
     identity !== null &&
     lookup?.state === 'free' &&
@@ -250,7 +290,7 @@ export function AgentRegistration({ owner, registryProgramId }: { owner: string;
         <div className="mt-4 grid gap-5">
           <Field
             label="Agent card URI"
-            hint="Publish the card first; its SHA-256 is recorded with the URI. Leave empty to register without a card."
+            hint="Publish the card first, at your own address or on the Square API below; its SHA-256 is recorded with the URI. Leave empty to register without a card."
             error={uriProblem}
           >
             {({ id, describedBy, invalid }) => (
@@ -280,7 +320,7 @@ export function AgentRegistration({ owner, registryProgramId }: { owner: string;
               <pre className="overflow-x-auto rounded-lg bg-surface-muted p-3 font-mono text-caption">{entry}</pre>
             </div>
           )}
-          {cardUri !== '' && !uriProblem && (
+          {cardUri !== '' && !uriProblem && !hostedCard && (
             <div className="flex flex-wrap items-center gap-3">
               <Button
                 variant="secondary"
@@ -301,22 +341,100 @@ export function AgentRegistration({ owner, registryProgramId }: { owner: string;
               ))}
             </ul>
           )}
-          {verified && (
+          {hostedCard && (
+            <p className="flex flex-wrap items-center gap-2 text-sm">
+              <StatusBadge tone="success">Hosted on the Square API</StatusBadge>
+              The API stores the card under this URI; its SHA-256 matches the one computed here.
+            </p>
+          )}
+          {shownCard && (
             <dl className="grid gap-2 text-sm">
               <div className="flex flex-wrap justify-between gap-2">
                 <dt className="text-muted">Name</dt>
-                <dd>{verified.card.name}</dd>
+                <dd>{shownCard.name}</dd>
               </div>
               <div className="flex flex-wrap justify-between gap-2">
                 <dt className="text-muted">A2A endpoint</dt>
-                <dd className="font-mono">{verified.card.url}</dd>
+                <dd className="font-mono">{shownCard.url}</dd>
               </div>
               <div className="flex flex-wrap justify-between gap-2">
                 <dt className="text-muted">Skills</dt>
-                <dd>{verified.card.skills.map((skill) => skill.name).join(', ')}</dd>
+                <dd>{shownCard.skills.map((skill) => skill.name).join(', ')}</dd>
               </div>
             </dl>
           )}
+          <div className="grid gap-3 border-t border-border pt-5">
+            <h3 className="text-sm font-medium">Host the card on the Square API</h3>
+            {!apiUrl ? (
+              <p className="text-sm text-muted">
+                Unavailable: <span className="font-mono">{ENV_VARS.apiUrl}</span> is not set.
+              </p>
+            ) : (
+              <>
+                <Field
+                  label="Agent card JSON"
+                  hint="The card in the Square agent card schema, with the entry above in its registrations. Hosting signs in to the Square API with this wallet; the API serves the card under its A2A discovery path, and that URI and its SHA-256 are registered."
+                  error={draft?.state === 'invalid' ? draft.problems.join(' ') : null}
+                >
+                  {({ id, describedBy, invalid }) => (
+                    <textarea
+                      id={id}
+                      className={`${inputClass} min-h-40`}
+                      value={cardText}
+                      onChange={(event) => setCardText(event.target.value)}
+                      aria-describedby={describedBy}
+                      aria-invalid={invalid}
+                      spellCheck={false}
+                      disabled={signature !== null || !identity}
+                    />
+                  )}
+                </Field>
+                <Field label="Or load the card from a file">
+                  {({ id }) => (
+                    <input
+                      id={id}
+                      type="file"
+                      accept="application/json,.json"
+                      className="text-sm"
+                      disabled={signature !== null || !identity}
+                      onChange={(event) => {
+                        const file = event.currentTarget.files?.[0];
+                        if (file) void file.text().then(setCardText);
+                      }}
+                    />
+                  )}
+                </Field>
+                {!identity && (
+                  <p className="text-sm text-muted">Choose the agent ID first: the card names its record.</p>
+                )}
+                {draft?.state === 'ready' && draft.normalized && (
+                  <p className="text-sm text-muted">
+                    The hosted card is the card as the schema reads it: fields outside the schema are left out and
+                    missing defaults are filled in.
+                  </p>
+                )}
+                <div className="flex flex-wrap items-center gap-3">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => void hostCard()}
+                    loading={hosting}
+                    disabled={
+                      draft?.state !== 'ready' ||
+                      lookup?.state !== 'free' ||
+                      signature !== null ||
+                      Boolean(apiSession.unavailable) ||
+                      Boolean(hostedCard)
+                    }
+                  >
+                    Host the card
+                  </Button>
+                  {apiSession.unavailable && <p className="text-caption text-muted">{apiSession.unavailable}</p>}
+                </div>
+                {hostError && <p className="text-sm text-danger-text">{hostError}</p>}
+              </>
+            )}
+          </div>
         </div>
       </section>
 
@@ -390,9 +508,14 @@ export function AgentRegistration({ owner, registryProgramId }: { owner: string;
         {registered && identity && (
           <p className="mt-4 text-sm">
             Registered.{' '}
+            <Link href={`/app/agents/${identity.agentRecord.toBase58()}`} className="text-link underline">
+              Open the profile
+            </Link>{' '}
+            or{' '}
             <Link href={`/app/did?did=${encodeURIComponent(identity.did)}`} className="text-link underline">
-              Resolve the DID
+              resolve the DID
             </Link>
+            .
           </p>
         )}
       </section>

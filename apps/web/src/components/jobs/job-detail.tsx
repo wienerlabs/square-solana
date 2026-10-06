@@ -558,9 +558,14 @@ export function JobDetail({ jobAddress, escrowProgramId }: { jobAddress: string;
       )}
 
       <section aria-labelledby="timeline-heading" className="rounded-card border border-border bg-surface p-6">
-        <h2 id="timeline-heading" className="text-sm font-medium uppercase tracking-wide text-muted">
-          Timeline
-        </h2>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 id="timeline-heading" className="text-sm font-medium uppercase tracking-wide text-muted">
+            Timeline
+          </h2>
+          <Link href={`/audit/${jobAddress}`} className="text-sm text-link underline">
+            Audit trail
+          </Link>
+        </div>
         {timeline.state === 'loading' && <p className="mt-3 text-sm text-muted">Reading the transactions…</p>}
         {timeline.state === 'error' && (
           <p className="mt-3 text-sm text-danger-text">The timeline could not be read: {timeline.message}</p>
