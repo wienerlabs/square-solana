@@ -45,10 +45,11 @@ const SEED_TRANSACTION = Buffer.from('transaction');
 const SEED_PROPOSAL = Buffer.from('proposal');
 const SEED_PROGRAM_CONFIG = Buffer.from('program_config');
 
-const u64Le = (value: bigint, label: string): Buffer => {
+// `DataView` ile: tarayıcı paketlerinin Buffer polyfill'inde (Next.js'in `buffer` 5'i) `writeBigUInt64LE` yoktur.
+const u64Le = (value: bigint, label: string): Uint8Array => {
   if (value < 0n || value >= 2n ** 64n) throw new Error(`${label} u64 aralığı dışında: ${value}`);
-  const out = Buffer.alloc(8);
-  out.writeBigUInt64LE(value);
+  const out = new Uint8Array(8);
+  new DataView(out.buffer).setBigUint64(0, value, true);
   return out;
 };
 

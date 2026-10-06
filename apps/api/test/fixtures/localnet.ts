@@ -1,8 +1,10 @@
 // Test fixture: gerçek programlarla localnet dünyası (uyuşmazlık uçtan uca testleri, BE-22 ve FE-17). Square
-// programları `solana-test-validator`'a yükseltilebilir program olarak yüklenir, registry ve escrow config'leri
+// programları `solana-test-validator`'a yükseltilebilir program olarak yüklenir, registry, verifier ve escrow config'leri
 // (3 arbitrator, M = 2, kısa dispute son tarihi) kurulur, settlement mint'i açılır, agent kaydolur, kurumun ve
 // agent cüzdanının screening'i yazılır. API bu süreçte (startStack), indexer ve istenirse keeper gerçek süreçlerdir;
-// veritabanı testlerin Postgres'idir. Ortam:
+// veritabanı testlerin Postgres'idir. Smart account testi (FE-21) Squads v4 programını ve ProgramConfig hesabını
+// validator açılırken bir kümeden kopyalar (`clone`); ek servisler (fee payer, prover) `spawn` ile aynı ömürde açılır.
+// Ortam:
 //   SQUARE_PROGRAMS_DIR   derlenmiş programlar (varsayılan <repo>/target/deploy)
 //   SQUARE_LOCALNET_RPC_PORT, SQUARE_LOCALNET_ARGS (ek validator argümanları, ör. port aralıkları),
 //   SQUARE_LOCALNET_LEDGER (varsayılan geçici dizin)
@@ -63,12 +65,16 @@ export interface LocalnetOptions {
   keeper: boolean;
   /** API'yi çağıracak web uygulamasının adresi (CORS ve giriş mesajının alanı). */
   webOrigin?: string;
+  /** Validator açılırken bu kümeden kopyalanan programlar ve hesaplar (ör. Squads v4; FE-21). */
+  clone?: { url: string; programs: readonly PublicKey[]; accounts: readonly PublicKey[] };
 }
 
 export interface Localnet {
   readonly connection: Connection;
   readonly stack: Stack;
   readonly admin: Wallet;
+  /** Registry config'inin screening yetkilisi. */
+  readonly screener: Wallet;
   readonly institution: Wallet;
   readonly agentWallet: Wallet;
   readonly panel: readonly Wallet[];
@@ -76,6 +82,8 @@ export interface Localnet {
   readonly institutionAta: PublicKey;
   readonly agentRecord: PublicKey;
   readonly logs: Record<string, string[]>;
+  /** Dünyayla aynı ömürde bir süreç: çıktısı `logs[name]`'de, `close` onu da kapatır. */
+  spawn(name: string, command: string, args: string[], env?: Record<string, string>): ChildProcess;
   send(instructions: readonly TransactionInstruction[] | BuiltTx, signers: Keypair[]): Promise<string>;
   /** Fonlanmış, kabul edilmiş ve teslim edilmiş iş (challenge penceresi açık). */
   deliveredJob(label: string, amount: bigint): Promise<PublicKey>;
@@ -96,6 +104,7 @@ export async function startLocalnet(options: LocalnetOptions): Promise<Localnet>
 
   const run = (name: string, command: string, args: string[], env: Record<string, string> = {}) => {
     const child = spawn(command, args, { env: { ...process.env, ...env }, stdio: ['ignore', 'pipe', 'pipe'] });
+    logs[name] ??= [];
     const keep = (chunk: Buffer) => logs[name]!.push(chunk.toString());
     child.stdout!.on('data', keep);
     child.stderr!.on('data', keep);
@@ -112,6 +121,14 @@ export async function startLocalnet(options: LocalnetOptions): Promise<Localnet>
     join(PROGRAMS_DIR, `square_${name}.so`),
     adminFile,
   ]);
+  const clone = options.clone
+    ? [
+        '--url',
+        options.clone.url,
+        ...options.clone.programs.flatMap((program) => ['--clone-upgradeable-program', program.toBase58()]),
+        ...options.clone.accounts.flatMap((account) => ['--clone', account.toBase58()]),
+      ]
+    : [];
   run('validator', 'solana-test-validator', [
     '--reset',
     '--quiet',
@@ -120,6 +137,7 @@ export async function startLocalnet(options: LocalnetOptions): Promise<Localnet>
     '--rpc-port',
     String(RPC_PORT),
     ...EXTRA_ARGS,
+    ...clone,
     ...programs,
   ]);
   const connection = new Connection(RPC_URL, 'confirmed');
@@ -171,6 +189,16 @@ export async function startLocalnet(options: LocalnetOptions): Promise<Localnet>
         admin: admin.keypair.publicKey,
         programData: programData(PROGRAM_IDS.registry),
       }),
+    ],
+    [admin.keypair],
+  );
+  // Verifier config'i: ispat bağlama (`set_compliance_proof`) onu ister. MPP yetkilisi bu dünyada kullanılmaz.
+  await send(
+    [
+      await client.verifier.instructions.initVerifierConfig(
+        [PROGRAM_IDS.escrow, PROGRAM_IDS.policy, Keypair.generate().publicKey],
+        { admin: admin.keypair.publicKey, programData: programData(PROGRAM_IDS.verifier) },
+      ),
     ],
     [admin.keypair],
   );
@@ -337,6 +365,7 @@ export async function startLocalnet(options: LocalnetOptions): Promise<Localnet>
     connection,
     stack,
     admin,
+    screener,
     institution,
     agentWallet,
     panel,
@@ -344,6 +373,7 @@ export async function startLocalnet(options: LocalnetOptions): Promise<Localnet>
     institutionAta,
     agentRecord: registered.agentRecord,
     logs,
+    spawn: run,
     send,
     deliveredJob,
     balance,

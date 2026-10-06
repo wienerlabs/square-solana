@@ -12,7 +12,9 @@ vault'u adına da yazar ve okur; koşul, cüzdanın multisig'te `Initiate` yetki
 anda okunur). Teslimat, agent kartı, politika meta verisi, Travel Rule ve dispute kanıtı uçlarında; kayıtlara
 üyenin cüzdanı yazılır.
 
-`@squaresdk/solana-sdk`: `ApiClientConfig.auth.smartAccount` başlığı her isteğe ekler.
+`@squaresdk/solana-sdk`: `ApiClientConfig.auth.smartAccount` başlığı her isteğe ekler. `squadsTransactionAddress` ve
+`squadsProposalAddress` tarayıcıda da çalışır: u64 indeks `DataView` ile yazılır (Next.js'in Buffer polyfill'inde
+`writeBigUInt64LE` yok).
 
 `@squaresdk/solana-types`: `API_CONTRACT_VERSION` 0.23.0.
 

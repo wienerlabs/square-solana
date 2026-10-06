@@ -284,6 +284,9 @@ kararı: [ADR 0023](../../docs/decisions/0023-x402-ucretli-uc-nokta-tanimlari.md
 - **Sayfalar:** Politika, agent kaydı, iş açma ve fonlama, iş detayı (kabul, teslim, ispat, alacak, uyuşmazlık) ve
   paneller rolün adresiyle çalışır. Sayfanın üstündeki not hangi adres adına gidildiğini ve ücretin kimde olduğunu
   söyler.
+- **Sponsorlu finalize:** Sponsor yalnızca Square ya da Squads talimatı taşıyan tx'i öder
+  (`no_square_instruction`). Bu yüzden keeper ücretinin USDC hesabı ayrı bir tx'le değil, finalize'la aynı tx'te
+  açılır; rent'i sponsor öder.
 - **Bilinen sınırlar:**
   - `finalize_payment`'ın açtığı itibar ve doğrulama kayıtlarının rent'ini program tetikleyene ödetir
     (`payer = keeper`). Sponsorlu finalize'da da cüzdanın bu rent kadar SOL'ü olmalı.
