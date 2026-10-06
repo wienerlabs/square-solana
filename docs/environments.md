@@ -38,7 +38,7 @@ Her servis bir Railway servisidir; derleme ve sağlık denetimi `apps/<servis>/r
 
 ### api
 
-`apps/api/.env.example` · 53 değişken, 7 secret
+`apps/api/.env.example` · 53 değişken, 8 secret
 
 | Değişken | Bölüm | Secret | Not |
 |---|---|---|---|
@@ -84,7 +84,7 @@ Her servis bir Railway servisidir; derleme ve sağlık denetimi `apps/<servis>/r
 | `API_PROVER_URL` | Prover vekili (zorunlu) |  |  |
 | `API_PROVER_API_KEY` | Prover vekili (zorunlu) | **secret** | API'nin prover'a gönderdiği servis anahtarı (prover'ın PROVER_API_KEY_SHA256 listesinde) |
 | `API_PROVER_TIMEOUT_MS` | Prover vekili (zorunlu) |  |  |
-| `API_TRAVEL_RULE_KEYS` | Travel Rule (zorunlu, BE-23) |  | Ana anahtar halkası: virgülle kimlik:base64 (her anahtar 32 bayt; ör. openssl rand -base64 32). Secret yöneticisinden verilir, repoya yazılmaz. |
+| `API_TRAVEL_RULE_KEYS` | Travel Rule (zorunlu, BE-23) | **secret** | Ana anahtar halkası: virgülle kimlik:base64 (her anahtar 32 bayt; ör. openssl rand -base64 32). Secret yöneticisinden verilir, repoya yazılmaz. |
 | `API_TRAVEL_RULE_ACTIVE_KEY_ID` | Travel Rule (zorunlu, BE-23) |  | Yeni kayıtları ve yeniden sarmayı yapan anahtarın kimliği (halkada olmalı) |
 | `API_TRAVEL_RULE_RETENTION_DAYS` | Travel Rule (zorunlu, BE-23) |  | Kaydın son yazmadan sonra saklandığı gün sayısı (hukuki karar) |
 | `API_TRAVEL_RULE_MAINTENANCE_INTERVAL_SECONDS` | Travel Rule (zorunlu, BE-23) |  | Silme ve yeniden sarma aralığı |

@@ -14,6 +14,8 @@ test('secret sınıflaması: anahtarlar, parolalar, bağlantı dizgeleri; hash, 
     'X402_FACILITATOR_TOKEN',
     'API_RPC_URLS',
     'ALERT_WEBHOOK_URL',
+    'API_SECRET_BOX_KEYS',
+    'API_TRAVEL_RULE_KEYS',
   ]) {
     assert.ok(isSecret(name), name);
   }
@@ -22,6 +24,7 @@ test('secret sınıflaması: anahtarlar, parolalar, bağlantı dizgeleri; hash, 
     'SCREENER_AUTHORITY_KEYPAIR_PATH',
     'STRIPE_PUBLISHABLE_KEY',
     'API_SECRET_BOX_ACTIVE_KEY',
+    'API_TRAVEL_RULE_ACTIVE_KEY_ID',
     'KEEPER_PORT',
     'LOG_LEVEL',
   ]) {
