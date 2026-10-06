@@ -3,16 +3,22 @@
 // anahtarının oluşturulup sırrının bir kez gösterilmesi ve iptali, ücretli uç noktanın oluşturulması,
 // pasifleştirilmesi ve kullanımı, örneklerin seçilen anahtar ve uç noktayla dolması; oturumun düşmesi;
 // erişilebilirlik. API bellek içi sahte sunucudur (test/helpers/fake-square-api.ts), istemci SDK'nınkidir.
+import { WalletContext, type WalletContextState } from '@solana/wallet-adapter-react';
+import { PublicKey } from '@solana/web3.js';
 import { cleanup, configure, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import axe from 'axe-core';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import DevelopersRoute from '@/app/app/developers/page';
+import { ApiSessionProvider } from '@/components/api-session';
 import { DeveloperPortal } from '@/components/developers/developers-page';
 import { Providers } from '@/components/providers';
 import { USDC_MINTS } from '@/lib/developer-portal';
-import { fakeSquareApi, testWallet } from './helpers/fake-square-api';
+import { fakeSquareApi, testWallet, type FakeSquareApi, type TestWallet } from './helpers/fake-square-api';
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
+});
 // Yük altında (turbo paralel koşu) API yanıtları ve yeniden çizim 1 saniyeyi aşabilir.
 configure({ asyncUtilTimeout: 8_000 });
 
@@ -48,18 +54,44 @@ describe('/app/developers', () => {
   });
 });
 
+const connected = (address: string, signMessage: TestWallet['signMessage'] | undefined) =>
+  ({
+    autoConnect: false,
+    wallets: [],
+    wallet: null,
+    publicKey: new PublicKey(address),
+    connecting: false,
+    connected: true,
+    disconnecting: false,
+    select: () => undefined,
+    connect: async () => undefined,
+    disconnect: async () => undefined,
+    sendTransaction: async () => {
+      throw new Error('the portal sends no transactions');
+    },
+    signTransaction: undefined,
+    signAllTransactions: undefined,
+    signMessage,
+    signIn: undefined,
+  }) as WalletContextState;
+
+function mountPortal(fake: FakeSquareApi, address: string, signMessage: TestWallet['signMessage'] | undefined) {
+  vi.stubGlobal('fetch', fake.fetch);
+  return render(
+    <Providers config={{ cluster: 'devnet', rpcUrl: RPC, programIds: {}, apiUrl: API }}>
+      <WalletContext.Provider value={connected(address, signMessage)}>
+        <ApiSessionProvider apiUrl={API}>
+          <DeveloperPortal apiUrl={API} cluster="devnet" wallet={address} />
+        </ApiSessionProvider>
+      </WalletContext.Provider>
+    </Providers>,
+  );
+}
+
 async function signedIn() {
   const fake = fakeSquareApi();
   const wallet = testWallet();
-  const view = render(
-    <DeveloperPortal
-      apiUrl={API}
-      cluster="devnet"
-      wallet={wallet.address}
-      signMessage={wallet.signMessage}
-      fetch={fake.fetch}
-    />,
-  );
+  const view = mountPortal(fake, wallet.address, wallet.signMessage);
   fireEvent.click(screen.getByRole('button', { name: 'Sign in with wallet' }));
   await screen.findByRole('button', { name: 'Sign out' });
   await screen.findByText('No API keys yet.');
@@ -190,20 +222,11 @@ describe('developer portal', { timeout: 30_000 }, () => {
   });
 
   it('explains a wallet that cannot sign messages', async () => {
-    const fake = fakeSquareApi();
-    render(
-      <DeveloperPortal
-        apiUrl={API}
-        cluster="devnet"
-        wallet={testWallet().address}
-        signMessage={undefined}
-        fetch={fake.fetch}
-      />,
-    );
+    mountPortal(fakeSquareApi(), testWallet().address, undefined);
     fireEvent.click(screen.getByRole('button', { name: 'Sign in with wallet' }));
     await waitFor(() =>
       expect(screen.getByRole('alert').textContent).toBe(
-        'This wallet cannot sign messages, so it cannot sign in to the API.',
+        'This wallet cannot sign messages, so it cannot sign in to the Square API.',
       ),
     );
   });

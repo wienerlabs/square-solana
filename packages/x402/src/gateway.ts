@@ -50,7 +50,7 @@ export type X402Event =
       readonly payer: string;
     }
   | { readonly type: 'settle_failed'; readonly fingerprint: string; readonly network: string; readonly reason: string }
-  | { readonly type: 'settled_callback_error'; readonly fingerprint: string; readonly error: unknown };
+  | { readonly type: 'settled_callback_error'; readonly fingerprint: string; readonly error: unknown }
   | { readonly type: 'idempotent_replay'; readonly key: string; readonly network: string }
   | { readonly type: 'idempotency_error'; readonly error: unknown };
 

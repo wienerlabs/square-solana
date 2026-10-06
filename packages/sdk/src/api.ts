@@ -81,11 +81,17 @@ export interface SquareApi {
   /** `DELETE /v1/api-keys/{id}`: anahtarı iptal eder. */
   deleteApiKey(id: string): Promise<void>;
 
+  /** `GET /v1/x402/endpoints`: oturumdaki cüzdanın ücretli uç nokta tanımları. */
   listX402Endpoints(): Promise<ApiEnvelope<X402Endpoint[]>>;
+  /** `POST /v1/x402/endpoints`: ücretli uç nokta tanımı; yol cüzdan başına tekildir (409). */
   createX402Endpoint(body: X402EndpointCreate): Promise<ApiEnvelope<X402Endpoint>>;
+  /** `GET /v1/x402/endpoints/{id}`: tanım; oturum ya da `x402:serve` kapsamlı anahtarla. */
   getX402Endpoint(id: string): Promise<ApiEnvelope<X402Endpoint>>;
+  /** `PATCH /v1/x402/endpoints/{id}`: kısmi güncelleme (fiyat, ağ, etkinlik, açıklama, yol). */
   updateX402Endpoint(id: string, body: X402EndpointUpdate): Promise<ApiEnvelope<X402Endpoint>>;
+  /** `DELETE /v1/x402/endpoints/{id}`: tanımı kullanım kaydıyla birlikte siler. */
   deleteX402Endpoint(id: string): Promise<void>;
+  /** `GET /v1/x402/endpoints/{id}/usage`: ödemeli çağrı sayısı, ağ ve mint başına toplam, son ödemeler. */
   getX402EndpointUsage(id: string): Promise<ApiEnvelope<X402EndpointUsage>>;
   /** Geliştiricinin sunucusunun uzlaştırdığı ödeme; aynı `fingerprint` ikinci kez bildirilirse ilk kayıt döner. */
   recordX402Payment(id: string, body: X402PaymentReport): Promise<ApiEnvelope<X402Payment>>;

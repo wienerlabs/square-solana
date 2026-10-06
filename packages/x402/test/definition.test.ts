@@ -18,7 +18,7 @@ import { createFacilitatorClient } from '../src/facilitator.js';
 import { createX402Gateway, type X402Event, type X402Gateway } from '../src/gateway.js';
 import { SOLANA_DEVNET, SOLANA_MAINNET, SOLANA_NETWORKS, SOLANA_TESTNET } from '../src/networks.js';
 import { createMemoryReplayStore } from '../src/replay.js';
-import type { FakeSolanaRpc } from '../src/testing.js';
+import type { FakeSolanaRpc } from './solana-rpc.js';
 import {
   createWallets,
   listen,

@@ -188,6 +188,17 @@ Her kayıtta zincirdeki `source_hash` denetim kaydındakidir; `expires_at − sc
 | Kimliksiz aynı başlıkla eşzamanlı iki istek | Biri 200, diğeri 402 (`replay_rejected`) | `2MYysDru1hnH4jjvj7gdfL9135BKzhjoRqgSdg7ZmroHChXcPPcyvm9V8zCeizcxZedQJ4WBbspyxsHxg9Htr51W` |
 | Uzlaşmış başlık yeniden | 402: facilitator'ın simülasyonu işlenmiş işlemi reddetti | — |
 
+## Geliştirici portalı (FE-22)
+
+Portalın API yüzeyiyle devnet koşusu, 2026-10-06 (`apps/api/test/x402-devnet.e2e.test.ts`).
+- **Anahtar ve tanım:** Geliştirici (MuhammedAkinci'nin üye cüzdanı) oturumla `x402:serve` kapsamlı bir API anahtarı oluşturdu ve
+  0,01 USDC'lik bir uç nokta tanımı açtı.
+- **Sunucu:** Geliştiricinin sunucusu tanımı bu anahtarla okudu (`paidRouteFromDefinition`). Ödeyen BC-36'nın kurumu,
+  alıcı agent'ı, ücret ödeyen deployer'dı.
+- **Uzlaştırma ve kullanım:** Uzlaştırma tx'i `4SqCKJnC8Ui9umWWFrRHpUwZMUY8x4xvH6pLhPG9ayxJur42ugYiXtPLktXYnFPkgKNcCPNsHTw8QCFX3hTPJ8yG`.
+  Kullanım: 1 ödeme, 10 000.
+- **Kapatma:** Pasifleştirilen tanım 503, silinen 404 döndü; iptal edilen anahtar tanımı okuyamadı.
+
 ## Fee payer ve Squads smart account (BE-27)
 
 Uçtan uca koşu, 2026-10-06 (`apps/fee-payer/test/squads-devnet.e2e.test.ts`).

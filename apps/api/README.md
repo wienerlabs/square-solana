@@ -295,6 +295,13 @@ DISPUTE_E2E_AGENT_RECORD=<agent kaydı> DISPUTE_E2E_ARBITRATORS=<üç arbitrator
 
 Koşu kaydı: [deploy kaydı](../../docs/deploy/devnet.md#uyuşmazlık-be-22).
 
+**Devnet: geliştirici portalı (FE-22):** `test/x402-devnet.e2e.test.ts` yalnızca ortamla çalışır.
+- **Akış:** API anahtarı portalın uçlarıyla oluşturulur → ücretli uç nokta tanımı → geliştiricinin sunucusu
+  (`paidRouteFromDefinition`) gerçek devnet USDC'siyle ödeme alır → kullanım → pasifleştirme ve silme → anahtar
+  iptali.
+- **Ortam:** `X402_PORTAL_E2E_DEVELOPER`, `X402_PORTAL_E2E_PAYER`, `X402_PORTAL_E2E_FEE_PAYER`, `X402_PORTAL_E2E_PAY_TO`.
+- **Kayıt:** [deploy kaydı](../../docs/deploy/devnet.md#geliştirici-portalı-fe-22).
+
 ## Kaynak
 
 Covenant `app/app/api/{jobs,escrow,claims,disputes,agents,auth,keys,openapi}` ve `app/lib/{wallet-auth,session,api-response}.ts`
