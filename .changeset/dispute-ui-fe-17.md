@@ -7,6 +7,6 @@ Uyuşmazlık arayüzü (FE-17). İş sayfasında dispute bölümü: kurum kanıt
 saatiyle); agent policy'li işte bekleme süresi dolunca `escalate_missing_proof`; herkes için oy sayısı / eşik,
 bekleyen karar, son tarih geri sayımı, `execute_resolution` ve son tarih geçince `lapse_dispute`; lapse sonrası
 "bond iade edildi" bilgisi ve taraflara kanıt listesi. Arbitrator konsolu `/app/arbitration` (arbitrator rolü):
-kuyruk, kanıtlar, oylar, API'nin hazırladığı `resolve_dispute` tx'inin imzadan önce denetlenmesi, webhook
-abonelikleri. Cüzdan imzalı API oturumu (`src/lib/api-session.ts`), isteğe bağlı `SQUARE_API_URL`, dispute
-hata kodlarının açıklamaları.
+sayfalı kuyruk, kanıtlar, oylar, API'nin hazırladığı `resolve_dispute` tx'inin imzadan önce denetlenmesi (compute
+budget'ta yalnızca birer limit ve fiyat, fiyat en çok 1 000 000 micro-lamport/CU), webhook abonelikleri. API
+oturumu FE-03'ün cüzdan imzalı oturumudur (`useApiClient`); dispute hata kodlarının açıklamaları.

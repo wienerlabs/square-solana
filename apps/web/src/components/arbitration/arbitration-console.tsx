@@ -100,24 +100,35 @@ export function ArbitrationConsole({ escrowProgramId }: { escrowProgramId: strin
   const disputeParams = params.state === 'ready' ? params.value : null;
   const isArbitrator = Boolean(publicKey && disputeParams?.arbitrators.some((key) => key.equals(publicKey)));
 
-  const [queue, setQueue] = useState<Load<QueueEntry[]>>({ state: 'loading' });
+  const [page, setPage] = useState(1);
+  const [queue, setQueue] = useState<Load<QueuePage>>({ state: 'loading' });
   const { api, report } = session;
   useEffect(() => {
     if (!api || !escrow || !isArbitrator) return;
     let active = true;
     (async () => {
-      const items = unwrap(await api.getArbitrationQueue({ limit: QUEUE_LIMIT }));
+      const envelope = await api.getArbitrationQueue({ page, limit: QUEUE_LIMIT });
+      const items = unwrap(envelope);
       const jobs = items.map((item) => new PublicKey(item.dispute.job));
       const accounts = await Promise.all(jobs.map((job) => escrow.client.escrow.fetch('job', job)));
-      return items.map((item, i) => ({ item, job: jobs[i]!, account: accounts[i] ?? null }));
+      return {
+        page,
+        total: envelope.meta.total ?? items.length,
+        entries: items.map((item, i) => ({ item, job: jobs[i]!, account: accounts[i] ?? null })),
+      };
     })().then(
-      (value) => active && setQueue({ state: 'ready', value }),
+      (value) => {
+        if (!active) return;
+        const last = queuePages(value.total);
+        if (value.page > last) setPage(last);
+        else setQueue({ state: 'ready', value });
+      },
       (caught: unknown) => active && setQueue({ state: 'error', message: report(caught) }),
     );
     return () => {
       active = false;
     };
-  }, [api, escrow, isArbitrator, report, revision]);
+  }, [api, escrow, isArbitrator, report, revision, page]);
 
   if (!apiUrl) {
     return (
@@ -179,11 +190,11 @@ export function ArbitrationConsole({ escrowProgramId }: { escrowProgramId: strin
           </div>
           {queue.state === 'loading' && <p className="text-sm text-muted">Reading the queue…</p>}
           {queue.state === 'error' && <p className="text-sm text-danger-text">{queue.message}</p>}
-          {queue.state === 'ready' && queue.value.length === 0 && (
+          {queue.state === 'ready' && queue.value.total === 0 && (
             <p className="text-sm text-muted">No open disputes.</p>
           )}
           {queue.state === 'ready' &&
-            queue.value.map((entry) => (
+            queue.value.entries.map((entry) => (
               <QueueCard
                 key={entry.job.toBase58()}
                 entry={entry}
@@ -198,11 +209,39 @@ export function ArbitrationConsole({ escrowProgramId }: { escrowProgramId: strin
                 onConfirmed={refresh}
               />
             ))}
+          {queue.state === 'ready' && (
+            <QueuePager page={queue.value.page} pages={queuePages(queue.value.total)} onPage={setPage} />
+          )}
         </section>
       )}
 
       <WebhooksPanel session={session} allowHttp={cluster === 'localnet'} />
     </div>
+  );
+}
+
+export interface QueuePage {
+  page: number;
+  total: number;
+  entries: QueueEntry[];
+}
+
+export const queuePages = (total: number) => Math.max(1, Math.ceil(total / QUEUE_LIMIT));
+
+export function QueuePager({ page, pages, onPage }: { page: number; pages: number; onPage(page: number): void }) {
+  if (pages <= 1) return null;
+  return (
+    <nav aria-label="Dispute queue pages" className="flex flex-wrap items-center gap-3">
+      <Button variant="ghost" size="sm" onClick={() => onPage(page - 1)} disabled={page <= 1}>
+        Previous
+      </Button>
+      <span className="text-sm text-muted">
+        Page {page} of {pages}
+      </span>
+      <Button variant="ghost" size="sm" onClick={() => onPage(page + 1)} disabled={page >= pages}>
+        Next
+      </Button>
+    </nav>
   );
 }
 
