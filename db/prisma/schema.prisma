@@ -588,6 +588,57 @@ model TravelRuleRecord {
   @@map("travel_rule_records")
 }
 
+// ---------------------------------------------------------------- servis korumaları (BE-13)
+
+/// Kalıcı hız sınırı (`@squaresdk/solana-hardening`): anahtar başına sabit pencere sayacı. Pencere değişince
+/// sayaç sıfırdan başlar; süresi dolan satırlar `purgeExpired` ile silinir.
+model RateLimitWindow {
+  /// Sınırın kapsamı ve öznesi, ör. `api:wallet:<adres>`.
+  key         String   @id @db.Text
+  windowStart DateTime @map("window_start") @db.Timestamptz(3)
+  count       Int
+  expiresAt   DateTime @map("expires_at") @db.Timestamptz(3)
+
+  @@index([expiresAt])
+  @@map("rate_limit_windows")
+}
+
+enum IdempotencyState {
+  inProgress @map("in_progress")
+  completed
+}
+
+/// İdempotent istek: aynı anahtarla gelen tekrar istek ilk isteğin kaydedilen yanıtını alır; aynı anahtar
+/// başka bir istekle kullanılamaz (`request_hash`).
+model IdempotencyRecord {
+  scope       String           @db.Text
+  key         String           @db.Text
+  requestHash String           @map("request_hash") @db.Char(64)
+  state       IdempotencyState
+  /// Tamamlanınca kaydedilen yanıt.
+  status      Int?
+  body        Json?
+  createdAt   DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  expiresAt   DateTime         @map("expires_at") @db.Timestamptz(3)
+
+  @@id([scope, key])
+  @@index([expiresAt])
+  @@map("idempotency_records")
+}
+
+/// Tek kullanımlık kimlikler (webhook teslimat kimliği, imzalı eylem nonce'u): tekrar oynatma koruması.
+/// Kimlik süresi dolana kadar ikinci kez kabul edilmez; süre, imzanın geçerlilik penceresidir.
+model ReplayGuard {
+  scope     String   @db.Text
+  id        String   @db.Text
+  expiresAt DateTime @map("expires_at") @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@id([scope, id])
+  @@index([expiresAt])
+  @@map("replay_guards")
+}
+
 // ---------------------------------------------------------------- A2A görev deposu (BE-17)
 
 /// A2A v1.0 görev durumu; değerler protokolün JSON adlarıdır (`@squaresdk/solana-types` TaskStateSchema).
