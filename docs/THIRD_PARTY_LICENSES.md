@@ -48,7 +48,7 @@ pnpm license:write
 | `spl-token-2022-interface` | cargo | Apache-2.0 | dev | `square-program-tests` | ✓ |
 | `spl-token-interface` | cargo | Apache-2.0 | dev | `square-program-tests` | ✓ |
 | `@a2a-js/sdk` | npm | Apache-2.0 | dev | `@squaresdk/solana-a2a` | ✓ |
-| `@anchor-lang/core` | npm | (MIT OR Apache-2.0) | runtime | `@squaresdk/solana-a2a`, `@squaresdk/solana-api`, `@squaresdk/solana-identity`, `@squaresdk/solana-indexer`, `@squaresdk/solana-keeper`, `@squaresdk/solana-policy`, `@squaresdk/solana-sdk`, `@squaresdk/solana-web` | ✓ |
+| `@anchor-lang/core` | npm | (MIT OR Apache-2.0) | runtime | `@squaresdk/solana-a2a`, `@squaresdk/solana-api`, `@squaresdk/solana-identity`, `@squaresdk/solana-indexer`, `@squaresdk/solana-keeper`, `@squaresdk/solana-monorepo`, `@squaresdk/solana-policy`, `@squaresdk/solana-sdk`, `@squaresdk/solana-web` | ✓ |
 | `@anthropic-ai/sdk` | npm | MIT | runtime | `@squaresdk/solana-agent-sdk` | ✓ |
 | `@aws-sdk/client-s3` | npm | Apache-2.0 | runtime | `@squaresdk/solana-api` | ✓ |
 | `@changesets/cli` | npm | MIT | dev | `@squaresdk/solana-monorepo` | ✓ |

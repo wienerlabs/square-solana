@@ -11,7 +11,8 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import * as multisig from '@sqds/multisig';
-import { Connection, Keypair, PublicKey } from '@solana/web3.js';
+import { Keypair, PublicKey } from '@solana/web3.js';
+import { connectionFor } from './rpc.mjs';
 
 const BASE58 = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
 /** Square'in kullandığı vault indeksi (`square_common::squads::vault_address`). */
@@ -105,7 +106,7 @@ async function create(connection, args) {
 
 async function main() {
   const args = parseArgs(process.argv.slice(2));
-  const connection = new Connection(args.rpc, 'confirmed');
+  const connection = connectionFor(args.rpc);
   const result =
     args.command === 'create' ? await create(connection, args) : await read(connection, new PublicKey(args.multisig));
   console.log(JSON.stringify(result, null, 2));
