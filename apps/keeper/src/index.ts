@@ -81,6 +81,7 @@ async function main(): Promise<void> {
     rules: keeperAlarmRules({
       lastRoundAt: () => crank.lastSuccessAt(),
       lastBalance: () => crank.lastBalance(),
+      oldestDueSeconds: () => crank.oldestDueSeconds(),
       startedAt,
       errors,
       thresholds: config.alerts,

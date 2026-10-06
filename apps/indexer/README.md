@@ -91,8 +91,15 @@ Ortam değişkenleri [`.env.example`](.env.example)'dadır; varsayılan değer y
 | `POST /webhooks/helius` | `INDEXER_PORT` | Yalnızca `INDEXER_WEBHOOK_AUTH_SHA256` verilince |
 | `GET /metrics` | `INDEXER_METRICS_PORT` | İç ağ |
 
+**Gecikme metrikleri** ([SLO'lar](../../docs/slo.md)):
+- `indexer_ingest_delay_seconds`: Canlı tx'in blok zamanından ayna tablolara yazılmasına kadar geçen süre
+  (histogram). İmleçsiz ilk taramadaki geçmiş tx'ler (backfill) ölçülmez.
+- `indexer_sync_lag_slots`: Tarama başında okunan kesinleşmiş uçla, bütün programların eksiksiz tarandığı son uç
+  arasındaki fark. Okunamayan bir tx'te duran tarama eksiksiz sayılmaz; fark o tx okunana kadar büyür.
+
 **Alarmlar:**
 - `indexer_stalled`: Son başarılı taramanın üstünden `INDEXER_ALERT_STALL_SECONDS` geçti.
+- `indexer_lagging`: Senkron gecikmesi `INDEXER_ALERT_LAG_SLOTS` slot'u aştı.
 - `indexer_reconcile_drift`: Son uzlaştırmanın sapması `INDEXER_ALERT_DRIFT`'in üstünde.
 - `indexer_errors`: İşleme hataları pencerede eşiğin üstünde.
 

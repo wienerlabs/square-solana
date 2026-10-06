@@ -1,6 +1,10 @@
 // Prometheus metrikleri: ortak servis metrikleri (`@squaresdk/solana-observability`) ve keeper'ın kararları,
-// bakiyesi, kazandığı ücret ve son turu. Ayrı bir portta (`KEEPER_METRICS_PORT`, iç ağ) `GET /metrics`.
-import { Counter, Gauge, createServiceMetrics, type ServiceMetrics } from '@squaresdk/solana-observability';
+// bakiyesi, kazandığı ücret, son turu ve gecikmesi. Ayrı bir portta (`KEEPER_METRICS_PORT`, iç ağ)
+// `GET /metrics`. Gecikme ölçümleri SLO'ların girdisidir ([docs/slo.md](../../../docs/slo.md)).
+import { Counter, Gauge, Histogram, createServiceMetrics, type ServiceMetrics } from '@squaresdk/solana-observability';
+
+/** `keeper_finalize_delay_seconds` kovaları; SLO sınırları (600 s, 3 600 s) birer kovadır. */
+export const FINALIZE_DELAY_BUCKETS = [30, 60, 120, 300, 600, 900, 1800, 3600, 7200, 21_600, 86_400] as const;
 
 export interface KeeperMetrics extends ServiceMetrics {
   /** Günlüğe yazılan kararlar: `outcome` (submitted, confirmed, skipped, failed) ve `reason`. */
@@ -11,6 +15,15 @@ export interface KeeperMetrics extends ServiceMetrics {
   readonly balance: Gauge;
   /** Son başarılı turun Unix zamanı (saniye). */
   readonly lastRound: Gauge;
+  /**
+   * Challenge penceresinin bitişinden finalize'ın onayına geçen süre. `gate`: `none` politikasız iş, `proof`
+   * politikalı iş (süreye kurumun ispatı bağlaması da girer).
+   */
+  readonly finalizeDelay: Histogram<'gate'>;
+  /** Tur başında finalize edilebilir durumda bekleyen job sayısı (journal.ts `backlog`). */
+  readonly dueJobs: Gauge;
+  /** Bunların en eskisinin finalize edilebilir olduğundan bu yana geçen süre (saniye); yoksa 0. */
+  readonly oldestDue: Gauge;
 }
 
 export function createMetrics(params: { service: string; version: string }): KeeperMetrics {
@@ -33,6 +46,23 @@ export function createMetrics(params: { service: string; version: string }): Kee
     lastRound: new Gauge({
       name: 'keeper_last_round_timestamp_seconds',
       help: 'Son başarılı turun Unix zamanı',
+      registers,
+    }),
+    finalizeDelay: new Histogram({
+      name: 'keeper_finalize_delay_seconds',
+      help: 'Challenge penceresinin bitişinden finalize’ın onayına geçen süre',
+      labelNames: ['gate'],
+      buckets: [...FINALIZE_DELAY_BUCKETS],
+      registers,
+    }),
+    dueJobs: new Gauge({
+      name: 'keeper_due_jobs',
+      help: 'Tur başında finalize edilebilir durumda bekleyen job sayısı',
+      registers,
+    }),
+    oldestDue: new Gauge({
+      name: 'keeper_oldest_due_seconds',
+      help: 'Finalize edilebilir en eski job’un bekleme süresi',
       registers,
     }),
   };

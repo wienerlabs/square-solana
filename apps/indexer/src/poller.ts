@@ -3,6 +3,10 @@
 // imzayla aynı transaction'da ilerler; süreç yarıda kesilirse kalan imzalar bir sonraki taramada işlenir.
 // İmleç yokken programın bütün geçmişi taranır (backfill). Birden çok programa dokunan tx her programın
 // taramasında görünür; yeniden işleme idempotenttir.
+//
+// Senkron gecikmesi: tarama başında kesinleşmiş uç okunur. Bütün programlar o uca kadar eksiksiz taranırsa
+// (henüz okunamayan tx'te durulmadıysa) indexer o uçla senkrondur; `indexer_sync_lag_slots` yeni uçla son
+// senkron uç arasındaki farktır.
 import type { PrismaClient } from '@squaresdk/solana-db';
 import type { Logger } from '@squaresdk/solana-observability';
 import type { SquareProgramIds, SquareProgramName } from '@squaresdk/solana-sdk';
@@ -17,6 +21,8 @@ export interface Poller {
   runOnce(): Promise<number>;
   /** Son başarılı taramanın zamanı (ms); hiç olmadıysa null. */
   lastSuccessAt(): number | null;
+  /** Son taramadaki senkron gecikmesi (slot); hiç tarama olmadıysa null. */
+  syncLag(): number | null;
 }
 
 export function createPoller(deps: {
@@ -33,6 +39,9 @@ export function createPoller(deps: {
   const clock = deps.clock ?? Date.now;
   const names = Object.keys(programIds) as SquareProgramName[];
   let lastSuccess: number | null = null;
+  /** Bütün programların eksiksiz tarandığı son kesinleşmiş uç; hiç olmadıysa ilk taramanın ucu. */
+  let syncedSlot: number | null = null;
+  let lag: number | null = null;
 
   async function newSignatures(name: SquareProgramName, until: string | undefined) {
     const found: ConfirmedSignatureInfo[] = [];
@@ -49,8 +58,10 @@ export function createPoller(deps: {
     }
   }
 
-  async function pollProgram(name: SquareProgramName): Promise<number> {
+  /** Programın yeni imzalarını işler; `complete` false ise henüz okunamayan bir tx'te durulmuştur. */
+  async function pollProgram(name: SquareProgramName): Promise<{ processed: number; complete: boolean }> {
     const cursor = await db.indexerCursor.findUnique({ where: { program: name } });
+    const backfill = cursor === null;
     const signatures = await newSignatures(name, cursor?.lastSignature);
     let processed = 0;
     for (const info of signatures) {
@@ -58,26 +69,37 @@ export function createPoller(deps: {
       if (info.err) {
         await pipeline.exclusive((tx) => writeCursor(tx, position));
         metrics.transactions.inc({ result: 'failed' });
-      } else if ((await pipeline.process(info.signature, position)) === 'pending') {
+      } else if ((await pipeline.process(info.signature, position, backfill)) === 'pending') {
         // Kesinleşmiş imza listesinde olup tx'i henüz okunamayan (RPC düğümü geride): sonraki taramada.
         log.warn('transaction_not_available', { program: name, signature: info.signature, slot: info.slot });
-        break;
+        return { processed, complete: false };
       }
       metrics.cursorSlot.set({ program: name }, info.slot);
       processed += 1;
     }
-    return processed;
+    return { processed, complete: true };
   }
 
   return {
     async runOnce() {
+      const tip = await chain.finalizedSlot();
       let total = 0;
-      for (const name of names) total += await pollProgram(name);
+      let complete = true;
+      for (const name of names) {
+        const result = await pollProgram(name);
+        total += result.processed;
+        complete &&= result.complete;
+      }
+      if (complete) syncedSlot = tip;
+      syncedSlot ??= tip;
+      lag = tip - syncedSlot;
+      metrics.syncLag.set(lag);
       lastSuccess = clock();
       metrics.lastPoll.set(lastSuccess / 1000);
       if (total > 0) log.info('polled', { processed: total });
       return total;
     },
     lastSuccessAt: () => lastSuccess,
+    syncLag: () => lag,
   };
 }

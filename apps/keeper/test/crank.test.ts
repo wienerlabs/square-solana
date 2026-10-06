@@ -225,6 +225,66 @@ describe('bekletme', () => {
   });
 });
 
+describe('gecikme ölçümü', () => {
+  const value = async (
+    metric: { get(): Promise<{ values: { metricName?: string; value: number; labels: object }[] }> },
+    name: string,
+    labels: Record<string, string> = {},
+  ) =>
+    (await metric.get()).values.find(
+      (entry) =>
+        (entry.metricName ?? name) === name &&
+        Object.entries(labels).every(([key, label]) => (entry.labels as Record<string, unknown>)[key] === label),
+    )?.value;
+
+  it('birikim: finalize edilebilir job sayılır, bekletilen sayılmaz, beklediği kayıt indexlenince yeniden sayılır', async () => {
+    const open = await world.job();
+    const gated = await world.job({ policy: 'missing', challengeEnd: NOW - 300 });
+    await world.job({ challengeEnd: NOW + 600 });
+    world.tokenAccount(keeper.publicKey);
+    world.tokenAccount(open.payee);
+    world.tokenAccount(open.institution);
+    const keeperCrank = crank();
+
+    // Tur başında: iki job da challenge bitişinden beri bekliyor; en eskisi 300 s.
+    expect(await keeperCrank.runOnce()).toEqual({ evaluated: 2, confirmed: 1 });
+    expect(await value(metrics.dueJobs, 'keeper_due_jobs')).toBe(2);
+    expect(keeperCrank.oldestDueSeconds()).toBe(300);
+    // Politikasız iş challenge bitişinden 60 s sonra onaylandı.
+    expect(await value(metrics.finalizeDelay, 'keeper_finalize_delay_seconds_sum', { gate: 'none' })).toBe(60);
+    expect(await value(metrics.finalizeDelay, 'keeper_finalize_delay_seconds_count', { gate: 'none' })).toBe(1);
+
+    // Onaylanan job ayna güncellenene kadar, ispat bekleyen job ispat gelene kadar birikimde değil.
+    const paid = await world.client.escrow.fetch('job', open.address);
+    await world.put('escrow', 'job', open.address, { ...paid!, status: { released: {} } });
+    now += 10_000;
+    await keeperCrank.runOnce();
+    expect(await value(metrics.dueJobs, 'keeper_due_jobs')).toBe(0);
+    expect(keeperCrank.oldestDueSeconds()).toBe(0);
+
+    const indexedAt = now + 1_000;
+    await db.client.releaseProof.create({
+      data: {
+        address: world.client.pda.releaseProof(gated.address)[0].toBase58(),
+        job: gated.address.toBase58(),
+        institution: gated.institution.toBase58(),
+        policy: gated.policy!.toBase58(),
+        payee: gated.payee.toBase58(),
+        verdict: 'compliant',
+        refusalCode: 0,
+        consumed: false,
+        netAmount: (AMOUNT - FEE).toString(),
+        proofTimestamp: BigInt(NOW),
+        account: {},
+        slot: 2n,
+        indexedAt: new Date(indexedAt),
+      },
+    });
+    const backlog = await createJournal(db.client).backlog(new Date(indexedAt + 5_000));
+    expect(backlog).toEqual({ due: 1, oldestReadyAt: new Date(indexedAt) });
+  });
+});
+
 describe('hatalar', () => {
   it('simülasyon: escrow’un bekleme hatası bekletir, diğer program hatası başarısız sayılır', async () => {
     world.tokenAccount(keeper.publicKey);

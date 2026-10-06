@@ -52,6 +52,8 @@ const EnvSchema = z.object({
   KEEPER_ALERT_MIN_BALANCE_LAMPORTS: u64,
   /** `keeper_stalled` alarmı: son başarılı turun üstünden bu kadar saniye geçti. */
   KEEPER_ALERT_STALL_SECONDS: int(1),
+  /** `keeper_backlog` alarmı: finalize edilebilir bir job bu kadar saniyeden uzun süredir bekliyor. */
+  KEEPER_ALERT_DUE_SECONDS: int(1),
   /** `keeper_errors` alarmı: başarısız finalize ve tur hataları bu değerin üstüne ... */
   KEEPER_ALERT_ERRORS: int(0),
   /** ... bu kadar saniyelik pencerede çıkarsa çalar. */
@@ -79,6 +81,7 @@ export interface KeeperConfig {
   readonly alerts: {
     readonly minBalanceLamports: bigint;
     readonly stallSeconds: number;
+    readonly dueSeconds: number;
     readonly errors: number;
     readonly errorWindowSeconds: number;
   };
@@ -141,6 +144,7 @@ export function loadConfig(env: Readonly<Record<string, string | undefined>>): K
     alerts: Object.freeze({
       minBalanceLamports: e.KEEPER_ALERT_MIN_BALANCE_LAMPORTS,
       stallSeconds: e.KEEPER_ALERT_STALL_SECONDS,
+      dueSeconds: e.KEEPER_ALERT_DUE_SECONDS,
       errors: e.KEEPER_ALERT_ERRORS,
       errorWindowSeconds: e.KEEPER_ALERT_ERROR_WINDOW_SECONDS,
     }),
