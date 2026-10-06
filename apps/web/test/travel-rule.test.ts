@@ -1,32 +1,27 @@
-// Travel Rule (FE-18): formun doğrulaması, kaydın kurulması, commitment'ın SDK ve zincirdeki uygulamayla
-// aynılığı (ortak vektörler), fonlama kapısı, yerel kayıtla doğrulama ve `commit_travel_rule` tx'inde
-// kişisel veri olmaması. Ağ kullanılmaz: tx'in kurulması için yalnızca blockhash verilir.
 import { readFileSync } from 'node:fs';
 import { BorshInstructionCoder, type Idl } from '@anchor-lang/core';
 import { Connection, Keypair, PublicKey, type Commitment } from '@solana/web3.js';
 import { createSquareClient, SQUARE_IDLS, travelRule } from '@squaresdk/solana-sdk';
+import { TravelRuleRecordSchema, type TravelRuleDisclosure, type TravelRuleRecord } from '@squaresdk/solana-types';
 import { describe, expect, it } from 'vitest';
 import { escrowErrorMessage } from '@/lib/job-wizard';
 import { bytesToHex, hexToBytes } from '@/lib/policy-draft';
 import {
-  buildTravelRuleRecord,
   checkTravelRuleForm,
-  createTravelRuleEntry,
-  emptyParty,
+  emptyPerson,
   emptyTravelRuleForm,
   isValidLei,
-  recomputeCommitment,
   travelRuleCommitment,
   travelRuleFundBlock,
   travelRuleRequired,
   travelRuleStatus,
-  verifyTravelRule,
+  verifyDisclosure,
+  type PersonForm,
   type TravelRuleForm,
 } from '@/lib/travel-rule';
 
 const key = () => Keypair.generate().publicKey;
 const TODAY = '2026-10-06';
-// GLEIF'in kendi LEI'si (ISO 17442 kontrol haneleri geçerli).
 const GLEIF_LEI = '506700GE1G29325QX363';
 
 const VECTORS = JSON.parse(
@@ -39,78 +34,135 @@ const VECTORS = JSON.parse(
   vectors: { label: string; job: string; salt: string; record: unknown; commitment: string }[];
 };
 
+const institution = key();
+const agentWallet = key();
+const mint = key();
+const context = { originatorAccount: institution, beneficiaryAccount: agentWallet, amount: 1_500_000_000n, mint };
+
 function filled(): TravelRuleForm {
   return {
     originator: {
-      ...emptyParty('legal'),
-      name: 'Example Research GmbH',
-      geographicAddress: 'Hauptstraße 1, 10115 Berlin',
+      ...emptyPerson('legal'),
+      primaryIdentifier: 'Example Research GmbH',
+      street: 'Hauptstraße 1',
+      city: 'Berlin',
+      postcode: '10115',
       country: 'de',
-      nationalId: 'HRB 123456',
-      vaspName: 'Self-hosted',
+      idType: 'RAID',
+      idValue: 'HRB 123456',
+      idCountry: 'de',
     },
-    beneficiary: { ...emptyParty('natural'), name: 'Ada Example', vaspName: 'Example Custody', vaspLei: GLEIF_LEI },
+    beneficiary: { ...emptyPerson('natural'), primaryIdentifier: 'Example', secondaryIdentifier: 'Ada' },
+    originatingVasp: { name: '', lei: '' },
+    beneficiaryVasp: { name: 'Example Custody', lei: GLEIF_LEI },
   };
 }
 
+const errorsOf = (form: TravelRuleForm) => {
+  const checked = checkTravelRuleForm(form, context, TODAY);
+  return checked.ok ? {} : checked.errors;
+};
+
+const withOriginator = (patch: Partial<PersonForm>): TravelRuleForm => {
+  const form = filled();
+  form.originator = { ...form.originator, ...patch };
+  return form;
+};
+
 describe('Travel Rule form', () => {
-  it('accepts the IVMS 101 minimum and normalises the codes', () => {
-    const checked = checkTravelRuleForm(filled(), TODAY);
+  it('builds the shared BE-23 record: accounts, amount and mint from the job, empty fields null', () => {
+    const checked = checkTravelRuleForm(filled(), context, TODAY);
     expect(checked.ok).toBe(true);
-    if (checked.ok) expect(checked.value.originator.country).toBe('DE');
+    if (!checked.ok) return;
+    const expected: TravelRuleRecord = {
+      originator: {
+        kind: 'legal',
+        primaryIdentifier: 'Example Research GmbH',
+        secondaryIdentifier: null,
+        accountNumber: institution.toBase58(),
+        address: { street: 'Hauptstraße 1', city: 'Berlin', postcode: '10115', country: 'DE' },
+        nationalIdentification: { type: 'RAID', value: 'HRB 123456', country: 'DE' },
+        dateOfBirth: null,
+        placeOfBirth: null,
+        countryOfResidence: null,
+      },
+      beneficiary: {
+        kind: 'natural',
+        primaryIdentifier: 'Example',
+        secondaryIdentifier: 'Ada',
+        accountNumber: agentWallet.toBase58(),
+        address: null,
+        nationalIdentification: null,
+        dateOfBirth: null,
+        placeOfBirth: null,
+        countryOfResidence: null,
+      },
+      originatingVasp: null,
+      beneficiaryVasp: { name: 'Example Custody', lei: GLEIF_LEI },
+      amount: '1500000000',
+      mint: mint.toBase58(),
+    };
+    expect(checked.record).toEqual(expected);
+    expect(TravelRuleRecordSchema.parse(checked.record)).toEqual(expected);
   });
 
-  it('requires names, the VASP and a way to identify the originator', () => {
-    const checked = checkTravelRuleForm(emptyTravelRuleForm(), TODAY);
-    expect(checked.ok).toBe(false);
-    if (checked.ok) return;
-    expect(checked.errors).toMatchObject({
-      'originator.name': 'Required.',
-      'beneficiary.name': 'Required.',
-      'originator.vaspName': 'Required. For a self-hosted wallet write “Self-hosted”.',
+  it('requires a name and a way to identify the originator', () => {
+    const errors = errorsOf(emptyTravelRuleForm());
+    expect(errors).toMatchObject({
+      'originator.primaryIdentifier': 'Give the legal name.',
+      'beneficiary.primaryIdentifier': 'Give the legal name.',
       'originator.identification':
         'Give the originator’s address, a national identifier or the date and place of birth.',
     });
-    // Beneficiary için ad, hesap ve VASP yeter (FATF Tavsiye 16).
-    expect(checked.errors['beneficiary.identification']).toBeUndefined();
+    expect(errors['beneficiary.identification']).toBeUndefined();
   });
 
   it('identifies a natural originator by the date and place of birth', () => {
     const form = filled();
     form.originator = {
-      ...emptyParty('natural'),
-      name: 'Grace Example',
+      ...emptyPerson('natural'),
+      primaryIdentifier: 'Example',
+      secondaryIdentifier: 'Grace',
       dateOfBirth: '1980-02-29',
       placeOfBirth: 'Zürich, CH',
-      vaspName: 'Self-hosted',
     };
-    expect(checkTravelRuleForm(form, TODAY).ok).toBe(true);
+    const checked = checkTravelRuleForm(form, context, TODAY);
+    expect(checked.ok).toBe(true);
+    if (checked.ok) expect(checked.record.originator).toMatchObject({ dateOfBirth: '1980-02-29', address: null });
   });
 
   it('rejects malformed and inconsistent values', () => {
-    const errorsOf = (patch: Partial<TravelRuleForm['originator']>) => {
-      const form = filled();
-      form.originator = { ...form.originator, ...patch };
-      const checked = checkTravelRuleForm(form, TODAY);
-      return checked.ok ? {} : checked.errors;
-    };
-    expect(errorsOf({ country: 'DEU' })['originator.country']).toBe('Two-letter ISO 3166-1 country code.');
-    expect(errorsOf({ country: '' })['originator.country']).toBe('Give the country of the address.');
-    expect(errorsOf({ vaspLei: '506700GE1G29325QX364' })['originator.vaspLei']).toMatch(/Not a valid LEI/);
-    expect(errorsOf({ name: 'x'.repeat(101) })['originator.name']).toBe('At most 100 characters.');
-    expect(errorsOf({ dateOfBirth: '1980-01-01', placeOfBirth: 'Berlin' })['originator.dateOfBirth']).toBe(
-      'Only a natural person has a date and place of birth.',
+    expect(errorsOf(withOriginator({ country: 'DEU' }))['originator.country']).toBe(
+      'Two-letter ISO 3166-1 country code.',
     );
-    const natural = { kind: 'natural' as const };
-    expect(errorsOf({ ...natural, dateOfBirth: '1980-02-30', placeOfBirth: 'Berlin' })['originator.dateOfBirth']).toBe(
-      'Not a real date.',
+    expect(errorsOf(withOriginator({ city: '' }))['originator.city']).toBe('Give the city of the address.');
+    expect(errorsOf(withOriginator({ idType: 'LEIX', idValue: '506700GE1G29325QX364', idCountry: '' }))).toMatchObject({
+      'originator.idValue': expect.stringMatching(/Not a valid LEI/),
+    });
+    expect(errorsOf(withOriginator({ idType: 'LEIX', idValue: GLEIF_LEI, idCountry: 'DE' }))).toMatchObject({
+      'originator.idCountry': 'An LEI has no issuing country.',
+    });
+    expect(errorsOf(withOriginator({ idType: '', idValue: 'x' }))['originator.idType']).toBe(
+      'Choose the identifier type.',
     );
-    expect(errorsOf({ ...natural, dateOfBirth: TODAY, placeOfBirth: 'Berlin' })['originator.dateOfBirth']).toBe(
-      'The date of birth must be in the past.',
+    expect(errorsOf(withOriginator({ primaryIdentifier: 'x'.repeat(101) }))['originator.primaryIdentifier']).toMatch(
+      /100/,
     );
-    expect(errorsOf({ ...natural, dateOfBirth: '1980-01-01' })['originator.placeOfBirth']).toBe(
+    const natural = { kind: 'natural' as const, secondaryIdentifier: 'Grace' };
+    expect(
+      errorsOf(withOriginator({ ...natural, dateOfBirth: '1980-02-30', placeOfBirth: 'Berlin' }))[
+        'originator.dateOfBirth'
+      ],
+    ).toBe('Not a real date.');
+    expect(
+      errorsOf(withOriginator({ ...natural, dateOfBirth: TODAY, placeOfBirth: 'Berlin' }))['originator.dateOfBirth'],
+    ).toBe('The date of birth must be in the past.');
+    expect(errorsOf(withOriginator({ ...natural, dateOfBirth: '1980-01-01' }))['originator.placeOfBirth']).toBe(
       'Give the place of birth with the date.',
     );
+    const vasp = filled();
+    vasp.originatingVasp = { name: '', lei: GLEIF_LEI };
+    expect(errorsOf(vasp)['originatingVasp.name']).toBe('Give the name of the VASP with its LEI.');
   });
 
   it('checks LEI check digits (ISO 7064 MOD 97-10)', () => {
@@ -121,42 +173,29 @@ describe('Travel Rule form', () => {
   });
 });
 
-describe('record and commitment', () => {
-  const institution = key();
-  const agentWallet = key();
-  const mint = key();
+describe('commitment and verification', () => {
   const job = key();
 
-  const record = () => {
-    const checked = checkTravelRuleForm(filled(), TODAY);
+  const record = (): TravelRuleRecord => {
+    const checked = checkTravelRuleForm(filled(), context, TODAY);
     if (!checked.ok) throw new Error('form');
-    return buildTravelRuleRecord(checked.value, {
-      originatorAccount: institution,
-      beneficiaryAccount: agentWallet,
-      amount: 1_500_000_000n,
-      asset: mint,
-    });
+    return checked.record;
   };
 
-  it('takes the accounts, amount and asset from the job and leaves out empty fields', () => {
-    expect(record()).toEqual({
-      originator: {
-        type: 'legal',
-        name: 'Example Research GmbH',
-        account: institution.toBase58(),
-        geographicAddress: { address: 'Hauptstraße 1, 10115 Berlin', country: 'DE' },
-        nationalIdentification: 'HRB 123456',
-        vasp: { name: 'Self-hosted' },
-      },
-      beneficiary: {
-        type: 'natural',
-        name: 'Ada Example',
-        account: agentWallet.toBase58(),
-        vasp: { name: 'Example Custody', lei: GLEIF_LEI },
-      },
-      amount: '1500000000',
-      asset: mint.toBase58(),
-    });
+  const disclosure = (salt: Uint8Array, value: TravelRuleRecord = record()): TravelRuleDisclosure => ({
+    status: {
+      job: job.toBase58(),
+      commitment: bytesToHex(travelRuleCommitment(job, salt, value)),
+      recordDigest: bytesToHex(travelRule.recordDigest(value)),
+      storedBy: institution.toBase58(),
+      storedAt: 1_790_000_000,
+      retainUntil: 1_950_000_000,
+      purgedAt: null,
+      chainCommitment: null,
+      committed: false,
+    },
+    record: value,
+    salt: bytesToHex(salt),
   });
 
   it('is the SDK commitment and matches the shared vectors of the on-chain implementation', () => {
@@ -165,55 +204,29 @@ describe('record and commitment', () => {
     for (const vector of VECTORS.vectors) {
       const jobKey = new PublicKey(vector.job);
       const salt = hexToBytes(vector.salt);
-      const commitment = travelRuleCommitment(jobKey, salt, vector.record);
-      expect(bytesToHex(commitment), vector.label).toBe(vector.commitment);
-      expect(commitment).toEqual(travelRule.commitment({ job: jobKey, salt, record: vector.record }));
+      expect(bytesToHex(travelRuleCommitment(jobKey, salt, vector.record)), vector.label).toBe(vector.commitment);
     }
   });
 
-  it('draws a fresh salt per entry and binds the commitment to the job', () => {
-    const now = 1_790_000_000;
-    const a = createTravelRuleEntry({ job, record: record(), now });
-    const b = createTravelRuleEntry({ job, record: record(), now });
-    expect(a.salt).toMatch(/^[0-9a-f]{64}$/);
-    expect(a.salt).not.toBe(b.salt);
-    expect(a.commitment).not.toBe(b.commitment);
-    expect(a.commitment).toBe(bytesToHex(travelRule.commitment({ job, salt: hexToBytes(a.salt), record: a.record })));
-    expect(recomputeCommitment(a)).toBe(a.commitment);
-    // Aynı kayıt ve salt başka bir işte başka bir commitment verir.
-    const other = createTravelRuleEntry({ job: key(), record: record(), now, salt: hexToBytes(a.salt) });
-    expect(other.commitment).not.toBe(a.commitment);
-  });
-
-  it('verifies the chain commitment by recomputing it from the record and salt', () => {
-    const jobAddress = job.toBase58();
-    const old = createTravelRuleEntry({ job, record: record(), now: 1 });
-    const current = createTravelRuleEntry({ job, record: record(), now: 2 });
-    const chain = hexToBytes(current.commitment);
-    expect(verifyTravelRule([old, current], jobAddress, chain)).toEqual({ state: 'match', entry: current });
-    expect(verifyTravelRule([], jobAddress, chain)).toEqual({ state: 'noRecord' });
-    expect(verifyTravelRule([old], key().toBase58(), chain)).toEqual({ state: 'noRecord' });
-    expect(verifyTravelRule([old], jobAddress, new Uint8Array(32))).toEqual({ state: 'notBound' });
-    expect(verifyTravelRule([old], jobAddress, chain)).toEqual({ state: 'mismatch', local: old.commitment });
-    // Saklanan commitment'a güvenilmez: kayıt değiştirilmişse yeniden hesaplanan tutmaz.
-    const edited = { ...current, record: { ...current.record, amount: '1' } };
-    expect(verifyTravelRule([edited], jobAddress, chain).state).toBe('mismatch');
+  it('recomputes the chain commitment from the record and salt the API discloses', () => {
+    const salt = travelRule.generateSalt();
+    const opened = disclosure(salt);
+    const chain = hexToBytes(opened.status.commitment);
+    expect(verifyDisclosure(job, opened, chain)).toEqual({
+      state: 'match',
+      storedAt: 1_790_000_000,
+      retainUntil: 1_950_000_000,
+    });
+    const other = disclosure(travelRule.generateSalt());
+    expect(verifyDisclosure(job, other, chain)).toEqual({ state: 'mismatch', recomputed: other.status.commitment });
+    const edited = { ...opened, record: { ...opened.record, amount: '1' } };
+    expect(verifyDisclosure(job, edited, chain).state).toBe('mismatch');
+    expect(verifyDisclosure(key(), opened, chain).state).toBe('mismatch');
   });
 });
 
 describe('funding gate', () => {
-  const job = key();
-  const entry = createTravelRuleEntry({
-    job,
-    record: {
-      originator: { type: 'legal', name: 'A', account: key().toBase58(), vasp: { name: 'Self-hosted' } },
-      beneficiary: { type: 'legal', name: 'B', account: key().toBase58(), vasp: { name: 'Self-hosted' } },
-      amount: '1000',
-      asset: key().toBase58(),
-    },
-    now: 1,
-  });
-  const bound = hexToBytes(entry.commitment);
+  const bound = new Uint8Array(32).fill(7);
   const none = new Uint8Array(32);
 
   it('follows the escrow rule: threshold on, amount at or above it', () => {
@@ -223,22 +236,18 @@ describe('funding gate', () => {
     expect(travelRuleRequired(10n ** 15n, 0n)).toBe(false);
   });
 
-  it('blocks funding above the threshold until the bound commitment matches the local record', () => {
-    expect(travelRuleFundBlock({ required: true, chainCommitment: none, verification: null })).toMatch(
-      /need a Travel Rule commitment before funding/,
+  it('blocks funding above the threshold until the bound commitment is checked against the stored record', () => {
+    const gate = (
+      chainCommitment: Uint8Array,
+      verification: Parameters<typeof travelRuleFundBlock>[0]['verification'],
+    ) => travelRuleFundBlock({ required: true, chainCommitment, verification });
+    expect(gate(none, null)).toMatch(/need a Travel Rule commitment before funding/);
+    expect(gate(bound, null)).toMatch(/Check the bound Travel Rule commitment/);
+    expect(gate(bound, { state: 'missing', reason: 'The Square API has no Travel Rule record for this job.' })).toMatch(
+      /no Travel Rule record for this job\. Store the record/,
     );
-    expect(travelRuleFundBlock({ required: true, chainCommitment: bound, verification: null })).toMatch(
-      /Unlock the Travel Rule records/,
-    );
-    const verify = (entries: (typeof entry)[]) => verifyTravelRule(entries, job.toBase58(), bound);
-    expect(travelRuleFundBlock({ required: true, chainCommitment: bound, verification: verify([]) })).toMatch(
-      /no record in this browser/,
-    );
-    const other = createTravelRuleEntry({ job, record: entry.record, now: 2 });
-    expect(travelRuleFundBlock({ required: true, chainCommitment: bound, verification: verify([other]) })).toMatch(
-      /does not match your record/,
-    );
-    expect(travelRuleFundBlock({ required: true, chainCommitment: bound, verification: verify([entry]) })).toBeNull();
+    expect(gate(bound, { state: 'mismatch', recomputed: 'ab'.repeat(32) })).toMatch(/does not match the record/);
+    expect(gate(bound, { state: 'match', storedAt: 1, retainUntil: 2 })).toBeNull();
     expect(travelRuleFundBlock({ required: false, chainCommitment: none, verification: null })).toBeNull();
   });
 
@@ -261,7 +270,6 @@ describe('funding gate', () => {
 });
 
 describe('commit_travel_rule transaction', () => {
-  // Yalnızca blockhash: tx kurulur, gönderilmez.
   class BlockhashOnly extends Connection {
     override async getLatestBlockhash(_commitment?: Commitment) {
       return { blockhash: key().toBase58(), lastValidBlockHeight: 1 };
@@ -275,47 +283,36 @@ describe('commit_travel_rule transaction', () => {
   });
 
   it('carries only the 32-byte commitment, no personal data', async () => {
-    const institution = key();
     const job = key();
-    const entry = createTravelRuleEntry({
-      job,
-      record: {
-        originator: {
-          type: 'natural',
-          name: 'Grace Example',
-          account: institution.toBase58(),
-          dateAndPlaceOfBirth: { date: '1980-02-29', place: 'Zürich, CH' },
-          vasp: { name: 'Self-hosted' },
-        },
-        beneficiary: { type: 'legal', name: 'Example Agent Operator', account: key().toBase58(), vasp: { name: 'X' } },
-        amount: '1500000000',
-        asset: key().toBase58(),
-      },
-      now: 1,
-    });
-    const built = await client.flow.commitTravelRule(
-      { institution, job, commitment: hexToBytes(entry.commitment) },
-      { feePayer: institution },
-    );
+    const form = filled();
+    form.originator = {
+      ...emptyPerson('natural'),
+      primaryIdentifier: 'Example',
+      secondaryIdentifier: 'Grace',
+      dateOfBirth: '1980-02-29',
+      placeOfBirth: 'Zürich, CH',
+    };
+    const checked = checkTravelRuleForm(form, context, TODAY);
+    if (!checked.ok) throw new Error('form');
+    const salt = travelRule.generateSalt();
+    const commitment = travelRuleCommitment(job, salt, checked.record);
+    const built = await client.flow.commitTravelRule({ institution, job, commitment }, { feePayer: institution });
     const message = built.transaction.message;
     const escrowIndex = message.staticAccountKeys.findIndex((k) => k.equals(escrow));
     const [ix] = message.compiledInstructions.filter((i) => i.programIdIndex === escrowIndex);
-    // 8 baytlık Anchor discriminator ve 32 baytlık commitment; hesaplar yalnızca kurum ve job.
     expect(ix!.data.length).toBe(8 + 32);
-    expect(bytesToHex(ix!.data.slice(8))).toBe(entry.commitment);
+    expect(bytesToHex(ix!.data.slice(8))).toBe(bytesToHex(commitment));
     expect(ix!.accountKeyIndexes.map((i) => message.staticAccountKeys[i]!.toBase58())).toEqual([
       institution.toBase58(),
       job.toBase58(),
     ]);
     const decoded = new BorshInstructionCoder(SQUARE_IDLS.escrow as unknown as Idl).decode(Buffer.from(ix!.data));
     expect(decoded?.name).toBe('commit_travel_rule');
-
-    // Serileştirilmiş tx'te kaydın hiçbir alanı, salt'ı ya da özeti yok.
     const wire = Buffer.from(built.transaction.serialize());
-    for (const secret of ['Grace Example', 'Zürich', '1980-02-29', 'Example Agent Operator', 'Self-hosted']) {
+    for (const secret of ['Example', 'Grace', 'Zürich', '1980-02-29', 'Example Custody']) {
       expect(wire.includes(Buffer.from(secret, 'utf8')), secret).toBe(false);
     }
-    expect(wire.includes(Buffer.from(entry.salt, 'hex'))).toBe(false);
-    expect(wire.includes(Buffer.from(travelRule.recordDigest(entry.record)))).toBe(false);
+    expect(wire.includes(Buffer.from(salt))).toBe(false);
+    expect(wire.includes(Buffer.from(travelRule.recordDigest(checked.record)))).toBe(false);
   });
 });

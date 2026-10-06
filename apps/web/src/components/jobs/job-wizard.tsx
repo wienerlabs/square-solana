@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useCallback, useEffect, useId, useMemo, useState, type ReactNode } from 'react';
 import { useConnection } from '@solana/wallet-adapter-react';
 import { PublicKey } from '@solana/web3.js';
+import { useApiClient } from '@/components/api-client';
 import { useNetworkGuard, useSendTransaction } from '@/components/network-guard';
 import { Address } from '@/components/ui/address';
 import { Button } from '@/components/ui/button';
@@ -35,8 +36,7 @@ import { loadDrafts } from '@/lib/policy-local';
 import { TransactionBlockedError } from '@/lib/send-transaction';
 import { formatUnits, parseUnits, settlementAccount } from '@/lib/settlement';
 import { statusLabel } from '@/lib/status';
-import { isBound, travelRuleFundBlock, travelRuleRequired, verifyTravelRule } from '@/lib/travel-rule';
-import { useTravelRuleVault } from '@/lib/use-travel-rule-vault';
+import { isBound, travelRuleFundBlock, travelRuleRequired, type TravelRuleVerification } from '@/lib/travel-rule';
 import { useSettlementToken, useTokenBalance } from '@/lib/use-settlement';
 import { useSignatureStatus } from '@/lib/use-signature-status';
 
@@ -267,14 +267,13 @@ export function JobWizard({ owner, escrowProgramId }: { owner: string; escrowPro
     fundAmount !== null && balance !== null && (balance.amount === null || balance.amount < fundAmount);
   const travelRule = setup !== null && fundAmount !== null && travelRuleRequired(fundAmount, setup.travelRuleThreshold);
 
-  // Travel Rule (FE-18): eşik üstündeki iş, zincirdeki commitment bu tarayıcıdaki şifreli kayıttan yeniden
-  // hesaplanan commitment'la eşleşmeden fonlanmaz.
-  const vault = useTravelRuleVault(owner);
+  const apiClient = useApiClient();
+  const [travelVerification, setTravelVerification] = useState<TravelRuleVerification | null>(null);
   const chainCommitment = existingJob?.commitment ?? NO_COMMITMENT;
   const travelBlock = travelRuleFundBlock({
     required: travelRule,
     chainCommitment,
-    verification: vault.unlocked && jobAddress ? verifyTravelRule(vault.entries, jobAddress, chainCommitment) : null,
+    verification: travelVerification,
   });
   const onTravelRuleConfirmed = useCallback(() => setRefresh((n) => n + 1), []);
 
@@ -572,7 +571,8 @@ export function JobWizard({ owner, escrowProgramId }: { owner: string; escrowPro
         <p className="rounded-card border border-border bg-surface p-6 text-sm text-muted">
           This amount is at or above the Travel Rule threshold (
           {formatUnits(setup.travelRuleThreshold, token?.decimals ?? 0)} USDC). Once the job is created, you enter the
-          originator and beneficiary here and bind their commitment before funding.
+          originator and beneficiary here; the Square API stores the record encrypted and you bind its commitment before
+          funding.
         </p>
       )}
       {existingJob && jobAddress && (travelRule || isBound(existingJob.commitment)) && (
@@ -581,7 +581,9 @@ export function JobWizard({ owner, escrowProgramId }: { owner: string; escrowPro
           jobAddress={jobAddress}
           job={existingJob}
           institution={ownerKey}
-          vault={vault}
+          api={apiClient}
+          verification={travelVerification}
+          onVerification={setTravelVerification}
           formatAmount={(base) => (token ? `${formatUnits(base, token.decimals)} USDC` : base.toString())}
           onConfirmed={onTravelRuleConfirmed}
         />
