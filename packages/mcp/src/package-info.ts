@@ -1,5 +1,4 @@
-/** Server name and version advertised over MCP come from package.json. */
-
+// MCP üzerinden bildirilen sunucu adı ve sürümü package.json'dan okunur.
 import { readFileSync } from 'node:fs';
 
 interface PackageInfo {
@@ -8,7 +7,7 @@ interface PackageInfo {
 }
 
 function loadPackageInfo(): PackageInfo {
-  // dist/package-info.js and src/package-info.ts both sit one level below the package root.
+  // dist/package-info.js ve src/package-info.ts paket kökünün bir altında.
   const raw: unknown = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
   if (
     typeof raw !== 'object' ||
@@ -16,9 +15,9 @@ function loadPackageInfo(): PackageInfo {
     typeof (raw as Record<string, unknown>).name !== 'string' ||
     typeof (raw as Record<string, unknown>).version !== 'string'
   ) {
-    throw new Error('package.json must declare name and version');
+    throw new Error('package.json name ve version içermeli');
   }
-  const { name, version } = raw as Record<string, string>;
+  const { name, version } = raw as PackageInfo;
   return { name, version };
 }
 

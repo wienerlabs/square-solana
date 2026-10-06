@@ -1,54 +1,50 @@
-#!/usr/bin/env node
-/**
- * covenant-mcp — Model Context Protocol server for Covenant.
- *
- * Covenant is the agent-to-agent settlement layer on Solana.
- * x402 powers paid access. Covenant powers paid work.
- *
- * This server exposes Covenant to any MCP-speaking agent (Claude Desktop,
- * Claude Code, Cursor, an autonomous loop). v0.1 ships the read-only
- * discovery surface, which needs no wallet and no credentials: find open
- * work, inspect a job's settlement state, read reputation, discover
- * counterparties, and check live protocol stats.
- *
- * The write surface (create_escrow / accept_job / deliver / release /
- * dispute / factor_claim) lands next; it activates when the server is
- * started with COVENANT_AGENT_KEYPAIR set, so an autonomous agent is its
- * own non-custodial wallet.
- *
- * Transport: stdio. Configure in your MCP client (see README).
- */
-
+// Square MCP sunucusu (BE-28). Covenant `mcp/`'nin (Apache-2.0, BE-02 ile taşındı) Square'e uyarlaması:
+// okuma tool'ları Square REST API'sini kullanır, yazma tool'ları imzasız tx hazırlar ve yalnızca imzası
+// doğrulanmış tx'i gönderir. Sunucu taşımadan bağımsızdır; stdio ve Streamable HTTP `bin.ts` / `http.ts`'te.
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { loadConfig } from './config.js';
+import type { SquareApi } from '@squaresdk/solana-sdk';
+import { createApi } from './api.js';
+import { createChain, type SquareChain } from './chain.js';
+import type { SquareMcpConfig } from './config.js';
 import { packageInfo } from './package-info.js';
-import { registerDiscoveryTools } from './tools/discover.js';
+import { registerReadTools } from './tools/discover.js';
+import type { ToolContext } from './tools/result.js';
+import { registerWriteTools } from './tools/write.js';
+import { LocalSigner } from './transactions.js';
 
-async function main(): Promise<void> {
-  const config = loadConfig();
-
-  const server = new McpServer({
-    name: packageInfo.name,
-    version: packageInfo.version,
-  });
-
-  // v0.1: read-only discovery tools (no wallet required).
-  registerDiscoveryTools(server, config);
-
-  const transport = new StdioServerTransport();
-  await server.connect(transport);
-
-  // stderr is safe to log to under stdio transport; stdout is the
-  // JSON-RPC channel and must not be polluted.
-  process.stderr.write(
-    `${packageInfo.name} v${packageInfo.version} connected. network=${config.network} api=${config.baseUrl}\n`,
-  );
+export interface SquareMcpDeps {
+  network: string;
+  api: SquareApi;
+  /** Yazma kipi; verilmezse yalnızca okuma tool'ları kaydedilir. */
+  write?: { chain: SquareChain; signer: LocalSigner | null } | null;
 }
 
-main().catch((err) => {
-  process.stderr.write(
-    `${packageInfo.name} fatal: ${err instanceof Error ? (err.stack ?? err.message) : String(err)}\n`,
+const INSTRUCTIONS = [
+  'Square is a compliant agent-to-agent settlement layer on Solana. Institutions open jobs bound to a',
+  'registered agent and lock the settlement token in a per-job escrow; the agent accepts and delivers; after the',
+  'challenge window a keeper releases the escrow (with a zero-knowledge compliance proof when the job has a',
+  'policy). Read tools need no wallet. Write tools return UNSIGNED transactions with a decoded summary: the',
+  'user signs them in their own wallet and passes the signed transaction to square_submit_signed_transaction.',
+  'This server holds no private key unless the operator explicitly configured a local signer.',
+].join(' ');
+
+/** Tool'ları kayıtlı yeni bir `McpServer`; her taşıma bağlantısı kendi örneğini alır. */
+export function createSquareMcpServer(deps: SquareMcpDeps): McpServer {
+  const server = new McpServer(
+    { name: packageInfo.name, version: packageInfo.version },
+    { instructions: INSTRUCTIONS },
   );
-  process.exit(1);
-});
+  const ctx: ToolContext = { network: deps.network, api: deps.api, write: deps.write ?? null };
+  registerReadTools(server, ctx);
+  if (deps.write) registerWriteTools(server, { ctx, chain: deps.write.chain, signer: deps.write.signer });
+  return server;
+}
+
+/** Yapılandırmadan bağımlılıklar: API istemcisi, yazma kipinde zincir erişimi ve yerel imzalayıcı. */
+export async function depsFromConfig(config: SquareMcpConfig): Promise<SquareMcpDeps> {
+  const api = createApi({ apiUrl: config.apiUrl, timeoutMs: config.timeoutMs, apiKey: config.apiKey });
+  if (!config.write) return { network: config.network, api, write: null };
+  const chain = createChain({ ...config.write, timeoutMs: config.timeoutMs });
+  const signer = config.signerKeypairPath ? await LocalSigner.fromFile(config.signerKeypairPath) : null;
+  return { network: config.network, api, write: { chain, signer } };
+}
