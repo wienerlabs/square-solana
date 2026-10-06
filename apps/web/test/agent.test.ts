@@ -1,11 +1,13 @@
 // Agent kaydı (FE-05): kimlik kuralları, tx'ten önce hesaplanan kayıt adresi ve DID, kartın kayda ait
-// olduğunun denetimi, kart hash'i ve `register_agent` talimatı. Ağ kullanılmaz: talimat registry IDL'iyle
+// olduğunun denetimi, kart hash'i (kendi adresindeki ve Square API'de barındırılan kart) ve `register_agent`
+// talimatı. Ağ kullanılmaz: talimat registry IDL'iyle
 // çözülür, kart baytları Square kart şemasına uyan gerçek bir belgedir.
+import { createHash } from 'node:crypto';
 import { BorshInstructionCoder, type Idl } from '@anchor-lang/core';
 import { Connection, Keypair, PublicKey, SystemProgram } from '@solana/web3.js';
 import { didFromRegistration, squareIdentity } from '@squaresdk/solana-identity';
 import { CHAIN_REFS } from '@squaresdk/solana-identity/constants';
-import { createPda, SQUARE_IDLS } from '@squaresdk/solana-sdk';
+import { createPda, specHashing, SQUARE_IDLS } from '@squaresdk/solana-sdk';
 import { AGENT_CARD_TYPE, AgentCardSchema, AgentRegistrationSchema } from '@squaresdk/solana-types';
 import { describe, expect, it } from 'vitest';
 import {
@@ -13,8 +15,10 @@ import {
   agentIdProblem,
   cardUriProblem,
   checkCard,
+  checkHostedCard,
   describeCardError,
   hex,
+  hostingProblem,
   registerAgentInstruction,
   registryErrorMessage,
 } from '@/lib/agent-registration';
@@ -146,6 +150,67 @@ describe('agent card', () => {
     expect(describeCardError(new Error('https://agents.square.test/card.json could not be dereferenced'))[0]).toMatch(
       /^The card could not be downloaded\. It must be served over https without redirects/,
     );
+  });
+});
+
+describe('card hosted on the Square API', () => {
+  const identity = agentIdentity({ genesisHash: DEVNET_GENESIS, registry, creator, agentId: 'alpha-01' });
+  // apps/api `cards.ts`'in hash'i: şemadan geçmiş kartın RFC 8785 kanonik JSON'unun SHA-256'sı.
+  const apiHash = (document: unknown) =>
+    createHash('sha256')
+      .update(Buffer.from(specHashing.canonicalizeSpec(AgentCardSchema.parse(document)), 'utf8'))
+      .digest('hex');
+
+  it('hashes the bytes the API stores, whatever the formatting of the input', () => {
+    const document = card([identity.registration]);
+    const draft = checkHostedCard(JSON.stringify(document, null, 2), identity.registration);
+    expect(draft).toMatchObject({ state: 'ready', normalized: false });
+    expect(draft.state === 'ready' && hex(draft.hash)).toBe(apiHash(document));
+    // Anahtar sırası ve boşluk hash'i değiştirmez.
+    const reordered = Object.fromEntries(Object.entries(document).reverse());
+    const again = checkHostedCard(JSON.stringify(reordered), identity.registration);
+    expect(again.state === 'ready' && hex(again.hash)).toBe(apiHash(document));
+  });
+
+  it('says when the hosted card differs from the input', () => {
+    const extra = { ...card([identity.registration]), notInTheSchema: true };
+    const draft = checkHostedCard(JSON.stringify(extra), identity.registration);
+    expect(draft).toMatchObject({ state: 'ready', normalized: true });
+    expect(draft.state === 'ready' && hex(draft.hash)).toBe(apiHash(extra));
+    // Eksik varsayılan (streaming) şemada dolar.
+    const defaults = { ...card([identity.registration]), capabilities: { pushNotifications: false } };
+    expect(checkHostedCard(JSON.stringify(defaults), identity.registration)).toMatchObject({ normalized: true });
+  });
+
+  it('refuses invalid JSON, schema errors and another agent’s card', () => {
+    expect(checkHostedCard('{"type":', identity.registration)).toEqual({
+      state: 'invalid',
+      problems: ['The card is not valid JSON.'],
+    });
+    const schema = checkHostedCard(
+      JSON.stringify({ ...card([identity.registration]), url: 'http://agents.square.test' }),
+      identity.registration,
+    );
+    expect(schema.state === 'invalid' && schema.problems[0]).toMatch(/^url: /);
+    const other = agentIdentity({ genesisHash: DEVNET_GENESIS, registry, creator: key(), agentId: 'alpha-01' });
+    expect(checkHostedCard(JSON.stringify(card([other.registration])), identity.registration)).toMatchObject({
+      state: 'invalid',
+    });
+  });
+
+  it('registers the hosting only when its hash is the one computed here', () => {
+    const document = card([identity.registration]);
+    const draft = checkHostedCard(JSON.stringify(document), identity.registration);
+    if (draft.state !== 'ready') throw new Error('draft');
+    const uri = `https://api.square.test/a/${identity.agentRecord.toBase58()}/.well-known/agent-card.json`;
+    expect(hostingProblem({ agentCardUri: uri, agentCardHash: hex(draft.hash) }, draft.hash)).toBeNull();
+    const other = '0'.repeat(64);
+    expect(hostingProblem({ agentCardUri: uri, agentCardHash: other }, draft.hash)).toBe(
+      `The Square API hashed the card as ${other}, not ${hex(draft.hash)}; that hash is not registered.`,
+    );
+    expect(
+      hostingProblem({ agentCardUri: uri.replace('https', 'http'), agentCardHash: hex(draft.hash) }, draft.hash),
+    ).toBe('The card must be served over https.');
   });
 });
 

@@ -1,7 +1,8 @@
 // Agent kaydı (FE-05, akışın 2. adımı): did:aip v2 Solana profili §4 ve §7.1. Kayıt adresi ve DID tx'ten
-// önce hesaplanır (seed'ler creator'ın anahtarını içerir); kart önce yayımlanır, indirilip doğrulanır ve
-// kartın baytlarının SHA-256'sıyla kaydedilir (§7.1). Kart sunucuya gönderilmez: tarayıcı kartı kendi
-// adresinden indirir.
+// önce hesaplanır (seed'ler creator'ın anahtarını içerir); kart önce yayımlanır, doğrulanır ve kartın
+// baytlarının SHA-256'sıyla kaydedilir (§7.1). Kart iki yoldan yayımlanır: agent'ın kendi adresinde (tarayıcı
+// indirip doğrular) ya da Square API'de (`putAgentCard`; API şemadan geçmiş kartın RFC 8785 kanonik JSON'unu
+// saklar, tarayıcı aynı baytların hash'ini kendisi hesaplar).
 import { Program } from '@anchor-lang/core';
 import { sha256 } from '@noble/hashes/sha2';
 import {
@@ -13,8 +14,13 @@ import {
   type TransactionInstruction,
 } from '@solana/web3.js';
 import { squareIdentity, type CardFetchOptions } from '@squaresdk/solana-identity';
-import { SQUARE_IDLS, type SquareRegistryContract } from '@squaresdk/solana-sdk';
-import type { AgentCard, AgentRegistration } from '@squaresdk/solana-types';
+import { SQUARE_IDLS, specHashing, type SquareRegistryContract } from '@squaresdk/solana-sdk';
+import {
+  AgentCardSchema,
+  type AgentCard,
+  type AgentCardHosting,
+  type AgentRegistration,
+} from '@squaresdk/solana-types';
 import { agentRecordAddress } from './idl-pda';
 import { programErrorMessage } from './program-error';
 
@@ -109,6 +115,52 @@ export async function fetchAndCheckCard(uri: string, registration: AgentRegistra
     return { state: 'invalid', problems: describeCardError(error) };
   }
   return checkCard(fetched.card, fetched.bytes, registration);
+}
+
+export type HostedCardDraft =
+  | {
+      state: 'ready';
+      card: AgentCard;
+      /** API'nin saklayacağı baytların (şemadan geçmiş kartın RFC 8785 kanonik JSON'u) SHA-256'sı. */
+      hash: Uint8Array;
+      /** Girdi şemanın okuduğu biçimden farklı: şemada olmayan alanlar çıkar, eksik varsayılanlar dolar. */
+      normalized: boolean;
+    }
+  | { state: 'invalid'; problems: string[] };
+
+/**
+ * Square API'de barındırılacak kart: JSON, Square kart şeması ve bu kaydın girdisi. API kartı şemadan
+ * geçirip kanonik JSON'unu saklar; hash aynı baytlardan burada hesaplanır.
+ */
+export function checkHostedCard(text: string, registration: AgentRegistration): HostedCardDraft {
+  let value: unknown;
+  try {
+    value = JSON.parse(text);
+  } catch {
+    return { state: 'invalid', problems: ['The card is not valid JSON.'] };
+  }
+  const parsed = AgentCardSchema.safeParse(value);
+  if (!parsed.success) return { state: 'invalid', problems: describeCardError(parsed.error) };
+  const canonical = specHashing.canonicalizeSpec(parsed.data);
+  const checked = checkCard(parsed.data, new TextEncoder().encode(canonical), registration);
+  if (checked.state === 'invalid') return checked;
+  return { state: 'ready', card: parsed.data, hash: checked.hash, normalized: canonicalOf(value) !== canonical };
+}
+
+/** Girdinin kendi kanonik biçimi; kanonikleştirilemiyorsa null (şemadan geçmiş biçimden farklı sayılır). */
+function canonicalOf(value: unknown): string | null {
+  try {
+    return specHashing.canonicalizeSpec(value);
+  } catch {
+    return null;
+  }
+}
+
+/** API'nin barındırdığı kartın hash'i tarayıcıdakiyle aynı mı? Değilse kayda o hash yazılmaz. */
+export function hostingProblem(hosting: AgentCardHosting, hash: Uint8Array): string | null {
+  return hosting.agentCardHash === hex(hash)
+    ? cardUriProblem(hosting.agentCardUri)
+    : `The Square API hashed the card as ${hosting.agentCardHash}, not ${hex(hash)}; that hash is not registered.`;
 }
 
 /** Kart hatasının okunur açıklaması. */
