@@ -15,6 +15,7 @@ import {
   clockUnixTimestamp,
   computeUnitLimitOf,
   createSender,
+  isLandedTransactionError,
   executableHash,
   MAX_SEND_ATTEMPTS,
   parseProgramData,
@@ -107,6 +108,8 @@ function fakeConnection(options: {
   expireTimes?: number;
   meta?: Partial<NonNullable<ConfirmedTxMeta['meta']>>;
   sendError?: unknown;
+  /** Onay, imza durumunu yoklayan yoldaki gibi zincir hatasıyla reddedilir. */
+  confirmError?: unknown;
 }) {
   let expired = 0;
   let lookups = 0;
@@ -122,6 +125,7 @@ function fakeConnection(options: {
         expired += 1;
         throw new TransactionExpiredBlockheightExceededError('sig');
       }
+      if (options.confirmError !== undefined) throw options.confirmError;
       return { value: { err: null } };
     },
     async getTransaction() {
@@ -175,6 +179,24 @@ describe('createSender', () => {
     await expect(success.send('6 + 8', 'finalize', async () => built(), [payer], 'proofRequired')).rejects.toThrow(
       /tx başarılı/,
     );
+  });
+
+  it('onay zincir hatasıyla reddedilirse tx zincirdedir: kayıt getTransaction’dan okunur', async () => {
+    const landed = { InstructionError: [4, { Custom: 6039 }] };
+    const failing = fakeConnection({
+      confirmError: landed,
+      meta: { err: landed, logMessages: escrowFailure(6039) },
+    });
+    const sender = createSender(failing.connection, client, () => {});
+    const record = await sender.send('6 + 8', 'finalize', async () => built(), [payer], 'proofRequired');
+    expect(record.error?.name).toBe('proofRequired');
+    await expect(sender.send('6 + 8', 'finalize', async () => built(), [payer])).rejects.toThrow(
+      /escrow proofRequired/,
+    );
+    const broken = createSender(fakeConnection({ confirmError: new Error('ağ') }).connection, client, () => {});
+    await expect(broken.send('3', 'x', async () => built(), [payer])).rejects.toThrow('ağ');
+    expect(isLandedTransactionError('AccountInUse')).toBe(true);
+    expect(isLandedTransactionError(null)).toBe(false);
   });
 
   it('eksik imzacı ve gönderim reddi', async () => {

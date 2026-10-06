@@ -149,7 +149,7 @@ hesapları okunur ve değerler kayıt satırları olarak yazılır. Square ALT'�
 (BC-31, `smoke` komutu); rapor `docs/deploy/smoke-<ağ>.md`.
 
 ```bash
-pnpm --filter @squaresdk/solana-smoke init  --config <ağ.json> --records <kayıt.md>
+pnpm --filter @squaresdk/solana-smoke run init --config <ağ.json> --records <kayıt.md>
 pnpm --filter @squaresdk/solana-smoke smoke --config <ağ.json>
 ```
 

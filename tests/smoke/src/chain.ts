@@ -109,6 +109,10 @@ export interface Sender {
 
 const isExpired = (error: unknown) => error instanceof TransactionExpiredBlockheightExceededError;
 
+/** Zincire girip düşen tx'in hatası (`TransactionError`: dize ya da `{ InstructionError: … }`); `Error` değildir. */
+export const isLandedTransactionError = (error: unknown): boolean =>
+  !(error instanceof Error) && (typeof error === 'string' || (typeof error === 'object' && error !== null));
+
 export function createSender(connection: Connection, client: SquareClient, log: (line: string) => void): Sender {
   const records: TxRecord[] = [];
   const commitment = 'confirmed' as const;
@@ -130,10 +134,16 @@ export function createSender(connection: Connection, client: SquareClient, log: 
         cause: error,
       });
     }
-    await connection.confirmTransaction(
-      { signature, blockhash: built.blockhash, lastValidBlockHeight: built.lastValidBlockHeight },
-      commitment,
-    );
+    try {
+      await connection.confirmTransaction(
+        { signature, blockhash: built.blockhash, lastValidBlockHeight: built.lastValidBlockHeight },
+        commitment,
+      );
+    } catch (error) {
+      // web3.js, imza durumunu yoklayarak gördüğü zincir hatasını ham `TransactionError` olarak fırlatır (abonelik
+      // bildiriminde değer olarak döner). Tx zincire girmiştir; kaydı ve hatası `getTransaction`'dan okunur.
+      if (!isLandedTransactionError(error)) throw error;
+    }
     return signature;
   }
 

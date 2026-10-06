@@ -14,12 +14,14 @@ Aynı komutlar her kümede çalışır; küme bir JSON yapılandırmasıyla seç
 
 ```bash
 pnpm turbo run build --filter @squaresdk/solana-smoke...             # paket ve bağımlılıkları
-pnpm --filter @squaresdk/solana-smoke init  --config <küme.json> [--records <kayıt.md>]
+pnpm --filter @squaresdk/solana-smoke run init --config <küme.json> [--records <kayıt.md>]
 pnpm --filter @squaresdk/solana-smoke smoke --config <küme.json> [--report <rapor.md>]
 pnpm --filter @squaresdk/solana-smoke smoke:localnet [--ledger <dizin>] [--rpc-port 8899] [--faucet-port 9900] \
   [--gossip-port 8001] [--dynamic-port-range 8100-8200] [--deploy-dir target/deploy] [--report <rapor.md>]
 pnpm --filter @squaresdk/solana-smoke test                          # zincirsiz birim testleri
 ```
+
+`init`, pnpm'in kendi `init` komutuyla çakıştığı için `run init` ile çağrılır.
 
 `smoke` ve `smoke:localnet` ispatı süreç içinde üretir (`createLocalProver`, snarkjs). Devrenin wasm'ı
 depoda değildir, önce derlenir: `circuits/payment-compliance/scripts/ci-build.sh` ya da
@@ -122,11 +124,12 @@ kurulumu kullanır, yeniden kurmaz. Kayıt deploy'la oluşur: `docs/deploy/smoke
 5. **Yapılandırma:** `~/square-devnet/devnet.json`; yukarıdaki tablo ve devnet kaydının değerleri:
    `programIds`, `settlementMint`, `lookupTable: 3cjUqPz9ECuym9w8trGRVUadGbj24Z7BvYALvEfmCCoG`,
    `init.squads.multisig: 3ucyX6nmbz9ytRVWr3wrYQD2try58Jy1xCyuNo8q6PD5`. `keys` yolları `keys/<rol>.json` biçiminde
-   göreli verilebilir. `admin` verilmez: authority vault'tur.
+   göreli verilebilir. `admin` verilmez: authority vault'tur. `init.escrow` değerleri `devnet.json`'dakilerdir;
+   `proofTimeoutSecs` ve `disputeTimeoutSecs` sayı olarak yazılır.
 6. **Init (yalnızca okur):**
 
    ```bash
-   pnpm --filter @squaresdk/solana-smoke init --config ~/square-devnet/devnet.json --records init-devnet.md
+   pnpm --filter @squaresdk/solana-smoke run init --config ~/square-devnet/devnet.json --records init-devnet.md
    ```
 
    Config'ler ve ALT zincirden okunup doğrulanır, kayıt satırları yazılır; kurulu config'e talimat üretilmez.
@@ -165,8 +168,7 @@ kurulumu kullanır, yeniden kurmaz. Kayıt deploy'la oluşur: `docs/deploy/smoke
 Birim testleri zincirsizdir. Zincirle çalışan akışlar (`runSmoke`, localnet koşucusunun süreç yönetimi,
 prover) `smoke:localnet` koşusunda gerçek işlemlerle sınanır ve kapsam ölçümünün dışındadır.
 
-## Kalan
+## Devnet koşusu
 
-Devnet deploy'u, Squads multisig'i, config'lerin vault imzasıyla kurulması ve devnet smoke raporu
-anahtarlar ve Squads üyeleri gerektirir; bu pakette yapılmadı. `docs/deploy/devnet.md` ve
-`docs/deploy/smoke-devnet.md` gerçek deploy ve koşuyla oluşur.
+[`docs/deploy/smoke-devnet.md`](../../docs/deploy/smoke-devnet.md): 2026-10-06, 8 adım ve iki varyant, 28 tx. Roller
+devnet kaydındaki anahtarlardır: payer deployer, kurum ve agent BC-36'nınkiler; alıcı ve keeper koşu için üretildi.

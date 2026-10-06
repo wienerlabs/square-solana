@@ -241,6 +241,12 @@ Uçtan uca koşu, 2026-10-06 (`apps/api/test/devnet.e2e.test.ts`).
 Lapse (dispute son tarihi devnet'te 7 gün) localnet testinde gerçek keeper süreciyle gösterilir
 (`apps/api/test/localnet.e2e.test.ts`).
 
+## Smoke (BC-31)
+
+8 adım ve iki varyant (ispat-ret, ispat-yok) gerçek işlemlerle, 2026-10-06: [smoke-devnet.md](smoke-devnet.md)
+(`tests/smoke`). Kurum ve agent BC-36'nınkiler; alıcı `H19475gy…` ve keeper `GCKxtmGg…` koşu için üretildi, kurum
+alıcıya 1 USDC, deployer keeper'a 0,1 SOL gönderdi.
+
 ## Yükseltmeler
 
 ### Escrow v0.6.0: dispute (BC-32, BC-33), 2026-10-06
