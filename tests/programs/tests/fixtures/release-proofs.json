@@ -152,6 +152,48 @@
       "proof_a": "15194e93475ed2d5cd838afb7528197d8108c02350c8d5c09a68ee6c7ca02e8a23f61fe5f0aec80265c8a525da8cd16d13fc182207a303ddec51efb9e7f9e438",
       "proof_b": "12e0940f1be511e29015fb910b1b5d1d55364518b2483cf35a9544ce9df5e547017bbbda057e3d338db1659d8609cc7778e6775b1549fc5c9eada01c8b7535750e24a67231d2388d9b2c4f02619224853ed5a4603d4a9cca3e966bf622bbc6c821bdf5876af04427b53de60a98132e583de6a0ded16bf07c8317945a1dcde34b",
       "proof_c": "18fe6879768db1de000cbd216a9047d9307d817ff9e4063e4fe37c6ea26244ec0e195dab96ba07b4b35bc58aa979411620a983f0afa3be96ceef4ce7caaee84f"
+    },
+    {
+      "name": "dispute_favor_agent",
+      "job": "a",
+      "payee": "agentWallet",
+      "mint": "settlementMint",
+      "net_amount": "25000000",
+      "refusal_code": 0,
+      "daily_spent_before": "0",
+      "timestamp": 1790000000,
+      "policy_commitment": "2c44b567d496bf243f0d5004a8e6435b7b5c8688595b3cc9f7b15ffe8dbcaf0f",
+      "proof_a": "2aec2ba5a0e5c25413a371426b19315b9bc40cd4cad7ca61a18ff627dbf60d5812b41d7c0b3639399a2fbb4537fd755fb419ca4161ca74674d97491b6de1a864",
+      "proof_b": "1962b95345aa13175ba8175d4b1732a24a8fc95969f9cb3f0641fd76e96e87b90fea1324b1620d8d9f58a581a134529eb0ed6808e228eee9b3daddf9995a9c8305e3b1368471ebfdfca281c2c644442ce980ed75a4db51eb2190a1ebebb62e832cc19c7df4aac10f9ecfe4397ac18802b7033502111259dac3fcaf725dcdabd7",
+      "proof_c": "0db376ad0e1eae413611a60088e5bc53720cad5f6b415e61ebc1f5bbe664b13d0156a4ea4a1124cb5500816f109b45c1060669f72ce3aa55cd7eee24a4cac9f5"
+    },
+    {
+      "name": "dispute_split",
+      "job": "a",
+      "payee": "agentWallet",
+      "mint": "settlementMint",
+      "net_amount": "10000000",
+      "refusal_code": 0,
+      "daily_spent_before": "0",
+      "timestamp": 1790000000,
+      "policy_commitment": "2c44b567d496bf243f0d5004a8e6435b7b5c8688595b3cc9f7b15ffe8dbcaf0f",
+      "proof_a": "1d2a47bcc2158d6eef27f1cf3d1724046b7cc43da3feac047b61c975bb8344f803b3df4907c8130be8935c0057f7bcdfbf7ae096936dd61b489549ca6110990c",
+      "proof_b": "09287301b2590459bbdd1368057f8c99956490a2c53ce7b518bcd6a8b583e4dc2065d646bc5cec525d5c8e62702b58c81f449b0fbb7ea69e0d41c639272c993b246e6f00907ed9f2966872a27972a2dc9fb4529c9a569239eff758899ebf2ce10f39a178b3b30c0b69447bfeb48e713b72bbda8cce48bdb162ecdb518316688c",
+      "proof_c": "2f1a715b03d069ced586f375c4e737a43754d2608efeacceb93c72756741b8c42fd03033abff07ead10cc66ea867ac4a568a3f503eb5eb43247839941be4602c"
+    },
+    {
+      "name": "dispute_refused_per_tx",
+      "job": "c",
+      "payee": "agentWallet",
+      "mint": "settlementMint",
+      "net_amount": "150000000",
+      "refusal_code": 1,
+      "daily_spent_before": "0",
+      "timestamp": 1790000000,
+      "policy_commitment": "2c44b567d496bf243f0d5004a8e6435b7b5c8688595b3cc9f7b15ffe8dbcaf0f",
+      "proof_a": "1ebb9645a57c8081ee2de4f57d6b8318d78f5574de5766e6b1b348ca07e46437281a65c1f7d97ea78737181086ee704c283db1bbac0b738a35caf2ae8e194861",
+      "proof_b": "18d62d145e896b1ca823942f1a54cc4086e6186388477404614bf81f2c40834901e55603486f32b93c6f0f7f1a1cb1f601d46493888f38d73a483a62f5bd3a172767a1f81e1371a914102ddd5eb1d21910580ab610625fde3a9a329b4518e5b510adbad4070225be33113911c321f1d2b09e93632a1d212af1f113861492361f",
+      "proof_c": "0aad7422ac8e4cce43ebfd803e82feda747e593cfc9ad11160d6cc8b3bd1fc3a0d6df169722b1da3dcf8598f977a49fa30c1e610d61016d247b6764fa203e3f9"
     }
   ]
 }

@@ -7,7 +7,8 @@ use crate::errors::EscrowError;
 use crate::state::{EscrowParams, MAX_ARBITRATORS, MAX_KEEPER_FEE_BPS};
 
 /// Challenge sınırları: `0 < min <= max`; `max` i64'e sığmalı (`challenge_end = now + period`).
-/// Keeper ücreti en fazla `MAX_KEEPER_FEE_BPS` (ADR 0013).
+/// Keeper ücreti en fazla `MAX_KEEPER_FEE_BPS` (ADR 0013). Dispute süresi pozitif (sıfır süre, her
+/// dispute'un açıldığı anda lapse edilebilmesi demektir), ispat bekleme süresi negatif değil (ADR 0016).
 pub fn validate_params(params: &EscrowParams) -> Result<()> {
     require!(
         params.min_challenge_period > 0
@@ -18,6 +19,10 @@ pub fn validate_params(params: &EscrowParams) -> Result<()> {
     require!(
         params.keeper_fee_bps <= MAX_KEEPER_FEE_BPS,
         EscrowError::InvalidKeeperFee
+    );
+    require!(
+        params.dispute_timeout_secs > 0 && params.proof_timeout_secs >= 0,
+        EscrowError::InvalidDisputeTimeout
     );
     Ok(())
 }
