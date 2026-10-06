@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Square Solana API
-  version: 0.19.0
+  version: 0.19.1
   summary: Square HTTP API sözleşmesi (BE-35), uygulaması apps/api (BE-18).
   description: |
     Contract-first API sözleşmesi. Zincirdeki hesaplar, event'ler ve instruction argümanları
@@ -1445,6 +1445,21 @@ components:
           type: array
           maxItems: 50
           items: { $ref: '#/components/schemas/AgentPricing' }
+        supportedInterfaces:
+          type: array
+          description: "A2A v1.0 istemcilerinin uç noktayı okuduğu alan; verilirse url'i kartın url'i ile aynı bir girdi içerir."
+          minItems: 1
+          maxItems: 8
+          items: { $ref: '#/components/schemas/AgentInterface' }
+    AgentInterface:
+      type: object
+      description: 'A2A v1.0 AgentInterface. Square yalnızca JSON-RPC bağlamasını sunar.'
+      required: [url, protocolBinding, protocolVersion]
+      additionalProperties: false
+      properties:
+        url: { type: string, format: uri, pattern: '^https://' }
+        protocolBinding: { type: string, const: JSONRPC }
+        protocolVersion: { type: string, pattern: '^\d{1,4}\.\d{1,4}$' }
     AgentService:
       type: object
       description: 'Kartın servis girdisi; DID belgesinde {did}#{name-slug} olur. endpoint bir URL ya da DID.'

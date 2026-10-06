@@ -1,47 +1,72 @@
 {
   "name": "@squaresdk/solana-agent-sdk",
   "version": "0.2.1",
+  "description": "Square agent yazma kiti: agent card ve well-known yolu, A2A uç noktası, job kabulü ve teslimi (teslimat yükleme + submit_work), isteğe bağlı alacak listeleme, register_agent yardımcısı; BE-19",
+  "license": "Apache-2.0",
   "private": true,
-  "description": "Build AIP-compatible AI agents in minutes. Create agents that earn USDC on Solana.",
-  "license": "MIT",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./anthropic": {
+      "types": "./dist/anthropic.d.ts",
+      "import": "./dist/anthropic.js"
+    }
+  },
   "files": [
     "dist",
-    "README.md"
+    "README.md",
+    "LICENSE",
+    "LICENSE-MIT",
+    "NOTICE"
   ],
   "scripts": {
-    "build": "tsc",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run --coverage",
+    "test:localnet": "SQUARE_LOCALNET=1 vitest run test/localnet.e2e.test.ts",
+    "example:text-stats": "tsc -p tsconfig.examples.json && node examples/dist/examples/text-stats-agent.js"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.39.0",
-    "express": "^4.21.2"
+    "@solana/web3.js": "^1.99.0",
+    "@squaresdk/solana-a2a": "workspace:*",
+    "@squaresdk/solana-identity": "workspace:*",
+    "@squaresdk/solana-sdk": "workspace:*",
+    "@squaresdk/solana-types": "workspace:*"
   },
-  "devDependencies": {
-    "@types/express": "^5.0.0",
-    "@types/node": "^24.0.0"
-  },
-  "keywords": [
-    "aip",
-    "agent",
-    "ai-agent",
-    "solana",
-    "usdc",
-    "a2a",
-    "json-rpc",
-    "claude",
-    "haiku",
-    "sdk",
-    "agent-internet-protocol",
-    "marketplace"
-  ],
   "peerDependencies": {
-    "@solana/web3.js": "^1.98.0"
+    "@anthropic-ai/sdk": "^0.131.0"
   },
   "peerDependenciesMeta": {
-    "@solana/web3.js": {
+    "@anthropic-ai/sdk": {
       "optional": true
     }
+  },
+  "devDependencies": {
+    "@a2a-js/sdk": "1.3.0",
+    "@anchor-lang/core": "1.2.0",
+    "@anthropic-ai/sdk": "^0.131.0",
+    "@noble/curves": "2.4.0",
+    "@solana/spl-token": "^0.4.15",
+    "@squaresdk/solana-config": "workspace:*",
+    "@squaresdk/solana-db": "workspace:*",
+    "@testcontainers/postgresql": "^12.2.0",
+    "@types/node": "^24.0.0",
+    "@vitest/coverage-v8": "^5.0.3",
+    "vitest": "^5.0.3"
+  },
+  "keywords": [
+    "square",
+    "solana",
+    "agent",
+    "a2a",
+    "did:aip",
+    "escrow",
+    "sdk"
+  ],
+  "engines": {
+    "node": ">=24"
   }
 }
