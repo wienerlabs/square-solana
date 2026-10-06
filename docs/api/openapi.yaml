@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Square Solana API
-  version: 0.18.0
+  version: 0.18.1
   summary: Square HTTP API sözleşmesi (BE-35), uygulaması apps/api (BE-18).
   description: |
     Contract-first API sözleşmesi. Zincirdeki hesaplar, event'ler ve instruction argümanları
@@ -167,6 +167,7 @@ paths:
       parameters:
         - name: id
           in: path
+          description: 'API anahtarının kimliği (`listApiKeys`).'
           required: true
           schema: { type: string, minLength: 1 }
       responses:
@@ -184,15 +185,19 @@ paths:
       parameters:
         - name: status
           in: query
+          description: 'Job durumu.'
           schema: { $ref: './schemas/idl.json#/JobStatus' }
         - name: institution
           in: query
+          description: "Job'u açan kurum anahtarı (`institution`; Squads vault'u da olabilir)."
           schema: { $ref: './schemas/idl.json#/Address' }
         - name: agentRecord
           in: query
+          description: "Job'un bağlı olduğu agent kaydı."
           schema: { $ref: './schemas/idl.json#/Address' }
         - name: policy
           in: query
+          description: "Job'un bağlı olduğu politika."
           schema: { $ref: './schemas/idl.json#/Address' }
         - $ref: '#/components/parameters/Page'
         - $ref: '#/components/parameters/Limit'
@@ -276,6 +281,7 @@ paths:
       parameters:
         - name: institution
           in: path
+          description: 'Kurum hesabının (`Institution` PDA) adresi.'
           required: true
           schema: { $ref: './schemas/idl.json#/Address' }
       responses:
@@ -299,9 +305,11 @@ paths:
       parameters:
         - name: institution
           in: query
+          description: 'Politikanın kurum hesabı.'
           schema: { $ref: './schemas/idl.json#/Address' }
         - name: active
           in: query
+          description: 'Yalnızca etkin (`true`) ya da devre dışı (`false`) politikalar.'
           schema: { type: boolean }
         - $ref: '#/components/parameters/Page'
         - $ref: '#/components/parameters/Limit'
@@ -379,9 +387,11 @@ paths:
       parameters:
         - name: owner
           in: query
+          description: 'Agent kaydının sahibi.'
           schema: { $ref: './schemas/idl.json#/Address' }
         - name: status
           in: query
+          description: 'Agent kaydının durumu.'
           schema: { $ref: './schemas/idl.json#/AgentStatus' }
         - name: skill
           in: query
@@ -488,12 +498,15 @@ paths:
       parameters:
         - name: status
           in: query
+          description: 'Alacak listelemesinin durumu.'
           schema: { $ref: './schemas/idl.json#/ClaimStatus' }
         - name: seller
           in: query
+          description: 'Alacağı satan agent cüzdanı.'
           schema: { $ref: './schemas/idl.json#/Address' }
         - name: buyer
           in: query
+          description: 'Alacağı alan cüzdan.'
           schema: { $ref: './schemas/idl.json#/Address' }
         - $ref: '#/components/parameters/Page'
         - $ref: '#/components/parameters/Limit'
@@ -540,6 +553,7 @@ paths:
       parameters:
         - name: jobStatus
           in: query
+          description: "Dispute'lu job'un durumu (`disputed`, `resolved` …)."
           schema: { $ref: './schemas/idl.json#/JobStatus' }
         - $ref: '#/components/parameters/Page'
         - $ref: '#/components/parameters/Limit'
@@ -586,6 +600,7 @@ paths:
       parameters:
         - name: wallet
           in: path
+          description: 'Screening kaydının cüzdanı.'
           required: true
           schema: { $ref: './schemas/idl.json#/Address' }
       responses:
@@ -609,9 +624,11 @@ paths:
       parameters:
         - name: job
           in: query
+          description: "Event'in ilgili olduğu job."
           schema: { $ref: './schemas/idl.json#/Address' }
         - name: program
           in: query
+          description: "Event'i yayan Square programı."
           schema:
             type: string
             enum: [registry, policy, verifier, escrow]
@@ -621,6 +638,7 @@ paths:
           schema: { type: string, minLength: 1, maxLength: 64 }
         - name: fromSlot
           in: query
+          description: "Bu slot'tan (dahil) sonraki event'ler."
           schema: { type: integer, minimum: 0 }
         - $ref: '#/components/parameters/Page'
         - $ref: '#/components/parameters/Limit'
@@ -647,9 +665,11 @@ paths:
       parameters:
         - name: job
           in: query
+          description: "Kararın job'u."
           schema: { $ref: './schemas/idl.json#/Address' }
         - name: outcome
           in: query
+          description: 'Kararın sonucu.'
           schema: { $ref: '#/components/schemas/KeeperOutcome' }
         - $ref: '#/components/parameters/Page'
         - $ref: '#/components/parameters/Limit'
@@ -773,6 +793,7 @@ paths:
         - $ref: '#/components/parameters/JobPath'
         - name: grantee
           in: path
+          description: 'İzni geri alınan cüzdan.'
           required: true
           schema: { $ref: './schemas/idl.json#/Address' }
       responses:
@@ -865,12 +886,15 @@ paths:
       parameters:
         - name: job
           in: query
+          description: 'Transferin fonlayacağı job.'
           schema: { $ref: './schemas/idl.json#/Address' }
         - name: institution
           in: query
+          description: 'Transferi kaydeden kurum anahtarı.'
           schema: { $ref: './schemas/idl.json#/Address' }
         - name: status
           in: query
+          description: 'Transferin durumu.'
           schema: { $ref: '#/components/schemas/CctpTransferStatus' }
         - $ref: '#/components/parameters/Page'
         - $ref: '#/components/parameters/Limit'
@@ -1060,10 +1084,12 @@ components:
     Page:
       name: page
       in: query
+      description: "Sayfa numarası (1'den)."
       schema: { type: integer, minimum: 1, default: 1 }
     Limit:
       name: limit
       in: query
+      description: 'Sayfa başına kayıt (1–200).'
       schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
     JobPath:
       name: job

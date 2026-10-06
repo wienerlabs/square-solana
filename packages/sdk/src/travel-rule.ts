@@ -9,6 +9,7 @@ import { canonicalJson } from './canonical.js';
 /** Commitment'ın alan ayırıcısı (sürümlü). */
 export const TRAVEL_RULE_DOMAIN = 'square/travel-rule/v1';
 
+/** Travel Rule kaydının özeti ve zincire giden commitment'ı (ADR 0015). */
 export interface TravelRuleHashing {
   /** Kaydın özeti: SHA-256(RFC 8785 kanonik JSON), 32 bayt. */
   recordDigest(record: unknown): Uint8Array;
@@ -22,6 +23,7 @@ const encoder = new TextEncoder();
 
 const recordDigest = (record: unknown): Uint8Array => sha256(encoder.encode(canonicalJson(record, 'record')));
 
+/** `TravelRuleHashing`'in uygulaması. */
 export const travelRule: TravelRuleHashing = {
   recordDigest,
   commitment({ job, salt, record }) {

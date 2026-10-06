@@ -2,6 +2,7 @@
 import { sha256 } from '@noble/hashes/sha2';
 import { canonicalJson } from './canonical.js';
 
+/** Job spec'inin kanonik biçimi ve hash'i. */
 export interface SpecHashing {
   /** RFC 8785 kanonik JSON. */
   canonicalizeSpec(spec: unknown): string;
@@ -9,6 +10,7 @@ export interface SpecHashing {
   specHash(spec: unknown): Uint8Array;
 }
 
+/** `SpecHashing`'in uygulaması. */
 export const specHashing: SpecHashing = {
   canonicalizeSpec: (spec) => canonicalJson(spec, 'spec'),
   specHash: (spec) => sha256(new TextEncoder().encode(canonicalJson(spec, 'spec'))),

@@ -17,40 +17,55 @@ export const CCTP_SOLANA_DOMAIN = 5;
  * `receive_message`'ın compute unit payı (BC-28'in yöntemi: ölçümlerin en yükseğinin iki katı, 10 bine yukarı).
  * Ölçüm: devnet'te Circle'ın MessageTransmitterV2'sine giden, yalnızca `receive_message` içeren 18 işlem
  * (2026-10-06); 178 061 – 194 880 CU. Square'in LiteSVM ölçümleri Circle'ın programını içermediği için
- * `tx-profile.json`'da değil, burada ([tx-budget.md](../../docs/design/tx-budget.md) §CCTP).
+ * `tx-profile.json`'da değil, burada ([tx-budget.md](../../../docs/design/tx-budget.md) §CCTP).
  */
 export const CCTP_RECEIVE_COMPUTE_UNITS = 390_000;
 
 /** Circle'ın Solana'daki CCTP V2 programları (ağın yapılandırmasından). */
 export interface CctpPrograms {
+  /** `MessageTransmitterV2`: mesajı doğrular, nonce'u işaretler. */
   readonly messageTransmitter: PublicKey;
+  /** `TokenMessengerMinterV2`: USDC'yi mint eder. */
   readonly tokenMessengerMinter: PublicKey;
 }
 
 /** Attestation'ı alınmış CCTP V2 mesajı. Sayılar büyük uçludur; 32 baytlık alanlar ham baytlardır. */
 export interface CctpMessage {
+  /** `MessageV2` sürümü. */
   readonly version: number;
+  /** Kaynak zincirin Circle domain'i. */
   readonly sourceDomain: number;
+  /** Hedef domain (Solana 5). */
   readonly destinationDomain: number;
   /** Circle'ın atadığı nonce; `used_nonce` PDA'sının tohumu. Yakma event'indeki kopyada sıfırdır. */
   readonly nonce: Uint8Array;
+  /** Kaynak zincirdeki gönderen (TokenMessenger), 32 bayt. */
   readonly sender: Uint8Array;
+  /** Hedefteki alıcı program (TokenMessengerMinter), 32 bayt. */
   readonly recipient: Uint8Array;
   /** Sıfır: herkes teslim edebilir. */
   readonly destinationCaller: Uint8Array;
+  /** Burn'ün istediği kesinlik (1000 hızlı, 2000 standart). */
   readonly minFinalityThreshold: number;
+  /** Attestation'ın verildiği kesinlik. */
   readonly finalityThresholdExecuted: number;
+  /** `BurnMessageV2` gövdesi. */
   readonly burn: {
+    /** `BurnMessageV2` sürümü. */
     readonly version: number;
     /** Kaynak zincirdeki USDC sözleşmesi, 32 bayta sola sıfırla doldurulmuş. */
     readonly burnToken: Uint8Array;
     /** Mint edilecek Solana token hesabı. */
     readonly mintRecipient: PublicKey;
+    /** Yakılan tutar (taban birim). */
     readonly amount: bigint;
+    /** Burn'ü gönderen kaynak cüzdan, 32 bayt. */
     readonly messageSender: Uint8Array;
+    /** Attester'ın alabileceği en fazla ücret. */
     readonly maxFee: bigint;
     /** Attester'ın aldığı ücret; mint edilen `amount − feeExecuted`'dir. */
     readonly feeExecuted: bigint;
+    /** Attestation'ın geçerliliğinin bittiği blok (attester yazar). */
     readonly expirationBlock: bigint;
   };
 }
@@ -107,14 +122,17 @@ const pda = (program: PublicKey, ...seeds: (string | Uint8Array | PublicKey)[]) 
 
 /** Mesajı teslim eden tx'in sabit hesapları (kaynak domain'e ve mint'e göre); ALT'a konabilir. */
 export interface CctpReceiveContext {
+  /** Circle'ın programları. */
   readonly programs: CctpPrograms;
   /** Solana'daki USDC (escrow'un settlement mint'i). */
   readonly usdcMint: PublicKey;
+  /** Mesajın kaynak domain'i. */
   readonly sourceDomain: number;
   /** Kaynak zincirdeki USDC, 32 bayt. */
   readonly burnToken: Uint8Array;
   /** `TokenMessenger.fee_recipient` (`fetchCctpFeeRecipient`). */
   readonly feeRecipient: PublicKey;
+  /** USDC mint'inin token programı. */
   readonly tokenProgram: PublicKey;
 }
 
@@ -177,6 +195,7 @@ export function cctpLookupTableAddresses(context: CctpReceiveContext): PublicKey
 /** `TokenMessenger` hesabındaki ücret alıcısı (discriminator 8, üç pubkey, u32, u8'den sonra). */
 const FEE_RECIPIENT_OFFSET = 8 + 32 * 3 + 4 + 1;
 
+/** Circle'ın `TokenMessenger` hesabından ücret alıcısını okur. */
 export async function fetchCctpFeeRecipient(connection: Connection, programs: CctpPrograms): Promise<PublicKey> {
   const address = pda(programs.tokenMessengerMinter, 'token_messenger');
   const info = await connection.getAccountInfo(address, 'confirmed');

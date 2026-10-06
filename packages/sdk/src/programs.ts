@@ -13,11 +13,16 @@ export type { SquareEscrowContract, SquarePolicyContract, SquareRegistryContract
 
 /** Program adı → Anchor IDL tipi (camelCase). */
 export interface SquareIdls {
+  /** square_registry: agent kayıtları (did:aip) ve screening. */
   registry: SquareRegistryContract;
+  /** square_policy: kurumlar ve harcama politikaları. */
   policy: SquarePolicyContract;
+  /** square_verifier: Groth16 release ispatları ve günlük sayaç. */
   verifier: SquareVerifierContract;
+  /** square_escrow: job'lar, kasa, alacak piyasası, dispute. */
   escrow: SquareEscrowContract;
 }
+/** Program adı: `registry`, `policy`, `verifier`, `escrow`. */
 export type SquareProgramName = keyof SquareIdls;
 
 /** BC-44 IDL'leri (JSON). `Program` oluştururken `address` yapılandırmadaki program kimliğiyle değiştirilir. */
@@ -28,4 +33,5 @@ export const SQUARE_IDLS = {
   escrow: escrowIdl as unknown as SquareEscrowContract,
 } as const satisfies SquareIdls;
 
+/** Programların bir ağdaki adresleri (yapılandırmadan; BC-09). */
 export type SquareProgramIds = Readonly<Record<SquareProgramName, PublicKey>>;

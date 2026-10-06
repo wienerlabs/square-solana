@@ -6,26 +6,39 @@ import { idlBytesConstant } from './idl-constants.js';
 import { SQUARE_IDLS, type SquareProgramIds, type SquareProgramName } from './programs.js';
 import type { Pda } from './types.js';
 
+/** Dört programın PDA'ları; seed'ler program arayüzünün tablosundadır (program-interface §5). */
 export interface SquarePda {
-  // square_registry
+  /** square_registry tekil config'i. */
   registryConfig(): Pda;
+  /** Agent kaydı: oluşturan ve `agent_id` (1–32 bayt). */
   agentRecord(creator: PublicKey, agentId: string): Pda;
+  /** Cüzdanın screening kaydı. */
   screeningRecord(wallet: PublicKey): Pda;
-  // square_policy
+  /** Kurum hesabı (sahip anahtarından). */
   institution(ownerKey: PublicKey): Pda;
+  /** Kurumun politikası (`policy_id`, 32 bayt). */
   policy(institution: PublicKey, policyId: Uint8Array): Pda;
-  // square_verifier
+  /** square_verifier tekil config'i. */
   verifierConfig(): Pda;
+  /** Kurumun günlük sayacı (`OperatorState`). */
   operatorState(institution: PublicKey): Pda;
+  /** Job'a bağlanan release ispatı. */
   releaseProof(job: PublicKey): Pda;
-  // square_escrow
+  /** square_escrow tekil config'i. */
   escrowConfig(): Pda;
+  /** Job: kurum ve spec hash'i (32 bayt). */
   job(institution: PublicKey, specHash: Uint8Array): Pda;
+  /** Job'un kasası (token hesabı). */
   vault(job: PublicKey): Pda;
+  /** Dispute bond'unun kasası. */
   bondVault(job: PublicKey): Pda;
+  /** Job'un alacak listelemesi. */
   claimListing(job: PublicKey): Pda;
+  /** Agent kaydının itibarı. */
   agentReputation(agentRecord: PublicKey): Pda;
+  /** Job'un settlement doğrulama kaydı. */
   validationRecord(job: PublicKey): Pda;
+  /** Escrow'un kasaları imzalayan yetki PDA'sı. */
   escrowAuthority(): Pda;
 }
 
@@ -40,6 +53,7 @@ function bytes32(value: Uint8Array, label: string): Uint8Array {
   return value;
 }
 
+/** Program kimliklerinden PDA türetici; seed'ler IDL sabitlerinden okunur. */
 export const createPda: CreatePda = (programIds) => {
   const seed = (program: SquareProgramName, name: string) => idlBytesConstant(SQUARE_IDLS[program] as Idl, name);
   const SEEDS = {

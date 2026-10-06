@@ -12,3 +12,10 @@ rules:
   operation-4xx-response: error
   operation-operationId: error
   tag-description: error
+  # API referansının bütünlüğü (BE-31): her operasyonun özeti, başarılı yanıtı ve tanımlı etiketi, her
+  # parametrenin açıklaması; kullanılmayan bileşen yok.
+  operation-summary: error
+  operation-2xx-response: error
+  operation-tag-defined: error
+  parameter-description: error
+  no-unused-components: error

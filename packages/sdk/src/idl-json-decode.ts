@@ -26,6 +26,7 @@ const lowerFirst = (name: string) => name.charAt(0).toLowerCase() + name.slice(1
 /** Geçersiz argüman: `path` alanın yolu (ör. `args.params.keeperFeeBps`). */
 export class IdlJsonError extends Error {
   constructor(
+    /** Geçersiz alanın yolu. */
     readonly path: string,
     message: string,
   ) {
