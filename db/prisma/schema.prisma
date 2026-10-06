@@ -760,3 +760,45 @@ model A2aMessage {
   @@index([taskId, id])
   @@map("a2a_messages")
 }
+
+// ---------------------------------------------------------------- fee payer (BE-27)
+
+enum SponsoredTxStatus {
+  /// İmzalandı ve kullanıcıya döndü (kullanıcı gönderir).
+  signed
+  /// Servis RPC'ye gönderdi.
+  submitted
+  /// Gönderim RPC'de reddedildi; bütçeye sayılmaz.
+  failed
+}
+
+/// Sponsorlanan tx'in maliyet günlüğü (apps/fee-payer, ADR 0019). Kullanıcının ve servisin günlük bütçesi bu
+/// tablodan denetlenir: UTC günü içinde, başarısız gönderimler hariç `fee_lamports + rent_lamports` toplamı.
+/// Maliyet imzadan önceki simülasyondandır: ücret `getFeeForMessage`, rent sponsor bakiyesindeki farktan ücret düşülerek.
+model SponsoredTx {
+  id               String            @id @default(uuid()) @db.Uuid
+  /// Tx'in ilk imzası (sponsorun imzası); tx kimliğidir.
+  signature        String            @unique @db.VarChar(88)
+  /// İstek sahibinin cüzdanı (oturum ya da API anahtarının sahibi); bütçe bu anahtarla sayılır.
+  wallet           String            @db.VarChar(44)
+  /// API anahtarıyla gelen istekte anahtarın kimliği.
+  apiKeyId         String?           @map("api_key_id") @db.Uuid
+  status           SponsoredTxStatus
+  feeLamports      Decimal           @map("fee_lamports") @db.Decimal(20, 0)
+  rentLamports     Decimal           @map("rent_lamports") @db.Decimal(20, 0)
+  /// Simülasyonda tüketilen compute unit.
+  computeUnits     Int?              @map("compute_units")
+  computeUnitLimit Int               @map("compute_unit_limit")
+  /// Mikro-lamport / CU.
+  computeUnitPrice Decimal           @map("compute_unit_price") @db.Decimal(20, 0)
+  /// Denetlenen talimatlar (`<program>:<talimat>`; vault tx'inin içindekiler `vault>` önekiyle).
+  instructions     String[]
+  /// Başarısız gönderimin RPC hatası.
+  error            String?           @db.Text
+  createdAt        DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime          @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@index([wallet, createdAt])
+  @@index([createdAt])
+  @@map("sponsored_txs")
+}
