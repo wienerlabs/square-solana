@@ -18,9 +18,13 @@ import unattestedPaymentsRouter from './routes/unattested-payments.js';
 import { startSolanaWatcher, stopSolanaWatcher } from './watchers/solana-watcher.js';
 import { startStripeReconciler, stopStripeReconciler } from './watchers/stripe-watcher.js';
 import { swaggerSpec } from './swagger.js';
+import { httpMetricsMiddleware } from '@squaresdk/solana-observability';
+import { alarms, createMetricsApp, metrics, routeLabel } from './observability.js';
 
 const app = express();
 
+app.disable('x-powered-by');
+app.use(httpMetricsMiddleware(metrics, routeLabel));
 app.use(helmet());
 app.use(
   cors({
@@ -42,7 +46,7 @@ app.get('/api-docs.json', (_req, res) => {
   res.json(swaggerSpec);
 });
 
-app.use('/health', healthRouter);
+app.use(healthRouter);
 app.use('/api/v1/proofs', proofRouter);
 app.use('/api/v1/attestations', attestationRouter);
 app.use('/api/v1/compliance', complianceReportRouter);
@@ -57,16 +61,22 @@ app.use(errorHandler);
 const server = app.listen(config.port, () => {
   logger.info(`Compliance API running on port ${config.port}`, {
     port: config.port,
+    metricsPort: config.metricsPort,
     env: config.nodeEnv,
+    alertWebhook: config.observability.webhook !== null,
   });
   startSolanaWatcher();
   startStripeReconciler();
 });
+const metricsServer = createMetricsApp().listen(config.metricsPort);
+const stopAlarms = alarms.start(config.observability.alertEvaluationSeconds * 1000);
 
 function gracefulShutdown(signal: string): void {
   logger.info(`Received ${signal}, shutting down gracefully`);
   stopSolanaWatcher();
   stopStripeReconciler();
+  stopAlarms();
+  metricsServer.close();
   server.close(() => {
     logger.info('Server closed');
     process.exit(0);

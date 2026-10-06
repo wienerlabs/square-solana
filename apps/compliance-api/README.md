@@ -13,7 +13,19 @@ REST API for managing proof records and batch attestations. Receives individual 
 | GET | `/api/v1/attestations/:id` | Get attestation by ID |
 | GET | `/api/v1/attestations/operator/:operatorId` | List attestations by operator |
 | GET | `/api/v1/attestations/:id/output` | Get attestation in standard output format |
-| GET | `/health` | Health check |
+| GET | `/health` | Liveness (`Health`, API contract) |
+| GET | `/ready` | Readiness: the database answers (`Health`; 503 when it does not) |
+| GET | `/metrics` | Prometheus metrics, served on the internal-only `COMPLIANCE_METRICS_PORT` |
+
+Logging, metrics, health and alerting come from
+[`@squaresdk/solana-observability`](../../packages/observability/) (BE-12). Log lines are JSON; secrets
+(Stripe keys, the database password, RPC keys, keypairs) are masked before they are written.
+
+- **Alarms:**
+  - `compliance_errors`: more error log lines than `COMPLIANCE_ALERT_ERRORS` within
+    `COMPLIANCE_ALERT_ERROR_WINDOW_SECONDS`.
+  - `compliance_database_down`: the database check fails for `COMPLIANCE_ALERT_DB_DOWN_SECONDS`.
+- **Notifications:** Alarms are logged, and sent to `ALERT_WEBHOOK_URL` when it is set.
 
 ## Setup
 
@@ -33,7 +45,9 @@ pnpm --filter @squaresdk/solana-compliance-api dev
 
 See `.env.example` for the full list. No variable has a built-in default:
 deployment-specific values (ports, URLs, program/wallet/mint addresses,
-prices) must be set explicitly. Optional variables (`STRIPE_WEBHOOK_SECRET`,
+prices) must be set explicitly. The shared observability variables (`LOG_LEVEL`, `HEALTH_CHECK_TIMEOUT_MS`,
+`ALERT_EVALUATION_SECONDS`, `ALERT_WEBHOOK_URL`, `ALERT_WEBHOOK_TIMEOUT_MS`) are described in the
+[package README](../../packages/observability/README.md). Optional variables (`STRIPE_WEBHOOK_SECRET`,
 `STRIPE_PUBLISHABLE_KEY`, `MPP_AUTHORITY_KEYPAIR_BASE58`, `HELIUS_API_KEY`,
 `COMPLIANCE_WATCHER_MINTS`) switch a feature on when present.
 

@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@solana/web3.js": "^1.98.4",
+    "@squaresdk/solana-observability": "workspace:*",
     "bs58": "^6.0.0",
     "circomlibjs": "^0.1.7",
     "cors": "^2.8.5",

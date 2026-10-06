@@ -1,50 +1,44 @@
 import { Router } from 'express';
+import { createHealth, sendHealth } from '@squaresdk/solana-observability';
+import { config } from '../config.js';
 import { healthCheck } from '../utils/database.js';
+import { logger } from '../utils/logger.js';
 import { packageInfo } from '../utils/package-info.js';
-import type { ApiResponse } from '../types/api.js';
+
+/** Liveness and readiness (`Health`, API contract): readiness checks the database. */
+export const health = createHealth({
+  version: packageInfo.version,
+  checks: { database: () => healthCheck() },
+  timeoutMs: config.observability.healthCheckTimeoutMs,
+  logger,
+});
 
 const router = Router();
-
-interface HealthStatus {
-  status: 'healthy' | 'degraded';
-  service: string;
-  version: string;
-  database: boolean;
-  uptime: number;
-  timestamp: string;
-}
 
 /**
  * @swagger
  * /health:
  *   get:
- *     summary: Health check
+ *     summary: Liveness (the process is up; dependencies are not checked)
  *     tags: [Health]
  *     responses:
  *       200:
- *         description: Service is healthy
- *       503:
- *         description: Service is degraded
+ *         description: The process is up
  */
-router.get('/', async (_req, res) => {
-  const dbHealthy = await healthCheck();
+router.get('/health', (_req, res) => sendHealth(res, health.live()));
 
-  const status: HealthStatus = {
-    status: dbHealthy ? 'healthy' : 'degraded',
-    service: packageInfo.name,
-    version: packageInfo.version,
-    database: dbHealthy,
-    uptime: process.uptime(),
-    timestamp: new Date().toISOString(),
-  };
-
-  const response: ApiResponse<HealthStatus> = {
-    success: dbHealthy,
-    data: status,
-    error: dbHealthy ? null : 'Database connection failed',
-  };
-
-  res.status(dbHealthy ? 200 : 503).json(response);
-});
+/**
+ * @swagger
+ * /ready:
+ *   get:
+ *     summary: Readiness (the database answers)
+ *     tags: [Health]
+ *     responses:
+ *       200:
+ *         description: Ready
+ *       503:
+ *         description: A dependency check failed; the reason is in the log
+ */
+router.get('/ready', async (_req, res) => sendHealth(res, await health.ready()));
 
 export default router;

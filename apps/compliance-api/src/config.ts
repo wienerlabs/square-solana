@@ -1,5 +1,6 @@
 import dotenv from 'dotenv';
 import path from 'node:path';
+import { parseObservabilityEnv } from '@squaresdk/solana-observability';
 import { z } from 'zod';
 
 dotenv.config({ path: path.resolve(process.cwd(), '.env') });
@@ -7,7 +8,8 @@ dotenv.config({ path: path.resolve(process.cwd(), '.env') });
 /// Every deployment-dependent value comes from the environment and is
 /// validated at boot; nothing falls back to a built-in URL, network, address,
 /// port or price. Variables marked optional switch a feature on when present
-/// (the corresponding route answers 503 while it is off).
+/// (the corresponding route answers 503 while it is off). Log level, readiness timeout and alerting are
+/// shared with the other services (`@squaresdk/solana-observability`, BE-12).
 
 const nonEmpty = z.string().trim().min(1);
 const intFromEnv = (min: number, max = Number.MAX_SAFE_INTEGER) =>
@@ -35,8 +37,9 @@ const commaList = (item: z.ZodString) =>
 const EnvSchema = z
   .object({
     COMPLIANCE_API_PORT: intFromEnv(1, 65535),
+    /// Internal-only port that serves `GET /metrics` (Prometheus).
+    COMPLIANCE_METRICS_PORT: intFromEnv(1, 65535),
     NODE_ENV: z.enum(['development', 'test', 'production']),
-    LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']),
     CORS_ORIGINS: commaList(z.string().url()).refine((list) => list.length > 0, 'at least one origin'),
 
     POSTGRES_HOST: nonEmpty,
@@ -79,8 +82,22 @@ const EnvSchema = z
     /// Mint allow list; unset watches every SPL transfer Helius returns.
     COMPLIANCE_WATCHER_MINTS: commaList(base58Pubkey).optional(),
     COMPLIANCE_STRIPE_RECONCILE_DELAY_MS: intFromEnv(0),
+
+    /// `compliance_errors` alarm: more error log lines than this ...
+    COMPLIANCE_ALERT_ERRORS: intFromEnv(0),
+    /// ... within this many seconds.
+    COMPLIANCE_ALERT_ERROR_WINDOW_SECONDS: intFromEnv(1),
+    /// `compliance_database_down` alarm: the database check fails for this many seconds.
+    COMPLIANCE_ALERT_DB_DOWN_SECONDS: intFromEnv(0),
   })
   .superRefine((env, ctx) => {
+    if (env.COMPLIANCE_METRICS_PORT === env.COMPLIANCE_API_PORT) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['COMPLIANCE_METRICS_PORT'],
+        message: 'must differ from COMPLIANCE_API_PORT',
+      });
+    }
     if (env.HELIUS_API_KEY && !env.HELIUS_API_URL) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
@@ -90,21 +107,26 @@ const EnvSchema = z
     }
   });
 
-function loadEnv(): z.infer<typeof EnvSchema> {
+function loadEnv() {
   const parsed = EnvSchema.safeParse(process.env);
-  if (!parsed.success) {
-    const problems = parsed.error.issues.map((issue) => `  ${issue.path.join('.')}: ${issue.message}`).join('\n');
-    throw new Error(`Invalid compliance-api environment:\n${problems}`);
+  const observability = parseObservabilityEnv(process.env);
+  const problems = [
+    ...(parsed.success ? [] : parsed.error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`)),
+    ...(observability.ok ? [] : observability.problems),
+  ];
+  if (!parsed.success || !observability.ok) {
+    throw new Error(`Invalid compliance-api environment:\n${problems.map((problem) => `  ${problem}`).join('\n')}`);
   }
-  return parsed.data;
+  return { env: parsed.data, observability: observability.config };
 }
 
-const env = loadEnv();
+const { env, observability } = loadEnv();
 
 export const config = {
   port: env.COMPLIANCE_API_PORT,
+  metricsPort: env.COMPLIANCE_METRICS_PORT,
   nodeEnv: env.NODE_ENV,
-  logLevel: env.LOG_LEVEL,
+  observability,
   corsOrigins: env.CORS_ORIGINS,
   database: {
     host: env.POSTGRES_HOST,
@@ -146,5 +168,10 @@ export const config = {
     intervalMs: env.COMPLIANCE_WATCHER_INTERVAL_MS,
     mintAllowList: env.COMPLIANCE_WATCHER_MINTS ?? [],
     stripeReconcileDelayMs: env.COMPLIANCE_STRIPE_RECONCILE_DELAY_MS,
+  },
+  alerts: {
+    errors: env.COMPLIANCE_ALERT_ERRORS,
+    errorWindowSeconds: env.COMPLIANCE_ALERT_ERROR_WINDOW_SECONDS,
+    databaseDownSeconds: env.COMPLIANCE_ALERT_DB_DOWN_SECONDS,
   },
 } as const;

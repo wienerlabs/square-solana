@@ -20,9 +20,23 @@ yazmaz; log'da yalnızca istek kimliği, sonuç, süre ve ret kodu (public sinya
 |---|---|---|
 | POST | `/v1/prove` | `x-api-key` ister. Gövde `ProveRequest`, yanıt `ProveResponse` zarfı (`@squaresdk/solana-types`); API sözleşmesindeki `POST /v1/prove` ile aynı |
 | GET | `/health` | Süreç sağlığı (`Health`, zarfsız) |
-| GET | `/ready` | Kapasite varsa 200, kuyruk doluysa 503 (`Health`, zarfsız) |
+| GET | `/ready` | Kapasite varsa 200, kuyruk doluysa 503 (`Health`, zarfsız; `checks.capacity`) |
 | GET | `/openapi.json` | Servisin OpenAPI 3.1 belgesi (şemalar zod'dan üretilir) |
 | GET | `/metrics` | Prometheus metrikleri; **ayrı portta** (`PROVER_METRICS_PORT`), yalnızca iç ağdan erişilmeli |
+
+Log, metrik, health ve alarm katmanı [`@squaresdk/solana-observability`](../../packages/observability/)'dir
+(BE-12): log satırları JSON'dur ve gizli alanlar maskelenir.
+
+- **Metrikler:** ortak `square_build_info{version, artifact_version}`, `http_requests_total`,
+  `http_request_duration_seconds`; prover'a özgü `prover_proofs_total{result}`, `prover_proving_seconds`,
+  `prover_active_proofs`, `prover_queued_requests`; alarmların durumu `square_alarm_firing{alarm}`.
+- **Alarmlar:**
+  - `prover_queue_backlog` (uyarı): sıradaki istek `PROVER_ALERT_QUEUE_DEPTH`'in üstünde
+    `PROVER_ALERT_QUEUE_SECONDS` boyunca kalırsa.
+  - `prover_failures` (kritik): iç hatayla biten ispat sayısı son `PROVER_ALERT_FAILURE_WINDOW_SECONDS`
+    saniyede `PROVER_ALERT_FAILURES`'ın üstüne çıkarsa.
+
+  Bildirim log'a, `ALERT_WEBHOOK_URL` verilmişse oraya da gider.
 
 `/v1/prove` hata kodları:
 
@@ -51,7 +65,7 @@ doğrulanır. zkey tek katılımcılı bir geliştirme setup'ıdır; mainnet ön
 
 ## Yapılandırma
 
-Tüm değişkenler zorunludur; eksik ya da geçersiz değerde servis açılmaz.
+`ALERT_WEBHOOK_URL` dışındaki değişkenler zorunludur; eksik ya da geçersiz değerde servis açılmaz.
 
 | Değişken | Açıklama |
 |---|---|
@@ -65,6 +79,12 @@ Tüm değişkenler zorunludur; eksik ya da geçersiz değerde servis açılmaz.
 | `PROVER_MANIFEST_PATH` | `manifest.json` yolu |
 | `PROVER_WASM_PATH` | `payment.wasm` yolu |
 | `PROVER_ZKEY_PATH` | `payment.zkey` yolu |
+| `PROVER_ALERT_QUEUE_DEPTH`, `PROVER_ALERT_QUEUE_SECONDS` | `prover_queue_backlog` alarmının eşiği ve süresi |
+| `PROVER_ALERT_FAILURES`, `PROVER_ALERT_FAILURE_WINDOW_SECONDS` | `prover_failures` alarmının eşiği ve penceresi |
+| `LOG_LEVEL` | `debug`, `info`, `warn` ya da `error` |
+| `HEALTH_CHECK_TIMEOUT_MS` | Tek bir hazırlık denetiminin süre sınırı |
+| `ALERT_EVALUATION_SECONDS` | Alarm kurallarının değerlendirilme aralığı |
+| `ALERT_WEBHOOK_URL`, `ALERT_WEBHOOK_TIMEOUT_MS` | İsteğe bağlı: alarm olaylarının gönderileceği JSON ucu (Slack / Discord uyumlu `text` alanı) ve süre sınırı |
 
 Docker imajı artefakt yollarını kendisi verir; diğerleri dağıtımda tanımlanır. Anahtar özeti:
 `printf %s "$ANAHTAR" | shasum -a 256`.

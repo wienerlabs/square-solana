@@ -1,40 +1,18 @@
+// Servisin logger'ı (`@squaresdk/solana-observability`, BE-12): kayıtlar tek satır JSON; gizli alanlar ve
+// mesajdaki gizli biçimler (Stripe anahtarları, bağlantı adresindeki parola, RPC anahtarı …) maskelenir.
+// Hata kayıtları `compliance_errors` alarmının penceresine sayılır.
+import { createEventWindow, createLogger } from '@squaresdk/solana-observability';
 import { config } from '../config.js';
+import { packageInfo } from './package-info.js';
 
-type LogLevel = 'debug' | 'info' | 'warn' | 'error';
+export const errorWindow = createEventWindow({ windowSeconds: config.alerts.errorWindowSeconds });
 
-const LOG_LEVELS: Record<LogLevel, number> = {
-  debug: 0,
-  info: 1,
-  warn: 2,
-  error: 3,
-};
-
-const currentLevel = LOG_LEVELS[config.logLevel];
-
-function formatMessage(level: LogLevel, message: string, meta?: Record<string, unknown>): string {
-  const timestamp = new Date().toISOString();
-  return JSON.stringify({ timestamp, level, message, ...meta });
-}
-
-export const logger = {
-  debug(message: string, meta?: Record<string, unknown>): void {
-    if (currentLevel <= LOG_LEVELS.debug) {
-      process.stdout.write(`${formatMessage('debug', message, meta)}\n`);
-    }
-  },
-  info(message: string, meta?: Record<string, unknown>): void {
-    if (currentLevel <= LOG_LEVELS.info) {
-      process.stdout.write(`${formatMessage('info', message, meta)}\n`);
-    }
-  },
-  warn(message: string, meta?: Record<string, unknown>): void {
-    if (currentLevel <= LOG_LEVELS.warn) {
-      process.stderr.write(`${formatMessage('warn', message, meta)}\n`);
-    }
-  },
-  error(message: string, meta?: Record<string, unknown>): void {
-    if (currentLevel <= LOG_LEVELS.error) {
-      process.stderr.write(`${formatMessage('error', message, meta)}\n`);
-    }
-  },
-};
+export const logger = createLogger({
+  service: packageInfo.name,
+  level: config.observability.logLevel,
+  observers: [
+    (record) => {
+      if (record.level === 'error') errorWindow.record();
+    },
+  ],
+});
