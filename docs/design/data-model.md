@@ -68,10 +68,15 @@ Notlar:
 | `mpp_payments` | İmzası doğrulanmış Stripe webhook'undan gelen fiat ödemesi; makbuzun Poseidon commitment'ı ve MPP authority imzası | MPP rayı | BE-25 |
 | `cctp_transfers` | CCTP mesajı (kaynak domain + nonce), Circle attestation'ı, Solana'da receive ve fund imzaları | CCTP relayer | BE-26 |
 | `travel_rule_records` | Şifreli Travel Rule verisi; zincirdeki commitment ile bağlı | API | BE-23 |
+| `rate_limit_windows` | Hız sınırı sayacı: anahtar (ör. `api:<cüzdan>`), pencerenin başı, ağırlık toplamı | servisler (`@squaresdk/solana-hardening/prisma`) | BE-13 |
+| `idempotency_records` | `Idempotency-Key` kaydı: `(scope, key)` tekil, isteğin SHA-256'sı, durum (`in_progress` / `completed`), kaydedilen yanıtın durum kodu ve gövdesi | servisler | BE-13 |
+| `replay_guards` | Tek kullanımlık kimlikler: webhook teslimat kimliği, imzalı eylem nonce'u; `(scope, id)` tekil | servisler | BE-13 |
 | `a2a_tasks` | A2A görevi: agent, çağıran, bağlı job ve spec hash'i (görevin A2A bağlamı job adresidir), görev durumu, durum mesajı, artefaktlar, iyimser `version`. `job_status` ve `job_slot` sunucunun zincirde son gördüğü değerlerdir, ayna veri değildir. `(agent_record, caller, create_message_id)` tekil; kısmi tekil indeks job başına tek terminal olmayan görev | agent'ın A2A sunucusu ([a2a.md](a2a.md) §7) | BE-17 |
 | `a2a_messages` | Görev geçmişi: istemci ve agent mesajları, ekleme sırasıyla; `pending` istemcinin devam mesajı agent'a iletilip işlenene kadar true. `(task_id, message_id)` tekil, görev silinince silinir | agent'ın A2A sunucusu | BE-17 |
 
 A2A tablolarındaki mesaj ve artefakt içerikleri JSONB olarak düz metindir. Travel Rule ya da kişisel veri bu tablolara yazılmamalıdır; bunu agent kodu sağlar, depo zorlamaz. Saklama ve silme kuralı henüz yoktur ([a2a.md](a2a.md) §10).
+
+Koruma tablolarının (`rate_limit_windows`, `idempotency_records`, `replay_guards`) her satırı `expires_at` taşır; süresi dolan satırı depo yeniden kullanır, `purgeExpired` siler. Kayıtlı yanıt gövdesi API yanıtıdır; gizli veri taşıyan bir uç idempotency'yi kullanmamalı ya da gövdeyi kaydetmemelidir.
 
 Agent card kayıttan önce yüklenebilir: 8 adımın 2.sinde önce `putAgentCard`, sonra `registerAgent` gelir. Bu yüzden zincir dışı tablolardan ayna tablolara yabancı anahtar yoktur.
 

@@ -16,7 +16,7 @@ kopyaları `pnpm license:write` yazar, `pnpm license:check` denetler.
 | [`identity/`](identity/) | `@squaresdk/solana-identity` | `did:aip` resolver (v2 Solana + v1), agent card | [BE-09] |
 | [`policy/`](policy/) | `@squaresdk/solana-policy` | kurum tarafı: politika, commitment, alıcı listesi, ispat | [BE-10] |
 | [`observability/`](observability/) | `@squaresdk/solana-observability` | gizli veriyi maskeleyen logger, Prometheus metrikleri, `/health` ve `/ready`, eşik alarmları | [BE-12] |
-| `hardening/` | `@squaresdk/solana-hardening` | SSRF, idempotency, rate limit, RPC failover, imzalı eylemler | [BE-13] |
+| [`hardening/`](hardening/) | `@squaresdk/solana-hardening` | SSRF, idempotency, kalıcı hız sınırı, RPC failover, cüzdan imzalı eylemler, webhook imzası ve tekrar koruması, AES-256-GCM gizli değer kutusu | [BE-13] |
 | [`a2a/`](a2a/) | `@squaresdk/solana-a2a` | A2A v1.0 görev protokolü (JSON-RPC 2.0 + SSE), görev ↔ job durum eşlemesi, Postgres görev deposu ([tasarım](../docs/design/a2a.md)) | [BE-17] |
 | [`agent-sdk/`](agent-sdk/) | `@squaresdk/solana-agent-sdk` | agent yazma kiti | [BE-19] |
 | `x402/` | `@squaresdk/solana-x402` | x402 v2 gateway (resmi `@x402/*` üzerine) | [BE-24] |

@@ -1,0 +1,55 @@
+{
+  "name": "@squaresdk/solana-hardening",
+  "version": "0.1.0",
+  "description": "Servislerin ortak korumaları: SSRF, kalıcı hız sınırı ve idempotency, RPC failover, imzalı eylemler, webhook imzası ve tekrar oynatma koruması, AES-256-GCM gizli değer saklama; BE-13",
+  "license": "Apache-2.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./prisma": {
+      "types": "./dist/prisma-store.d.ts",
+      "import": "./dist/prisma-store.js",
+      "default": "./dist/prisma-store.js"
+    }
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run --coverage"
+  },
+  "dependencies": {
+    "@noble/curves": "2.4.0",
+    "bs58": "^6.0.0",
+    "undici": "^8.11.2"
+  },
+  "peerDependencies": {
+    "@squaresdk/solana-db": "workspace:*"
+  },
+  "peerDependenciesMeta": {
+    "@squaresdk/solana-db": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@solana/web3.js": "^1.99.0",
+    "@squaresdk/solana-config": "workspace:*",
+    "@squaresdk/solana-db": "workspace:*",
+    "@testcontainers/postgresql": "^12.2.0",
+    "@types/node": "^24.0.0",
+    "@vitest/coverage-v8": "^5.0.3",
+    "vitest": "^5.0.3"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}
