@@ -67,8 +67,8 @@ zarf ve yetki API'nindir (BE-18).
   slot'una göre yeniden eskiye; eşitlikte adres. Event'ler eskiden yeniye (slot, imza, talimat, event).
 - **Kapanmış hesaplar:** Kapanmış job ve alacaklar dönmez.
 - **Zaman:** `indexedAt` ve meta `updatedAt` Unix saniyesidir (sözleşmede i64 zamanlar saniye).
-- **Kart:** `cardVerified` kartın son denetimde zincirdeki hash'le eşleşmesini ve o hash'in hâlâ zincirdeki
-  değer olmasını ister.
+- **Kart:** `cardVerified`, kartın saklanan baytlarının SHA-256'sının zincirdeki güncel `agentCardHash`'e eşit
+  olmasıdır. Kayıttan önce barındırılan kart, kayıt indexlenince doğrulanmış olur.
 
 ## Çalıştırma
 

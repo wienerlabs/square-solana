@@ -1,0 +1,51 @@
+{
+  "name": "@squaresdk/solana-api",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Square REST API: cüzdan Ed25519 oturumu ve API anahtarları, indexer veritabanından okuma uçları, 8 adımın imzasız tx hazırlığı, teslimat yükleme, agent card barındırma, prover vekili, OpenAPI 3.1 (BE-18)",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "dist/index.js",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json && redocly bundle ../../docs/api/openapi.yaml --ext json -o dist/openapi.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "start": "node dist/index.js",
+    "test": "vitest run --coverage"
+  },
+  "dependencies": {
+    "@anchor-lang/core": "1.2.0",
+    "@aws-sdk/client-s3": "^3.1146.0",
+    "@noble/curves": "2.4.0",
+    "@solana/web3.js": "^1.99.0",
+    "@squaresdk/solana-db": "workspace:*",
+    "@squaresdk/solana-hardening": "workspace:*",
+    "@squaresdk/solana-identity": "workspace:*",
+    "@squaresdk/solana-indexer": "workspace:*",
+    "@squaresdk/solana-observability": "workspace:*",
+    "@squaresdk/solana-sdk": "workspace:*",
+    "@squaresdk/solana-types": "workspace:*",
+    "bs58": "^6.0.0",
+    "busboy": "^1.6.0",
+    "cors": "^2.8.5",
+    "express": "^4.21.2",
+    "helmet": "^8.0.0",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@squaresdk/solana-config": "workspace:*",
+    "@testcontainers/postgresql": "^12.2.0",
+    "@types/busboy": "^1.5.4",
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.23",
+    "@types/node": "^24.0.0",
+    "@vitest/coverage-v8": "^5.0.3",
+    "testcontainers": "^12.2.0",
+    "vitest": "^5.0.3"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}

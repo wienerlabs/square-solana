@@ -79,6 +79,12 @@ Notlar:
 
 A2A tablolarındaki mesaj ve artefakt içerikleri JSONB olarak düz metindir. Travel Rule ya da kişisel veri bu tablolara yazılmamalıdır; bunu agent kodu sağlar, depo zorlamaz. Saklama ve silme kuralı henüz yoktur ([a2a.md](a2a.md) §10).
 
+API'nin yazdığı tablolar (BE-18, [apps/api](../../apps/api/README.md)):
+
+- **`deliveries`:** `storage_key` içeriğin SHA-256'sıdır (S3 uyumlu deponun anahtarı). `delivery_uri` deponun herkese açık adresidir.
+- **`agent_cards`:** Barındırılan kartta `raw` kartın RFC 8785 kanonik JSON'u, `skills` beceri kimlikleri ve etiketleridir. `verified` yazma anındaki eşleşmedir; görünümdeki `cardVerified` zincirdeki güncel hash'le hesaplanır.
+- **`sessions`, `api_keys`:** Belirteç `sqs_…`, anahtar `sqk_…`; yalnızca SHA-256'ları durur.
+
 Koruma tablolarının (`rate_limit_windows`, `idempotency_records`, `replay_guards`) her satırı `expires_at` taşır; süresi dolan satırı depo yeniden kullanır, `purgeExpired` siler. Kayıtlı yanıt gövdesi API yanıtıdır; gizli veri taşıyan bir uç idempotency'yi kullanmamalı ya da gövdeyi kaydetmemelidir.
 
 Agent card kayıttan önce yüklenebilir: 8 adımın 2.sinde önce `putAgentCard`, sonra `registerAgent` gelir. Bu yüzden zincir dışı tablolardan ayna tablolara yabancı anahtar yoktur.
