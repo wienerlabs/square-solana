@@ -12,6 +12,7 @@ const SECTIONS = [
   { href: '/app/jobs/new', label: 'New job' },
   { href: '/app/claims', label: 'Receivables' },
   { href: '/app/did', label: 'Resolve DID' },
+  { href: '/app/developers', label: 'Developers' },
 ] as const;
 
 export function AppNav() {

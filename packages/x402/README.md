@@ -15,12 +15,13 @@ ve kalıcı tekrar korumasını ve idempotent yanıtı ekler. Facilitator karar�
 
 | Modül | Ne verir |
 |---|---|
-| `gateway` | `createX402Gateway({ facilitator, replay, idempotency, networks, rpcUrl, replayTtlSeconds, onEvent })` ve `gateway.paidRoute({ price, payTo, network, description, settle })` (Express ara katmanı). İşleyici ödemeyi `getX402Payment(res)` ile okur |
+| `gateway` | `createX402Gateway({ facilitator, replay, idempotency, networks, rpcUrl, replayTtlSeconds, onEvent })` ve `gateway.paidRoute({ price, payTo, network, description, settle, onSettled })` (Express ara katmanı). İşleyici ödemeyi `getX402Payment(res)` ile okur; `onSettled` route'ta zincire yazılan her ödemeyi verir |
+| `definition` | `paidRouteFromDefinition(gateway, kaynak, { onPayment, refreshSeconds, settle })`: Square geliştirici portalındaki tanımdan (`X402Endpoint`) ücretli route ve uzlaştırılan ödemenin bildirimi ([Portal tanımları](#portal-tanımları-fe-22)) |
 | `client` | `createPayingFetch({ signer, networks, rpcUrl, spendControls })`: ödeyen `fetch`, cüzdan imzalayıcısı enjekte edilir; sunucu duyurduysa ödeme kimliği ekler (`paymentIdentifierExtension`). `readPaymentReceipt(response)`: `PAYMENT-RESPONSE` makbuzu |
 | `facilitator` | `createFacilitatorClient({ mode: 'self', feePayer, rpcUrls })` (varsayılan) ya da `({ mode: 'remote', url, authToken })`, `createSelfFacilitator`, `DEFAULT_FACILITATOR_MODE` |
 | `facilitator-http` | `createFacilitatorRouter({ facilitator, authToken })`: kendi facilitator'ımızı başka servislere x402 facilitator HTTP API'siyle açar (`POST /verify`, `POST /settle`, `GET /supported`; bearer belirteci zorunlu) |
 | `idempotent` | `PaymentResponseStore` (hardening'in `IdempotencyStore`'uyla aynı), `IdempotencyOptions`: ödeme kimliğiyle kayıtlı yanıt ([aşağıda](#idempotent-yanıt)) |
-| `replay` | `ReplayStore` (hardening'in arayüzüyle aynı), `paymentFingerprint(payload)`, `replayScope(network)` |
+| `replay` | `ReplayStore` (hardening'in arayüzüyle aynı), `paymentFingerprint(payload)`, `replayScope(network)`, `createMemoryReplayStore()` (tek süreçlik geliştirme deposu) |
 | `networks` | CAIP-2 kimlikleri `SOLANA_MAINNET`, `SOLANA_DEVNET`, `SOLANA_TESTNET`. `toSolanaNetwork` v1 adını ve takma adı CAIP-2'ye çevirir. `usdcMint(network)` |
 
 Paket yalnızca gerçek RPC'lerle çalışır. Testlerin Solana JSON-RPC fikstürü `test/solana-rpc.ts`'tedir ve
@@ -59,6 +60,46 @@ readPaymentReceipt(response); // { success, transaction, network, payer }
 - **Harcama sınırı:** resmi istemcinin `spendControls`'udur. Varsayılan yalnızca tanınan stablecoin'leri ve
   ödeme başına $1'ı kabul eder. Başka bir mint `allowedAssets` ile açılır; mint başına taban birim tavanı
   verilebilir.
+
+## Portal tanımları (FE-22)
+
+Geliştirici ücretli uç noktasını Square geliştirici portalında (web `/app/developers`) tanımlar: yol, ad, fiyat,
+mint, ağ, alıcı, açıklama, etkin / pasif. Ödemeyi kendi sunucusu ister; tanım ve kullanım Square API'sindedir.
+Karar: [ADR 0023](../../docs/decisions/0023-x402-ucretli-uc-nokta-tanimlari.md). Square API'sinin kendi altında
+geçit olması seçilmedi: facilitator ve ücret ödeyen cüzdan ADR 0018'deki gibi ücretli ucu açan servistedir.
+
+```ts
+const square = createApiClient({ baseUrl, auth: { apiKey: process.env.SQUARE_API_KEY! } }); // x402:serve
+app.get(
+  '/v1/report',
+  paidRouteFromDefinition(
+    gateway,
+    async () => {
+      const result = await square.getX402Endpoint(id);
+      if (result.success) return result.data;
+      if (result.error.code === 'not_found') return null;
+      throw new Error(result.error.message);
+    },
+    { onPayment: (payment) => square.recordX402Payment(id, payment).then(() => undefined) },
+  ),
+  handler,
+);
+```
+
+- **Route:** tanımdan `gateway.paidRoute` kurulur. Fiyat `{ amount, asset: mint }` olur; ağ, alıcı ve
+  açıklama tanımdandır. Fiyat ya da alıcı değişince ara katman yeniden kurulur.
+- **Yenileme:** kaynak fonksiyonsa tanım `refreshSeconds` (varsayılan 30) önbellekte tutulur. Portaldaki
+  değişiklik en geç bu süre sonra uygulanır.
+- **Pasif ve silinmiş tanım:** pasif tanım 503 (`x402_endpoint_disabled`), silinmiş tanım (kaynak `null`
+  döner) 404 (`x402_endpoint_not_found`) alır. İkisinde de ödeme istenmez ve işleyici çalışmaz.
+- **Tanım okunamazsa:** hiç okunamamışsa 503 (`x402_definition_unavailable`); okunduktan sonraki hatada son
+  bilinen tanım kullanılır. Hata `onError`'a gider.
+- **Bildirim:** uzlaştırılan her ödeme `onPayment(kayıt, tanım)` ile verilir. Kayıt API'nin
+  `X402PaymentReport` gövdesidir: `fingerprint` (tekrar koruması kimliği), `transaction` (makbuzun işlem
+  imzası), ağ, mint, tutar, ödeyen, alıcı, `settledAt`. Bildirim yanıtı bekletmez; hatası `onError`'a gider ve
+  ödeme kullanımda sayılmaz.
+- **Tip hizası:** API'nin `X402Endpoint`'i tanım, `X402PaymentRecord` API'nin gövdesi olarak doğrudan
+  kullanılır (`test/definition.test.ts`, `@squaresdk/solana-types` ile derleme zamanında).
 
 ## Akış
 
@@ -171,6 +212,10 @@ Kapsam dışı (başka issue'lar):
     canlandırılır. Facilitator'ın bellek içi önbelleği boştur; tekrarı yalnızca veritabanı kaydı durdurur. Aynı
     veritabanını paylaşan iki örnek de sınanır.
   - `idempotent.test.ts`: Kayıtlı yanıt, kimlik çakışması, saklanmayan yanıt, geçersiz kimlik, depo hataları.
+
+- **Portal tanımı:** `definition.test.ts` tanımdan 402 gereksinimini, ödeme ve bildirimi, yenilemeyi (fiyat,
+  pasif, silinmiş), tanım okunamazken davranışı ve API sözleşmesiyle tip hizasını sınar. Square API'siyle uçtan
+  uca kabul `apps/api/test/x402.test.ts`'tedir.
 
 Devnet koşusu (`test/devnet.e2e.test.ts`) yalnızca ortamla çalışır; anahtarlar repoda tutulmaz:
 

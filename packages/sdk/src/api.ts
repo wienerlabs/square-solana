@@ -50,6 +50,12 @@ import type {
   TravelRuleStatus,
   TxRequest,
   UnsignedTx,
+  X402Endpoint,
+  X402EndpointCreate,
+  X402EndpointUpdate,
+  X402EndpointUsage,
+  X402Payment,
+  X402PaymentReport,
 } from '@squaresdk/solana-types';
 
 /** Sayfalama: `page` 1'den, `limit` 1–200. */
@@ -74,6 +80,21 @@ export interface SquareApi {
   createApiKey(body: ApiKeyCreate): Promise<ApiEnvelope<ApiKeyCreated>>;
   /** `DELETE /v1/api-keys/{id}`: anahtarı iptal eder. */
   deleteApiKey(id: string): Promise<void>;
+
+  /** `GET /v1/x402/endpoints`: oturumdaki cüzdanın ücretli uç nokta tanımları. */
+  listX402Endpoints(): Promise<ApiEnvelope<X402Endpoint[]>>;
+  /** `POST /v1/x402/endpoints`: ücretli uç nokta tanımı; yol cüzdan başına tekildir (409). */
+  createX402Endpoint(body: X402EndpointCreate): Promise<ApiEnvelope<X402Endpoint>>;
+  /** `GET /v1/x402/endpoints/{id}`: tanım; oturum ya da `x402:serve` kapsamlı anahtarla. */
+  getX402Endpoint(id: string): Promise<ApiEnvelope<X402Endpoint>>;
+  /** `PATCH /v1/x402/endpoints/{id}`: kısmi güncelleme (fiyat, ağ, etkinlik, açıklama, yol). */
+  updateX402Endpoint(id: string, body: X402EndpointUpdate): Promise<ApiEnvelope<X402Endpoint>>;
+  /** `DELETE /v1/x402/endpoints/{id}`: tanımı kullanım kaydıyla birlikte siler. */
+  deleteX402Endpoint(id: string): Promise<void>;
+  /** `GET /v1/x402/endpoints/{id}/usage`: ödemeli çağrı sayısı, ağ ve mint başına toplam, son ödemeler. */
+  getX402EndpointUsage(id: string): Promise<ApiEnvelope<X402EndpointUsage>>;
+  /** Geliştiricinin sunucusunun uzlaştırdığı ödeme; aynı `fingerprint` ikinci kez bildirilirse ilk kayıt döner. */
+  recordX402Payment(id: string, body: X402PaymentReport): Promise<ApiEnvelope<X402Payment>>;
 
   /** `GET /v1/jobs`: job'lar (indexer), durum, kurum, agent kaydı ya da politikaya göre. */
   listJobs(
@@ -188,6 +209,13 @@ export const API_OPERATIONS = [
   'listApiKeys',
   'createApiKey',
   'deleteApiKey',
+  'listX402Endpoints',
+  'createX402Endpoint',
+  'getX402Endpoint',
+  'updateX402Endpoint',
+  'deleteX402Endpoint',
+  'getX402EndpointUsage',
+  'recordX402Payment',
   'listJobs',
   'getJob',
   'uploadDelivery',

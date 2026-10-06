@@ -7,8 +7,8 @@ Uygulama ve servisler (pnpm workspace). `package.json` adları `@squaresdk/solan
 
 | Dizin | Görev | Issue |
 |---|---|---|
-| [`web/`](web/) | Next.js web uygulaması (`@solana/wallet-adapter-react`); iskelet hazır, 8 adımlı akış ve demo M4'te | [FE-01] |
-| [`api/`](api/) | REST API: cüzdan oturumu ve API anahtarları, okuma uçları, 8 adımın tx hazırlığı, teslimat yükleme, agent card barındırma, prover vekili, dispute kanıtı, arbitrator kuyruğu, oyu ve webhook bildirimleri, `GET /openapi.json` | [BE-18], [BE-22] |
+| [`web/`](web/) | Next.js web uygulaması (`@solana/wallet-adapter-react`); iskelet hazır, 8 adımlı akış ve demo M4'te; geliştirici portalı `/app/developers` | [FE-01], [FE-22] |
+| [`api/`](api/) | REST API: cüzdan oturumu ve API anahtarları, okuma uçları, 8 adımın tx hazırlığı, teslimat yükleme, agent card barındırma, prover vekili, dispute kanıtı, arbitrator kuyruğu, oyu ve webhook bildirimleri, x402 ücretli uç nokta tanımları ve kullanımı, `GET /openapi.json` | [BE-18], [BE-22], [FE-22] |
 | [`indexer/`](indexer/) | Event tabanlı indexer: kesinleşmiş tx'lerden event'ler ve ayna tablolar, Helius webhook ve RPC backfill, uzlaştırma, okuma API'si (`@squaresdk/solana-indexer/read`) | [BE-14] |
 | [`keeper/`](keeper/) | Finalize crank: zincir doğrulaması, kârlılık eşiği, priority fee, `ProofRequired` ve screening için geri çekilme, `keeper_actions` günlüğü; son tarihi geçmiş dispute'ların `lapse_dispute` crank'i | [BE-15], [BE-22] |
 | [`prover/`](prover/) | Release devresi için Groth16 prover servisi (snarkjs, `POST /v1/prove`); Aperture `prover-service`'ten geçmişiyle taşındı [BE-02], yeni devreye uyarlandı | [BE-11] |
@@ -33,3 +33,4 @@ Tüm servisler tek veritabanını ([`db/`](../db/)) kullanır. Her servisin Rail
 [BE-25]: https://github.com/wienerlabs/square-solana/issues/80
 [BE-27]: https://github.com/wienerlabs/square-solana/issues/82
 [FE-01]: https://github.com/wienerlabs/square-solana/issues/21
+[FE-22]: https://github.com/wienerlabs/square-solana/issues/86
