@@ -13,6 +13,11 @@ import type {
   ApiKeyCreated,
   AuthChallenge,
   AuthChallengeRequest,
+  CctpFundTx,
+  CctpFundTxRequest,
+  CctpTransfer,
+  CctpTransferCreate,
+  CctpTransferStatus,
   ClaimStatus,
   ClaimView,
   DeliveryReceipt,
@@ -102,6 +107,15 @@ export interface SquareApi {
   deleteTravelRuleGrant(job: Address, grantee: Address): Promise<void>;
   listTravelRuleAccess(job: Address, query?: PageParams): Promise<ApiEnvelope<TravelRuleAccess[]>>;
 
+  /** Burn tx'ini job'a bağlar (job'un kurumu); aynı burn yeniden kaydedilirse aynı transfer döner (BE-26). */
+  registerCctpTransfer(body: CctpTransferCreate): Promise<ApiEnvelope<CctpTransfer>>;
+  listCctpTransfers(
+    query?: PageParams & { job?: Address; institution?: Address; status?: CctpTransferStatus },
+  ): Promise<ApiEnvelope<CctpTransfer[]>>;
+  getCctpTransfer(id: string): Promise<ApiEnvelope<CctpTransfer>>;
+  /** Kurumun imzalayacağı tx: mesaj teslim edilmediyse mint ile fonlama tek tx'te, edildiyse yalnızca fonlama. */
+  prepareCctpFundTx(id: string, body: CctpFundTxRequest): Promise<ApiEnvelope<CctpFundTx>>;
+
   prepareTx(body: TxRequest): Promise<ApiEnvelope<UnsignedTx>>;
   prove(body: ProveRequest): Promise<ApiEnvelope<ProveResponse>>;
   getHealth(): Promise<Health>;
@@ -139,6 +153,10 @@ export const API_OPERATIONS = [
   'createTravelRuleGrant',
   'deleteTravelRuleGrant',
   'listTravelRuleAccess',
+  'registerCctpTransfer',
+  'listCctpTransfers',
+  'getCctpTransfer',
+  'prepareCctpFundTx',
   'prepareTx',
   'prove',
   'getHealth',

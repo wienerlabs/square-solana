@@ -20,6 +20,7 @@
     "@aws-sdk/client-s3": "^3.1146.0",
     "@noble/curves": "2.4.0",
     "@solana/web3.js": "^1.99.0",
+    "@squaresdk/solana-cctp": "workspace:*",
     "@squaresdk/solana-db": "workspace:*",
     "@squaresdk/solana-hardening": "workspace:*",
     "@squaresdk/solana-identity": "workspace:*",
@@ -35,6 +36,7 @@
     "zod": "^4.6.5"
   },
   "devDependencies": {
+    "@solana/spl-token": "^0.4.15",
     "@squaresdk/solana-config": "workspace:*",
     "@testcontainers/postgresql": "^12.2.0",
     "@types/busboy": "^1.5.4",

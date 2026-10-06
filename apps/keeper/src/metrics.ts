@@ -1,5 +1,5 @@
 // Prometheus metrikleri: ortak servis metrikleri (`@squaresdk/solana-observability`) ve keeper'ın kararları,
-// bakiyesi, kazandığı ücret, son turu ve gecikmesi. Ayrı bir portta (`KEEPER_METRICS_PORT`, iç ağ)
+// bakiyesi, kazandığı ücret, son turu ve gecikmesi; CCTP relayer'ının geçişleri ve açık transferleri. Ayrı bir portta (`KEEPER_METRICS_PORT`, iç ağ)
 // `GET /metrics`. Gecikme ölçümleri SLO'ların girdisidir ([docs/slo.md](../../../docs/slo.md)).
 import { Counter, Gauge, Histogram, createServiceMetrics, type ServiceMetrics } from '@squaresdk/solana-observability';
 
@@ -24,6 +24,10 @@ export interface KeeperMetrics extends ServiceMetrics {
   readonly dueJobs: Gauge;
   /** Bunların en eskisinin finalize edilebilir olduğundan bu yana geçen süre (saniye); yoksa 0. */
   readonly oldestDue: Gauge;
+  /** CCTP transferlerinin durum geçişleri (BE-26). */
+  readonly cctpTransitions: Counter<'from' | 'to'>;
+  /** Sonuçlanmamış CCTP transferleri, duruma göre (`pendingAttestation`, `attested`, `received`). */
+  readonly cctpOpen: Gauge<'status'>;
 }
 
 export function createMetrics(params: { service: string; version: string }): KeeperMetrics {
@@ -63,6 +67,18 @@ export function createMetrics(params: { service: string; version: string }): Kee
     oldestDue: new Gauge({
       name: 'keeper_oldest_due_seconds',
       help: 'Finalize edilebilir en eski job’un bekleme süresi',
+      registers,
+    }),
+    cctpTransitions: new Counter({
+      name: 'keeper_cctp_transitions_total',
+      help: 'CCTP transferlerinin durum geçişleri',
+      labelNames: ['from', 'to'],
+      registers,
+    }),
+    cctpOpen: new Gauge({
+      name: 'keeper_cctp_open_transfers',
+      help: 'Sonuçlanmamış CCTP transferleri, duruma göre',
+      labelNames: ['status'],
       registers,
     }),
   };

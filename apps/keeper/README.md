@@ -55,6 +55,16 @@ Her karar `keeper_actions`'a yazılır; API bunu `GET /v1/keeper/actions` ile su
 - **Kârsız job** da günlüğe yazılır ve geri çekilmeyle yeniden değerlendirilir; priority fee ya da kur değişmiş
   olabilir.
 
+## CCTP relayer
+
+`KEEPER_CCTP_*` verilirse keeper ikinci bir döngüde CCTP relayer'ını çalıştırır (BE-26,
+[cctp-funding.md](../../docs/design/cctp-funding.md#relayer-be-26)). Durum makinesi `@squaresdk/solana-cctp`'dedir:
+kayıtlı burn'lerin attestation'ını izler, kurumun tek tx'ini `KEEPER_CCTP_RELAY_AFTER_SECONDS` boyunca bekler, sonra
+`receive_message`'ı keeper cüzdanıyla gönderir ve job'un fonlanmasını izler. Teslim tx'inin priority fee'si finalize'la
+aynı kuraldır (`KEEPER_PRIORITY_FEE_PERCENTILE`, `KEEPER_MAX_COMPUTE_UNIT_PRICE`). Yoklama `KEEPER_POLL_INTERVAL_MS`
+aralığında, transfer başına geri çekilme `KEEPER_CCTP_BACKOFF_BASE_SECONDS` – `KEEPER_CCTP_BACKOFF_MAX_SECONDS`.
+Teslim ve servis hataları `keeper_errors` alarmına sayılır.
+
 ## Çalıştırma
 
 - **Önce:** Migration'lar ve `programs` tablosunun seed'i keeper'dan önce uygulanır
@@ -86,6 +96,9 @@ Her karar `keeper_actions`'a yazılır; API bunu `GET /v1/keeper/actions` ile su
   - `keeper_due_jobs`, `keeper_oldest_due_seconds`: Tur başında finalize edilebilir durumda bekleyen job'lar ve
     en eskisinin bekleme süresi. İspat, screening ya da kârlılık yüzünden bekletilen job sayılmaz. Beklenen
     kayıt (ispat ya da screening) indexlenince job o andan itibaren yeniden sayılır.
+
+- CCTP relayer: `keeper_cctp_transitions_total{from,to}` (transferlerin durum geçişleri),
+  `keeper_cctp_open_transfers{status}` (sonuçlanmamış transferler, duruma göre).
 
 **Alarmlar:**
 - `keeper_low_balance`: Bakiye `KEEPER_ALERT_MIN_BALANCE_LAMPORTS`'un altında; işlem ücreti ve rent

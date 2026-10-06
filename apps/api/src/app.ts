@@ -1,4 +1,4 @@
-// HTTP yüzeyi: sözleşmedeki 33 operasyon (docs/api/openapi.yaml), `GET /openapi.json`. Metrikler ayrı
+// HTTP yüzeyi: sözleşmedeki 37 operasyon (docs/api/openapi.yaml), `GET /openapi.json`. Metrikler ayrı
 // uygulamada (`createMetricsApp`), iç ağdaki portta. Hız sınırı paylaşılan Postgres sayacıyla
 // (`@squaresdk/solana-hardening`): okuma ve yazma uçları ayrı kurallarla, kimliği olan istekte cüzdan, olmayanda
 // istemci IP'si başına.
@@ -21,12 +21,14 @@ import helmet from 'helmet';
 import { authenticate, principalOf } from './auth/middleware.js';
 import type { AuthService } from './auth/service.js';
 import type { CardService } from './cards.js';
+import type { CctpService } from './cctp.js';
 import type { DeliveryService } from './deliveries.js';
 import { HttpError, requestId, requestIdOf, sendError } from './http.js';
 import type { OpenApiDocument } from './openapi.js';
 import type { PolicyMetaService } from './policy-meta.js';
 import type { ProverProxy } from './prover.js';
 import { authRoutes } from './routes/auth.js';
+import { cctpRoutes } from './routes/cctp.js';
 import { readRoutes } from './routes/reads.js';
 import { travelRuleRoutes } from './routes/travel-rule.js';
 import { writeRoutes } from './routes/writes.js';
@@ -43,6 +45,7 @@ export interface AppDeps {
   readonly tx: TxBuilder;
   readonly prover: ProverProxy;
   readonly travelRule: TravelRuleService;
+  readonly cctp: CctpService;
   readonly limiters: { readonly read: RateLimiter; readonly write: RateLimiter };
   readonly openapi: OpenApiDocument;
   readonly health: HealthProbe;
@@ -123,6 +126,7 @@ export function createApp(deps: AppDeps): express.Express {
   app.use(authRoutes({ auth: deps.auth, readLimit, writeLimit }));
   app.use(readRoutes({ db: deps.db, read: deps.read, readLimit }));
   app.use(travelRuleRoutes({ travelRule: deps.travelRule, readLimit, writeLimit }));
+  app.use(cctpRoutes({ cctp: deps.cctp, readLimit, writeLimit }));
   app.use(
     writeRoutes({
       deliveries: deps.deliveries,

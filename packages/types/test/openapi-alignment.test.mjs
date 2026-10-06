@@ -55,6 +55,10 @@ const OBJECTS = {
   TravelRuleGrantCreate: t.TravelRuleGrantCreateSchema,
   TravelRuleGrant: t.TravelRuleGrantSchema,
   TravelRuleAccess: t.TravelRuleAccessSchema,
+  CctpTransferCreate: t.CctpTransferCreateSchema,
+  CctpTransfer: t.CctpTransferSchema,
+  CctpFundTxRequest: t.CctpFundTxRequestSchema,
+  CctpFundTx: t.CctpFundTxSchema,
 };
 
 const ENUMS = {
@@ -66,6 +70,7 @@ const ENUMS = {
   TravelRuleIdentifierType: t.TravelRuleIdentifierTypeSchema,
   TravelRulePersonKind: t.TravelRulePersonKindSchema,
   TravelRuleAccessAction: t.TravelRuleAccessActionSchema,
+  CctpTransferStatus: t.CctpTransferStatusSchema,
 };
 
 const acceptsUndefined = (schema) => schema.safeParse(undefined).success;

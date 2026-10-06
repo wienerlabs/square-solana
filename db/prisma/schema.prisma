@@ -531,39 +531,59 @@ model MppPayment {
 }
 
 enum CctpTransferStatus {
-  /// Kaynak zincirde burn görüldü, Circle attestation'ı bekleniyor.
+  /// Burn kaydedildi, Circle'ın attestation'ı bekleniyor.
   pendingAttestation
+  /// Mesaj imzalandı, Solana'da henüz teslim edilmedi.
   attested
-  /// Solana'da `receive_message` tamamlandı.
+  /// `receive_message` tamamlandı: USDC kurumun hesabında, job henüz fonlanmadı.
   received
   /// Job fonlandı.
   funded
+  /// Devam edilemez (mesaj bu job'un kurumuna değil, job iptal edildi …); sebep `error`'da.
   failed
 }
 
-/// CCTP ile gelen USDC (BE-26). Mesaj kimliği (kaynak domain, nonce) Circle CCTP'den gelir.
+/// CCTP ile bir job'u fonlayan USDC transferi (BE-26, docs/design/cctp-funding.md). Kurum kaynak zincirdeki burn
+/// tx'ini kaydeder; relayer (keeper) Circle'ın attestation'ını izler, gerekirse mesajı Solana'da teslim eder ve
+/// job'un fonlanmasını izler. Mesaj ve attestation herkese açıktır (Circle'ın servisi). Burn tx'inde tek mesaj
+/// beklenir.
 model CctpTransfer {
   id               String             @id @default(uuid()) @db.Uuid
   sourceDomain     Int                @map("source_domain")
-  nonce            Decimal            @db.Decimal(20, 0)
-  sourceTxHash     String             @map("source_tx_hash") @db.Text
-  messageHash      String             @map("message_hash") @db.Char(64)
-  /// Circle attestation'ı (hex); gelmeden null.
-  attestation      String?            @db.Text
-  amount           Decimal            @db.Decimal(20, 0)
+  /// Kaynak zincirdeki burn tx'i, 0x'li küçük harf hex.
+  sourceTxHash     String             @map("source_tx_hash") @db.VarChar(66)
+  job              String             @db.VarChar(44)
+  /// Job'un `institution`'ı: kaydı yapan ve fonlama tx'ini imzalayan anahtar.
+  institution      String             @db.VarChar(44)
+  /// Beklenen mint alıcısı: kurumun settlement mint'indeki token hesabı.
   mintRecipient    String             @map("mint_recipient") @db.VarChar(44)
-  job              String?            @db.VarChar(44)
   status           CctpTransferStatus
+  /// Circle'ın atadığı nonce (V2'de 32 bayt); attestation'dan önce null.
+  nonce            String?            @db.Char(64)
+  /// Attestation'lı mesaj, hex.
+  message          String?            @db.Text
+  /// Circle'ın attestation'ı, hex.
+  attestation      String?            @db.Text
+  /// Yakılan tutar; mint edilen `amount − fee_executed`.
+  amount           Decimal?           @db.Decimal(20, 0)
+  feeExecuted      Decimal?           @map("fee_executed") @db.Decimal(20, 0)
+  attestedAt       DateTime?          @map("attested_at") @db.Timestamptz(3)
   receiveSignature String?            @map("receive_signature") @db.VarChar(88)
   fundSignature    String?            @map("fund_signature") @db.VarChar(88)
+  /// Relayer'ın bu durumdaki ardışık denemesi; durum değişince sıfırlanır.
+  attempts         Int                @default(0)
+  /// Relayer'ın bir sonraki bakışı; null ise ilk turda.
+  nextAttemptAt    DateTime?          @map("next_attempt_at") @db.Timestamptz(3)
+  /// Son denemenin hatası ya da `failed` sebebi.
   error            String?            @db.Text
   createdAt        DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt        DateTime           @updatedAt @map("updated_at") @db.Timestamptz(3)
 
+  @@unique([sourceDomain, sourceTxHash])
   @@unique([sourceDomain, nonce])
-  @@unique([messageHash])
-  @@index([status])
+  @@index([status, nextAttemptAt])
   @@index([job])
+  @@index([institution])
   @@map("cctp_transfers")
 }
 

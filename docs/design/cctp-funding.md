@@ -1,6 +1,6 @@
-# CCTP ile fonlama (BC-36)
+# CCTP ile fonlama (BC-36, BE-26)
 
-**Issue:** BC-36 (#77) · **Program sözleşmesi:** v0.5.1 ([§7](program-interface.md#7-m5m6-taslakları)) · **SDK:** `@squaresdk/solana-sdk` `cctp`, `flow.receiveAndFundJob`
+**Issue:** BC-36 (#77), BE-26 (#81) · **Program sözleşmesi:** v0.5.1 ([§7](program-interface.md#7-m5m6-taslakları)) · **API sözleşmesi:** v0.18.0 ([api-sdk-contract.md](api-sdk-contract.md)) · **Paketler:** `@squaresdk/solana-sdk` `cctp`, `flow.receiveAndFundJob`; `@squaresdk/solana-cctp` (relayer)
 
 USDC'si başka bir zincirde (Ethereum, Base, Arbitrum …) duran kurum, bir Square job'unu köprü kullanmadan
 fonlar. Circle'ın Cross-Chain Transfer Protocol'ü (CCTP V2) USDC'yi kaynak zincirde yakar ve Circle'ın
@@ -77,7 +77,61 @@ katı, 10 bine yukarı yuvarlanmış: 390 000.
 Tek tx'in yararı son satırdır: fonlama düşerse mint de düşer. USDC kurumun hesabında yarım kalmış bir
 adımda beklemez.
 
-## Devnet örneği (2026-10-06)
+## Relayer (BE-26)
+
+Zincirdeki akışın off-chain tarafı: burn'ün kaydı, Circle'ın attestation'ının izlenmesi, mesajın Solana'da
+teslimi ve job'un fonlanmasının izlenmesi. `fund_job`'u kurum imzalar (`institution` imzacıdır); relayer kurumun
+anahtarını tutmaz. Relayer yalnızca izinsiz işi yapar: attestation'ı izler ve gerekirse `receive_message`'ı kendisi
+gönderir (mesajın `destinationCaller`'ı sıfırsa herkes teslim edebilir).
+
+| Parça | Nerede | Ne yapar |
+|---|---|---|
+| Burn yardımcısı | `@squaresdk/solana-sdk` (`cctpBurnCall`, `cctpApproveCall`, `fetchCctpFees`) | `depositForBurn` ve `approve` çağrı tarifleri (viem / wagmi `writeContract` biçiminde; SDK EVM kütüphanesine bağlı değil). Mint alıcısı `cctpMintRecipient`: kurumun USDC hesabı |
+| Attestation istemcisi | `@squaresdk/solana-sdk` (`fetchCctpAttestation`) | Tek bakış: `notFound`, `pending` (durum ve gecikme sebebi) ya da `complete` (mesajlar) |
+| Kayıt | API `POST /v1/cctp/transfers` (`@squaresdk/solana-cctp` `createRegistrar`) | Burn tx'ini job'a bağlar: job `Open`, mint'i USDC, `institution`'ı istek sahibi. Kaynak tx'i başına tek satır. Squads vault'un açtığı işte `institution` vault PDA'sıdır, oturum açamaz; bu iş vault işlemiyle fonlanır |
+| Durum makinesi | Keeper'daki CCTP turu (`createCctpRelayer`) | Aşağıdaki tablo; `cctp_transfers` |
+| Kurumun tx'i | API `POST /v1/cctp/transfers/{id}/tx` (`createFundTxBuilder`) | Mesaj teslim edilmediyse mint + `fund_job` tek tx'te, edildiyse yalnızca `fund_job`. Tx simüle edilir |
+
+### Durumlar
+
+| Durum | Relayer ne yapar | Sonraki |
+|---|---|---|
+| `pendingAttestation` | Circle'ın servisine bakar; imzalanmadıysa geri çekilerek bekler. İmzalanınca mesajı doğrular: hedef Solana, kaynak kayıttaki domain, mint alıcısı kurumun USDC hesabı, teslim eden sınırlanmamış ya da kurum, tx'te tek mesaj | `attested`; mesaj bu job'u fonlayamıyorsa `failed` |
+| `attested` | Nonce hesabı (`used_nonce`) varsa mesaj teslim edilmiştir. Yoksa kurumun tek tx'ini `relayAfterSeconds` boyunca bekler; süre dolunca `receive_message`'ı kendisi gönderir (ücreti ve kurumun USDC hesabı yoksa rent'i relayer öder). Teslim eden kurumla sınırlıysa relayer teslim etmez | `received` (teslim imzası nonce hesabını açan tx) |
+| `received` | Job `Open` ise bekler. `Open`'dan çıktıysa fonlama tx'ini job'un imzalarında arar (`Instruction: FundJob`) | `funded`; job fonlanmadan iptal edildiyse `failed` (USDC kurumun hesabında) |
+| `funded`, `failed` | Bakılmaz | — |
+
+Bekleme ve hata aynı durumda kalır, bir sonraki bakış geri çekilmeyle ileri atılır (`attempts`, `next_attempt_at`;
+taban ve üst sınır yapılandırmadan). Hata `error`'a yazılır; durum değişince ikisi sıfırlanır.
+
+### Yeniden deneme
+
+Her adım zincirden ya da Circle'dan yeniden okur, kendi kaydına güvenmez:
+- **Kayıt:** Aynı burn aynı job'a yeniden kaydedilirse aynı satır döner; başka job'a kaydedilmek istenirse 409.
+  Eşzamanlı iki kayıtta tekillik kısıtı ikincisini birincinin satırına yönlendirir.
+- **Teslim:** Relayer göndermeden önce nonce hesabına bakar. Tx gönderilip sonucu yazılamadan süreç düşerse bir
+  sonraki turda nonce hesabı görülür ve aynı mesaj ikinci kez gönderilmez. Simülasyon düşer ama mesaj bu arada
+  teslim edildiyse relayer göndermez, teslim imzasını nonce hesabından okur. Zincirde de ikinci teslim reddedilir
+  (`used_nonce` bir kez açılır).
+- **Fonlama:** Kurumun tx'i her istekte zincirin o anki durumuna göre kurulur. `fund_job` `Open` olmayan job'u
+  reddeder; ikinci fonlama zincirde düşer.
+
+Keeper tek örnek çalışır (finalize crank'iyle aynı kural): aynı transferi iki süreç ilerletmez.
+
+### Yapılandırma
+
+| Servis | Değişkenler |
+|---|---|
+| API | `API_CCTP_MESSAGE_TRANSMITTER`, `API_CCTP_TOKEN_MESSENGER_MINTER`, `API_CCTP_LOOKUP_TABLES` (`domain:ALT`, virgülle; desteklenen kaynaklar). Verilmezse kayıt ve tx reddedilir, okuma çalışır |
+| Keeper | Aynı üçü (`KEEPER_CCTP_*`) ve `KEEPER_CCTP_ATTESTATION_URL`, `KEEPER_CCTP_RELAY_AFTER_SECONDS`, `KEEPER_CCTP_BACKOFF_BASE_SECONDS`, `KEEPER_CCTP_BACKOFF_MAX_SECONDS`. Verilmezse relayer çalışmaz |
+
+Değerler ağın yapılandırmasındadır (`scripts/deploy/networks/<ağ>.json`, `cctp`). Metrikler:
+`keeper_cctp_transitions_total{from,to}`, `keeper_cctp_open_transfers{status}`; teslim hataları `keeper_errors`
+alarmına sayılır.
+
+## Devnet örnekleri (2026-10-06)
+
+### SDK ile, standart kesinlik (BC-36)
 
 `scripts/deploy/cctp-burn.mjs` ve `scripts/deploy/cctp-fund-job.mjs` ile ([kayıt](../deploy/devnet.md#cctp-ile-fonlama-bc-36)):
 
@@ -92,6 +146,19 @@ adımda beklemez.
 Sonuç: job `DYog8N8bftM5cAY2xop7BzLjMmZqgW9wTAJek4LXbfGC` `Funded`, vault'ta 5 000 000 (5 USDC). Mesaj
 `packages/sdk/test/fixtures/cctp-sepolia-to-solana.json`'da, Circle'ın kendi çözümüyle birlikte; SDK'nın
 çözümü onunla alan alan karşılaştırılır.
+
+### Relayer ile, hızlı kesinlik (BE-26)
+
+`packages/cctp/test/devnet.e2e.test.ts` iki senaryo koştu; imzalar [deploy kaydında](../deploy/devnet.md#cctp-relayer-be-26):
+- **Kurumun tek tx'i:** Relayer attestation'ı izledi, kurum mint + fonlamayı tek tx'te imzaladı
+  ([`3kVtrhkq…`](https://explorer.solana.com/tx/3kVtrhkqYKj7q4oRFwiufTtfKuwStDYZ7ZBicKXxQZdeHWwFesszrwaHS3XkdZLgnUxSEE3itHjvBpSN1nM5Ddr5?cluster=devnet)),
+  relayer `funded` yazdı.
+- **Relayer'ın teslimi:** Relayer `receive_message`'ı kendisi gönderdi
+  ([`3A18dF3u…`](https://explorer.solana.com/tx/3A18dF3u5Yg979qapN2jPU6qXkXPReC4xNmmaqFgGVGgqdxiA6ee4pVwZoyMTMSu2WKXMWZeJ92yGhqmEogHFKgZ?cluster=devnet)).
+  Yarıda kalmış tur canlandırıldı, relayer ikinci tx göndermedi. Kurum yalnızca `fund_job`'u imzaladı
+  ([`26bGXaaQ…`](https://explorer.solana.com/tx/26bGXaaQ35wcUua75rT7rXFXyiUECwRrvYETiYYq2Qdx68a6y1n46doNpAtHWxjoKXdfzhD1YJ5UtydFBesbQm3m?cluster=devnet)).
+
+Burn'den fonlamaya A 18, B 37 saniye sürdü (hızlı kesinlik; Sepolia blok zamanları ve Solana imzaları).
 
 ## Adresler
 

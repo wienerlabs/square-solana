@@ -1,7 +1,7 @@
 # @squaresdk/solana-api
 
 Square'in REST API servisi (BE-18). Sözleşme [`docs/api/openapi.yaml`](../../docs/api/openapi.yaml)'dır
-(33 operasyon); servis `GET /openapi.json`'da sözleşmenin derlenmiş halini yayımlar. Web uygulaması ve
+(37 operasyon); servis `GET /openapi.json`'da sözleşmenin derlenmiş halini yayımlar. Web uygulaması ve
 entegrasyonlar SDK'nın `createApiClient`'ıyla bağlanır.
 
 | Etiket | Uygulama |
@@ -13,6 +13,7 @@ entegrasyonlar SDK'nın `createApiClient`'ıyla bağlanır.
 | agent card | Barındırma ve A2A keşif yolu `/a/{agentRecord}/.well-known/agent-card.json` ([Agent card](#agent-card)) |
 | politika meta | Herkese açık ad, açıklama ve etiketler; yazan kurumun güncel yetkilisi |
 | travel rule | Kaydın şifreli saklanması, commitment'ı, izinli okuma ve erişim kaydı ([Travel Rule](#travel-rule)) |
+| cctp | Burn'ün job'a kaydı, transferin durumu, kurumun mint + fonlama tx'i ([CCTP](#cctp)) |
 | prover | `POST /v1/prove`, prover servisine (apps/prover) vekil |
 
 Tüm `/v1` yanıtları `{ success, data, error, meta }` zarfıyla döner; `meta.requestId` yanıtın `X-Request-Id`
@@ -135,6 +136,21 @@ oturumuyla çağrılır; API anahtarı kabul edilmez.
 - **Bakım:** Silme ve yeniden sarma her `API_TRAVEL_RULE_MAINTENANCE_INTERVAL_SECONDS`'ta bir koşar. Hatası
   `api_errors` alarmına sayılır.
 
+
+## CCTP
+
+Başka zincirde yakılan USDC ile job fonlama (BE-26, [cctp-funding.md](../../docs/design/cctp-funding.md#relayer-be-26)).
+Mantık `@squaresdk/solana-cctp`'dedir; attestation'ı keeper'daki relayer izler.
+- **Kayıt (`POST /v1/cctp/transfers`):** Oturum ya da `tx:prepare` kapsamlı anahtarla, job'un kurumu
+  (`institution`) adına. Job `Open`, mint'i settlement mint'i olmalı; kaynak domain `API_CCTP_LOOKUP_TABLES`'ta
+  olmalı. Aynı burn aynı job'a yeniden kaydedilirse aynı transfer döner (200), başka job'a 409.
+- **Okuma (`GET /v1/cctp/transfers`, `GET /v1/cctp/transfers/{id}`):** Açık; mesaj ve attestation Circle'ın
+  servisinde de açıktır.
+- **Kurumun tx'i (`POST /v1/cctp/transfers/{id}/tx`):** Mesaj teslim edilmediyse mint ile `fund_job` tek tx'te,
+  Square ALT'ı (`API_LOOKUP_TABLE`) ve kaynağın CCTP ALT'ıyla (`receiveAndFund`); edildiyse yalnızca `fund_job`
+  (`fund`). Tx simüle edilir; zincirde düşecek tx 422.
+- **Yapılandırma:** `API_CCTP_MESSAGE_TRANSMITTER`, `API_CCTP_TOKEN_MESSENGER_MINTER`, `API_CCTP_LOOKUP_TABLES`
+  birlikte verilir; verilmezse kayıt ve tx reddedilir.
 ## Çalıştırma
 
 Migration'lar ve `programs` tablosunun seed'i API'den önce uygulanır (indexer'la aynı; [apps/indexer](../indexer/README.md#çalıştırma)).

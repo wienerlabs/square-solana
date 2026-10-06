@@ -2,6 +2,7 @@
 // değerde servis açılmaz. Varsayılan değer yoktur. Log, hazırlık ve alarm webhook'u değişkenleri servislerde
 // ortaktır (`@squaresdk/solana-observability`). Program kimlikleri veritabanının `programs` tablosundan
 // okunur.
+import { parseCctpSettings, type CctpSettings } from '@squaresdk/solana-cctp';
 import { parseObservabilityEnv, type ObservabilityConfig } from '@squaresdk/solana-observability';
 import { Keypair } from '@solana/web3.js';
 import bs58 from 'bs58';
@@ -13,6 +14,9 @@ const int = (min: number, max = Number.MAX_SAFE_INTEGER) =>
 const u64 = nonEmpty.regex(/^(0|[1-9][0-9]{0,19})$/, 'u64 ondalık bekleniyor').transform(BigInt);
 const port = int(1, 65_535);
 const httpUrl = z.url({ protocol: /^https?$/ });
+/** Boş bırakılan isteğe bağlı değişken verilmemiş sayılır. */
+const optional = <T extends z.ZodType>(schema: T) =>
+  z.preprocess((value) => (typeof value === 'string' && value.trim() === '' ? undefined : value), schema.optional());
 
 const EnvSchema = z.object({
   DATABASE_URL: nonEmpty,
@@ -54,6 +58,18 @@ const EnvSchema = z.object({
   KEEPER_ALERT_STALL_SECONDS: int(1),
   /** `keeper_backlog` alarmı: finalize edilebilir bir job bu kadar saniyeden uzun süredir bekliyor. */
   KEEPER_ALERT_DUE_SECONDS: int(1),
+  /**
+   * CCTP relayer (BE-26): Circle'ın programları ve kaynak domain başına CCTP ALT'ı (`domain:adres`, virgülle),
+   * attestation servisi, kurumun tek tx'ini bekleme süresi ve attestation / fonlama yoklamasının geri çekilmesi.
+   * Hepsi birlikte verilir; verilmezse relayer çalışmaz.
+   */
+  KEEPER_CCTP_MESSAGE_TRANSMITTER: optional(nonEmpty),
+  KEEPER_CCTP_TOKEN_MESSENGER_MINTER: optional(nonEmpty),
+  KEEPER_CCTP_LOOKUP_TABLES: optional(nonEmpty),
+  KEEPER_CCTP_ATTESTATION_URL: optional(z.url({ protocol: /^https$/ }).transform((value) => value.replace(/\/+$/, ''))),
+  KEEPER_CCTP_RELAY_AFTER_SECONDS: optional(int(0)),
+  KEEPER_CCTP_BACKOFF_BASE_SECONDS: optional(int(1)),
+  KEEPER_CCTP_BACKOFF_MAX_SECONDS: optional(int(1)),
   /** `keeper_errors` alarmı: başarısız finalize ve tur hataları bu değerin üstüne ... */
   KEEPER_ALERT_ERRORS: int(0),
   /** ... bu kadar saniyelik pencerede çıkarsa çalar. */
@@ -67,6 +83,13 @@ export interface Economics {
   readonly maxComputeUnitPrice: bigint;
 }
 
+export interface CctpRelayerConfig {
+  readonly settings: CctpSettings;
+  readonly attestationApi: string;
+  readonly relayAfterSeconds: number;
+  readonly backoff: { readonly baseSeconds: number; readonly maxSeconds: number };
+}
+
 export interface KeeperConfig {
   readonly databaseUrl: string;
   readonly rpc: { readonly urls: readonly string[]; readonly timeoutMs: number; readonly cooldownMs: number };
@@ -78,6 +101,8 @@ export interface KeeperConfig {
   readonly batchSize: number;
   readonly backoff: { readonly baseSeconds: number; readonly maxSeconds: number };
   readonly economics: Economics;
+  /** CCTP relayer; yapılandırılmamışsa null. */
+  readonly cctp: CctpRelayerConfig | null;
   readonly alerts: {
     readonly minBalanceLamports: bigint;
     readonly stallSeconds: number;
@@ -97,6 +122,57 @@ function keypair(secret: string): Keypair | string {
   }
 }
 
+const CCTP_RELAY_VARS = [
+  'KEEPER_CCTP_ATTESTATION_URL',
+  'KEEPER_CCTP_RELAY_AFTER_SECONDS',
+  'KEEPER_CCTP_BACKOFF_BASE_SECONDS',
+  'KEEPER_CCTP_BACKOFF_MAX_SECONDS',
+] as const;
+
+/** CCTP relayer'ın değişkenleri: programlar ve ALT'lar `@squaresdk/solana-cctp`'nin kuralıyla, gerisi birlikte. */
+function cctpConfig(e: z.infer<typeof EnvSchema>, problems: string[]): CctpRelayerConfig | null {
+  const settings = parseCctpSettings(
+    {
+      messageTransmitter: e.KEEPER_CCTP_MESSAGE_TRANSMITTER,
+      tokenMessengerMinter: e.KEEPER_CCTP_TOKEN_MESSENGER_MINTER,
+      lookupTables: e.KEEPER_CCTP_LOOKUP_TABLES,
+    },
+    {
+      messageTransmitter: 'KEEPER_CCTP_MESSAGE_TRANSMITTER',
+      tokenMessengerMinter: 'KEEPER_CCTP_TOKEN_MESSENGER_MINTER',
+      lookupTables: 'KEEPER_CCTP_LOOKUP_TABLES',
+    },
+  );
+  if (!settings.ok) {
+    problems.push(...settings.problems);
+    return null;
+  }
+  const missing = CCTP_RELAY_VARS.filter((name) => e[name] === undefined);
+  if (!settings.settings) {
+    if (missing.length < CCTP_RELAY_VARS.length) {
+      problems.push('KEEPER_CCTP_*: relayer değişkenleri programlar ve ALT listesiyle birlikte verilir');
+    }
+    return null;
+  }
+  if (missing.length > 0) {
+    problems.push(`${missing.join(', ')}: CCTP relayer'ı için gerekli`);
+    return null;
+  }
+  if (e.KEEPER_CCTP_BACKOFF_MAX_SECONDS! < e.KEEPER_CCTP_BACKOFF_BASE_SECONDS!) {
+    problems.push('KEEPER_CCTP_BACKOFF_MAX_SECONDS: KEEPER_CCTP_BACKOFF_BASE_SECONDS’tan küçük olamaz');
+    return null;
+  }
+  return Object.freeze({
+    settings: settings.settings,
+    attestationApi: e.KEEPER_CCTP_ATTESTATION_URL!,
+    relayAfterSeconds: e.KEEPER_CCTP_RELAY_AFTER_SECONDS!,
+    backoff: Object.freeze({
+      baseSeconds: e.KEEPER_CCTP_BACKOFF_BASE_SECONDS!,
+      maxSeconds: e.KEEPER_CCTP_BACKOFF_MAX_SECONDS!,
+    }),
+  });
+}
+
 export function loadConfig(env: Readonly<Record<string, string | undefined>>): KeeperConfig {
   const parsed = EnvSchema.safeParse(env);
   const observability = parseObservabilityEnv(env);
@@ -105,8 +181,11 @@ export function loadConfig(env: Readonly<Record<string, string | undefined>>): K
     ...(observability.ok ? [] : observability.problems),
   ];
   let keeper: Keypair | null = null;
+  let cctp: CctpRelayerConfig | null = null;
   if (parsed.success) {
     const e = parsed.data;
+    const relay = cctpConfig(e, problems);
+    if (relay) cctp = relay;
     if (e.KEEPER_PORT === e.KEEPER_METRICS_PORT) problems.push('KEEPER_METRICS_PORT: KEEPER_PORT ile aynı olamaz');
     if (e.KEEPER_BACKOFF_MAX_SECONDS < e.KEEPER_BACKOFF_BASE_SECONDS) {
       problems.push('KEEPER_BACKOFF_MAX_SECONDS: KEEPER_BACKOFF_BASE_SECONDS’tan küçük olamaz');
@@ -141,6 +220,7 @@ export function loadConfig(env: Readonly<Record<string, string | undefined>>): K
       priorityFeePercentile: e.KEEPER_PRIORITY_FEE_PERCENTILE,
       maxComputeUnitPrice: e.KEEPER_MAX_COMPUTE_UNIT_PRICE,
     }),
+    cctp,
     alerts: Object.freeze({
       minBalanceLamports: e.KEEPER_ALERT_MIN_BALANCE_LAMPORTS,
       stallSeconds: e.KEEPER_ALERT_STALL_SECONDS,

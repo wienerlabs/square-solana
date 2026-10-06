@@ -5,6 +5,7 @@ import { SQUARE_IDLS } from '@squaresdk/solana-sdk';
 import {
   AgentStatusSchema,
   ApiKeyScopeSchema,
+  CctpTransferStatusSchema,
   ClaimStatusSchema,
   DisputeResolutionSchema,
   JobStatusSchema,
@@ -110,6 +111,7 @@ describe('@squaresdk/solana-types ile hiza', () => {
       KeeperReason: KeeperReasonSchema.options,
       ApiKeyScope: ApiKeyScopeSchema.options,
       TravelRuleAccessAction: TravelRuleAccessActionSchema.options,
+      CctpTransferStatus: CctpTransferStatusSchema.options,
     };
     for (const [type, values] of Object.entries(expected)) {
       expect(labels(type), type).toEqual([...values]);

@@ -2,6 +2,7 @@
 // değerde servis açılmaz. Varsayılan değer yoktur. Log, hazırlık ve alarm webhook'u değişkenleri servislerde
 // ortaktır (`@squaresdk/solana-observability`). Program kimlikleri veritabanının `programs` tablosundan,
 // ağ referansı (did:aip) RPC'nin genesis hash'inden okunur.
+import { parseCctpSettings, type CctpSettings } from '@squaresdk/solana-cctp';
 import { createSecretBox, parseSecretBoxKeys } from '@squaresdk/solana-hardening';
 import { parseObservabilityEnv, type ObservabilityConfig } from '@squaresdk/solana-observability';
 import { z } from 'zod';
@@ -81,6 +82,14 @@ const EnvSchema = z.object({
   /** `computeUnitPrice` verilmeyen tx'lerin priority fee'si (mikro-lamport / CU). */
   API_COMPUTE_UNIT_PRICE: nonEmpty.regex(/^(0|[1-9][0-9]{0,19})$/, 'u64 ondalık bekleniyor').transform(BigInt),
 
+  /**
+   * CCTP ile fonlama (BE-26): Circle'ın `MessageTransmitterV2` ve `TokenMessengerMinterV2` programları ve kaynak
+   * domain başına CCTP ALT'ı (`domain:adres`, virgülle). Üçü birlikte verilir; verilmezse CCTP kayıtları reddedilir.
+   */
+  API_CCTP_MESSAGE_TRANSMITTER: optional(nonEmpty),
+  API_CCTP_TOKEN_MESSENGER_MINTER: optional(nonEmpty),
+  API_CCTP_LOOKUP_TABLES: optional(nonEmpty),
+
   API_PROVER_URL: baseUrl(httpUrl),
   /** API'nin prover'a gönderdiği servis anahtarı. */
   API_PROVER_API_KEY: nonEmpty,
@@ -128,6 +137,8 @@ export interface ApiConfig {
   readonly deliveries: { readonly store: DeliveryStoreConfig; readonly maxBytes: number };
   readonly tx: { readonly lookupTable: string | null; readonly computeUnitPrice: bigint };
   readonly prover: { readonly url: string; readonly apiKey: string; readonly timeoutMs: number };
+  /** CCTP ile fonlama; yapılandırılmamışsa null. */
+  readonly cctp: CctpSettings | null;
   readonly travelRule: {
     /** `kimlik → 32 bayt` (`parseSecretBoxKeys`). */
     readonly keys: Readonly<Record<string, Uint8Array>>;
@@ -146,8 +157,23 @@ export function loadConfig(env: Readonly<Record<string, string | undefined>>): A
     ...(parsed.success ? [] : parsed.error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`)),
     ...(observability.ok ? [] : observability.problems),
   ];
+  let cctp: CctpSettings | null = null;
   if (parsed.success) {
     const e = parsed.data;
+    const settings = parseCctpSettings(
+      {
+        messageTransmitter: e.API_CCTP_MESSAGE_TRANSMITTER,
+        tokenMessengerMinter: e.API_CCTP_TOKEN_MESSENGER_MINTER,
+        lookupTables: e.API_CCTP_LOOKUP_TABLES,
+      },
+      {
+        messageTransmitter: 'API_CCTP_MESSAGE_TRANSMITTER',
+        tokenMessengerMinter: 'API_CCTP_TOKEN_MESSENGER_MINTER',
+        lookupTables: 'API_CCTP_LOOKUP_TABLES',
+      },
+    );
+    if (settings.ok) cctp = settings.settings;
+    else problems.push(...settings.problems);
     if (e.API_PORT === e.API_METRICS_PORT) problems.push('API_METRICS_PORT: API_PORT ile aynı olamaz');
     if (e.API_PUBLIC_BASE_URL.length + CARD_PATH_MAX > AGENT_CARD_URI_MAX) {
       problems.push(`API_PUBLIC_BASE_URL: agent card URI'si ${AGENT_CARD_URI_MAX} karakteri aşar`);
@@ -204,6 +230,7 @@ export function loadConfig(env: Readonly<Record<string, string | undefined>>): A
     }),
     tx: Object.freeze({ lookupTable: e.API_LOOKUP_TABLE ?? null, computeUnitPrice: e.API_COMPUTE_UNIT_PRICE }),
     prover: Object.freeze({ url: e.API_PROVER_URL, apiKey: e.API_PROVER_API_KEY, timeoutMs: e.API_PROVER_TIMEOUT_MS }),
+    cctp,
     travelRule: Object.freeze({
       keys: parseSecretBoxKeys(e.API_TRAVEL_RULE_KEYS),
       activeKeyId: e.API_TRAVEL_RULE_ACTIVE_KEY_ID,

@@ -69,7 +69,7 @@ Notlar:
 | `keeper_actions` | Keeper günlüğü (`KeeperAction`) | keeper | BE-15 |
 | `users`, `auth_challenges`, `sessions`, `api_keys` | Cüzdan Ed25519 oturumu ve API anahtarları | API | BE-18 |
 | `mpp_payments` | İmzası doğrulanmış Stripe webhook'undan gelen fiat ödemesi; makbuzun Poseidon commitment'ı ve MPP authority imzası | MPP rayı | BE-25 |
-| `cctp_transfers` | CCTP mesajı (kaynak domain + nonce), Circle attestation'ı, Solana'da receive ve fund imzaları | CCTP relayer | BE-26 |
+| `cctp_transfers` | Job'a bağlanan burn (kaynak domain + burn tx'i, tekil), kurum ve beklenen mint alıcısı; attestation'dan sonra mesaj, nonce (V2, 32 bayt), tutar ve ücret; Solana'da receive ve fund imzaları; relayer'ın denemesi ve bir sonraki bakışı ([cctp-funding.md](cctp-funding.md#relayer-be-26)) | API (kayıt), keeper'daki CCTP relayer'ı (güncelleme) | BE-26 |
 | `travel_rule_records` | Job başına Travel Rule kaydı: commitment, kaydın özeti, zarf şifrelemesiyle şifreli `{ kayıt, salt }` (sarılmış veri anahtarı, ana anahtar kimliği), yazan, saklama sonu, silinme | API (`putTravelRule`) | BE-23 |
 | `travel_rule_grants` | Kaydı okuma izni: `(job, grantee)` tekil, amaç, veren, süre, geri alınma | API (`createTravelRuleGrant`) | BE-23 |
 | `travel_rule_accesses` | Erişim kaydı: kişisel veriye dokunan her işlem (`store`, `read`, `grant`, `revoke`, `purge`), yapan ve izin verilen cüzdan, istek kimliği; yalnızca eklenir | API | BE-23 |
