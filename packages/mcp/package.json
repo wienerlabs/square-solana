@@ -14,9 +14,9 @@
       "default": "./dist/index.js"
     },
     "./client": {
-      "types": "./dist/client/pool.d.ts",
-      "import": "./dist/client/pool.js",
-      "default": "./dist/client/pool.js"
+      "types": "./dist/client/index.d.ts",
+      "import": "./dist/client/index.js",
+      "default": "./dist/client/index.js"
     }
   },
   "bin": {

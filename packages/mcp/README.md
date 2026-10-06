@@ -98,26 +98,32 @@ Claude Code: `claude mcp add square -e SQUARE_MCP_CLUSTER=devnet -e … -- node 
 ## Havuzlu istemci
 
 ```ts
-import { createMcpClientPool } from '@squaresdk/solana-mcp/client';
+import { McpClientPool } from '@squaresdk/solana-mcp/client';
 
-const pool = createMcpClientPool({
-  servers: [
-    { name: 'square', transport: { kind: 'stdio', command: 'node', args: ['dist/bin.js'], env } },
-    { name: 'search', transport: { kind: 'http', url: 'https://tools.example.com/mcp', headers } },
-  ],
-  clientInfo: { name: 'research-agent', version: '1.0.0' },
-  maxConnectionsPerServer: 2,
-  idleTimeoutMs: 60_000,
+const pool = new McpClientPool({
+  servers: {
+    square: { type: 'stdio', command: 'node', args: ['dist/bin.js'], env },
+    search: { type: 'http', url: 'https://tools.example.com/mcp', headers },
+  },
+  maxConcurrency: 4,
+  toolCacheTtlMs: 60_000,
   requestTimeoutMs: 30_000,
+  reconnect: { maxAttempts: 3, backoffMs: 200, maxBackoffMs: 2_000 },
 });
 const work = await pool.callTool('square', 'square_find_work', { agentRecord });
+const quote = await pool.callToolByName('search_quote', { query }); // tool'u sunan tek sunucu bulunur
 ```
 
-- **Bağlantı sınırı:** Sunucu başına en fazla `maxConnectionsPerServer` bağlantı; dolunca çağrı sırada bekler.
-- **Yeniden kullanım:** Boşta kalan bağlantı yeniden kullanılır; `idleTimeoutMs` boyunca kullanılmayan kapanır.
-- **Kopan bağlantı:** Zaman aşımına uğrayan ya da taşıması kopan bağlantı atılır.
-- **Yeniden deneme yok:** Araç çağrısı kendiliğinden yeniden denenmez; yazma araçları idempotent değildir.
-- **Taşımalar:** stdio ve Streamable HTTP.
+- **Bağlantı:** Sunucu başına tek bağlantı, ilk istekte açılır ve yeniden kullanılır.
+- **Eşzamanlılık:** Sunucu başına aynı anda en fazla `maxConcurrency` istek yürür; fazlası sırada bekler.
+- **Yeniden bağlanma:** Kopan bağlantı sonraki istekte yeniden açılır. Açılış üstel beklemeyle `maxAttempts`
+  kez denenir; tükenince `connect_failed` hatası döner.
+- **Yeniden deneme yok:** Yolda kopan araç çağrısı yeniden denenmez; yazma araçları idempotent değildir.
+  Yalnızca `listTools` bir kez yeniden denenir.
+- **Araç keşfi:** Araç listesi `toolCacheTtlMs` boyunca önbellekte tutulur. Sunucunun `tools/list_changed`
+  bildirimi ve yeniden bağlanma önbelleği düşürür. `listAllTools`, `findTool` ve `callToolByName` bütün
+  sunucularda arar; araç birden çok sunucudaysa `ambiguous_tool` döner.
+- **Taşımalar:** stdio, Streamable HTTP ve özel taşıma (`type: 'transport'`).
 
 ## Testler
 
@@ -125,5 +131,5 @@ const work = await pool.callTool('square', 'square_find_work', { agentRecord });
 - **Araçlar:** Gerçek bir MCP istemcisinden, bellek içi taşımayla ve bellekteki zincire karşı.
 - **İmza akışı:** Anahtarsız modda imzasız tx döner, hiçbir şey gönderilmez. Anahtar rolünse imzalanıp gönderilir.
   Başka rolün tx'i kurulmaz. İmzasız tx gönderilmez.
-- **Havuz:** Yeniden kullanım, sınır ve sıra, zaman aşımı, kopan bağlantı, boşta kapanma, kapatma.
+- **Havuz:** Yeniden kullanım, eşzamanlılık sınırı, yeniden bağlanma, araç önbelleği, sunucular arası keşif, kapatma.
 - **Taşımalar:** stdio'da derlenmiş sunucu açılır; Streamable HTTP bir HTTP sunucusuna karşı denenir.
