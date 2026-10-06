@@ -34,7 +34,9 @@ export interface LocatedEvent<N extends SquareEventName = SquareEventName> exten
   eventIndex: number;
 }
 
+/** Bir tx'in event'leri. */
 export interface TransactionEvents {
+  /** Event'ler, tx'teki sırasıyla. */
   events: LocatedEvent[];
   /** Log `Log truncated` ile kesildi: kesilen kısmın event'leri eksik. */
   truncated: boolean;

@@ -25,19 +25,27 @@ import type {
 
 /** Tx imzalayabilen cüzdan (wallet-adapter ve Keypair sarmalayıcıları). */
 export interface WalletLike {
+  /** Cüzdanın adresi. */
   publicKey: PublicKey;
+  /** Tx'i imzalar ve imzalı halini döner. */
   signTransaction<T extends VersionedTransaction>(tx: T): Promise<T>;
 }
 
+/** `createSquareClient` yapılandırması. */
 export interface SquareClientConfig {
+  /** Solana RPC bağlantısı. */
   connection: Connection;
   /** Ortam yapılandırmasından gelen program kimlikleri (BC-09); varsayılan yok. */
   programIds: SquareProgramIds;
+  /** Anchor provider'ının cüzdanı; yalnızca okuma ve tx kurmada gerekmez. */
   wallet?: WalletLike;
+  /** Okuma ve tx kurmanın commitment'ı; verilmezse bağlantınınki. */
   commitment?: Commitment;
 }
 
+/** Tek programın istemcisi: Anchor programı, instruction builder'ları, hesap okuma. */
 export interface ProgramClient<I extends Idl, A> {
+  /** Yapılandırmadaki adresle kurulmuş Anchor programı. */
   readonly program: Program<I>;
   /** IDL'deki her instruction için builder. */
   readonly instructions: InstructionBuilders<I>;
@@ -51,7 +59,7 @@ export interface SquareFlow {
   registerAgent(
     params: { owner: PublicKey; agentId: string; agentCardUri: string; agentCardHash: Uint8Array; wallet: PublicKey },
     options: BuildOptions,
-  ): Promise<BuiltTx & { agentRecord: PublicKey }>;
+  ): Promise<BuiltTx & { /** Açılacak agent kaydı. */ agentRecord: PublicKey }>;
   /** Adım 3a: job açılışı; `spec` RFC 8785 ile hash'lenir. */
   createJob(
     params: {
@@ -64,7 +72,7 @@ export interface SquareFlow {
       challengePeriod: bigint;
     },
     options: BuildOptions,
-  ): Promise<BuiltTx & { job: PublicKey; specHash: Uint8Array }>;
+  ): Promise<BuiltTx & { /** Açılacak job. */ job: PublicKey; /** Spec'in hash'i (32 bayt). */ specHash: Uint8Array }>;
   /**
    * Adım 3: Travel Rule commitment'ı (ADR 0015). `Open` işe bağlanır, fonlamaya kadar değiştirilebilir;
    * eşiği aşan iş onsuz fonlanmaz. Commitment `travelRule.commitment` ile hesaplanır.
@@ -93,7 +101,7 @@ export interface SquareFlow {
       job: PublicKey;
     },
     options: BuildOptions,
-  ): Promise<BuiltTx & { minted: bigint }>;
+  ): Promise<BuiltTx & { /** Mint edilecek tutar (yakılan eksi Circle'ın ücreti). */ minted: bigint }>;
   /** Adım 4: kabul. */
   acceptJob(params: { agent: PublicKey; job: PublicKey }, options: BuildOptions): Promise<BuiltTx>;
   /** Adım 4: teslim. */
@@ -115,12 +123,14 @@ export interface SquareFlow {
     },
     options: BuildOptions,
   ): Promise<BuiltTx>;
+  /** Satılmamış alacak listelemesini kapatır (satıcı). */
   cancelClaim(params: { seller: PublicKey; job: PublicKey }, options: BuildOptions): Promise<BuiltTx>;
   /** Adım 6 + 8: permissionless finalize (keeper). ReleaseProof yoksa `ProofRequired` ile döner. */
   finalizePayment(
     params: { keeper: PublicKey; job: PublicKey; keeperTokenAccount: PublicKey },
     options: BuildOptions,
   ): Promise<BuiltTx>;
+  /** Challenge penceresinde teslime itiraz eder; bond kasaya kilitlenir (kurum). */
   raiseDispute(
     params: {
       institution: PublicKey;
@@ -131,24 +141,35 @@ export interface SquareFlow {
     },
     options: BuildOptions,
   ): Promise<BuiltTx>;
+  /** Arbitrator oyu; eşik dolunca karar kesinleşir. */
   resolveDispute(
     params: { arbitrator: PublicKey; job: PublicKey; resolution: DisputeResolution },
     options: BuildOptions,
   ): Promise<BuiltTx>;
+  /** Kesinleşmiş dispute kararını uygular: kasayı ve bond'u karara göre dağıtır (izinsiz). */
   executeResolution(params: { caller: PublicKey; job: PublicKey }, options: BuildOptions): Promise<BuiltTx>;
+  /** Job'u iptal eder; fonlanmışsa tutar kuruma döner (kurum). */
   cancelJob(
     params: { institution: PublicKey; job: PublicKey; institutionTokenAccount: PublicKey },
     options: BuildOptions,
   ): Promise<BuiltTx>;
 }
 
+/** Dört program için typed istemci (BE-08). */
 export interface SquareClient {
+  /** Yapılandırmadaki program kimlikleri. */
   readonly programIds: SquareProgramIds;
+  /** PDA türetici. */
   readonly pda: SquarePda;
+  /** square_registry istemcisi. */
   readonly registry: ProgramClient<SquareIdls['registry'], RegistryAccounts>;
+  /** square_policy istemcisi. */
   readonly policy: ProgramClient<SquareIdls['policy'], PolicyAccounts>;
+  /** square_verifier istemcisi. */
   readonly verifier: ProgramClient<SquareIdls['verifier'], VerifierAccounts>;
+  /** square_escrow istemcisi. */
   readonly escrow: ProgramClient<SquareIdls['escrow'], EscrowAccounts>;
+  /** 8 adımın tx builder'ları. */
   readonly flow: SquareFlow;
   /** Instruction'lardan imzasız v0 tx (compute budget ve ALT profilleriyle). */
   buildTx(instructions: readonly TransactionInstruction[], options: BuildOptions): Promise<BuiltTx>;
@@ -199,6 +220,7 @@ function programClient<I extends Idl, A>(prog: Program<I>): ProgramClient<I, A> 
   };
 }
 
+/** `SquareClient`'ı yapılandırmadaki program kimlikleriyle kurar. */
 export const createSquareClient: CreateSquareClient = (config) => {
   const commitment = config.commitment ?? config.connection.commitment;
   if (!commitment) throw new Error('commitment gerekli: config.commitment ya da connection commitment');
