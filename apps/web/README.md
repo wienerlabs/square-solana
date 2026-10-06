@@ -9,6 +9,8 @@ Square'in web uygulaması: Next.js 16 (App Router), React 19, Tailwind CSS 4 ve 
 | `/app/policy` | Kurumun harcama politikası: sır, kural editörü, alıcı listesi, zincire gidecek değerler (FE-04) |
 | `/app/agent` | Agent kaydı: kimlik, DID ve kayıt adresi tx'ten önce, kartın indirilip doğrulanması, `register_agent` (FE-05) |
 | `/app/did` | did:aip çözümü: kayıt zincirden, kart kendi adresinden; DID belgesi ve meta verisi. `?did=` ile paylaşılır (FE-05) |
+| `/app/agents` | Agent dizini: beceri, fiyat ve tamamlanmış iş filtresi, sıralama (FE-05) |
+| `/app/agents/[agentRecord]` | Agent profili: kayıt ve kart, beceriler ve fiyatlar, itibar, validation geçmişi, işler (FE-05) |
 | `/app/jobs/new` | İş açma ve fonlama: agent, tutar, deadline, challenge süresi, politika bağlama, iş tanımı ve hash'i, iki tarafın screening'i, `create_job` + `fund_job` (FE-06) |
 | `/app/jobs/[job]` | İş detayı: zincirdeki job, event'lerden canlı zaman çizelgesi, zincir saatine göre challenge sayacı; agent cüzdanı için kabul ve teslim (FE-07); alacağın listelenmesi, geri çekilmesi ve onaylı alıcının alımı, payee (FE-08); uyum ispatının durumu, kurumun ispatı üretip bağlaması (FE-09); herkesin tetikleyebildiği finalize, ödeme, validation, itibar ve keeper günlüğü (FE-10) |
 | `/app/claims` | Alacak piyasası: satıştaki alacaklar, fiyat, iskonto, kimin alabileceği (FE-08) |
@@ -79,7 +81,18 @@ kimliğinden türetilir. did:aip v1 programının kimliği (`CgchXu…Vbc`) redd
 | Tx | `register_agent` registry IDL'iyle kurulur, `useSendTransaction()` ile imzalanır; ücreti ve rent'i sahibi öder. Registry hata kodu IDL'deki mesajıyla gösterilir |
 | Çözüm | `@squaresdk/solana-identity`'nin `resolveDid`'i uygulamanın bağlantısıyla: başka bir ağın DID'i `unsupportedChain`. Kart durumu (doğrulandı, yok, ulaşılamadı, hash uyuşmuyor, geçersiz), sahip, agent cüzdanı, kayıt ve güncelleme zamanı, okunan slot, servisler ve DID belgesi |
 
-Profil sayfasındaki itibar, validation geçmişi ve işler ile agent dizini, indexer ve API'yi (BE-14, BE-18) bekliyor.
+### Dizin ve profil
+
+Square API'den (`SQUARE_API_URL`) okunur: indexer (BE-14) registry'yi, itibarı ve işleri zincirden yansıtır, kartları API barındırır (`putAgentCard`). Ağ doğrulanmadan okunmaz.
+
+| Parça | Davranış |
+|---|---|
+| Dizin | `listAgents`, sayfa başına 200, en fazla 1.000 agent; varsayılan olarak yalnızca etkin agent'lar. Beceri filtresi API'de: kartlardaki beceri kimliği ya da etiketiyle birebir eşleşme. Fiyat ve en az tamamlanmış iş filtresi okunan agent'lar üzerinde, yazarken; 1.000'den fazla agent varsa sayfa bunu söyler |
+| Fiyat | Kartın `pricing`'i, settlement mint'inin biriminde (`EscrowConfig.settlement_mint`, USDC): beceri arandıysa ona uyan becerilerin, yoksa bütün becerilerin en düşük fiyatı. Başka mint'teki fiyat karşılaştırılmaz. Fiyat sınırı varken fiyatı olmayan agent görünmez |
+| Sıralama | En çok tamamlanmış iş (eşitlikte kazanç), en düşük fiyat, en yeni kayıt |
+| Ağ | Agent'ın DID'indeki zincir referansı ve registry kimliği bu ağınkiyle (genesis hash'i, `SQUARE_PROGRAM_ID_REGISTRY`) karşılaştırılır: API başka bir kümenin ya da eski bir registry'nin indexer'ını okuyorsa o agent'lar gösterilmez ve sayısı yazılır |
+| Profil | `getAgent` ve `listJobs({ agentRecord })`: kart (adı, açıklaması, A2A ucu, sağlayıcı; SHA-256'sı kayıtla eşleşiyor mu), beceriler ve fiyatları, itibar (`AgentReputation`: tamamlanan, başarısız, uyuşmazlıklı iş, kazanç, ilk ve son settlement), validation geçmişi (settlement'ı yazılmış işlerin `ValidationRecord`'u, yeniden eskiye; retse sebepleri) ve son 50 iş. Kartı API'de barındırılmayan agent'ın kartı DID çözümüyle kendi adresinden okunur. API agent'ı henüz indexlemediyse sayfa DID'in zincirden çözümüne bağlantı verir |
+| Bağlantılar | İş detayındaki agent satırı ve kayıt sayfasındaki "zaten kayıtlı" bilgisi profile gider |
 
 ## İş açma ve fonlama (FE-06)
 

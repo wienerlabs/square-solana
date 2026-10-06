@@ -7,6 +7,7 @@ const SECTIONS = [
   { href: '/app', label: 'Overview' },
   { href: '/app/policy', label: 'Policy' },
   { href: '/app/agent', label: 'Agent' },
+  { href: '/app/agents', label: 'Directory' },
   { href: '/app/jobs/new', label: 'New job' },
   { href: '/app/claims', label: 'Receivables' },
   { href: '/app/did', label: 'Resolve DID' },
