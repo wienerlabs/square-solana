@@ -158,8 +158,22 @@ Servislerin değerleri:
 | `API_CCTP_LOOKUP_TABLES`, `KEEPER_CCTP_LOOKUP_TABLES` | `0:2Zg2NRhkLqdFHq3SZcxqHmZkTTLXmKx4yeZNbfSqPbUY` |
 | `KEEPER_CCTP_ATTESTATION_URL` | `https://iris-api-sandbox.circle.com` |
 
-## Sonraki yükseltme
+## Yükseltmeler
 
-Kh0ra'nın #184'ü (dispute talimatları, BC-32 ve BC-33) hesap düzenini değiştirmiyor; yalnızca talimat ekliyor.
-Merge edilince runbook'un 6. adımıyla, buffer ve Squads "Upgrade program" işlemiyle yükseltilir. Bu kayda yeni
-hash'ler eklenir.
+### Escrow v0.6.0: dispute (BC-32, BC-33), 2026-10-06
+
+Program sözleşmesi v0.6.0. M-of-N arbitration, dispute zaman aşımı (`lapse_dispute`), ispatsız bekleme başvurusu
+(`escalate_missing_proof`) ([ADR 0016](../decisions/0016-dispute-m-of-n-zaman-asimi-ve-ispatsiz-bekleme.md)).
+Hesap düzeni değişmedi. Upgrade'den sonra config ve üç `Funded` job yeni kodla okundu.
+
+| | |
+|---|---|
+| Kaynak | `feat/bc-32-33-dispute`, commit `93633b6` (programın kaynağı merge'te değişmedi) |
+| Build | `solana-verify build`, imaj `solanafoundation/solana-verifiable-build:4.1.2` ([Deploy](#deploy-bc-30-2026-10-06)'taki digest), `--library-name square_escrow` |
+| Executable hash | `84825b9b5f5e1087fc1a8e993f161d61a0dcd6760f49b99afa9182242ef2d796`. Buffer ve zincirdeki program aynı hash'i veriyor (`solana-verify get-buffer-hash`, `get-program-hash`) |
+| Buffer | `AwH8mrwMFZ9ikUD5Ct4UrM2ZoebiuEvWZYGs6PDQYVvC`; yazan deployer, authority'si vault'a verildi; rent'i deployer'a döndü (spill) |
+| Squads | İşlem 4. `scripts/deploy/upgrade-program.mjs` iki üyeyle yürüttü (muhammedakinci, mehmethayirli) |
+| İmzalar | Oluşturma `2692LDVB…`; öneri `3fgWzDTD…`; onaylar `5BH5KDpJ…`, `21kCPyhn…`; yürütme `5o9LpXK7UK3Je3e9tS7Rojbv4t7hEyXTW372ZT9peFozmdcKhGLdCtiou99XQRXyu2DtxWmuLCLQ5KdD3QdWZV1C` |
+| Son deploy slot'u | 508076228 → 508189090 |
+
+Sonraki yükseltmeler runbook'un 6. adımıyla yapılır ve buraya eklenir.
