@@ -191,7 +191,10 @@ function parseCctpSource(
   };
 }
 
-/** https adresi; http yalnızca localnet'te (tarayıcı adrese doğrudan gider). */
+/** Bu makinenin adresleri: istek makineden çıkmaz (ör. devnet'e bağlı yerel API ile deneme). */
+const LOCAL_HOSTS: ReadonlySet<string> = new Set(['localhost', '127.0.0.1', '[::1]']);
+
+/** https adresi; http yalnızca localnet'te ve bu makinenin adreslerinde (tarayıcı adrese doğrudan gider). */
 function urlProblems(variable: string, value: string, cluster: string): string[] {
   let url: URL;
   try {
@@ -200,10 +203,12 @@ function urlProblems(variable: string, value: string, cluster: string): string[]
     return [`${variable} is not a valid URL`];
   }
   if (url.protocol !== 'https:' && url.protocol !== 'http:') {
-    return [`${variable} must use https (or http for localnet); got ${url.protocol}`];
+    return [`${variable} must use https (or http for localnet and local hosts); got ${url.protocol}`];
   }
-  if (url.protocol === 'http:' && cluster !== 'localnet') {
-    return [`${variable} must use https unless ${ENV_VARS.cluster} is localnet`];
+  if (url.protocol === 'http:' && cluster !== 'localnet' && !LOCAL_HOSTS.has(url.hostname)) {
+    return [
+      `${variable} must use https unless ${ENV_VARS.cluster} is localnet or the host is local (localhost, 127.0.0.1, [::1])`,
+    ];
   }
   return [];
 }

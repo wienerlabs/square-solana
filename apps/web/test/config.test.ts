@@ -31,11 +31,17 @@ describe('parseWebConfig', () => {
     expect(parseWebConfig({ ...valid, SQUARE_SOLANA_RPC_URL: 'wss://rpc.example.org' }).ok).toBe(false);
   });
 
-  it('allows http only for localnet', () => {
+  it('allows http only for localnet and for this machine', () => {
     expect(parseWebConfig({ ...valid, SQUARE_SOLANA_RPC_URL: 'http://rpc.example.org' }).ok).toBe(false);
     expect(
       parseWebConfig({ SQUARE_SOLANA_CLUSTER: 'localnet', SQUARE_SOLANA_RPC_URL: 'http://127.0.0.1:8899' }).ok,
     ).toBe(true);
+    // Devnet'e bağlı, bu makinede çalışan servisler: istek makineden çıkmaz.
+    for (const host of ['127.0.0.1:8790', 'localhost:8790', '[::1]:8790']) {
+      expect(parseWebConfig({ ...valid, SQUARE_API_URL: `http://${host}` }).ok).toBe(true);
+    }
+    expect(parseWebConfig({ ...valid, SQUARE_API_URL: 'http://127.0.0.2:8790' }).ok).toBe(false);
+    expect(parseWebConfig({ ...valid, SQUARE_API_URL: 'http://localhost.example.org' }).ok).toBe(false);
   });
 
   it('trims surrounding whitespace', () => {
@@ -106,7 +112,7 @@ describe('prover', () => {
     expect(parseWebConfig({ ...valid, SQUARE_PROVER_URL: '' })).toEqual(parseWebConfig(valid));
     const insecure = parseWebConfig({ ...valid, SQUARE_PROVER_URL: 'http://prover.example.org' });
     expect(insecure.ok === false && insecure.errors).toEqual([
-      'SQUARE_PROVER_URL must use https unless SQUARE_SOLANA_CLUSTER is localnet',
+      'SQUARE_PROVER_URL must use https unless SQUARE_SOLANA_CLUSTER is localnet or the host is local (localhost, 127.0.0.1, [::1])',
     ]);
     expect(
       parseWebConfig({
@@ -125,7 +131,7 @@ describe('api', () => {
     expect(parseWebConfig({ ...valid, SQUARE_API_URL: ' ' })).toEqual(parseWebConfig(valid));
     const insecure = parseWebConfig({ ...valid, SQUARE_API_URL: 'http://api.example.org' });
     expect(insecure.ok === false && insecure.errors).toEqual([
-      'SQUARE_API_URL must use https unless SQUARE_SOLANA_CLUSTER is localnet',
+      'SQUARE_API_URL must use https unless SQUARE_SOLANA_CLUSTER is localnet or the host is local (localhost, 127.0.0.1, [::1])',
     ]);
   });
 });
@@ -188,7 +194,7 @@ describe('cctp', () => {
       'SQUARE_CCTP_SOURCE_DOMAIN must be a Circle domain id (an unsigned 32-bit integer)',
       'SQUARE_CCTP_TOKEN_MESSENGER is not an EVM address',
       'SQUARE_CCTP_USDC is not an EVM address',
-      'SQUARE_CCTP_ATTESTATION_URL must use https unless SQUARE_SOLANA_CLUSTER is localnet',
+      'SQUARE_CCTP_ATTESTATION_URL must use https unless SQUARE_SOLANA_CLUSTER is localnet or the host is local (localhost, 127.0.0.1, [::1])',
       'SQUARE_CCTP_MESSAGE_TRANSMITTER is not a Solana address',
     ]);
     const unknown = parseWebConfig({ ...withApi, ...CCTP, SQUARE_CCTP_SOURCE_CHAIN_ID: '4294967296' }, evmChainInfo);
