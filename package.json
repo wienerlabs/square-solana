@@ -23,13 +23,17 @@
   },
   "devDependencies": {
     "@changesets/cli": "^3.0.3",
+    "@lezer/highlight": "^1.2.5",
+    "@lezer/lr": "^1.4.10",
+    "@prometheus-io/lezer-promql": "^0.313.4",
     "@redocly/cli": "^2.57.0",
     "@squaresdk/solana-config": "workspace:*",
     "@types/node": "^24.0.0",
     "eslint": "^10.12.0",
     "prettier": "^3.9.9",
     "turbo": "^2.11.7",
-    "typescript": "~5.9.3"
+    "typescript": "~5.9.3",
+    "yaml": "^2.9.1"
   },
   "engines": {
     "node": ">=24"

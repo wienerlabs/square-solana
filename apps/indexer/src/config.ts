@@ -51,6 +51,8 @@ const EnvSchema = z.object({
   INDEXER_WEBHOOK_PENDING_TTL_SECONDS: optional(int(1)),
   /** `indexer_stalled` alarmı: son başarılı taramanın üstünden bu kadar saniye geçerse çalar. */
   INDEXER_ALERT_STALL_SECONDS: int(1),
+  /** `indexer_lagging` alarmı: senkron gecikmesi bu kadar slot'u aşarsa çalar. */
+  INDEXER_ALERT_LAG_SLOTS: int(0),
   /** `indexer_reconcile_drift` alarmı: son uzlaştırmanın bulduğu sapma bu değerin üstündeyse çalar. */
   INDEXER_ALERT_DRIFT: int(0),
   /** `indexer_errors` alarmı: işleme hatası sayısı bu değerin üstüne ... */
@@ -68,6 +70,7 @@ export interface WebhookConfig {
 
 export interface AlertThresholds {
   readonly stallSeconds: number;
+  readonly lagSlots: number;
   readonly drift: number;
   readonly errors: number;
   readonly errorWindowSeconds: number;
@@ -137,6 +140,7 @@ export function loadConfig(env: Readonly<Record<string, string | undefined>>): I
     webhook,
     alerts: Object.freeze({
       stallSeconds: e.INDEXER_ALERT_STALL_SECONDS,
+      lagSlots: e.INDEXER_ALERT_LAG_SLOTS,
       drift: e.INDEXER_ALERT_DRIFT,
       errors: e.INDEXER_ALERT_ERRORS,
       errorWindowSeconds: e.INDEXER_ALERT_ERROR_WINDOW_SECONDS,

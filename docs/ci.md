@@ -128,6 +128,7 @@ anchor build && node scripts/ci/idl-conformance.mjs   # program IDL'leri ↔ idl
 anchor test --validator legacy --skip-build            # program testleri (LiteSVM)
 pnpm contract:check                     # IDL'den türetilen dosyalar
 pnpm secrets:scan                       # gitleaks, bütün geçmiş
+node scripts/ci/monitoring.mjs          # izleme kuralları ve pano ↔ servis metrikleri (docs/slo.md)
 node --test "scripts/ci/*.test.mjs"     # CI betiklerinin testleri
 cd circuits/payment-compliance && CIRCUIT_TESTS_STRICT=1 npm test   # devre testleri, atlamasız
 ```

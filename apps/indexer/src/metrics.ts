@@ -1,6 +1,12 @@
 // Prometheus metrikleri: ortak servis metrikleri (`@squaresdk/solana-observability`) ve indexer'ın işleme,
-// imleç, uzlaştırma ve webhook sayaçları. Ayrı bir portta (`INDEXER_METRICS_PORT`, iç ağ) `GET /metrics`.
-import { Counter, Gauge, createServiceMetrics, type ServiceMetrics } from '@squaresdk/solana-observability';
+// imleç, gecikme, uzlaştırma ve webhook sayaçları. Ayrı bir portta (`INDEXER_METRICS_PORT`, iç ağ) `GET /metrics`.
+// Gecikme ölçümleri SLO'ların girdisidir ([docs/slo.md](../../../docs/slo.md)).
+import { Counter, Gauge, Histogram, createServiceMetrics, type ServiceMetrics } from '@squaresdk/solana-observability';
+
+/**
+ * `indexer_ingest_delay_seconds` kovaları. Kesinleşme tek başına ~13 s ekler; SLO sınırı (60 s) bir kovadır.
+ */
+export const INGEST_DELAY_BUCKETS = [5, 10, 15, 20, 30, 45, 60, 90, 120, 300, 600, 1800] as const;
 
 export interface IndexerMetrics extends ServiceMetrics {
   /** İşlenen tx'ler: `indexed`, `failed` (başarısız tx), `pending` (henüz kesinleşmemiş). */
@@ -13,6 +19,10 @@ export interface IndexerMetrics extends ServiceMetrics {
   readonly cursorSlot: Gauge<'program'>;
   /** Son başarılı taramanın Unix zamanı (saniye). */
   readonly lastPoll: Gauge;
+  /** Canlı tx'in blok zamanından ayna tablolara yazılmasına kadar geçen süre (backfill sayılmaz). */
+  readonly ingestDelay: Histogram;
+  /** Kesinleşmiş zincir ucunun, bütün programların eksiksiz tarandığı son uçtan farkı (slot). */
+  readonly syncLag: Gauge;
   /** Son uzlaştırmanın tablo başına sapması. */
   readonly reconcileDrift: Gauge<'table'>;
   /** Son uzlaştırmada zincirde olup sözleşme IDL'iyle çözülemeyen hesaplar, tabloya göre. */
@@ -62,6 +72,17 @@ export function createMetrics(params: { service: string; version: string }): Ind
     lastPoll: new Gauge({
       name: 'indexer_last_poll_timestamp_seconds',
       help: 'Son başarılı taramanın Unix zamanı',
+      registers,
+    }),
+    ingestDelay: new Histogram({
+      name: 'indexer_ingest_delay_seconds',
+      help: 'Canlı tx’in blok zamanından veritabanına yazılmasına kadar geçen süre',
+      buckets: [...INGEST_DELAY_BUCKETS],
+      registers,
+    }),
+    syncLag: new Gauge({
+      name: 'indexer_sync_lag_slots',
+      help: 'Kesinleşmiş zincir ucunun eksiksiz taranmış son uçtan farkı (slot)',
       registers,
     }),
     reconcileDrift: new Gauge({
