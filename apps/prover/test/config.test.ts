@@ -16,6 +16,13 @@ const ENV = {
   PROVER_MANIFEST_PATH: '/app/artifacts/manifest.json',
   PROVER_WASM_PATH: '/app/artifacts/payment.wasm',
   PROVER_ZKEY_PATH: '/app/artifacts/payment.zkey',
+  PROVER_ALERT_QUEUE_DEPTH: '4',
+  PROVER_ALERT_QUEUE_SECONDS: '120',
+  PROVER_ALERT_FAILURES: '0',
+  PROVER_ALERT_FAILURE_WINDOW_SECONDS: '300',
+  LOG_LEVEL: 'info',
+  HEALTH_CHECK_TIMEOUT_MS: '2000',
+  ALERT_EVALUATION_SECONDS: '15',
 };
 
 describe('loadConfig', () => {
@@ -32,6 +39,8 @@ describe('loadConfig', () => {
         wasmPath: '/app/artifacts/payment.wasm',
         zkeyPath: '/app/artifacts/payment.zkey',
       },
+      alerts: { queueDepth: 4, queueSeconds: 120, failures: 0, failureWindowSeconds: 300 },
+      observability: { logLevel: 'info', healthCheckTimeoutMs: 2000, alertEvaluationSeconds: 15, webhook: null },
     });
     expect(Object.isFrozen(config)).toBe(true);
   });
@@ -46,6 +55,9 @@ describe('loadConfig', () => {
       PROVER_MAX_CONCURRENT: '0',
       PROVER_QUEUE_TIMEOUT_MS: '1.5',
       PROVER_ZKEY_PATH: '  ',
+      PROVER_ALERT_FAILURE_WINDOW_SECONDS: '0',
+      LOG_LEVEL: 'verbose',
+      ALERT_WEBHOOK_URL: 'https://hooks.example/alarm',
     };
     const message = (() => {
       try {
@@ -63,6 +75,9 @@ describe('loadConfig', () => {
       'PROVER_MAX_CONCURRENT',
       'PROVER_QUEUE_TIMEOUT_MS',
       'PROVER_ZKEY_PATH',
+      'PROVER_ALERT_FAILURE_WINDOW_SECONDS',
+      'LOG_LEVEL',
+      'ALERT_WEBHOOK_TIMEOUT_MS',
     ]) {
       expect(message).toContain(key);
     }

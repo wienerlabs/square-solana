@@ -1,0 +1,39 @@
+{
+  "name": "@squaresdk/solana-observability",
+  "version": "0.1.0",
+  "description": "Uzun çalışan servislerin gözlemlenebilirlik katmanı: gizli veriyi maskeleyen yapılandırılmış logger, Prometheus metrikleri, /health ve /ready, eşik alarmları; BE-12",
+  "license": "Apache-2.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run --coverage"
+  },
+  "dependencies": {
+    "@prometheus-io/client": "^0.16.1",
+    "@squaresdk/solana-types": "workspace:*",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@squaresdk/solana-config": "workspace:*",
+    "@types/node": "^24.0.0",
+    "@vitest/coverage-v8": "^5.0.3",
+    "vitest": "^5.0.3"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}

@@ -15,7 +15,7 @@ kopyaları `pnpm license:write` yazar, `pnpm license:check` denetler.
 | [`sdk/`](sdk/) | `@squaresdk/solana-sdk` | 4 program için IDL'den typed client, PDA'lar, event decoder, tx builder'lar | [BE-08] |
 | [`identity/`](identity/) | `@squaresdk/solana-identity` | `did:aip` resolver (v2 Solana + v1), agent card | [BE-09] |
 | [`policy/`](policy/) | `@squaresdk/solana-policy` | kurum tarafı: politika, commitment, alıcı listesi, ispat | [BE-10] |
-| `observability/` | `@squaresdk/solana-observability` | logger, metrikler, health, alarm | [BE-12] |
+| [`observability/`](observability/) | `@squaresdk/solana-observability` | gizli veriyi maskeleyen logger, Prometheus metrikleri, `/health` ve `/ready`, eşik alarmları | [BE-12] |
 | `hardening/` | `@squaresdk/solana-hardening` | SSRF, idempotency, rate limit, RPC failover, imzalı eylemler | [BE-13] |
 | [`a2a/`](a2a/) | `@squaresdk/solana-a2a` | A2A v1.0 görev protokolü (JSON-RPC 2.0 + SSE), görev ↔ job durum eşlemesi, Postgres görev deposu ([tasarım](../docs/design/a2a.md)) | [BE-17] |
 | [`agent-sdk/`](agent-sdk/) | `@squaresdk/solana-agent-sdk` | agent yazma kiti | [BE-19] |

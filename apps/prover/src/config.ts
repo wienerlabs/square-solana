@@ -1,5 +1,7 @@
 // Çalışma zamanı yapılandırması: her değer ortamdan gelir ve açılışta doğrulanır; eksik ya da
-// geçersiz değerde servis açılmaz. Varsayılan değer yoktur.
+// geçersiz değerde servis açılmaz. Varsayılan değer yoktur. Log, hazırlık ve alarm webhook'u
+// değişkenleri servislerde ortaktır (`@squaresdk/solana-observability`, `parseObservabilityEnv`).
+import { parseObservabilityEnv, type ObservabilityConfig } from '@squaresdk/solana-observability';
 import { z } from 'zod';
 
 const nonEmpty = z.string().trim().min(1);
@@ -34,6 +36,14 @@ const EnvSchema = z
     PROVER_MANIFEST_PATH: nonEmpty,
     PROVER_WASM_PATH: nonEmpty,
     PROVER_ZKEY_PATH: nonEmpty,
+    /** `prover_queue_backlog` alarmı: sıradaki istek sayısı bu değerin üstünde ... */
+    PROVER_ALERT_QUEUE_DEPTH: int(0),
+    /** ... bu kadar saniye kalırsa çalar. */
+    PROVER_ALERT_QUEUE_SECONDS: int(0),
+    /** `prover_failures` alarmı: iç hatayla biten ispat sayısı bu değerin üstüne ... */
+    PROVER_ALERT_FAILURES: int(0),
+    /** ... bu kadar saniyelik pencerede çıkarsa çalar. */
+    PROVER_ALERT_FAILURE_WINDOW_SECONDS: int(1),
   })
   .refine((env) => env.PROVER_SERVICE_PORT !== env.PROVER_METRICS_PORT, {
     path: ['PROVER_METRICS_PORT'],
@@ -52,6 +62,13 @@ export interface ArtifactPaths {
   readonly zkeyPath: string;
 }
 
+export interface AlertThresholds {
+  readonly queueDepth: number;
+  readonly queueSeconds: number;
+  readonly failures: number;
+  readonly failureWindowSeconds: number;
+}
+
 export interface ProverConfig {
   readonly port: number;
   readonly metricsPort: number;
@@ -59,13 +76,19 @@ export interface ProverConfig {
   readonly apiKeySha256: readonly string[];
   readonly limits: LimiterConfig;
   readonly artifacts: ArtifactPaths;
+  readonly alerts: AlertThresholds;
+  readonly observability: ObservabilityConfig;
 }
 
 export function loadConfig(env: Readonly<Record<string, string | undefined>>): ProverConfig {
   const parsed = EnvSchema.safeParse(env);
-  if (!parsed.success) {
-    const problems = parsed.error.issues.map((issue) => `  ${issue.path.join('.')}: ${issue.message}`).join('\n');
-    throw new Error(`Geçersiz prover ortamı:\n${problems}`);
+  const observability = parseObservabilityEnv(env);
+  const problems = [
+    ...(parsed.success ? [] : parsed.error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`)),
+    ...(observability.ok ? [] : observability.problems),
+  ];
+  if (!parsed.success || !observability.ok) {
+    throw new Error(`Geçersiz prover ortamı:\n${problems.map((problem) => `  ${problem}`).join('\n')}`);
   }
   const e = parsed.data;
   return Object.freeze({
@@ -83,5 +106,12 @@ export function loadConfig(env: Readonly<Record<string, string | undefined>>): P
       wasmPath: e.PROVER_WASM_PATH,
       zkeyPath: e.PROVER_ZKEY_PATH,
     }),
+    alerts: Object.freeze({
+      queueDepth: e.PROVER_ALERT_QUEUE_DEPTH,
+      queueSeconds: e.PROVER_ALERT_QUEUE_SECONDS,
+      failures: e.PROVER_ALERT_FAILURES,
+      failureWindowSeconds: e.PROVER_ALERT_FAILURE_WINDOW_SECONDS,
+    }),
+    observability: observability.config,
   });
 }

@@ -6,7 +6,13 @@ import { createApp, createMetricsApp } from '../src/app.js';
 import { loadArtifacts, type Artifacts } from '../src/artifacts.js';
 import { apiKeyCheck } from '../src/auth.js';
 import { createLimiter } from '../src/limiter.js';
-import type { Log, LogFields } from '../src/log.js';
+import {
+  createEventWindow,
+  createHealth,
+  createLogger,
+  type EventWindow,
+  type LogRecord,
+} from '@squaresdk/solana-observability';
 import { createMetrics, type ProverMetrics } from '../src/metrics.js';
 import { createProver, type Prover } from '../src/prover.js';
 import { ARTIFACT_PATHS, close, listen, scenario, verifyResponse } from './helpers.js';
@@ -22,14 +28,21 @@ async function errorOf(response: Response) {
   return body.error;
 }
 
-/** Log satırlarını toplar; witness'ın log'a düşmediği buradan denetlenir. */
+/** Log kayıtlarını toplar; witness'ın log'a düşmediği buradan denetlenir. */
 function collectingLog() {
-  const lines: { kind: 'event' | 'error'; name: string; fields: LogFields }[] = [];
-  const log: Log = {
-    event: (name, fields = {}) => lines.push({ kind: 'event', name, fields }),
-    error: (name, fields = {}) => lines.push({ kind: 'error', name, fields }),
-  };
+  const lines: LogRecord[] = [];
+  const log = createLogger({
+    service: INFO.name,
+    level: 'debug',
+    sink: { out: () => undefined, err: () => undefined },
+    observers: [(record) => lines.push(record)],
+  });
   return { log, lines };
+}
+
+/** Metin biçimindeki metrikte `name` satırı; etiket sırası istemcinin işidir. */
+function metricLine(text: string, name: string, labels: readonly string[]): string | undefined {
+  return text.split('\n').find((line) => line.startsWith(`${name}{`) && labels.every((label) => line.includes(label)));
 }
 
 interface Service {
@@ -37,6 +50,7 @@ interface Service {
   server: Server;
   metrics: ProverMetrics;
   lines: ReturnType<typeof collectingLog>['lines'];
+  failures: EventWindow;
 }
 
 async function start(prover: Prover, limits = { maxConcurrent: 2, maxQueue: 2, queueTimeoutMs: 60_000 }) {
@@ -48,6 +62,13 @@ async function start(prover: Prover, limits = { maxConcurrent: 2, maxQueue: 2, q
     limiter,
   });
   const { log, lines } = collectingLog();
+  const failures = createEventWindow({ windowSeconds: 60 });
+  const health = createHealth({
+    version: INFO.version,
+    checks: { capacity: () => limiter.hasCapacity() },
+    timeoutMs: 1000,
+    logger: log,
+  });
   const app = createApp({
     info: INFO,
     corsOrigins: ['https://app.example.org'],
@@ -57,9 +78,11 @@ async function start(prover: Prover, limits = { maxConcurrent: 2, maxQueue: 2, q
     retryAfterSecs: Math.ceil(limits.queueTimeoutMs / 1000),
     metrics,
     log,
+    health,
+    failures,
   });
   const { server, url } = await listen(app);
-  return { server, url, metrics, lines } satisfies Service;
+  return { server, url, metrics, lines, failures } satisfies Service;
 }
 
 const post = (url: string, body: unknown, headers: Readonly<Record<string, string>> = { 'x-api-key': API_KEY }) =>
@@ -94,8 +117,8 @@ describe('POST /v1/prove', () => {
     expect(body.data.artifactVersion).toBe(artifacts.version);
     expect(await verifyResponse(body.data)).toBe(true);
 
-    const line = service.lines.find((l) => l.fields['requestId'] === body.meta.requestId);
-    expect(line).toMatchObject({ kind: 'event', name: 'prove', fields: { result: 'ok', refusalCode: 0 } });
+    const line = service.lines.find((l) => l['requestId'] === body.meta.requestId);
+    expect(line).toMatchObject({ level: 'info', msg: 'prove', result: 'ok', refusalCode: 0 });
     const logged = JSON.stringify(service.lines);
     for (const value of [
       ...(witness.policy_salts as string[]),
@@ -162,11 +185,13 @@ describe('POST /v1/prove', () => {
       expect((await errorOf(response)).code).toBe('internal_error');
       expect(broken.lines).toContainEqual(
         expect.objectContaining({
-          kind: 'error',
-          name: 'prove_failed',
-          fields: expect.objectContaining({ error: expect.stringMatching(/ProofSelfCheckError/) }),
+          level: 'error',
+          msg: 'prove_failed',
+          error: expect.stringMatching(/ProofSelfCheckError/),
         }),
       );
+      // `prover_failures` alarmının değeri.
+      expect(broken.failures.count()).toBe(1);
     } finally {
       await close(broken.server);
     }
@@ -181,7 +206,7 @@ describe('kapasite', () => {
       // İlk istek yuvayı alana kadar bekle.
       await expect.poll(async () => (await fetch(`${busy.url}/ready`)).status).toBe(503);
       const ready = HealthSchema.parse(await (await fetch(`${busy.url}/ready`)).json());
-      expect(ready).toMatchObject({ status: 'degraded', checks: { artifacts: 'ok', capacity: 'fail' } });
+      expect(ready).toEqual({ status: 'down', version: INFO.version, checks: { capacity: 'fail' } });
 
       const second = await post(busy.url, request());
       expect(second.status).toBe(503);
@@ -220,7 +245,7 @@ describe('health, OpenAPI, bilinmeyen yol', () => {
     expect(HealthSchema.parse(await ready.json())).toEqual({
       status: 'ok',
       version: INFO.version,
-      checks: { artifacts: 'ok', capacity: 'ok' },
+      checks: { capacity: 'ok' },
     });
   });
 
@@ -255,13 +280,23 @@ describe('metrikler', () => {
       expect(response.status).toBe(200);
       expect(response.headers.get('content-type')).toContain('text/plain');
       const text = await response.text();
-      expect(text).toContain(`prover_build_info{version="${INFO.version}",artifact_version="${artifacts.version}"`);
-      expect(text).toMatch(/prover_proofs_total\{result="ok",service="@squaresdk\/solana-prover"\} [1-9]/);
-      expect(text).toMatch(/prover_proofs_total\{result="unauthorized"/);
-      expect(text).toMatch(/prover_proofs_total\{result="artifact_mismatch"/);
+      const service_ = 'service="@squaresdk/solana-prover"';
+      expect(
+        metricLine(text, 'square_build_info', [`version="${INFO.version}"`, `artifact_version="${artifacts.version}"`]),
+      ).toBeDefined();
+      expect(metricLine(text, 'prover_proofs_total', ['result="ok"', service_])).toMatch(/ [1-9]\d*$/);
+      expect(metricLine(text, 'prover_proofs_total', ['result="unauthorized"'])).toBeDefined();
+      expect(metricLine(text, 'prover_proofs_total', ['result="artifact_mismatch"'])).toBeDefined();
       expect(text).toMatch(/prover_proving_seconds_count\{service="@squaresdk\/solana-prover"\} [1-9]/);
-      expect(text).toMatch(/prover_http_requests_total\{method="POST",route="\/v1\/prove",status="200"/);
-      expect(text).toMatch(/prover_http_requests_total\{method="POST",route="unmatched",status="404"/);
+      expect(
+        metricLine(text, 'http_requests_total', ['method="POST"', 'route="/v1/prove"', 'status="200"']),
+      ).toBeDefined();
+      expect(
+        metricLine(text, 'http_requests_total', ['method="POST"', 'route="unmatched"', 'status="404"']),
+      ).toBeDefined();
+      expect(
+        metricLine(text, 'http_request_duration_seconds_count', ['route="/v1/prove"', 'status="200"']),
+      ).toBeDefined();
       expect(text).toContain('prover_active_proofs');
       expect(text).toContain('process_cpu_user_seconds_total');
       expect((await fetch(`${url}/health`)).status).toBe(404);

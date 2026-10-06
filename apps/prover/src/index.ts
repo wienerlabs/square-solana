@@ -1,12 +1,19 @@
-// Süreç giriş noktası: yapılandırma ve artefaktlar doğrulanmadan servis açılmaz.
+// Süreç giriş noktası: yapılandırma ve artefaktlar doğrulanmadan servis açılmaz. Log, metrik, health ve
+// alarmlar `@squaresdk/solana-observability`'dendir.
 import type { Server } from 'node:http';
+import {
+  alarmNotifiers,
+  createAlarms,
+  createEventWindow,
+  createHealth,
+  createLogger,
+} from '@squaresdk/solana-observability';
+import { proverAlarmRules } from './alarms.js';
 import { createApp, createMetricsApp } from './app.js';
 import { loadArtifacts } from './artifacts.js';
 import { apiKeyCheck } from './auth.js';
 import { loadConfig } from './config.js';
-import { errorSummary } from './errors.js';
 import { createLimiter } from './limiter.js';
-import { processLog } from './log.js';
 import { createMetrics } from './metrics.js';
 import { packageInfo } from './package-info.js';
 import { createProver } from './prover.js';
@@ -22,6 +29,7 @@ const close = (server: Server) => new Promise<void>((resolve) => server.close(()
 
 async function main(): Promise<void> {
   const config = loadConfig(process.env);
+  const log = createLogger({ service: packageInfo.name, level: config.observability.logLevel });
   const artifacts = await loadArtifacts(config.artifacts);
   const prover = createProver(artifacts);
   const limiter = createLimiter(config.limits);
@@ -31,6 +39,20 @@ async function main(): Promise<void> {
     artifactVersion: artifacts.version,
     limiter,
   });
+  const failures = createEventWindow({ windowSeconds: config.alerts.failureWindowSeconds });
+  const health = createHealth({
+    version: packageInfo.version,
+    checks: { capacity: () => limiter.hasCapacity() },
+    timeoutMs: config.observability.healthCheckTimeoutMs,
+    logger: log,
+  });
+  const alarms = createAlarms({
+    service: packageInfo.name,
+    rules: proverAlarmRules({ limiter, failures, thresholds: config.alerts }),
+    notifiers: alarmNotifiers(config.observability),
+    logger: log,
+    registry: metrics.registry,
+  });
   const app = createApp({
     info: packageInfo,
     corsOrigins: config.corsOrigins,
@@ -39,24 +61,28 @@ async function main(): Promise<void> {
     limiter,
     retryAfterSecs: Math.ceil(config.limits.queueTimeoutMs / MS_PER_SECOND),
     metrics,
-    log: processLog,
+    log,
+    health,
+    failures,
   });
 
   const servers = await Promise.all([
     listen(app, config.port),
-    listen(createMetricsApp(metrics.registry, processLog), config.metricsPort),
+    listen(createMetricsApp(metrics.registry, log), config.metricsPort),
   ]);
-  processLog.event('listening', {
-    service: packageInfo.name,
+  const stopAlarms = alarms.start(config.observability.alertEvaluationSeconds * MS_PER_SECOND);
+  log.info('listening', {
     version: packageInfo.version,
     circuit: artifacts.circuit,
     artifactVersion: artifacts.version,
     port: config.port,
     metricsPort: config.metricsPort,
+    alertWebhook: config.observability.webhook !== null,
   });
 
   const shutdown = async (signal: string) => {
-    processLog.event('shutdown', { signal });
+    log.info('shutdown', { signal });
+    stopAlarms();
     await Promise.all(servers.map(close));
     // snarkjs'in eğri worker'ları süreci açık tutar.
     process.exit(0);
@@ -66,6 +92,7 @@ async function main(): Promise<void> {
 }
 
 main().catch((error: unknown) => {
-  processLog.error('startup_failed', { error: errorSummary(error) });
+  // Yapılandırma okunamadan düşen açılış: log düzeyi henüz bilinmediği için yalnızca hata yazılır.
+  createLogger({ service: packageInfo.name, level: 'error' }).error('startup_failed', { error });
   process.exit(1);
 });

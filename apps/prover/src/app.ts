@@ -1,15 +1,24 @@
 // HTTP yüzeyi: `POST /v1/prove` (API sözleşmesindeki istek, yanıt ve zarf), `GET /health`,
-// `GET /ready`, `GET /openapi.json`. Metrikler ayrı uygulamada (`createMetricsApp`).
+// `GET /ready`, `GET /openapi.json`. Metrikler ayrı uygulamada (`createMetricsApp`). Log, metrik, health ve
+// alarm katmanı `@squaresdk/solana-observability`'dir (BE-12).
 import { randomUUID } from 'node:crypto';
 import cors from 'cors';
 import express, { type NextFunction, type Request, type RequestHandler, type Response } from 'express';
 import helmet from 'helmet';
-import { ProveRequestSchema, type ApiErrorCode, type Health } from '@squaresdk/solana-types';
-import type { Registry } from 'prom-client';
+import { ProveRequestSchema, type ApiErrorCode } from '@squaresdk/solana-types';
+import {
+  httpMetricsMiddleware,
+  metricsResponse,
+  sendHealth,
+  type EventWindow,
+  type HealthProbe,
+  type LogFields,
+  type Logger,
+  type Registry,
+} from '@squaresdk/solana-observability';
 import type { ApiKeyCheck } from './auth.js';
 import { errorMessage, errorSummary } from './errors.js';
 import { CapacityError, type Limiter } from './limiter.js';
-import type { Log, LogFields } from './log.js';
 import type { ProofResult, ProverMetrics } from './metrics.js';
 import { openapiDocument } from './openapi.js';
 import { InvalidWitnessError, type Prover } from './prover.js';
@@ -26,7 +35,10 @@ export interface AppDeps {
   /** 503 yanıtındaki `Retry-After` (saniye). */
   readonly retryAfterSecs: number;
   readonly metrics: ProverMetrics;
-  readonly log: Log;
+  readonly log: Logger;
+  readonly health: HealthProbe;
+  /** İç hatayla biten ispatlar (`prover_failures` alarmının değeri). */
+  readonly failures: EventWindow;
 }
 
 const requestIdOf = (res: Response): string => res.locals['requestId'] as string;
@@ -47,10 +59,6 @@ function fail(
   });
 }
 
-function health(res: Response, status: number, body: Health): void {
-  res.status(status).set('cache-control', 'no-store').json(body);
-}
-
 /** `route` etiketi: eşleşen yol şablonu; eşleşmeyen istekler tek etikette toplanır (kardinalite). */
 const routeLabel = (req: Request) => (req.route ? `${req.baseUrl}${String(req.route.path)}` : 'unmatched');
 
@@ -59,21 +67,20 @@ export function createApp(deps: AppDeps): express.Express {
   const app = express();
   app.disable('x-powered-by');
 
-  app.use((req, res, next) => {
+  app.use((_req, res, next) => {
     const requestId = randomUUID();
     res.locals['requestId'] = requestId;
     res.set('x-request-id', requestId);
-    res.on('finish', () => {
-      metrics.httpRequests.inc({ method: req.method, route: routeLabel(req), status: String(res.statusCode) });
-    });
     next();
   });
+  app.use(httpMetricsMiddleware(metrics, routeLabel));
   app.use(helmet());
   app.use(cors({ origin: [...deps.corsOrigins], methods: ['GET', 'POST'] }));
 
   const record = (res: Response, result: ProofResult, fields: LogFields = {}) => {
     metrics.proofs.inc({ result });
-    log.event('prove', { requestId: requestIdOf(res), result, ...fields });
+    if (result === 'error') deps.failures.record();
+    log.info('prove', { requestId: requestIdOf(res), result, ...fields });
   };
 
   // Anahtar, gövde ayrıştırılmadan önce denetlenir.
@@ -122,17 +129,9 @@ export function createApp(deps: AppDeps): express.Express {
     }
   });
 
-  app.get('/health', (_req, res) => health(res, 200, { status: 'ok', version: deps.info.version, checks: {} }));
-
-  app.get('/ready', (_req, res) => {
-    const capacity = limiter.hasCapacity();
-    health(res, capacity ? 200 : 503, {
-      status: capacity ? 'ok' : 'degraded',
-      version: deps.info.version,
-      // Artefaktlar açılışta doğrulandı; doğrulanamasaydı süreç açılmazdı.
-      checks: { artifacts: 'ok', capacity: capacity ? 'ok' : 'fail' },
-    });
-  });
+  // Artefaktlar açılışta doğrulanır, doğrulanamazsa süreç açılmaz; hazırlık kapasiteye bakar (index.ts).
+  app.get('/health', (_req, res) => sendHealth(res, deps.health.live()));
+  app.get('/ready', async (_req, res) => sendHealth(res, await deps.health.ready()));
 
   const document = openapiDocument({ ...deps.info, artifactVersion: prover.version });
   app.get('/openapi.json', (_req, res) => {
@@ -156,12 +155,13 @@ export function createApp(deps: AppDeps): express.Express {
 }
 
 /** Yalnızca iç ağdan erişilen metrik uygulaması. */
-export function createMetricsApp(registry: Registry, log: Log): express.Express {
+export function createMetricsApp(registry: Registry, log: Logger): express.Express {
   const app = express();
   app.disable('x-powered-by');
   app.get('/metrics', async (_req, res) => {
     try {
-      res.set('content-type', registry.contentType).send(await registry.metrics());
+      const { contentType, body } = await metricsResponse(registry);
+      res.set('content-type', contentType).send(body);
     } catch (error) {
       log.error('metrics_failed', { error: errorSummary(error) });
       res.status(500).end();

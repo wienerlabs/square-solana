@@ -1,17 +1,16 @@
-// Prometheus metrikleri: süreç metrikleri, HTTP istekleri, ispat sonuçları ve süreleri, kuyruk
-// durumu. Ayrı bir portta (`PROVER_METRICS_PORT`, iç ağ) `GET /metrics` ile sunulur.
-import { Counter, Gauge, Histogram, Registry, collectDefaultMetrics } from 'prom-client';
+// Prometheus metrikleri: ortak servis metrikleri (`@squaresdk/solana-observability`: süreç, sürüm, HTTP
+// istekleri) ve ispat sonuçları, süreleri, kuyruk durumu. Ayrı bir portta (`PROVER_METRICS_PORT`, iç ağ)
+// `GET /metrics` ile sunulur.
+import { Counter, Gauge, Histogram, createServiceMetrics, type ServiceMetrics } from '@squaresdk/solana-observability';
 import type { Limiter } from './limiter.js';
 
 /** `POST /v1/prove` sonuçları; `prover_proofs_total{result}` etiketi. */
 export type ProofResult =
   'ok' | 'unauthorized' | 'invalid_input' | 'invalid_witness' | 'artifact_mismatch' | 'capacity' | 'error';
 
-export interface ProverMetrics {
-  readonly registry: Registry;
+export interface ProverMetrics extends ServiceMetrics {
   readonly proofs: Counter<'result'>;
   readonly provingSeconds: Histogram;
-  readonly httpRequests: Counter<'method' | 'route' | 'status'>;
 }
 
 export function createMetrics(params: {
@@ -20,16 +19,13 @@ export function createMetrics(params: {
   artifactVersion: string;
   limiter: Limiter;
 }): ProverMetrics {
-  const registry = new Registry();
-  registry.setDefaultLabels({ service: params.service });
-  collectDefaultMetrics({ register: registry });
-
-  new Gauge({
-    name: 'prover_build_info',
-    help: 'Servis sürümü ve yüklü zkey (artefakt sürümü); değer her zaman 1',
-    labelNames: ['version', 'artifact_version'],
-    registers: [registry],
-  }).set({ version: params.version, artifact_version: params.artifactVersion }, 1);
+  // `square_build_info{version, artifact_version}`: servis sürümü ve yüklü zkey.
+  const base = createServiceMetrics({
+    service: params.service,
+    version: params.version,
+    buildLabels: { artifact_version: params.artifactVersion },
+  });
+  const { registry } = base;
 
   new Gauge({
     name: 'prover_active_proofs',
@@ -49,23 +45,17 @@ export function createMetrics(params: {
   });
 
   return {
-    registry,
+    ...base,
     proofs: new Counter({
       name: 'prover_proofs_total',
       help: 'POST /v1/prove sonuçları',
       labelNames: ['result'],
       registers: [registry],
     }),
-    // Kova sınırları prom-client'ın varsayılanı (5 ms – 10 s).
+    // Kova sınırları istemcinin varsayılanı (5 ms – 10 s).
     provingSeconds: new Histogram({
       name: 'prover_proving_seconds',
       help: 'Başarılı ispatların üretim süresi (witness + ispat + doğrulama)',
-      registers: [registry],
-    }),
-    httpRequests: new Counter({
-      name: 'prover_http_requests_total',
-      help: 'HTTP istekleri',
-      labelNames: ['method', 'route', 'status'],
       registers: [registry],
     }),
   };
