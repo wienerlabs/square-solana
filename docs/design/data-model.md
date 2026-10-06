@@ -70,7 +70,9 @@ Notlar:
 | `users`, `auth_challenges`, `sessions`, `api_keys` | Cüzdan Ed25519 oturumu ve API anahtarları | API | BE-18 |
 | `mpp_payments` | İmzası doğrulanmış Stripe webhook'undan gelen fiat ödemesi; makbuzun Poseidon commitment'ı ve MPP authority imzası | MPP rayı | BE-25 |
 | `cctp_transfers` | CCTP mesajı (kaynak domain + nonce), Circle attestation'ı, Solana'da receive ve fund imzaları | CCTP relayer | BE-26 |
-| `travel_rule_records` | Şifreli Travel Rule verisi; zincirdeki commitment ile bağlı | API | BE-23 |
+| `travel_rule_records` | Job başına Travel Rule kaydı: commitment, kaydın özeti, zarf şifrelemesiyle şifreli `{ kayıt, salt }` (IV, sarılmış veri anahtarı, ana anahtar kimliği), yazan, saklama sonu, silinme | API (`putTravelRule`) | BE-23 |
+| `travel_rule_grants` | Kaydı okuma izni: `(job, grantee)` tekil, amaç, veren, süre, geri alınma | API (`createTravelRuleGrant`) | BE-23 |
+| `travel_rule_accesses` | Erişim kaydı: kişisel veriye dokunan her işlem (`store`, `read`, `grant`, `revoke`, `purge`), yapan ve izin verilen cüzdan, istek kimliği; yalnızca eklenir | API | BE-23 |
 | `rate_limit_windows` | Hız sınırı sayacı: anahtar (ör. `api:<cüzdan>`), pencerenin başı, ağırlık toplamı | servisler (`@squaresdk/solana-hardening/prisma`) | BE-13 |
 | `idempotency_records` | `Idempotency-Key` kaydı: `(scope, key)` tekil, isteğin SHA-256'sı, durum (`in_progress` / `completed`), kaydedilen yanıtın durum kodu ve gövdesi | servisler | BE-13 |
 | `replay_guards` | Tek kullanımlık kimlikler: webhook teslimat kimliği, imzalı eylem nonce'u; `(scope, id)` tekil | servisler | BE-13 |
@@ -84,6 +86,11 @@ API'nin yazdığı tablolar (BE-18, [apps/api](../../apps/api/README.md)):
 - **`deliveries`:** `storage_key` içeriğin SHA-256'sıdır (S3 uyumlu deponun anahtarı). `delivery_uri` deponun herkese açık adresidir.
 - **`agent_cards`:** Barındırılan kartta `raw` kartın RFC 8785 kanonik JSON'u, `skills` beceri kimlikleri ve etiketleridir. `verified` yazma anındaki eşleşmedir; görünümdeki `cardVerified` zincirdeki güncel hash'le hesaplanır.
 - **`sessions`, `api_keys`:** Belirteç `sqs_…`, anahtar `sqk_…`; yalnızca SHA-256'ları durur.
+- **`travel_rule_records`:** Düz metin sütunu yoktur ([ADR 0017](../decisions/0017-travel-rule-saklama-erisim-ve-paylasim.md)).
+  - `{ kayıt, salt }` kayda özgü veri anahtarıyla AES-256-GCM ile şifrelenir. Veri anahtarı `key_id`'li ana
+    anahtarla sarılır.
+  - Saklama süresi dolunca şifreli alanlar silinir (`purged_at`). Commitment ve özet kalır.
+  - CHECK kısıtı: silinmiş satırın şifreli alanlarının hepsi boş, silinmemişin hepsi dolu.
 
 Koruma tablolarının (`rate_limit_windows`, `idempotency_records`, `replay_guards`) her satırı `expires_at` taşır; süresi dolan satırı depo yeniden kullanır, `purgeExpired` siler. Kayıtlı yanıt gövdesi API yanıtıdır; gizli veri taşıyan bir uç idempotency'yi kullanmamalı ya da gövdeyi kaydetmemelidir.
 

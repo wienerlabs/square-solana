@@ -159,9 +159,15 @@ export class World {
   }
 
   /** Job: ayna satırı ve (PDA çözümü için) zincirdeki hesap. `disputed` ise dispute satırı da. */
-  async job(params: { institution: string; agentRecord: string; agentWallet: string; disputed?: boolean }) {
+  async job(params: {
+    institution: string;
+    agentRecord: string;
+    agentWallet: string;
+    disputed?: boolean;
+    status?: 'open' | 'funded' | 'accepted';
+  }) {
     const address = key();
-    const status = params.disputed ? 'disputed' : 'accepted';
+    const status = params.disputed ? 'disputed' : (params.status ?? 'accepted');
     const value = sample(this.programs.escrow.idl, 'job', {
       institution: new PublicKey(params.institution),
       agentRecord: new PublicKey(params.agentRecord),
