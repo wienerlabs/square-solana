@@ -7,10 +7,11 @@ import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { createRemoteProver, type Prover } from '../src/prover.js';
 import { buildSetComplianceProofTx } from '../src/tx.js';
 import { watchJobProof } from '../src/watch.js';
+import { dayStart } from '../src/release.js';
 import { buildReleaseWitness, type ReleaseWitness } from '../src/witness.js';
 import { localProver, verify } from './helpers/artifacts.js';
 import { readCircuitJson, TIMESTAMP, USDC_DEVNET, world } from './helpers/circuit-world.js';
-import { JOB_AMOUNT, okPolicy, policyAccount, PROOF_TIMEOUT_SECS, salts, State } from './helpers/state.js';
+import { JOB_AMOUNT, okPolicy, policyAccount, salts, State } from './helpers/state.js';
 
 let state: State;
 const feePayer = Keypair.generate().publicKey;
@@ -195,12 +196,14 @@ describe('createRemoteProver', () => {
 
 describe('watchJobProof (bayatlamada otomatik yenileme)', () => {
   /** İzleyiciyi çalıştırır; yenileme, hata, kendiliğinden bitiş ya da `quietMs` sessizlik sonrası durur. */
-  function run(quietMs = 150) {
+  function run(quietMs = 150, now = TIMESTAMP) {
     const submitted: BuiltTx[] = [];
     const errors: unknown[] = [];
     const reasons: string[] = [];
     const done: string[] = [];
-    const prover: Prover = { prove: (w: ReleaseWitness) => localProver.prove(w) };
+    // İzleyici ispatı bayat bulduğu anda prover'ı çağırır; ispatın üretimi sessizlik süresinden uzun sürebilir.
+    const proving: ReleaseWitness[] = [];
+    const prover: Prover = { prove: (w: ReleaseWitness) => (proving.push(w), localProver.prove(w)) };
     const finished = new Promise<void>((resolve) => {
       const stop = watchJobProof({
         client: state.client,
@@ -216,15 +219,14 @@ describe('watchJobProof (bayatlamada otomatik yenileme)', () => {
           return `sig-${submitted.length}`;
         },
         intervalMs: 5,
-        refreshBeforeSecs: 300,
         onError: (e) => (errors.push(e), stop(), resolve()),
         onRefreshed: ({ reason }) => (reasons.push(reason), stop(), resolve()),
         onDone: (reason) => (done.push(reason), resolve()),
-        now: () => TIMESTAMP,
+        now: () => now,
       });
       setTimeout(() => (stop(), resolve()), quietMs);
     });
-    return { done: finished, submitted, errors, reasons, ended: done };
+    return { done: finished, submitted, errors, reasons, ended: done, proving };
   }
 
   const bound = async (overrides: Record<string, unknown> = {}) => {
@@ -252,8 +254,9 @@ describe('watchJobProof (bayatlamada otomatik yenileme)', () => {
 
   it('taze ispat varken bir şey göndermez', async () => {
     await bound();
-    const watch = run();
+    const watch = run(500);
     await watch.done;
+    expect(watch.proving).toEqual([]);
     expect(watch.submitted).toEqual([]);
     expect(watch.errors).toEqual([]);
   });
@@ -263,7 +266,7 @@ describe('watchJobProof (bayatlamada otomatik yenileme)', () => {
     ['payee değişti', () => state.claim('bought', Keypair.generate().publicKey)],
     ['net tutar değişti', () => bound({ netAmount: new BN(1) })],
     ['mint değişti', () => bound({ mint: Keypair.generate().publicKey })],
-    ['süresi doluyor', () => bound({ proofTimestamp: new BN(TIMESTAMP - PROOF_TIMEOUT_SECS + 300) })],
+    ['gün değişti', () => bound({ proofTimestamp: new BN(dayStart(TIMESTAMP) - 60) })],
   ] as const) {
     it(`bayatlayınca yeniler: ${reason}`, async () => {
       await bound();
@@ -274,6 +277,24 @@ describe('watchJobProof (bayatlamada otomatik yenileme)', () => {
       expect(watch.submitted).toHaveLength(1);
     });
   }
+
+  it('gece yarısından hemen sonra dünkü ispatı yeniler, sayaç aynı kalsa da (ADR 0012 §4)', async () => {
+    // Dün 23:59'da yapılmış ispat, bugün 00:02'de: payee, net, mint ve sayaç aynı, release'in günü farklı.
+    await bound({ proofTimestamp: new BN(dayStart(TIMESTAMP) - 60) });
+    const watch = run(30_000, dayStart(TIMESTAMP) + 120);
+    await watch.done;
+    expect(watch.reasons).toEqual(['gün değişti']);
+    expect(watch.submitted).toHaveLength(1);
+  });
+
+  it('aynı UTC gününde saatler önce yapılmış ispatı yenilemez: ispat gün sonuna kadar tazedir', async () => {
+    await bound({ proofTimestamp: new BN(TIMESTAMP - 2 * 3600) });
+    const watch = run(500);
+    await watch.done;
+    expect(watch.proving).toEqual([]);
+    expect(watch.submitted).toEqual([]);
+    expect(watch.errors).toEqual([]);
+  });
 
   it("tüketilmiş ispatta, bitmiş job'da ve teslim edilmemiş job'da göndermez; hata onError'a gider", async () => {
     await bound({ consumed: true });
@@ -318,7 +339,6 @@ describe('watchJobProof (bayatlamada otomatik yenileme)', () => {
         buildOptions: { feePayer },
         submit: async () => 'sig',
         intervalMs: 5,
-        refreshBeforeSecs: 300,
         onError: () => resolve(),
         onRefreshed: () => (stop(), resolve()),
         now: () => TIMESTAMP,

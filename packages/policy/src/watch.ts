@@ -1,11 +1,12 @@
-// Teslim edilmiş job'un ispatını taze tutar (proof freshness). Escrow, ispat release anındaki
-// zincir durumuyla (payee, net, mint, günlük sayaç) eşleşmiyorsa ya da süresi geçmişse ödemez;
-// izleyici bunlardan biri değişince ispatı yeniden üretip bağlar.
+// Teslim edilmiş job'un ispatını taze tutar (proof freshness). Escrow, ispat release anındaki zincir
+// durumuyla (payee, net, mint, günlük sayaç) eşleşmiyorsa ya da release ispatın UTC gününde değilse
+// ödemez (ADR 0012 §4, `checkFresh`); izleyici bunlardan biri değişince ispatı yeniden üretip bağlar.
 import type { PublicKey } from '@solana/web3.js';
-import type { BuildOptions, BuiltTx, SquareClient } from '@squaresdk/solana-sdk';
+import type { BuildOptions, BuiltTx, SquareClient, VerifierAccounts } from '@squaresdk/solana-sdk';
 import type { PolicyDocument } from '@squaresdk/solana-types';
 import type { PolicySalts } from './policy.js';
 import type { Prover } from './prover.js';
+import { checkFresh, type Staleness } from './release.js';
 import { buildSetComplianceProofTx } from './tx.js';
 import { buildReleaseWitness, type ReleaseWitness } from './witness.js';
 
@@ -26,8 +27,6 @@ export interface WatchJobProofParams {
   submit: (tx: BuiltTx) => Promise<string>;
   /** Kontrol aralığı (ms). */
   intervalMs: number;
-  /** İspat süresi dolmadan bu kadar saniye önce yenilenir. */
-  refreshBeforeSecs: number;
   onError: (error: unknown) => void;
   onRefreshed?: (event: { signature: string; witness: ReleaseWitness; reason: string }) => void;
   /** İzleme kendiliğinden bitince (job bitti ya da ispat tüketildi) sebebiyle çağrılır. */
@@ -36,20 +35,43 @@ export interface WatchJobProofParams {
   now?: () => number;
 }
 
-/** Bayatlık sebebi; ispat tazeyse null. */
-async function staleness(params: WatchJobProofParams, witness: ReleaseWitness): Promise<string | null> {
-  const { client, job } = params;
-  const proof = await client.verifier.fetch('releaseProof', client.pda.releaseProof(job)[0]);
+const STALE_REASON: Readonly<Record<Staleness, string>> = {
+  payee: 'payee değişti',
+  netAmount: 'net tutar değişti',
+  mint: 'mint değişti',
+  day: 'gün değişti',
+  dailyCounter: 'günlük sayaç değişti',
+};
+
+const big = (value: { toString(): string }) => BigInt(value.toString());
+
+type VerifierProof = VerifierAccounts['releaseProof'];
+
+/**
+ * Bayatlık sebebi; ispat tazeyse null. Escrow'un kuralıyla (`checkFresh`): witness release'in şimdiki
+ * hâlidir (payee, net, mint), sayaç politikanın kurumunun `OperatorState`'idir (witness'ınki gibi).
+ */
+async function staleness(
+  client: SquareClient,
+  proof: VerifierProof | null,
+  institution: PublicKey,
+  witness: ReleaseWitness,
+): Promise<string | null> {
   if (!proof) return 'ispat yok';
-  if (!proof.payee.equals(witness.payee)) return 'payee değişti';
-  if (!proof.mint.equals(witness.mint)) return 'mint değişti';
-  if (BigInt(proof.netAmount.toString()) !== witness.netAmount) return 'net tutar değişti';
-  if (BigInt(proof.dailySpentBefore.toString()) !== witness.dailySpentBefore) return 'günlük sayaç değişti';
-  const config = await client.escrow.fetch('escrowConfig', client.pda.escrowConfig()[0]);
-  if (!config) throw new Error('escrow config bulunamadı');
-  const age = witness.timestamp - proof.proofTimestamp.toNumber();
-  if (age >= config.params.proofTimeoutSecs.toNumber() - params.refreshBeforeSecs) return 'süresi doluyor';
-  return null;
+  const operator = await client.verifier.fetch('operatorState', client.pda.operatorState(institution)[0]);
+  const reason = checkFresh(
+    {
+      payee: proof.payee,
+      netAmount: big(proof.netAmount),
+      mint: proof.mint,
+      dailySpentBefore: big(proof.dailySpentBefore),
+      proofTimestamp: proof.proofTimestamp.toNumber(),
+    },
+    operator && { dayStartUnix: operator.dayStartUnix.toNumber(), dailySpent: big(operator.dailySpent) },
+    { payee: witness.payee, netAmount: witness.netAmount, mint: witness.mint },
+    witness.timestamp,
+  );
+  return reason && STALE_REASON[reason];
 }
 
 /** İzlemeyi başlatır; durdurma fonksiyonu döner. Bir kontrol bitmeden yenisi başlamaz. */
@@ -82,14 +104,15 @@ export function watchJobProof(params: WatchJobProofParams): () => void {
       paymentCategory: params.paymentCategory,
       ...(params.now && { now: params.now() }),
     });
-    const reason = await staleness(params, witness);
-    if (!reason) return;
     const onChainPolicy = await client.policy.fetch('policy', account.policy!);
+    if (!onChainPolicy) throw new Error(`politika hesabı bulunamadı: ${account.policy!.toBase58()}`);
+    const reason = await staleness(client, proof, onChainPolicy.institution, witness);
+    if (!reason) return;
     const tx = await buildSetComplianceProofTx(
       client,
       {
         authority: params.authority,
-        institution: onChainPolicy!.institution,
+        institution: onChainPolicy.institution,
         policy: account.policy!,
         job,
         proof: await params.prover.prove(witness),

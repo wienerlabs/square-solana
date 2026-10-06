@@ -46,5 +46,23 @@ export {
   type Prover,
   type SnarkjsProof,
 } from './prover.js';
+export {
+  CLOCK_TOLERANCE_SECS,
+  DAILY_REFUSALS,
+  PERMANENT_REFUSALS,
+  REFUSAL,
+  SECONDS_PER_DAY,
+  checkFresh,
+  dailySpentAt,
+  dayStart,
+  isFinalRefusal,
+  refusalRules,
+  releaseNetAmount,
+  type BoundProof,
+  type OperatorCounter,
+  type RefusalRule,
+  type ReleaseTarget,
+  type Staleness,
+} from './release.js';
 export { SIGNAL, buildSetComplianceProofTx } from './tx.js';
 export { watchJobProof, type WatchJobProofParams } from './watch.js';

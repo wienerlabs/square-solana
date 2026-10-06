@@ -10,7 +10,7 @@ Uygulama ve servisler (pnpm workspace). `package.json` adları `@squaresdk/solan
 | [`web/`](web/) | Next.js web uygulaması (`@solana/wallet-adapter-react`); iskelet hazır, 8 adımlı akış ve demo M4'te | [FE-01] |
 | [`api/`](api/) | REST API: cüzdan oturumu ve API anahtarları, okuma uçları, 8 adımın tx hazırlığı, teslimat yükleme, agent card barındırma, prover vekili, `GET /openapi.json` | [BE-18] |
 | [`indexer/`](indexer/) | Event tabanlı indexer: kesinleşmiş tx'lerden event'ler ve ayna tablolar, Helius webhook ve RPC backfill, uzlaştırma, okuma API'si (`@squaresdk/solana-indexer/read`) | [BE-14] |
-| `keeper/` | finalize crank (kârlılık, `ProofRequired` ve screening farkındalığı) | [BE-15] |
+| [`keeper/`](keeper/) | Finalize crank: zincir doğrulaması, kârlılık eşiği, priority fee, `ProofRequired` ve screening için geri çekilme, `keeper_actions` günlüğü | [BE-15] |
 | [`prover/`](prover/) | Release devresi için Groth16 prover servisi (snarkjs, `POST /v1/prove`); Aperture `prover-service`'ten geçmişiyle taşındı [BE-02], yeni devreye uyarlandı | [BE-11] |
 | [`compliance-api/`](compliance-api/) | Aperture compliance API'si (MPP / Stripe, x402 raporu, kayıtsız ödeme izleyicisi); geçmişiyle taşındı [BE-02], uyarlama [BE-25] ve [BE-18] | [BE-25] |
 | `screener/` | sanctions screening servisi | [BE-16] |
