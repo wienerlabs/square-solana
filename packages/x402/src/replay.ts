@@ -15,6 +15,32 @@ export interface ReplayStore {
   claim(scope: string, id: string, expiresAt: Date, now: Date): Promise<boolean>;
 }
 
+/** Bellek deposunda süresi dolan kayıtlar bu kadar `claim`'de bir silinir. */
+const MEMORY_SWEEP_EVERY = 1_000;
+
+/**
+ * Süreç içi tekrar deposu: tek örnekle çalışan sunucular ve geliştirme içindir. Kayıt süreç yeniden başlayınca
+ * kaybolur ve örnekler arasında paylaşılmaz; birden çok örnekte ya da kalıcı koruma gerektiğinde veritabanı
+ * deposu verilir (Square servislerinde `createPrismaReplayStore`). Süresi dolan kayıtlar ara ara silinir.
+ */
+export function createMemoryReplayStore(): ReplayStore {
+  const seen = new Map<string, number>();
+  let claims = 0;
+  return {
+    async claim(scope, id, expiresAt, now) {
+      claims += 1;
+      if (claims % MEMORY_SWEEP_EVERY === 0) {
+        for (const [key, until] of seen) if (until <= now.getTime()) seen.delete(key);
+      }
+      const key = `${scope}\u0000${id}`;
+      const until = seen.get(key);
+      if (until !== undefined && until > now.getTime()) return false;
+      seen.set(key, expiresAt.getTime());
+      return true;
+    },
+  };
+}
+
 /** Tekrar korumasının kapsamı: `x402:<CAIP-2 ağı>`. */
 export function replayScope(network: string): string {
   return `x402:${network}`;

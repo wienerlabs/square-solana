@@ -126,6 +126,14 @@ export const createApiClient: CreateApiClient = (config: ApiClientConfig): Squar
     createApiKey: (body) => envelope('POST', '/v1/api-keys', { json: body }),
     deleteApiKey: (id) => empty('DELETE', `/v1/api-keys/${segment(id)}`),
 
+    listX402Endpoints: () => envelope('GET', '/v1/x402/endpoints'),
+    createX402Endpoint: (body) => envelope('POST', '/v1/x402/endpoints', { json: body }),
+    getX402Endpoint: (id) => envelope('GET', `/v1/x402/endpoints/${segment(id)}`),
+    updateX402Endpoint: (id, body) => envelope('PATCH', `/v1/x402/endpoints/${segment(id)}`, { json: body }),
+    deleteX402Endpoint: (id) => empty('DELETE', `/v1/x402/endpoints/${segment(id)}`),
+    getX402EndpointUsage: (id) => envelope('GET', `/v1/x402/endpoints/${segment(id)}/usage`),
+    recordX402Payment: (id, body) => envelope('POST', `/v1/x402/endpoints/${segment(id)}/payments`, { json: body }),
+
     listJobs: (query = {}) => envelope('GET', '/v1/jobs', { query }),
     getJob: (job) => envelope('GET', `/v1/jobs/${segment(job)}`),
     uploadDelivery: (job, file) => envelope('POST', `/v1/jobs/${segment(job)}/deliveries`, { form: upload(file) }),

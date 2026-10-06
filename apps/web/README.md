@@ -13,6 +13,7 @@ Square'in web uygulaması: Next.js 16 (App Router), React 19, Tailwind CSS 4 ve 
 | `/app/jobs/[job]` | İş detayı: zincirdeki job, event'lerden canlı zaman çizelgesi, zincir saatine göre challenge sayacı; agent cüzdanı için kabul ve teslim (FE-07); alacağın listelenmesi, geri çekilmesi ve onaylı alıcının alımı, payee (FE-08); uyum ispatının durumu, kurumun ispatı üretip bağlaması (FE-09); Travel Rule durumu, commitment ve yerel kayıtla doğrulama (FE-18); uyuşmazlık: itiraz, ispatsız bekleme başvurusu, oy durumu ve son tarih, kararın ödenmesi, lapse (FE-17) |
 | `/app/arbitration` | Arbitrator konsolu: açık dispute'lar, kanıtlar, oylar, oy ve webhook abonelikleri; navigasyonda arbitrator rolünde görünür (FE-17) |
 | `/app/claims` | Alacak piyasası: satıştaki alacaklar, fiyat, iskonto, kimin alabileceği (FE-08) |
+| `/app/developers` | Geliştirici portalı: API oturumu, API anahtarları, x402 ücretli uç noktalar ve kullanımı, SDK örnekleri (FE-22) |
 | `/design` | Bileşen kataloğu |
 | `/healthz` | Sağlık kontrolü (Railway) |
 
@@ -25,7 +26,7 @@ Değerler ortamdan gelir ve kök layout'ta **istek anında, sunucuda** okunur (`
 | `SQUARE_SOLANA_CLUSTER` | `devnet`, `testnet`, `mainnet-beta` ya da `localnet` |
 | `SQUARE_SOLANA_RPC_URL` | O cluster'ın JSON-RPC ucu; `https` (yalnızca `localnet` için `http`). WebSocket ucu web3.js tarafından bundan türetilir |
 | `SQUARE_PROVER_URL` | İsteğe bağlı: release ispatını üreten prover servisinin kök adresi ([`apps/prover`](../prover/README.md)); `https` (yalnızca `localnet` için `http`). Tanımlı değilse kurum iş sayfasında ispat üretemez, ispatın durumu yine görünür. Prover'ın `CORS_ORIGINS`'i web'in adresini içermeli |
-| `SQUARE_API_URL` | İsteğe bağlı: Square API'nin kök adresi ([`apps/api`](../api/README.md)); `https` (yalnızca `localnet` için `http`). Keeper günlüğü, dispute kanıtı, arbitrator kuyruğu, oy tx'i ve webhook abonelikleri buradan gelir (FE-10, FE-17). Tanımlı değilse sayfa bunu söyler: kurum yalnızca kanıtın hash'iyle itiraz eder, arbitrator konsolu kapanır. API'nin `CORS_ORIGINS`'i web'in adresini içermeli |
+| `SQUARE_API_URL` | İsteğe bağlı: Square API'nin kök adresi ([`apps/api`](../api/README.md)); `https` (yalnızca `localnet` için `http`). Keeper günlüğü, dispute kanıtı, arbitrator kuyruğu, oy tx'i, webhook abonelikleri ve geliştirici portalı (`/app/developers`) buradan gelir (FE-10, FE-17, FE-22). Tanımlı değilse sayfa bunu söyler: kurum yalnızca kanıtın hash'iyle itiraz eder, arbitrator konsolu ve geliştirici portalı kapanır. Sondaki eğik çizgi atılır. API'nin `CORS_ORIGINS`'i web'in adresini içermeli |
 | `SQUARE_PROGRAM_ID_{REGISTRY,POLICY,VERIFIER,ESCROW}` | İsteğe bağlı: programların o cluster'daki adresi (db ile aynı adlar; IDL'deki adres kullanılmaz). Tanımlı olan program landing'de adresi ve zincirdeki deploy durumuyla, tanımlı olmayan "Not configured" olarak görünür. USDC bakiyesi escrow'un config'inden okunduğu için `ESCROW` gerekir. Geçersiz bir değer yapılandırma hatasıdır |
 
 RPC adresi istemci bileşenine (`ConnectionProvider`) gider, yani tarayıcıya iner: ekranda yalnızca host gösterilse de sayfa yükünde görünür. İçinde API anahtarı olan bir RPC kullanılacaksa ya alan adıyla kısıtlanmış (domain allowlist'li) bir anahtar ya da anahtarı sunucuda tutan bir vekil gerekir.
@@ -181,6 +182,18 @@ M-of-N arbitration ve dispute zaman aşımının arayüzü ([ADR 0016](../../doc
 | Zaman çizelgesi | `DisputeRaised` (challenger, bond, son tarih), `DisputeVote` (arbitrator, oy, sayım), `DisputeDecided`, `DisputeResolved` (dağılım), `DisputeLapsed` (iade edilen bond, iş `Delivered`'a döndü), `MissingProofEscalated` |
 
 Kalan: devnet'te gerçek API ve programlarla uçtan uca deneme, devnet deploy'u (BC-30) ve yayımlanmış bir API'ye bağlıdır; burada bileşenler sahte zincir hesaplarıyla, tx'ler SDK akışıyla kurulup çözülerek test edilir.
+
+## Geliştirici portalı (FE-22)
+
+Harici geliştiricinin self-servis sayfası (`/app/developers`); `SQUARE_API_URL` gerekir. Ücretli uç nokta
+kararı: [ADR 0023](../../docs/decisions/0023-x402-ucretli-uc-nokta-tanimlari.md).
+
+| Parça | Davranış |
+|---|---|
+| Oturum | Bağlı cüzdan `createAuthChallenge`'ın metnini imzalar (wallet-adapter `signMessage`; işlem değildir, ücretsizdir), imza base58 ile `createSession`'a gider. Belirteç yalnızca sayfanın belleğindedir: yenilemede, cüzdan değişince, süresi dolunca ya da API `unauthorized` dönünce oturum kapanır. Mesaj imzalayamayan cüzdan bunu söyler |
+| API anahtarları | Liste: etiket, ön ek, kapsamlar, oluşturma ve son kullanım zamanı. Oluşturma etiket ve kapsamlarla; sır yalnızca oluşturma yanıtında gelir, bir kez gösterilir ve kopyalanır, kapatılınca sayfadan silinir. İptal hemen geçerlidir |
+| Ücretli uç noktalar | Tanım: ad, yol (geliştiricinin sunucusundaki route), fiyat, mint, ağ, alıcı (`payTo`, varsayılan bağlı cüzdan), açıklama, etkin / pasif. Ağ uygulamanın kümesinden gelir (localnet'te devnet), mint ağın USDC'si; USDC'de fiyat USDC olarak girilir ve tam sayı aritmetiğiyle taban birime çevrilir, başka mint'te taban birimdir. Düzenleme, pasifleştirme ve silme. Kullanım: ödemeli çağrı sayısı, tahsil edilen toplam, son ödeme ve son ödemeler (ödeyen, tutar, işlem) |
+| SDK örnekleri | Seçilen anahtar ve uç noktayla doldurulur, kopyalanır: `createApiClient` (anahtarın kapsamına göre), geliştiricinin sunucusu (`paidRouteFromDefinition` → `paidRoute`, kendi facilitator'ı, ödemenin bildirimi) ve ödeyen istemci (`createPayingFetch`). Sırlar ortam değişkenlerindedir. `test/developer-snippets.test.ts` her örneği doldurulmuş hâliyle gerçek paketlere karşı TypeScript derleyicisinden geçirir |
 
 ## Tasarım sistemi
 

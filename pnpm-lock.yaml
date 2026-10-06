@@ -99,6 +99,9 @@ importers:
         specifier: ^4.6.5
         version: 4.6.5
     devDependencies:
+      '@solana/kit':
+        specifier: ^5.5.1
+        version: 5.5.1(bufferutil@4.1.0)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)(utf-8-validate@6.0.6)
       '@solana/spl-token':
         specifier: ^0.4.15
         version: 0.4.15(@solana/web3.js@1.99.0(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@6.0.6))(bufferutil@4.1.0)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)(utf-8-validate@6.0.6)
@@ -108,6 +111,9 @@ importers:
       '@squaresdk/solana-keeper':
         specifier: workspace:*
         version: link:../keeper
+      '@squaresdk/solana-x402':
+        specifier: workspace:*
+        version: link:../../packages/x402
       '@testcontainers/postgresql':
         specifier: ^12.2.0
         version: 12.2.0
@@ -564,6 +570,9 @@ importers:
       bn.js:
         specifier: ^5.2.5
         version: 5.2.5
+      bs58:
+        specifier: ^6.0.0
+        version: 6.0.0
       next:
         specifier: 16.3.8
         version: 16.3.8(@babel/core@7.29.7)(@opentelemetry/api@1.9.1)(@types/node@24.19.1)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
@@ -580,9 +589,15 @@ importers:
         specifier: ^4.6.5
         version: 4.6.5
     devDependencies:
+      '@solana/kit':
+        specifier: ^5.5.1
+        version: 5.5.1(bufferutil@4.1.0)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)(utf-8-validate@6.0.6)
       '@squaresdk/solana-config':
         specifier: workspace:*
         version: link:../../packages/config
+      '@squaresdk/solana-x402':
+        specifier: workspace:*
+        version: link:../../packages/x402
       '@tailwindcss/postcss':
         specifier: ^4.3.3
         version: 4.3.3
@@ -595,6 +610,12 @@ importers:
       '@types/bn.js':
         specifier: ^5.2.0
         version: 5.2.0
+      '@types/express':
+        specifier: ^4.17.23
+        version: 4.17.25
+      '@types/node':
+        specifier: ^24.0.0
+        version: 24.19.1
       '@types/react':
         specifier: ^19.3.0
         version: 19.3.0
@@ -604,12 +625,18 @@ importers:
       axe-core:
         specifier: ^4.13.0
         version: 4.13.0
+      express:
+        specifier: ^4.21.2
+        version: 4.22.3
       jsdom:
         specifier: ^30.1.1
         version: 30.1.1(@noble/hashes@1.8.0)
       tailwindcss:
         specifier: ^4.3.3
         version: 4.3.3
+      typescript:
+        specifier: ~5.9.3
+        version: 5.9.3
       vitest:
         specifier: ^5.0.3
         version: 5.0.3(@opentelemetry/api@1.9.1)(@types/node@24.19.1)(@vitest/coverage-v8@5.0.3)(jsdom@30.1.1(@noble/hashes@1.8.0))(vite@8.3.2(@types/node@24.19.1)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
@@ -1081,6 +1108,9 @@ importers:
       '@squaresdk/solana-hardening':
         specifier: workspace:*
         version: link:../hardening
+      '@squaresdk/solana-types':
+        specifier: workspace:*
+        version: link:../types
       '@testcontainers/postgresql':
         specifier: ^12.2.0
         version: 12.2.0

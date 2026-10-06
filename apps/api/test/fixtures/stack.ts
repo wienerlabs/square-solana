@@ -36,6 +36,7 @@ import { createDeliveryStore, createEvidenceStore } from '../../src/storage.js';
 import { createKeyring, type Keyring } from '../../src/travel-rule/crypto.js';
 import { createTravelRuleService, type TravelRuleService } from '../../src/travel-rule/service.js';
 import { createTxBuilder } from '../../src/tx.js';
+import { createX402EndpointService } from '../../src/x402.js';
 import { FixtureRpc, startRpc } from './rpc.js';
 
 /** IDL'lerin bildirdiği program kimlikleri. */
@@ -213,6 +214,7 @@ export async function startStack(options: {
     }),
     evidenceMaxBytes: options.evidenceMaxBytes ?? 1024 * 1024,
     prover: createProverProxy({ url: proverUrl, apiKey: 'prover-service-key', timeoutMs: 2_000 }),
+    x402: createX402EndpointService({ db }),
     travelRule,
     limiters: { read: window(limits.read), write: window(limits.write) },
     openapi: options.openapi,

@@ -64,7 +64,7 @@ pnpm license:write
 | `@prometheus-io/client` | npm | Apache-2.0 | runtime | `@squaresdk/solana-observability` | ✓ |
 | `@prometheus-io/lezer-promql` | npm | Apache-2.0 | dev | `@squaresdk/solana-monorepo` | ✓ |
 | `@redocly/cli` | npm | MIT | dev | `@squaresdk/solana-monorepo` | ✓ |
-| `@solana/kit` | npm | MIT | runtime | `@squaresdk/solana-compliance-api`, `@squaresdk/solana-x402` | ✓ |
+| `@solana/kit` | npm | MIT | runtime | `@squaresdk/solana-api`, `@squaresdk/solana-compliance-api`, `@squaresdk/solana-web`, `@squaresdk/solana-x402` | ✓ |
 | `@solana/spl-token` | npm | Apache-2.0 | runtime | `@squaresdk/solana-agent-sdk`, `@squaresdk/solana-api`, `@squaresdk/solana-fee-payer`, `@squaresdk/solana-hosted`, `@squaresdk/solana-keeper`, `@squaresdk/solana-mcp`, `@squaresdk/solana-sdk`, `@squaresdk/solana-smoke`, `@squaresdk/solana-web` | ✓ |
 | `@solana/sysvars` | npm | MIT | runtime | `@squaresdk/solana-x402` | ✓ |
 | `@solana/wallet-adapter-base` | npm | Apache-2.0 | runtime | `@squaresdk/solana-web` | ✓ |
@@ -82,8 +82,8 @@ pnpm license:write
 | `@types/bn.js` | npm | MIT | dev | `@squaresdk/solana-fee-payer`, `@squaresdk/solana-policy`, `@squaresdk/solana-sdk`, `@squaresdk/solana-smoke`, `@squaresdk/solana-web` | ✓ |
 | `@types/busboy` | npm | MIT | dev | `@squaresdk/solana-api` | ✓ |
 | `@types/cors` | npm | MIT | dev | `@squaresdk/solana-api`, `@squaresdk/solana-compliance-api`, `@squaresdk/solana-fee-payer`, `@squaresdk/solana-prover` | ✓ |
-| `@types/express` | npm | MIT | dev | `@squaresdk/solana-api`, `@squaresdk/solana-compliance-api`, `@squaresdk/solana-fee-payer`, `@squaresdk/solana-indexer`, `@squaresdk/solana-keeper`, `@squaresdk/solana-prover`, `@squaresdk/solana-screener`, `@squaresdk/solana-x402` | ✓ |
-| `@types/node` | npm | MIT | dev | `@squaresdk/solana-agent-sdk`, `@squaresdk/solana-api`, `@squaresdk/solana-compliance-api`, `@squaresdk/solana-fee-payer`, `@squaresdk/solana-hardening`, `@squaresdk/solana-hosted`, `@squaresdk/solana-indexer`, `@squaresdk/solana-keeper`, `@squaresdk/solana-monorepo`, `@squaresdk/solana-observability`, `@squaresdk/solana-prover`, `@squaresdk/solana-screener`, `@squaresdk/solana-smoke`, `@squaresdk/solana-x402` | ✓ |
+| `@types/express` | npm | MIT | dev | `@squaresdk/solana-api`, `@squaresdk/solana-compliance-api`, `@squaresdk/solana-fee-payer`, `@squaresdk/solana-indexer`, `@squaresdk/solana-keeper`, `@squaresdk/solana-prover`, `@squaresdk/solana-screener`, `@squaresdk/solana-web`, `@squaresdk/solana-x402` | ✓ |
+| `@types/node` | npm | MIT | dev | `@squaresdk/solana-agent-sdk`, `@squaresdk/solana-api`, `@squaresdk/solana-compliance-api`, `@squaresdk/solana-fee-payer`, `@squaresdk/solana-hardening`, `@squaresdk/solana-hosted`, `@squaresdk/solana-indexer`, `@squaresdk/solana-keeper`, `@squaresdk/solana-monorepo`, `@squaresdk/solana-observability`, `@squaresdk/solana-prover`, `@squaresdk/solana-screener`, `@squaresdk/solana-smoke`, `@squaresdk/solana-web`, `@squaresdk/solana-x402` | ✓ |
 | `@types/pg` | npm | MIT | dev | `@squaresdk/solana-compliance-api`, `@squaresdk/solana-db` | ✓ |
 | `@types/react` | npm | MIT | dev | `@squaresdk/solana-web` | ✓ |
 | `@types/react-dom` | npm | MIT | dev | `@squaresdk/solana-web` | ✓ |
@@ -97,14 +97,14 @@ pnpm license:write
 | `@x402/svm` | npm | Apache-2.0 | runtime | `@squaresdk/solana-x402` | ✓ |
 | `axe-core` | npm | MPL-2.0 | dev | `@squaresdk/solana-web` | ❌ izinsiz / bilinmiyor |
 | `bn.js` | npm | MIT | runtime | `@squaresdk/solana-fee-payer`, `@squaresdk/solana-policy`, `@squaresdk/solana-sdk`, `@squaresdk/solana-smoke`, `@squaresdk/solana-web` | ✓ |
-| `bs58` | npm | MIT | runtime | `@squaresdk/solana-api`, `@squaresdk/solana-compliance-api`, `@squaresdk/solana-db`, `@squaresdk/solana-fee-payer`, `@squaresdk/solana-hardening`, `@squaresdk/solana-hosted`, `@squaresdk/solana-identity`, `@squaresdk/solana-indexer`, `@squaresdk/solana-keeper`, `@squaresdk/solana-mcp`, `@squaresdk/solana-screener` | ✓ |
+| `bs58` | npm | MIT | runtime | `@squaresdk/solana-api`, `@squaresdk/solana-compliance-api`, `@squaresdk/solana-db`, `@squaresdk/solana-fee-payer`, `@squaresdk/solana-hardening`, `@squaresdk/solana-hosted`, `@squaresdk/solana-identity`, `@squaresdk/solana-indexer`, `@squaresdk/solana-keeper`, `@squaresdk/solana-mcp`, `@squaresdk/solana-screener`, `@squaresdk/solana-web` | ✓ |
 | `busboy` | npm | MIT | runtime | `@squaresdk/solana-api` | ✓ |
 | `circomlibjs` | npm | GPL-3.0 | runtime | `@squaresdk/solana-compliance-api` | ⚠️ inceleme |
 | `cors` | npm | MIT | runtime | `@squaresdk/solana-api`, `@squaresdk/solana-compliance-api`, `@squaresdk/solana-fee-payer`, `@squaresdk/solana-prover` | ✓ |
 | `dotenv` | npm | BSD-2-Clause | runtime | `@squaresdk/solana-compliance-api` | ✓ |
 | `eslint` | npm | MIT | dev | `@squaresdk/solana-monorepo` | ✓ |
 | `eslint-config-prettier` | npm | MIT | runtime | `@squaresdk/solana-config` | ✓ |
-| `express` | npm | MIT | runtime | `@squaresdk/solana-api`, `@squaresdk/solana-compliance-api`, `@squaresdk/solana-fee-payer`, `@squaresdk/solana-indexer`, `@squaresdk/solana-keeper`, `@squaresdk/solana-prover`, `@squaresdk/solana-screener`, `@squaresdk/solana-x402` | ✓ |
+| `express` | npm | MIT | runtime | `@squaresdk/solana-api`, `@squaresdk/solana-compliance-api`, `@squaresdk/solana-fee-payer`, `@squaresdk/solana-indexer`, `@squaresdk/solana-keeper`, `@squaresdk/solana-prover`, `@squaresdk/solana-screener`, `@squaresdk/solana-web`, `@squaresdk/solana-x402` | ✓ |
 | `globals` | npm | MIT | runtime | `@squaresdk/solana-config` | ✓ |
 | `helmet` | npm | MIT | runtime | `@squaresdk/solana-api`, `@squaresdk/solana-compliance-api`, `@squaresdk/solana-fee-payer`, `@squaresdk/solana-prover`, `@squaresdk/solana-screener` | ✓ |
 | `jsdom` | npm | MIT | dev | `@squaresdk/solana-web` | ✓ |
@@ -126,7 +126,7 @@ pnpm license:write
 | `tsx` | npm | MIT | dev | `@squaresdk/solana-compliance-api` | ✓ |
 | `turbo` | npm | MIT | dev | `@squaresdk/solana-monorepo` | ✓ |
 | `tweetnacl` | npm | Unlicense | runtime | `@squaresdk/solana-compliance-api` | ✓ |
-| `typescript` | npm | Apache-2.0 | dev | `@squaresdk/solana-monorepo` | ✓ |
+| `typescript` | npm | Apache-2.0 | dev | `@squaresdk/solana-monorepo`, `@squaresdk/solana-web` | ✓ |
 | `typescript-eslint` | npm | MIT | runtime | `@squaresdk/solana-config` | ✓ |
 | `undici` | npm | MIT | runtime | `@squaresdk/solana-hardening` | ✓ |
 | `uuid` | npm | MIT | runtime | `@squaresdk/solana-compliance-api` | ✓ |
