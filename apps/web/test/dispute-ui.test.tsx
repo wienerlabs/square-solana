@@ -4,7 +4,7 @@
 // sabitlenmiş karar, kapanmış oy) ve konsolun ön koşulları. Hesaplar escrow IDL'iyle kodlanıp sahte zincirden
 // okunur; RPC yerelde dinlenmeyen bir adrestir, ağ doğrulanmaz, cüzdan bağlı değildir.
 import './helpers/record-requests';
-import { cleanup, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import axe from 'axe-core';
 import BN from 'bn.js';
 import type { PublicKey } from '@solana/web3.js';
@@ -12,7 +12,7 @@ import { createApiClient, createPda } from '@squaresdk/solana-sdk';
 import type { ArbitrationQueueItem } from '@squaresdk/solana-types';
 import { afterEach, describe, expect, it } from 'vitest';
 import { ArbitrationPage } from '@/components/arbitration/arbitration-page';
-import { QueueCard } from '@/components/arbitration/arbitration-console';
+import { QueueCard, QueuePager, queuePages } from '@/components/arbitration/arbitration-console';
 import { JobDispute } from '@/components/jobs/job-dispute';
 import { Providers } from '@/components/providers';
 import type { ApiClientState } from '@/components/api-client';
@@ -270,6 +270,28 @@ describe('arbitration console', () => {
     cleanup();
     await mountCard({ approval_mask: 0b001, approval_count: 1, resolution: { FavorAgent: {} } }, RAISED + 100);
     expect(screen.getByText('You have already voted in the current count.')).toBeTruthy();
+  });
+
+  it('pages through a queue longer than one page', async () => {
+    expect([queuePages(0), queuePages(50), queuePages(51), queuePages(120)]).toEqual([1, 1, 2, 3]);
+    const { container } = render(<QueuePager page={1} pages={1} onPage={() => undefined} />);
+    expect(container.innerHTML).toBe('');
+    cleanup();
+    const asked: number[] = [];
+    const { container: pager } = render(
+      <main>
+        <QueuePager page={2} pages={3} onPage={(next) => asked.push(next)} />
+      </main>,
+    );
+    expect(screen.getByText('Page 2 of 3')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Previous' }));
+    expect(asked).toEqual([3, 1]);
+    expect(await axeViolations(pager)).toEqual([]);
+    cleanup();
+    render(<QueuePager page={3} pages={3} onPage={() => undefined} />);
+    expect(screen.getByRole('button', { name: 'Next' }).matches(':disabled')).toBe(true);
+    expect(screen.getByRole('button', { name: 'Previous' }).matches(':disabled')).toBe(false);
   });
 
   it('needs the Square API and an arbitrator wallet', () => {
