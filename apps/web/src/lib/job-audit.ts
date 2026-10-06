@@ -76,12 +76,20 @@ export function proofHistory(entries: readonly TimelineEntry[]): ProofDecision[]
 }
 
 /**
- * İşlemin Solana Explorer bağlantısı. localnet'te explorer uygulamanın RPC'sine bağlanır (`customUrl`); RPC
- * adresi bağlantıya girer, o yüzden yalnızca localnet'te.
+ * Solana Explorer bağlantısı. localnet'te explorer uygulamanın RPC'sine bağlanır (`customUrl`); RPC adresi
+ * bağlantıya girer, o yüzden yalnızca localnet'te.
  */
-export function explorerTxUrl(signature: string, cluster: Cluster, rpcUrl: string): string {
-  const base = `https://explorer.solana.com/tx/${signature}`;
+function explorerUrl(path: string, cluster: Cluster, rpcUrl: string): string {
+  const base = `https://explorer.solana.com/${path}`;
   if (cluster === 'mainnet-beta') return base;
   if (cluster === 'localnet') return `${base}?cluster=custom&customUrl=${encodeURIComponent(rpcUrl)}`;
   return `${base}?cluster=${cluster}`;
 }
+
+/** İşlemin Solana Explorer bağlantısı. */
+export const explorerTxUrl = (signature: string, cluster: Cluster, rpcUrl: string) =>
+  explorerUrl(`tx/${signature}`, cluster, rpcUrl);
+
+/** Hesabın (program, config, ALT) Solana Explorer bağlantısı. */
+export const explorerAddressUrl = (address: string, cluster: Cluster, rpcUrl: string) =>
+  explorerUrl(`address/${address}`, cluster, rpcUrl);

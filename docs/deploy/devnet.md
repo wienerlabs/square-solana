@@ -109,6 +109,7 @@ kurulduktan sonra donduruldu: authority'si yoktur, değişmez. Servislerde `API_
 | `SQUARE_PROGRAM_ID_VERIFIER` | `8yLdDR5zoAzeEWzkNX19DKy4HfVYXb7VcU3wWStwTFPh` |
 | `SQUARE_PROGRAM_ID_ESCROW` | `6yBTEVbizMVCWAp4c3jx6Xdsay3CiUmrJmTswY7QRWaX` |
 | `API_LOOKUP_TABLE` | `3cjUqPz9ECuym9w8trGRVUadGbj24Z7BvYALvEfmCCoG` |
+| `SQUARE_LOOKUP_TABLE` (web, ağ sayfası) | `3cjUqPz9ECuym9w8trGRVUadGbj24Z7BvYALvEfmCCoG` |
 
 ## Sonraki yükseltme
 
