@@ -20,6 +20,7 @@ Mimari karar kayıtları (ADR). Her karar ayrı bir dosyada, sıra numarasıyla 
 | [0013](0013-release-keeper-ucreti-iade-ve-itibar.md) | Release: keeper ücretinin tavanı, yalnızca kalıcı retlerin iade etmesi, payee screening'i, itibar ve validation kaydı | BC-23 (#31), BC-24 (#32), BC-26 (#34) |
 | [0014](0014-alacak-piyasasi-satici-ve-alici-kurallari.md) | Alacak piyasası: satıcının güncel agent cüzdanı olması, kurumun alıcı olamaması, güncel ve sıfırda kısıtsız alıcı listesi | BC-25 (#33) |
 | [0015](0015-travel-rule-commitment-ve-esik.md) | Travel Rule commitment'ı: salt'lı ve job'a bağlı tanım, yalnızca `Open` işe bağlama, eşiğe eşit tutarda zorunluluk | BC-34 (#71) |
+| [0017](0017-travel-rule-saklama-erisim-ve-paylasim.md) | Travel Rule kaydı: IVMS101 alt kümesi, sunucuda üretilen salt, zarf şifrelemesi ve anahtar döndürme, izinli okuma, erişim kaydı, yapılandırmadaki saklama süresi | BE-23 (#73) |
 
 ## §12 kararlarının karşılığı
 
