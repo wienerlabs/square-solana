@@ -117,3 +117,17 @@
   arbitrator bildirimi BE-22'de uygulandı ([apps/api](../../apps/api/README.md#uyuşmazlık)).
 - `lapse_dispute`'un otomatik çağrılması BE-22'de keeper'ın lapse crank'i olarak uygulandı
   ([apps/keeper](../../apps/keeper/README.md#lapse-cranki-be-22)).
+- **Kararın ispatsız beklemesi:** Policy'li işte FavorAgent ya da agent payı sıfırdan büyük bir Split kararı,
+  kurum uyumlu bir ispat (ödeme) ya da kesin bir ret (iade) bağlayana kadar `Resolved`'da bekler. Kurum
+  hiçbirini bağlamazsa escrow ve bond kilitli kalır: `lapse_dispute` `Disputed`, `escalate_missing_proof`
+  `Delivered` ister. Bu bilinçli bir tercihtir: agent tarafına ispatsız ödeme yapılmaz ve kurum ispatı vermeyerek
+  fonunu geri alamaz, yani bekletmek kuruma bir şey kazandırmaz. Zaman aşımıyla iade ya da ispatsız ödeme yolu
+  yoktur.
+- **Aynı gün bayatlayan ispat:** `escalate_missing_proof` ispatın yalnızca gününe, tüketilip tüketilmediğine ve
+  kararına bakar. `check_fresh`'in payee, net tutar, mint ve günlük sayaç denetimlerini yapmaz, çünkü talimat
+  `OperatorState` ve alacak listelemesi hesaplarını almaz. `finalize_payment`'in bayat saydığı aynı günkü bir
+  ispat başvuruyu UTC günü bitene kadar engeller. Kurum her gün ispat bağlayıp sayacını başka bir release'le
+  değiştirirse bu tekrarlanabilir. Tam denetim bu iki hesabın talimata eklenmesini, yani arayüz değişikliğini
+  gerektirir; v0.6.0'da yapılmadı.
+- **Alacak alıcısının başvurusu:** Başvuruyu yalnızca `job.agent_wallet` imzalar. Alacak satıldıysa payee
+  alıcıdır ve başvuru için agent'a bağlıdır; alıcı bu riski alacağın fiyatına katar.
