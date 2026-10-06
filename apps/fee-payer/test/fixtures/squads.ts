@@ -2,7 +2,7 @@
 // testte yoktur; öneri işleminin zincirde bıraktığı VaultTransaction hesabı buradan yazılır.
 import * as sqds from '@sqds/multisig';
 import type { VaultMessage } from '@squaresdk/solana-sdk/squads';
-import type { PublicKey } from '@solana/web3.js';
+import { SystemProgram, type PublicKey } from '@solana/web3.js';
 import BN from 'bn.js';
 
 /** `VaultTransaction` hesap verisi: mesaj `vault_transaction_create`'in kaydettiğiyle aynı. */
@@ -38,6 +38,21 @@ export function vaultTransactionData(params: {
         readonlyIndexes: Uint8Array.from(lookup.readonlyIndexes),
       })),
     },
+  }).serialize();
+  return data;
+}
+
+export function multisigData(params: { members: readonly PublicKey[]; rentCollector: PublicKey | null }): Buffer {
+  const [data] = sqds.accounts.Multisig.fromArgs({
+    createKey: params.members[0]!,
+    configAuthority: SystemProgram.programId,
+    threshold: 1,
+    timeLock: 0,
+    transactionIndex: new BN(0),
+    staleTransactionIndex: new BN(0),
+    rentCollector: params.rentCollector,
+    bump: 255,
+    members: params.members.map((key) => ({ key, permissions: { mask: 7 } })),
   }).serialize();
   return data;
 }

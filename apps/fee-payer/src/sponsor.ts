@@ -50,6 +50,7 @@ export type SponsorPolicy = Omit<PolicyContext, 'sponsor' | 'lookupTable' | 'squ
 
 /** Paket sınırı (bayt); base64 tx bundan büyük olamaz. */
 const PACKET_DATA_SIZE = 1232;
+const TOKEN_ACCOUNT_BYTES = 165;
 
 /** Simülasyon hatasının JSON'u (`InstructionError` gibi iç içe yapılar). */
 const jsonSafe = (value: unknown): unknown =>
@@ -72,6 +73,17 @@ export function createSponsorService(deps: {
 }): SponsorService {
   const { connection, metrics, ledger } = deps;
   const sponsorKey = deps.sponsor.publicKey;
+  let tokenAccountRent: Promise<bigint> | null = null;
+  const tokenAccountRentLamports = () => {
+    tokenAccountRent ??= rpc(() => connection.getMinimumBalanceForRentExemption(TOKEN_ACCOUNT_BYTES)).then(
+      BigInt,
+      (error: unknown) => {
+        tokenAccountRent = null;
+        throw error;
+      },
+    );
+    return tokenAccountRent;
+  };
 
   async function rpc<T>(call: () => Promise<T>): Promise<T> {
     try {
@@ -166,7 +178,12 @@ export function createSponsorService(deps: {
       if (after === undefined) throw rpcUnavailable(new Error('simülasyon sponsor hesabını döndürmedi'));
       const feeLamports = BigInt(fee);
       const delta = before - BigInt(after);
-      const rentLamports = delta > feeLamports ? delta - feeLamports : 0n;
+      const simulatedRent = delta > feeLamports ? delta - feeLamports : 0n;
+      const rentFloor =
+        inspection.sponsoredTokenAccounts > 0
+          ? BigInt(inspection.sponsoredTokenAccounts) * (await tokenAccountRentLamports())
+          : 0n;
+      const rentLamports = simulatedRent > rentFloor ? simulatedRent : rentFloor;
       const cost = feeLamports + rentLamports;
       if (cost > deps.maxLamportsPerTx) {
         return reject(
@@ -206,8 +223,8 @@ export function createSponsorService(deps: {
       }
 
       const serialized = tx.serialize();
-      let submitted = false;
-      if (request.submit) {
+      let submitted = reservation.replayed === 'submitted';
+      if (request.submit && !submitted) {
         try {
           await connection.sendRawTransaction(serialized, { skipPreflight: true });
         } catch (error) {
@@ -228,11 +245,13 @@ export function createSponsorService(deps: {
       }
 
       metrics.requests.inc({ outcome: submitted ? 'submitted' : 'signed' });
-      metrics.feeLamports.inc(Number(feeLamports));
-      metrics.rentLamports.inc(Number(rentLamports));
-      metrics.txCost.observe(Number(cost));
-      metrics.userDailySpend.observe(Number(reservation.userSpent));
-      if (computeUnits !== null) metrics.computeUnits.observe(computeUnits);
+      if (reservation.replayed === null) {
+        metrics.feeLamports.inc(Number(feeLamports));
+        metrics.rentLamports.inc(Number(rentLamports));
+        metrics.txCost.observe(Number(cost));
+        metrics.userDailySpend.observe(Number(reservation.userSpent));
+        if (computeUnits !== null) metrics.computeUnits.observe(computeUnits);
+      }
       return {
         transaction: Buffer.from(serialized).toString('base64'),
         signature,

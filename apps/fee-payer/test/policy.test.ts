@@ -1,7 +1,11 @@
 // Politikanın her ret dalı ayrı testte (ADR 0019). Zincir okumaları bellekteki tablolardan.
 import * as sqds from '@sqds/multisig';
 import { SQUADS_PROGRAM_ID, squadsVaultAddress, wrapInVault } from '@squaresdk/solana-sdk/squads';
-import { createAssociatedTokenAccountIdempotentInstruction, createTransferCheckedInstruction } from '@solana/spl-token';
+import {
+  TOKEN_2022_PROGRAM_ID,
+  createAssociatedTokenAccountIdempotentInstruction,
+  createTransferCheckedInstruction,
+} from '@solana/spl-token';
 import {
   ComputeBudgetProgram,
   Keypair,
@@ -15,7 +19,7 @@ import {
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_ALLOWED_INSTRUCTIONS, parseAllowedInstructions, programKinds } from '../src/catalog.js';
 import { PolicyRejection, inspectTransaction, type PolicyContext, type RejectionReason } from '../src/policy.js';
-import { vaultTransactionData } from './fixtures/squads.js';
+import { multisigData, vaultTransactionData } from './fixtures/squads.js';
 import { PROGRAM_IDS } from './fixtures/stack.js';
 import { BLOCKHASH, key, signed, squareIx, table, v0 } from './fixtures/tx.js';
 
@@ -114,6 +118,13 @@ describe('kabul', () => {
       'system:transfer',
       'registry:register_agent',
     ]);
+  });
+
+  it('sponsorun ödediği ATA açılışı rent tabanına sayılır, kullanıcının ödediği sayılmaz', async () => {
+    const sponsored = v0(S, [createAssociatedTokenAccountIdempotentInstruction(S, key(), U, key()), registerAgent()]);
+    expect((await inspect(sponsored)).sponsoredTokenAccounts).toBe(1);
+    const own = v0(S, [createAssociatedTokenAccountIdempotentInstruction(U, key(), U, key()), registerAgent()]);
+    expect((await inspect(own)).sponsoredTokenAccounts).toBe(0);
   });
 
   it('address lookup table’dan gelen hesaplar çözülür', async () => {
@@ -286,6 +297,15 @@ describe('ret dalları', () => {
     });
   });
 
+  it('sponsor_rent_unbounded: sponsorun ödediği Token-2022 hesabı', async () => {
+    const mint = key();
+    const ata = createAssociatedTokenAccountIdempotentInstruction(S, key(), U, mint, TOKEN_2022_PROGRAM_ID);
+    await expectReject(inspect(v0(S, [ata, registerAgent()])), 'sponsor_rent_unbounded', {
+      instruction: 'ata:create_idempotent',
+      position: 0,
+    });
+  });
+
   it('duplicate_compute_budget: aynı compute budget talimatı iki kez', async () => {
     await expectReject(inspect(v0(S, [limit(10_000), limit(20_000), registerAgent()])), 'duplicate_compute_budget', {
       instruction: 'set_compute_unit_limit',
@@ -336,6 +356,9 @@ describe('Squads vault tx’leri', () => {
   const multisig = key();
   const member = Keypair.generate();
   const M = member.publicKey;
+  const onChain = (entries: [string, Uint8Array][] = [], rentCollector: PublicKey | null = null): Chain => ({
+    squads: new Map([[multisig.toBase58(), multisigData({ members: [M], rentCollector })], ...entries]),
+  });
 
   const plan = (instructions: TransactionInstruction[], index = 1n) =>
     wrapInVault({ multisig, transactionIndex: index, member: M, rentPayer: S, instructions });
@@ -344,7 +367,7 @@ describe('Squads vault tx’leri', () => {
 
   it('öneri işlemi: iç talimatlar denetlenir, adlar `vault>` önekiyle', async () => {
     const real = plan([vaultOwned(squadsVaultAddress(multisig, 0)[0])]);
-    const result = await inspect(v0(S, [...real.propose]));
+    const result = await inspect(v0(S, [...real.propose]), onChain());
     expect(result.instructions).toEqual([
       'squads:vault_transaction_create',
       'vault>registry:register_agent',
@@ -355,16 +378,16 @@ describe('Squads vault tx’leri', () => {
 
   it('yürütme işlemi: mesaj zincirdeki VaultTransaction hesabından', async () => {
     const p = plan([squareIx('escrow', 'create_job', { payer: S, institution: squadsVaultAddress(multisig, 0)[0] })]);
-    const squads = new Map([
+    const chain = onChain([
       [p.transaction.toBase58(), vaultTransactionData({ multisig, creator: M, index: 1n, message: p.message })],
     ]);
-    const result = await inspect(signed(v0(S, [p.execute]), member), { squads }, true);
+    const result = await inspect(signed(v0(S, [p.execute]), member), chain, true);
     expect(result.instructions).toEqual(['squads:vault_transaction_execute', 'vault>escrow:create_job']);
   });
 
   it('öneri ve yürütme aynı tx’te: mesaj aynı tx’in vault_transaction_create’inden', async () => {
     const p = plan([squareIx('escrow', 'accept_job', { agent: key() })]);
-    const result = await inspect(v0(S, [...p.propose, p.execute]));
+    const result = await inspect(v0(S, [...p.propose, p.execute]), onChain());
     expect(result.instructions.at(-1)).toBe('vault>escrow:accept_job');
   });
 
@@ -383,7 +406,7 @@ describe('Squads vault tx’leri', () => {
       keys: create.keys,
       data: Buffer.concat([create.data.subarray(0, 8), Buffer.from([0, 0, 1])]),
     });
-    await expectReject(inspect(v0(S, [corrupt])), 'invalid_squads_message', { instruction: 0 });
+    await expectReject(inspect(v0(S, [corrupt]), onChain()), 'invalid_squads_message', { instruction: 0 });
     const squads = new Map([[p.transaction.toBase58(), Buffer.alloc(100, 1)]]);
     await expectReject(inspect(v0(S, [p.execute]), { squads }), 'invalid_squads_message', {
       transaction: p.transaction.toBase58(),
@@ -442,20 +465,22 @@ describe('Squads vault tx’leri', () => {
       transactionMessage: message,
       addressLookupTableAccounts: [lookup],
     });
-    await expectReject(inspect(v0(S, [create])), 'inner_lookup_table');
+    await expectReject(inspect(v0(S, [create]), onChain()), 'inner_lookup_table');
   });
 
   it('program_not_allowed: vault mesajında compute budget ya da Squads', async () => {
-    await expectReject(inspect(v0(S, [...plan([limit(10_000), registerAgent()]).propose])), 'program_not_allowed', {
-      inner: true,
-    });
+    await expectReject(
+      inspect(v0(S, [...plan([limit(10_000), registerAgent()]).propose]), onChain()),
+      'program_not_allowed',
+      { inner: true },
+    );
     const nested = sqds.instructions.proposalApprove({ multisigPda: key(), transactionIndex: 1n, member: key() });
-    await expectReject(inspect(v0(S, [...plan([nested]).propose])), 'program_not_allowed', { inner: true });
+    await expectReject(inspect(v0(S, [...plan([nested]).propose]), onChain()), 'program_not_allowed', { inner: true });
   });
 
   it('instruction_not_allowed: vault mesajında yönetici talimatı', async () => {
     const admin = squareIx('escrow', 'update_arbitrators', { admin: key() });
-    await expectReject(inspect(v0(S, [...plan([admin]).propose])), 'instruction_not_allowed', {
+    await expectReject(inspect(v0(S, [...plan([admin]).propose]), onChain()), 'instruction_not_allowed', {
       instruction: 'escrow:update_arbitrators',
       inner: true,
     });
@@ -464,7 +489,7 @@ describe('Squads vault tx’leri', () => {
   it('sponsor_drain: vault mesajında sponsordan aktarım', async () => {
     const drain = SystemProgram.transfer({ fromPubkey: S, toPubkey: key(), lamports: 1 });
     const p = plan([registerAgent(), drain]);
-    await expectReject(inspect(v0(S, [...p.propose])), 'sponsor_drain', { inner: true, position: 1 });
+    await expectReject(inspect(v0(S, [...p.propose]), onChain()), 'sponsor_drain', { inner: true, position: 1 });
     // Yürütmede de (mesaj zincirden).
     const squads = new Map([
       [p.transaction.toBase58(), vaultTransactionData({ multisig, creator: M, index: 1n, message: p.message })],
@@ -474,10 +499,61 @@ describe('Squads vault tx’leri', () => {
 
   it('sponsor_account_misuse: vault mesajında sponsor yetkili', async () => {
     const p = plan([squareIx('escrow', 'fund_job', { institution: S })]);
-    await expectReject(inspect(v0(S, [...p.propose])), 'sponsor_account_misuse', {
+    await expectReject(inspect(v0(S, [...p.propose]), onChain()), 'sponsor_account_misuse', {
       instruction: 'escrow:fund_job',
       account: 'institution',
       inner: true,
     });
+  });
+
+  it('sponsorun ödediği vault rent’i: multisig’in rent_collector’ı yok ya da sponsor', async () => {
+    const p = plan([registerAgent()]);
+    await expect(inspect(v0(S, [...p.propose]), onChain([], S))).resolves.toBeTruthy();
+    await expectReject(inspect(v0(S, [...p.propose]), onChain([], U)), 'sponsor_rent_extractable', {
+      instruction: 'squads:vault_transaction_create',
+      rentCollector: U.toBase58(),
+    });
+    await expectReject(inspect(v0(S, [...p.propose])), 'squads_multisig_not_found', {
+      multisig: multisig.toBase58(),
+    });
+  });
+
+  it('sponsorun açtığı multisig: rent_collector yok ya da sponsor; aynı tx’teki öneri onun ayarıyla', async () => {
+    const createKey = Keypair.generate();
+    const open = (rentCollector: PublicKey | null) =>
+      sqds.instructions.multisigCreateV2({
+        treasury: key(),
+        creator: S,
+        multisigPda: sqds.getMultisigPda({ createKey: createKey.publicKey })[0],
+        configAuthority: null,
+        threshold: 1,
+        members: [{ key: M, permissions: { mask: 7 } }],
+        timeLock: 0,
+        createKey: createKey.publicKey,
+        rentCollector,
+      });
+    await expect(inspect(v0(S, [open(null)]))).resolves.toBeTruthy();
+    await expect(inspect(v0(S, [open(S)]))).resolves.toBeTruthy();
+    await expectReject(inspect(v0(S, [open(U)])), 'sponsor_rent_extractable', {
+      instruction: 'squads:multisig_create_v2',
+      rentCollector: U.toBase58(),
+    });
+    const created = sqds.getMultisigPda({ createKey: createKey.publicKey })[0];
+    const propose = wrapInVault({
+      multisig: created,
+      transactionIndex: 1n,
+      member: M,
+      rentPayer: S,
+      instructions: [registerAgent()],
+    }).propose;
+    await expect(inspect(v0(S, [open(null), ...propose]))).resolves.toBeTruthy();
+    await expectReject(inspect(v0(S, [open(U), ...propose])), 'sponsor_rent_extractable');
+  });
+
+  it('vault mesajında sponsorun ödediği ATA da rent tabanına sayılır', async () => {
+    const vault = squadsVaultAddress(multisig, 0)[0];
+    const ata = createAssociatedTokenAccountIdempotentInstruction(S, key(), vault, key());
+    const result = await inspect(v0(S, [...plan([ata, registerAgent()]).propose]), onChain());
+    expect(result.sponsoredTokenAccounts).toBe(1);
   });
 });

@@ -45,6 +45,9 @@ Tx imzalanmadan önce çözülür ve denetlenir ([`src/policy.ts`](src/policy.ts
 | `sponsor_account_misuse` | Sponsor ücret / rent dışı bir yerde (imzacı, yetkili, token sahibi, yazılabilir hesap) |
 | `duplicate_compute_budget`, `compute_unit_price_too_high`, `compute_unit_limit_too_high` | Compute budget tavanları |
 | `invalid_squads_message`, `inner_lookup_table`, `squads_transaction_not_found`, `squads_accounts_mismatch` | Squads vault tx'i çözülemiyor, iç mesaj ALT kullanıyor, yürütülen VaultTransaction yok ya da hesaplar mesajla aynı değil |
+| `squads_multisig_not_found` | Sponsorun `rent_payer` olduğu vault tx'inin multisig'i zincirde yok |
+| `sponsor_rent_unbounded` | Sponsor bir Token-2022 ATA'sının rent'ini ödeyecek (boyutu mint uzantılarına bağlı) |
+| `sponsor_rent_extractable` | Sponsorun ödediği Squads rent'i başka bir `rent_collector`'a dönecek |
 | `no_square_instruction` | Tx'te Square ya da Squads talimatı yok |
 | `simulation_failed` | Simülasyon başarısız ya da blockhash geçersiz (422, `programError` IDL adıyla) |
 | `tx_cost_too_high` | Ücret + rent tx başına tavanın üstünde |
@@ -55,6 +58,12 @@ Sponsorun durabileceği "ödeyici" yerleri: Square talimatlarının `payer` ve `
 açılışının `payer`'ı, Squads `multisig_create_v2`'nin `creator`'ı ve `vault_transaction_create` /
 `proposal_create`'in `rent_payer`'ı. Varsayılan izin listesi [`src/catalog.ts`](src/catalog.ts)'teki
 `DEFAULT_ALLOWED_INSTRUCTIONS`'tır; `FEE_PAYER_ALLOWED_INSTRUCTIONS` ile değiştirilebilir.
+
+Maliyet: sponsorun ödediği her ATA açılışı en az bir token hesabının rent'i olarak bütçeye yazılır, simülasyon
+hesabın var olduğunu gösterse bile (`create_idempotent`). Aynı tx ikinci kez gelirse ilk kayıt döner, ikinci
+kez ücretlenmez ve gönderilmez. Servisin bir günde kaybedebileceği en büyük tutar
+`FEE_PAYER_GLOBAL_DAILY_LAMPORTS`'tur: kullanıcı bütçeleri cüzdana göredir ve cüzdan açmak ücretsizdir
+([ADR 0019](../../docs/decisions/0019-fee-payer-politikasi.md) §7, açık noktalar).
 
 ## Squads smart account
 
