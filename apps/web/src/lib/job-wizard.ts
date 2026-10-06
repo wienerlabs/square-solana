@@ -24,6 +24,8 @@ export interface EscrowSetup {
   maxChallengePeriod: bigint;
   /** 0: Travel Rule eşiği kapalı (BC-34). */
   travelRuleThreshold: bigint;
+  /** Finalize'ı tetikleyenin payı, baz puan (`EscrowParams.keeper_fee_bps`). */
+  keeperFeeBps: number;
 }
 
 export type EscrowSetupLookup = { state: 'uninitialized'; config: PublicKey } | { state: 'ready'; setup: EscrowSetup };
@@ -57,6 +59,7 @@ export async function readEscrowSetup(connection: Connection, escrowProgramId: P
       minChallengePeriod: big(account.params.minChallengePeriod),
       maxChallengePeriod: big(account.params.maxChallengePeriod),
       travelRuleThreshold: big(account.params.travelRuleThreshold),
+      keeperFeeBps: account.params.keeperFeeBps,
     },
   };
 }

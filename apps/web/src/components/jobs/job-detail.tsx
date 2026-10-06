@@ -13,6 +13,7 @@ import { StatusBadge } from '@/components/ui/status-badge';
 import { TxConfirmation } from '@/components/ui/tx-confirmation';
 import { JobClaim } from './job-claim';
 import { JobRelease } from './job-release';
+import { JobSettlement } from './job-settlement';
 import { chainRefOf, hex } from '@/lib/agent-registration';
 import { payoutOf, type Payout } from '@/lib/claim-market';
 import { claimListingAddress } from '@/lib/idl-pda';
@@ -29,6 +30,7 @@ import {
   type TimelineEntry,
 } from '@/lib/job-detail';
 import { escrowErrorMessage, formatDuration, readEscrowSetup, type EscrowSetupLookup } from '@/lib/job-wizard';
+import { readReleaseState, type ReleaseState } from '@/lib/release-proof';
 import { TransactionBlockedError } from '@/lib/send-transaction';
 import { formatUnits } from '@/lib/settlement';
 import { JOB_STATUS_TONE, statusLabel } from '@/lib/status';
@@ -178,8 +180,23 @@ export function JobDetail({ jobAddress, escrowProgramId }: { jobAddress: string;
   }, [verified, connection, revision]);
   const chainNow = chainOffset === null ? null : localNow + chainOffset;
 
-  // Agent eylemleri: yalnızca job'un agent cüzdanı.
   const account = job.state === 'ready' ? job.value : null;
+
+  // Politikalı işin ispat durumu: "Compliance proof" bölümü ve finalize paneli aynı okumayı kullanır.
+  const [release, setRelease] = useState<Load<ReleaseState>>({ state: 'loading' });
+  useEffect(() => {
+    if (!escrow || !account?.policy) return;
+    let active = true;
+    readReleaseState(escrow, jobKey, account).then(
+      (value) => active && setRelease({ state: 'ready', value }),
+      (error: Error) => active && setRelease({ state: 'error', message: error.message }),
+    );
+    return () => {
+      active = false;
+    };
+  }, [escrow, jobKey, account, revision]);
+
+  // Agent eylemleri: yalnızca job'un agent cüzdanı.
   const isAgent = Boolean(account && publicKey?.equals(account.agentWallet));
   const fileId = useId();
   const uriId = useId();
@@ -337,8 +354,21 @@ export function JobDetail({ jobAddress, escrowProgramId }: { jobAddress: string;
         jobKey={jobKey}
         account={account}
         listing={listing}
+        release={release}
+        chainNow={chainNow}
+        formatAmount={formatAmount}
+      />
+
+      <JobSettlement
+        escrow={escrow}
+        jobKey={jobKey}
+        account={account}
+        listing={listing}
+        release={account.policy ? release : null}
+        timeline={timeline.state === 'ready' ? timeline.value : null}
         chainNow={chainNow}
         revision={revision}
+        token={token}
         formatAmount={formatAmount}
       />
 
