@@ -53,6 +53,9 @@ Notlar:
 
 - **Dispute** ayrı bir hesap değildir, `Job` hesabının bir alanıdır. Program kuralına göre job başına en fazla bir dispute açılabilir. `disputes` tablosu yalnızca `/v1/disputes` filtresi içindir; hesap verisi `jobs.account` içinde kalır.
 - **Kapanan hesaplar:** Kapanabilen hesaplarda (`jobs`, `claims`) `closed_slot` sütunu var. Bir `ClaimListing` iptal edilip aynı PDA'da yeniden açılabilir; satır yeniden açılınca güncellenir.
+- **Slot ve zaman:** `slot` hesabın okunduğu slot'tur; satır yalnızca daha yeni bir okumayla güncellenir.
+  `indexed_at` indexer'ın yazma zamanıdır, API'de Unix saniyesi olarak döner. Yazma, idempotency,
+  uzlaştırma ve okuma API'si: [`apps/indexer`](../../apps/indexer/README.md) (BE-14).
 - **Aynalanmayan hesaplar:** Singleton config hesapları (`RegistryConfig`, `EscrowConfig`, `VerifierConfig`) ve `OperatorState` aynalanmaz; API'de görünümleri yok, okuyan servis zincirden okur. Gerekirse sonraki bir migration ile eklenir.
 
 ### Zincir dışı tablolar
