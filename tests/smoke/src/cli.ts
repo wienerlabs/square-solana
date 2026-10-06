@@ -7,7 +7,7 @@
 // `docs/deploy/smoke-<küme>.md`'ye yazar.
 import { mkdirSync, realpathSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
 import { inspect, parseArgs } from 'node:util';
 import { loadClusterConfig } from './config.js';
 import { createContext } from './context.js';
@@ -32,7 +32,7 @@ export function reportFailure(error: unknown): void {
 export function isEntryPoint(moduleUrl: string, argv1: string | undefined = process.argv[1]): boolean {
   if (!argv1) return false;
   try {
-    return moduleUrl === pathToFileURL(realpathSync(argv1)).href;
+    return realpathSync(fileURLToPath(moduleUrl)) === realpathSync(argv1);
   } catch {
     return false;
   }
