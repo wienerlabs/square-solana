@@ -76,16 +76,20 @@ export class CapabilityRuntime {
     return { active: this.active, queued: this.waiters.length, ...this.counters };
   }
 
-  private async acquire(signal: AbortSignal): Promise<void> {
+  room(): string | null {
     const { maxConcurrency, maxQueue } = this.options.capability.limits;
+    if (this.closed) return `${this.id}: çalıştırma kapatıldı`;
+    if (this.active + this.waiters.length < maxConcurrency + maxQueue) return null;
+    this.counters.rejected += 1;
+    return `${this.id}: eşzamanlılık sınırı (${maxConcurrency}) ve kuyruk (${maxQueue}) dolu`;
+  }
+
+  private async acquire(signal: AbortSignal): Promise<void> {
+    const { maxConcurrency } = this.options.capability.limits;
     if (this.closed) throw new CapabilityBusyError(`${this.id}: çalıştırma kapatıldı`);
     if (this.active < maxConcurrency) {
       this.active += 1;
       return;
-    }
-    if (this.waiters.length >= maxQueue) {
-      this.counters.rejected += 1;
-      throw new CapabilityBusyError(`${this.id}: eşzamanlılık sınırı (${maxConcurrency}) ve kuyruk (${maxQueue}) dolu`);
     }
     await new Promise<void>((resolve, reject) => {
       const waiter = {
