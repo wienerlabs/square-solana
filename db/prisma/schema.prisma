@@ -223,25 +223,33 @@ enum JobStatus {
   cancelled
 }
 
+/// `Job.rail` (ADR 0024): escrow'da tutulan ödeme ya da Stripe ile ödenen fiat iş.
+enum SettlementRail {
+  escrow
+  fiat
+}
+
 model Job {
-  address      String    @id @db.VarChar(44)
-  institution  String    @db.VarChar(44)
-  agentRecord  String    @map("agent_record") @db.VarChar(44)
-  agentWallet  String    @map("agent_wallet") @db.VarChar(44)
-  policy       String?   @db.VarChar(44)
-  mint         String    @db.VarChar(44)
-  amount       Decimal   @db.Decimal(20, 0)
-  specHash     String    @map("spec_hash") @db.Char(64)
+  address      String         @id @db.VarChar(44)
+  institution  String         @db.VarChar(44)
+  agentRecord  String         @map("agent_record") @db.VarChar(44)
+  agentWallet  String         @map("agent_wallet") @db.VarChar(44)
+  policy       String?        @db.VarChar(44)
+  mint         String         @db.VarChar(44)
+  amount       Decimal        @db.Decimal(20, 0)
+  specHash     String         @map("spec_hash") @db.Char(64)
   status       JobStatus
-  createdAt    BigInt    @map("created_at")
+  createdAt    BigInt         @map("created_at")
   deadline     BigInt
   /// Teslimden sonra challenge penceresinin sonu; teslim edilmemişse 0 (keeper sorgusu).
-  challengeEnd BigInt    @map("challenge_end")
+  challengeEnd BigInt         @map("challenge_end")
+  /// Fiat iş keeper'ın `finalize_payment` crank'ine girmez (`finalize_fiat_payment`, ADR 0024).
+  rail         SettlementRail @default(escrow)
   account      Json
   slot         BigInt
-  indexedAt    DateTime  @map("indexed_at") @db.Timestamptz(3)
+  indexedAt    DateTime       @map("indexed_at") @db.Timestamptz(3)
   /// Hesap kapandıysa kapandığı slot.
-  closedSlot   BigInt?   @map("closed_slot")
+  closedSlot   BigInt?        @map("closed_slot")
 
   @@unique([institution, specHash])
   @@index([status, challengeEnd])
@@ -588,9 +596,9 @@ model ScreeningDecision {
 
 /// Cüzdanla oturum açan kullanıcı. Kimlik cüzdan adresidir.
 model User {
-  wallet     String          @id @db.VarChar(44)
-  createdAt  DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
-  lastSeenAt DateTime?       @map("last_seen_at") @db.Timestamptz(3)
+  wallet        String          @id @db.VarChar(44)
+  createdAt     DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
+  lastSeenAt    DateTime?       @map("last_seen_at") @db.Timestamptz(3)
   challenges    AuthChallenge[]
   sessions      Session[]
   apiKeys       ApiKey[]

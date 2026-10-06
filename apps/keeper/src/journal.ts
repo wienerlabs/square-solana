@@ -1,6 +1,7 @@
 // Keeper günlüğü (`keeper_actions`; API `GET /v1/keeper/actions`) ve aday seçimi. Her crank'in kayıtları
 // talimatıyla (`action`) ayrılır; bir crank'in bekletmesi diğerini etkilemez.
-// - Finalize: adaylar indexer'ın job aynasından gelir: `Delivered`, challenge penceresi bitmiş, hesabı açık.
+// - Finalize: adaylar indexer'ın job aynasından gelir: `Delivered`, escrow rayında (fiat işi `finalize_fiat_payment`
+//   kapatır, ADR 0024), challenge penceresi bitmiş, hesabı açık.
 //   Bekletilen job (son kaydı `nextAttemptAt` taşıyan) zamanı gelene kadar seçilmez; ancak beklediği şey
 //   indexlendiyse beklemeden yeniden denenir: ispat bekleyen job'a ispat (`release_proofs`), screening bekleyen
 //   job'a payee'nin kaydı (`screenings`) son denemeden sonra yazıldıysa. Böylece `ProofRequired` sürekli
@@ -95,7 +96,7 @@ export function createJournal(db: PrismaClient): FinalizeJournal {
           SELECT k.reason, k.next_attempt_at, k.at FROM keeper_actions k
           WHERE k.job = j.address AND k.action = 'finalizePayment' ORDER BY k.at DESC, k.id DESC LIMIT 1
         ) last ON true
-        WHERE j.status = 'delivered' AND j.challenge_end <= ${seconds} AND j.closed_slot IS NULL
+        WHERE j.status = 'delivered' AND j.rail = 'escrow' AND j.challenge_end <= ${seconds} AND j.closed_slot IS NULL
           AND (
             last.next_attempt_at IS NULL OR last.next_attempt_at <= ${now}
             OR (last.reason IN ('proofRequired', 'staleProof') AND EXISTS (
@@ -130,7 +131,7 @@ export function createJournal(db: PrismaClient): FinalizeJournal {
                 OR s.wallet IN (SELECT c.buyer FROM claims c WHERE c.job = j.address AND c.buyer IS NOT NULL))
             ) woken
           ) wake ON true
-          WHERE j.status = 'delivered' AND j.challenge_end <= ${seconds} AND j.closed_slot IS NULL
+          WHERE j.status = 'delivered' AND j.rail = 'escrow' AND j.challenge_end <= ${seconds} AND j.closed_slot IS NULL
             AND (last.outcome IS NULL OR last.outcome <> 'confirmed')
             AND (last.reason IS NULL
               OR last.reason NOT IN ('proofRequired', 'staleProof', 'screeningPending', 'unprofitable')

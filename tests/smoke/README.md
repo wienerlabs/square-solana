@@ -45,6 +45,7 @@ Her adımdan sonra sonuç zincirden okunup doğrulanır; tutmayan doğrulama ko�
 | | 6 + 8 | `finalizePayment` (keeper) | `Released`, alıcıya net, keeper'a ücret, `AgentReputation`, `ValidationRecord` `Verified`, listeleme `Settled`, ispat tüketildi |
 | ispat-ret | 1–8 | işlem başı tavanı 1 olan ikinci politika; aynı akış, alacak satışı yok | ret kodu `PER_TX`, kesin ret; `Refunded`, net kuruma, keeper ücreti yine ödenir, `ValidationRecord` `Refused`, itibar değişmez |
 | ispat-yok | 3–8 | ispatsız finalize (ön simülasyonsuz gönderilir) → `ProofRequired`; sonra ispat ve finalize | ret anında iş `Delivered`, vault dolu, `ReleaseProof` yok; ispat bağlanınca agent'a ödenir |
+| fiat | 3–8 | Yalnızca `keys.mppAuthority` verilmişse ([`src/fiat.ts`](src/fiat.ts), ADR 0024): `createFiatJob`, `acceptJob` (açıkken), `submitWork`; `admin` yerel anahtarsa `updateMppAuthority` (yeni anahtar); Ed25519 attestation + `verifyMppPaymentProof`; `finalizeFiatPayment`; rotasyon yapıldıysa eski anahtara geri | ray `Fiat`, vault yok; `ReleaseProof` uyumlu, net işin tamamı, payee agent; `Released`, `ValidationRecord` `Verified`, itibar +1, günlük sayaç tutar kadar ilerledi, token hareketi yok; config'in MPP anahtarı upgrade'siz değişti |
 
 - **Yeniden koşu:** Koşu kimliği agent kimliğine, spec'lere ve politika kimliklerine girer. Aynı anahtarlarla
   tekrar koşmak çakışmaz. Kurum hesabı varsa yeniden açılmaz. Üç iş fonlanır: kurumun token bakiyesi en az
@@ -75,7 +76,7 @@ yazılır.
 | `settlementMint` | USDC mint'i; devnet: Circle devnet USDC `4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU` |
 | `lookupTable` | Square ALT'ı. Yoksa `init` açar ve adresini yazdırır; sonraki koşular için yapılandırmaya eklenir |
 | `computeUnitPrice` | Öncelik ücreti (micro-lamport / CU); verilmezse eklenmez |
-| `keys` | Anahtar dosyalarının yolları: `payer` (ücret ve rent), `admin` (yalnızca upgrade authority yerel bir anahtarsa), `lookupTableAuthority` (verilmezse payer), `screener`, `institution`, `agent`, `buyer`, `keeper` |
+| `keys` | Anahtar dosyalarının yolları: `payer` (ücret ve rent), `admin` (yalnızca upgrade authority yerel bir anahtarsa), `lookupTableAuthority` (verilmezse payer), `screener`, `institution`, `agent`, `buyer`, `keeper`, `mppAuthority` (isteğe bağlı: `VerifierConfig.mpp_authority`'nin anahtarı; verilirse fiat varyantı koşar. Smoke Stripe ödemesi yapmaz, makbuz commitment'ı koşudan türetilir; gerçek Stripe akışı BE-25) |
 | `init.registry` | `screenerAuthority` (screener servisinin anahtarı, BE-16), `screeningTtlSecs` |
 | `init.verifier` | `mppAuthority` (BC-37) |
 | `init.escrow` | `arbitrators` (2–7, tekrarsız) ve `threshold` (2 ≤ M ≤ N) (ADR 0016). `params`: challenge sınırları (0 < min ≤ max), `minBondBps`, `minBondAbsolute`, `keeperFeeBps` (≤ 100, ADR 0013), `proofTimeoutSecs` (≥ 0), `disputeTimeoutSecs` (> 0), `travelRuleThreshold` (0 = kapalı, ADR 0015). u64 değerler sayı ya da ondalık dize |
@@ -85,7 +86,7 @@ yazılır.
 `init` yalnızca `payer`'ı (ve varsa `admin`'i) ister; `smoke` `payer`, `screener`, `institution`, `agent`,
 `buyer` ve `keeper`'ı ister. `smoke:localnet` yapılandırmayı kendisi üretir
 ([`src/localnet.ts`](src/localnet.ts)): kısa challenge (`min_challenge_period` 1 s, iş 5 s), keeper ücreti
-50 bps, 2-of-3 arbitrator, 6 ondalıklı yerel mint.
+50 bps, 2-of-3 arbitrator, 6 ondalıklı yerel mint; MPP authority koşunun anahtarıdır, fiat varyantı koşar.
 
 ## Devnet: adım adım
 

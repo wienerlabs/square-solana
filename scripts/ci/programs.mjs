@@ -30,12 +30,6 @@ export const SECTIONS = Object.freeze(['instructions', 'accounts', 'types', 'eve
 export const PROGRAMS = Object.freeze([
   { name: 'square_policy', crate: 'square-policy', contract: 'square_policy_contract', status: 'contract' },
   { name: 'square_registry', crate: 'square-registry', contract: 'square_registry_contract', status: 'contract' },
-  {
-    name: 'square_verifier',
-    crate: 'square-verifier',
-    contract: 'square_verifier_contract',
-    status: 'contract',
-    pending: [{ issue: 'BC-37 (#78)', instructions: ['verify_mpp_payment_proof', 'update_mpp_authority'] }],
-  },
+  { name: 'square_verifier', crate: 'square-verifier', contract: 'square_verifier_contract', status: 'contract' },
   { name: 'square_escrow', crate: 'square-escrow', contract: 'square_escrow_contract', status: 'contract' },
 ]);

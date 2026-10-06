@@ -13,10 +13,8 @@ use crate::errors::EscrowError;
 use crate::linked;
 use crate::release_gate::{self, Gate};
 use crate::settlement;
-use crate::state::{
-    AgentReputation, EscrowConfig, Job, JobStatus, ValidationOutcome, ValidationRecord,
-};
-use crate::{Finalized, ReleaseRefused, ReleaseVerified, ReputationRecorded, ValidationRecorded};
+use crate::state::{AgentReputation, EscrowConfig, Job, JobStatus, ValidationRecord};
+use crate::{Finalized, ReleaseRefused, ReleaseVerified};
 
 #[derive(Accounts)]
 pub struct FinalizePayment<'info> {
@@ -323,61 +321,17 @@ fn record_outcome(
     net: u64,
     now: i64,
 ) -> Result<()> {
-    let paid = gate.pays_agent_side();
-    let reputation = &mut accounts.agent_reputation;
-    if reputation.agent_record == Pubkey::default() {
-        reputation.agent_record = job.agent_record;
-        reputation.bump = reputation_bump;
-        reputation.first_job_at = now;
-    }
-    if paid {
-        reputation.jobs_completed = reputation
-            .jobs_completed
-            .checked_add(1)
-            .ok_or(EscrowError::MathOverflow)?;
-        reputation.total_earned = reputation
-            .total_earned
-            .checked_add(net)
-            .ok_or(EscrowError::MathOverflow)?;
-    }
-    reputation.last_job_at = now;
-    emit!(ReputationRecorded {
-        agent_record: job.agent_record,
-        job: job_key,
-        jobs_completed: reputation.jobs_completed,
-        jobs_failed: reputation.jobs_failed,
-        jobs_disputed: reputation.jobs_disputed,
-        total_earned: reputation.total_earned,
-    });
-
-    let (outcome, refusal_code) = match gate {
-        Gate::NoGate => (ValidationOutcome::NoGate, 0),
-        Gate::Verified { .. } => (ValidationOutcome::Verified, 0),
-        Gate::Refused { refusal_code, .. } => (ValidationOutcome::Refused, refusal_code),
-    };
-    accounts.validation_record.set_inner(ValidationRecord {
-        job: job_key,
-        agent_record: job.agent_record,
-        outcome,
-        refusal_code,
-        recorded_at: now,
-        bump: validation_bump,
-        policy: job.policy,
-        release_proof: gate.release_proof(),
-    });
-    emit!(ValidationRecorded {
-        job: job_key,
-        agent_record: job.agent_record,
-        outcome,
-        refusal_code,
-    });
-
-    let job_account = &mut accounts.job;
-    job_account.status = if paid {
-        JobStatus::Released
-    } else {
-        JobStatus::Refunded
-    };
-    job_account.settled_at = now;
-    Ok(())
+    settlement::record_outcome(
+        settlement::Outcome {
+            reputation: &mut accounts.agent_reputation,
+            validation_record: &mut accounts.validation_record,
+            job_account: &mut accounts.job,
+            bumps: (reputation_bump, validation_bump),
+        },
+        job,
+        job_key,
+        gate,
+        net,
+        now,
+    )
 }

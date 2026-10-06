@@ -8,11 +8,13 @@ import { TOKEN_PROGRAM_ID } from '@solana/spl-token';
 import { AddressLookupTableProgram, ComputeBudgetProgram, PublicKey, VersionedTransaction } from '@solana/web3.js';
 import { createTransferStore } from '@squaresdk/solana-cctp';
 import {
+  CCTP_RECEIVE_COMPUTE_UNITS,
   cctpLookupTableAddresses,
   cctpMintRecipient,
   cctpUsedNonceAddress,
   decodeCctpMessage,
   squareLookupTableAddresses,
+  TX_COMPUTE_UNIT_LIMITS,
 } from '@squaresdk/solana-sdk';
 import { afterAll, beforeAll, beforeEach, describe, expect, inject, it } from 'vitest';
 import { loadOpenApi } from '../src/openapi.js';
@@ -257,7 +259,7 @@ describe('kurumun fonlama tx’i', () => {
         (ix) => keys[ix.programIdIndex]?.equals(ComputeBudgetProgram.programId) && ix.data[0] === 2,
       ),
     ).toBe(true);
-    expect(combined.data.tx.computeUnitLimit).toBe(480_000);
+    expect(combined.data.tx.computeUnitLimit).toBe(TX_COMPUTE_UNIT_LIMITS.fundJob + CCTP_RECEIVE_COMPUTE_UNITS);
 
     stack.rpc.setAccount(usedNonce.toBase58(), {
       owner: CCTP_PROGRAMS.messageTransmitter.toBase58(),

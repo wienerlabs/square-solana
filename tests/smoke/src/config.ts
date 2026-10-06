@@ -136,6 +136,11 @@ export const ClusterConfigSchema = z.object({
     agent: KeyPath.optional(),
     buyer: KeyPath.optional(),
     keeper: KeyPath.optional(),
+    /**
+     * `VerifierConfig.mpp_authority`'nin anahtarı (BC-37). Verilirse fiat varyantı koşar: smoke Stripe ödemesi
+     * yapmaz, makbuz commitment'ı koşudan türetilir ve bu anahtarla imzalanır. Gerçek Stripe akışı BE-25'tedir.
+     */
+    mppAuthority: KeyPath.optional(),
   }),
   init: InitSchema.optional(),
   smoke: SmokeSchema.optional(),

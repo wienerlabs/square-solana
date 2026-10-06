@@ -1,17 +1,16 @@
 use anchor_lang::prelude::*;
 use groth16_solana::groth16::Groth16Verifier;
-use square_common::release::daily_spent_at;
+use square_common::contract::square_escrow_contract::types::SettlementRail;
 use square_common::seeds::{
     CLAIM_SEED, OPERATOR_STATE_SEED, RELEASE_PROOF_SEED, VERIFIER_CONFIG_SEED,
 };
-use square_common::time::day_start;
 
 use crate::errors::VerifierError;
-use crate::linked;
 use crate::release_vk::{RELEASE_NR_INPUTS, SQUARE_RELEASE_VK};
-use crate::signals::ReleaseSignals;
+use crate::signals::{ReleaseSignals, NO_STRIPE_RECEIPT};
 use crate::state::{OperatorState, ReleaseProof, ReleaseVerdict, VerifierConfig};
-use crate::{ComplianceProofSet, CLOCK_TOLERANCE_SECS};
+use crate::ComplianceProofSet;
+use crate::{binding, linked};
 
 #[derive(Accounts)]
 pub struct SetComplianceProof<'info> {
@@ -83,27 +82,20 @@ pub fn handler(
         job.policy == Some(accounts.policy.key()),
         VerifierError::PolicyMismatch
     );
+    // Fiat işin ödemesi Stripe'tadır; ispatı `verify_mpp_payment_proof` bağlar (ADR 0024).
+    require!(
+        matches!(job.rail, SettlementRail::Escrow),
+        VerifierError::RailMismatch
+    );
     linked::require_bindable(&job)?;
     require!(
         !accounts.release_proof.consumed,
         VerifierError::ProofAlreadyConsumed
     );
 
-    // Saat: ispatın anı zincirin saatine tolerans içinde yakın olmalı (ADR 0012).
-    require!(
-        proof_timestamp >= 0 && (proof_timestamp - now).abs() <= CLOCK_TOLERANCE_SECS,
-        VerifierError::StaleProof
-    );
-    // Sayaç: ispat anının UTC gününe göre (gün dönümü uygulanmış). Durum daha yeni bir güne aitse bu
-    // an için sayaç bilinemez.
-    let state = &accounts.operator_state;
-    let is_new_state = state.institution == Pubkey::default();
-    let daily_spent_before = if is_new_state {
-        0
-    } else {
-        daily_spent_at(state.day_start_unix, state.daily_spent, proof_timestamp)
-            .ok_or(VerifierError::StaleProof)?
-    };
+    binding::require_current(proof_timestamp, now)?;
+    let daily_spent_before =
+        binding::daily_spent_before(&accounts.operator_state, proof_timestamp)?;
 
     let payee = linked::payee(
         &job_key,
@@ -121,6 +113,7 @@ pub fn handler(
         daily_spent_before,
         proof_timestamp: proof_timestamp as u64,
         job: job_key,
+        stripe_receipt_hash: NO_STRIPE_RECEIPT,
     }
     .public_inputs();
     let verified = Groth16Verifier::<RELEASE_NR_INPUTS>::new(
@@ -133,15 +126,12 @@ pub fn handler(
     .is_ok_and(|mut verifier| verifier.verify().is_ok());
     require!(verified, VerifierError::InvalidProof);
 
-    if is_new_state {
-        ctx.accounts.operator_state.set_inner(OperatorState {
-            institution,
-            daily_spent: 0,
-            day_start_unix: day_start(proof_timestamp),
-            total_lifetime_payments: 0,
-            bump: ctx.bumps.operator_state,
-        });
-    }
+    binding::open_operator_state(
+        &mut ctx.accounts.operator_state,
+        institution,
+        proof_timestamp,
+        ctx.bumps.operator_state,
+    );
     let verdict = if refusal_code == 0 {
         ReleaseVerdict::Compliant
     } else {

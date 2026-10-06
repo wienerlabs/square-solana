@@ -74,6 +74,28 @@ export interface SquareFlow {
     options: BuildOptions,
   ): Promise<BuiltTx & { /** Açılacak job. */ job: PublicKey; /** Spec'in hash'i (32 bayt). */ specHash: Uint8Array }>;
   /**
+   * Fiat rayı (BC-37, ADR 0024): kurumun Stripe ile ödeyeceği iş. Vault ve fonlama yok; iş her zaman bir
+   * politikaya bağlıdır, iki tarafın screening kaydı açılışta okunur. Agent işi açıkken kabul eder.
+   */
+  createFiatJob(
+    params: {
+      institution: PublicKey;
+      agentRecord: PublicKey;
+      policy: PublicKey;
+      spec: unknown;
+      amount: bigint;
+      deadline: number;
+    },
+    options: BuildOptions,
+  ): Promise<BuiltTx & { /** Açılacak job. */ job: PublicKey; /** Spec'in hash'i (32 bayt). */ specHash: Uint8Array }>;
+  /** Fiat iş (ADR 0024): açık işi ya da son tarihi geçmiş kabul edilmiş işi iptal eder (kurum); iade yok. */
+  cancelFiatJob(params: { institution: PublicKey; job: PublicKey }, options: BuildOptions): Promise<BuiltTx>;
+  /**
+   * Fiat iş (ADR 0024), permissionless: verifier'ın `verify_mpp_payment_proof`'uyla bağlanmış uyumlu ispatı
+   * tüketir, işi `Released` yapar; itibar ve validation kaydının rent'ini `payer` öder. Ödeme ve keeper ücreti yok.
+   */
+  finalizeFiatPayment(params: { payer: PublicKey; job: PublicKey }, options: BuildOptions): Promise<BuiltTx>;
+  /**
    * Adım 3: Travel Rule commitment'ı (ADR 0015). `Open` işe bağlanır, fonlamaya kadar değiştirilebilir;
    * eşiği aşan iş onsuz fonlanmaz. Commitment `travelRule.commitment` ile hesaplanır.
    */

@@ -3,7 +3,7 @@ use anchor_lang::prelude::*;
 use crate::errors::EscrowError;
 use crate::instructions::agent_job::AgentJob;
 use crate::linked;
-use crate::state::JobStatus;
+use crate::state::{JobStatus, SettlementRail};
 use crate::JobAccepted;
 
 pub fn handler(ctx: Context<AgentJob>, spec_hash: [u8; 32]) -> Result<()> {
@@ -14,9 +14,10 @@ pub fn handler(ctx: Context<AgentJob>, spec_hash: [u8; 32]) -> Result<()> {
         job.agent_wallet,
         EscrowError::AgentMismatch
     );
-    match job.status {
-        JobStatus::Funded => {}
-        JobStatus::Open => return err!(EscrowError::JobNotFunded),
+    // Escrow işi fonlandıktan sonra, fiat iş (fonlama adımı yok) açıkken kabul edilir.
+    match (job.rail, job.status) {
+        (SettlementRail::Escrow, JobStatus::Funded) | (SettlementRail::Fiat, JobStatus::Open) => {}
+        (SettlementRail::Escrow, JobStatus::Open) => return err!(EscrowError::JobNotFunded),
         _ => return err!(EscrowError::InvalidStatus),
     }
     require!(job.spec_hash == spec_hash, EscrowError::SpecHashMismatch);
