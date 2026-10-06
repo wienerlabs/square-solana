@@ -62,7 +62,7 @@ pnpm license:write
 | `@prometheus-io/client` | npm | Apache-2.0 | runtime | `@squaresdk/solana-observability` | ✓ |
 | `@redocly/cli` | npm | MIT | dev | `@squaresdk/solana-monorepo` | ✓ |
 | `@solana/kit` | npm | MIT | runtime | `@squaresdk/solana-compliance-api`, `@squaresdk/solana-x402` | ✓ |
-| `@solana/spl-token` | npm | Apache-2.0 | runtime | `@squaresdk/solana-agent-sdk`, `@squaresdk/solana-fee-payer`, `@squaresdk/solana-keeper`, `@squaresdk/solana-mcp`, `@squaresdk/solana-sdk`, `@squaresdk/solana-web` | ✓ |
+| `@solana/spl-token` | npm | Apache-2.0 | runtime | `@squaresdk/solana-agent-sdk`, `@squaresdk/solana-api`, `@squaresdk/solana-fee-payer`, `@squaresdk/solana-keeper`, `@squaresdk/solana-mcp`, `@squaresdk/solana-sdk`, `@squaresdk/solana-web` | ✓ |
 | `@solana/sysvars` | npm | MIT | runtime | `@squaresdk/solana-x402` | ✓ |
 | `@solana/wallet-adapter-base` | npm | Apache-2.0 | runtime | `@squaresdk/solana-web` | ✓ |
 | `@solana/wallet-adapter-phantom` | npm | Apache-2.0 | runtime | `@squaresdk/solana-web` | ✓ |

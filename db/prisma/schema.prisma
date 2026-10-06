@@ -260,23 +260,36 @@ enum DisputeResolution {
 }
 
 /// `Job.dispute` izdüşümü: job başına en fazla bir dispute (program kuralı). Hesap verisi
-/// `jobs.account` içindedir; bu tablo `/v1/disputes` filtresi ve sıralaması içindir.
+/// `jobs.account` içindedir; bu tablo `/v1/disputes` filtresi ve sıralaması, arbitrator kuyruğu ve lapse
+/// crank'i (BE-22) içindir.
 model Dispute {
-  job         String            @id @db.VarChar(44)
-  institution String            @db.VarChar(44)
-  agentRecord String            @map("agent_record") @db.VarChar(44)
-  jobStatus   JobStatus         @map("job_status")
-  challenger  String            @db.VarChar(44)
-  bond        Decimal           @db.Decimal(20, 0)
-  reasonHash  String            @map("reason_hash") @db.Char(64)
-  raisedAt    BigInt            @map("raised_at")
-  deadline    BigInt
-  resolution  DisputeResolution
-  lapsed      Boolean
-  slot        BigInt
-  indexedAt   DateTime          @map("indexed_at") @db.Timestamptz(3)
+  job                  String            @id @db.VarChar(44)
+  institution          String            @db.VarChar(44)
+  agentRecord          String            @map("agent_record") @db.VarChar(44)
+  jobStatus            JobStatus         @map("job_status")
+  challenger           String            @db.VarChar(44)
+  bond                 Decimal           @db.Decimal(20, 0)
+  reasonHash           String            @map("reason_hash") @db.Char(64)
+  raisedAt             BigInt            @map("raised_at")
+  deadline             BigInt
+  /// Eşiğe ulaşıldığı zaman; karar yoksa 0.
+  decidedAt            BigInt            @map("decided_at")
+  /// `execute_resolution` ya da `lapse_dispute`'un kapattığı zaman; açıksa 0.
+  closedAt             BigInt            @map("closed_at")
+  resolution           DisputeResolution
+  lapsed               Boolean
+  /// Bit i: sayımın dayandığı setteki `arbitrators[i]` karara oy verdi.
+  approvalMask         Int               @map("approval_mask")
+  approvalCount        Int               @map("approval_count")
+  /// Sayımın dayandığı arbitrator seti (u32). Config'teki sürüm daha yeniyse sonraki oy sayımı sıfırlar
+  /// (ADR 0016).
+  arbitratorSetVersion BigInt            @map("arbitrator_set_version")
+  slot                 BigInt
+  indexedAt            DateTime          @map("indexed_at") @db.Timestamptz(3)
 
   @@index([jobStatus, raisedAt])
+  /// Lapse crank'i: son tarihi geçmiş açık dispute'lar.
+  @@index([jobStatus, deadline])
   @@index([institution])
   @@index([agentRecord])
   @@map("disputes")
@@ -388,6 +401,98 @@ model Delivery {
 
   @@unique([job, workHash])
   @@map("deliveries")
+}
+
+enum EvidenceRole {
+  institution
+  agent
+  arbitrator
+}
+
+/// Dispute kanıtı (BE-22). İçerik özel nesne deposundadır (herkese açık değil); burada konumu ve SHA-256'sı
+/// tutulur. Kurumun yüklediği içeriğin hash'i `raise_dispute`'un `reason_hash`'idir. Okuyan: kurum, agent
+/// cüzdanı / sahibi ve aktif arbitrator'lar.
+model DisputeEvidence {
+  id          String       @id @default(uuid()) @db.Uuid
+  job         String       @db.VarChar(44)
+  contentHash String       @map("content_hash") @db.Char(64)
+  contentType String       @map("content_type") @db.VarChar(120)
+  byteSize    BigInt       @map("byte_size")
+  /// Nesne deposundaki anahtar.
+  storageKey  String       @map("storage_key") @db.Text
+  role        EvidenceRole
+  uploadedBy  String       @map("uploaded_by") @db.VarChar(44)
+  createdAt   DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@unique([job, contentHash])
+  @@index([job, createdAt])
+  @@map("dispute_evidence")
+}
+
+/// Arbitrator bildirim olayları; değerler Standard Webhooks `type` adlarıdır (API `ArbitrationEventType`).
+enum ArbitrationEvent {
+  disputeRaised    @map("dispute.raised")
+  disputeEscalated @map("dispute.escalated")
+  disputeVote      @map("dispute.vote")
+  disputeDecided   @map("dispute.decided")
+  disputeDeadline  @map("dispute.deadline")
+}
+
+/// Arbitrator'ın kaydettiği webhook ucu (BE-22). Sır, gönderimi imzalamak için gerekir; secret box'la
+/// (`@squaresdk/solana-hardening`) şifreli saklanır, AAD kaydın kimliğidir.
+model ArbitrationWebhook {
+  id         String                 @id @default(uuid()) @db.Uuid
+  wallet     String                 @db.VarChar(44)
+  url        String                 @db.VarChar(512)
+  events     ArbitrationEvent[]
+  secret     String                 @db.Text
+  createdAt  DateTime               @default(now()) @map("created_at") @db.Timestamptz(3)
+  deliveries NotificationDelivery[]
+
+  @@unique([wallet, url])
+  @@map("arbitration_webhooks")
+}
+
+enum DeliveryState {
+  pending
+  delivered
+  failed
+}
+
+/// Bildirim outbox'ı: bir olay bir uca bir kez kuyruğa girer (`event_key`), gönderici yeniden denemeyle
+/// teslim eder. Teslimat kimliği (`webhook-id`) satırın kimliğidir; denemeler arasında değişmez.
+model NotificationDelivery {
+  id            String             @id @default(uuid()) @db.Uuid
+  webhookId     String             @map("webhook_id") @db.Uuid
+  /// Olayın tekil anahtarı: `event:<chain_events.id>` ya da `deadline:<job>:<raised_at>`.
+  eventKey      String             @map("event_key") @db.Text
+  type          ArbitrationEvent
+  job           String             @db.VarChar(44)
+  /// Gönderilecek gövde (`ArbitrationNotification`).
+  payload       Json
+  state         DeliveryState      @default(pending)
+  attempts      Int                @default(0)
+  nextAttemptAt DateTime           @map("next_attempt_at") @db.Timestamptz(3)
+  /// Bir gönderici örneğinin kiralaması; süresi dolmadan başka örnek satırı almaz.
+  lockedUntil   DateTime?          @map("locked_until") @db.Timestamptz(3)
+  lastStatus    Int?               @map("last_status")
+  lastError     String?            @map("last_error") @db.Text
+  createdAt     DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
+  deliveredAt   DateTime?          @map("delivered_at") @db.Timestamptz(3)
+  webhook       ArbitrationWebhook @relation(fields: [webhookId], references: [id], onDelete: Cascade)
+
+  @@unique([webhookId, eventKey])
+  @@index([state, nextAttemptAt])
+  @@map("notification_outbox")
+}
+
+/// Bildirim kuyruğuna alınmış son `chain_events.id`.
+model NotificationCursor {
+  name        String   @id @db.Text
+  lastEventId BigInt   @map("last_event_id")
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@map("notification_cursors")
 }
 
 enum KeeperActionKind {
@@ -529,6 +634,7 @@ enum ApiKeyScope {
   deliveriesWrite @map("deliveries:write")
   agentsWrite     @map("agents:write")
   prove
+  disputesWrite   @map("disputes:write")
 }
 
 /// API anahtarı (`ApiKey`). Gizli değer saklanmaz, yalnızca SHA-256'sı; `prefix` listelemede gösterilir.

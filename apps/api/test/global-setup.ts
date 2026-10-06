@@ -17,11 +17,13 @@ import type { TestProject } from 'vitest/node';
 const SEAWEEDFS_IMAGE = 'chrislusf/seaweedfs:4.48';
 const S3_PORT = 8333;
 export const DELIVERY_BUCKET = 'deliveries';
+/** Dispute kanıtları: anonim okuma yok. */
+export const EVIDENCE_BUCKET = 'evidence';
 
 declare module 'vitest' {
   export interface ProvidedContext {
     databaseUrl: string;
-    s3: { endpoint: string; accessKeyId: string; secretAccessKey: string; bucket: string };
+    s3: { endpoint: string; accessKeyId: string; secretAccessKey: string; bucket: string; evidenceBucket: string };
     /** Paketin `build` adımıyla aynı derleme: sözleşmenin tek dosyalık JSON'u. */
     openapiPath: string;
   }
@@ -58,13 +60,15 @@ export default async function setup(project: TestProject) {
     credentials: { accessKeyId, secretAccessKey },
   });
   // Filer ve volume sunucusu hazır olana kadar kova oluşturma tekrar denenir.
-  for (let attempt = 0; ; attempt += 1) {
-    try {
-      await s3.send(new CreateBucketCommand({ Bucket: DELIVERY_BUCKET }));
-      break;
-    } catch (error) {
-      if (attempt >= 30) throw error;
-      await new Promise((resolve) => setTimeout(resolve, 1_000));
+  for (const bucket of [DELIVERY_BUCKET, EVIDENCE_BUCKET]) {
+    for (let attempt = 0; ; attempt += 1) {
+      try {
+        await s3.send(new CreateBucketCommand({ Bucket: bucket }));
+        break;
+      } catch (error) {
+        if (attempt >= 30) throw error;
+        await new Promise((resolve) => setTimeout(resolve, 1_000));
+      }
     }
   }
   const openapiPath = join(mkdtempSync(join(tmpdir(), 'square-api-openapi-')), 'openapi.json');
@@ -79,7 +83,13 @@ export default async function setup(project: TestProject) {
   );
   project.provide('openapiPath', openapiPath);
   project.provide('databaseUrl', database.url);
-  project.provide('s3', { endpoint, accessKeyId, secretAccessKey, bucket: DELIVERY_BUCKET });
+  project.provide('s3', {
+    endpoint,
+    accessKeyId,
+    secretAccessKey,
+    bucket: DELIVERY_BUCKET,
+    evidenceBucket: EVIDENCE_BUCKET,
+  });
   return async () => {
     await database.stop();
     await seaweed.stop();

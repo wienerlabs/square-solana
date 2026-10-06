@@ -177,7 +177,12 @@ export function disputeColumns(job: Json): MirrorColumns | null {
     reasonHash: str(dispute, 'reasonHash'),
     raisedAt: big(dispute, 'raisedAt'),
     deadline: big(dispute, 'deadline'),
+    decidedAt: big(dispute, 'decidedAt'),
+    closedAt: big(dispute, 'closedAt'),
     resolution: str(resolution, 'kind'),
     lapsed: bool(dispute, 'lapsed'),
+    approvalMask: num(dispute, 'approvalMask'),
+    approvalCount: num(dispute, 'approvalCount'),
+    arbitratorSetVersion: big(dispute, 'arbitratorSetVersion'),
   };
 }

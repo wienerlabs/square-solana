@@ -1,11 +1,12 @@
 // Test fixture: API'yi üretimdeki gibi kurar (index.ts'in bağlaması) ve yerel bir portta açar. Veritabanı ve
 // depo paylaşılan konteynerlerdir (global-setup), zincir ve prover yerel fixture sunucularıdır. İstemci SDK'nın
 // `createApiClient`'idir: uçlar sözleşmedeki istemciyle denenir.
+import { randomBytes } from 'node:crypto';
 import { once } from 'node:events';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { createDatabaseClient, type PrismaClient } from '@squaresdk/solana-db';
-import { createRateLimiter } from '@squaresdk/solana-hardening';
+import { createRateLimiter, createSecretBox, type SecretBox } from '@squaresdk/solana-hardening';
 import { createPrismaRateLimitStore } from '@squaresdk/solana-hardening/prisma';
 import { createReadApi } from '@squaresdk/solana-indexer/read';
 import { createEventWindow, createHealth, createLogger, createServiceMetrics } from '@squaresdk/solana-observability';
@@ -22,10 +23,15 @@ import { createApp } from '../../src/app.js';
 import { createAuthService } from '../../src/auth/service.js';
 import { createCardService } from '../../src/cards.js';
 import { createDeliveryService } from '../../src/deliveries.js';
+import { createArbitrationService } from '../../src/disputes/arbitration.js';
+import { createArbitrators, type Arbitrators } from '../../src/disputes/arbitrators.js';
+import { createEvidenceService } from '../../src/disputes/evidence.js';
+import { createParties } from '../../src/disputes/parties.js';
+import { createWebhookService } from '../../src/disputes/webhooks.js';
 import type { OpenApiDocument } from '../../src/openapi.js';
 import { createPolicyMetaService } from '../../src/policy-meta.js';
 import { createProverProxy } from '../../src/prover.js';
-import { createDeliveryStore } from '../../src/storage.js';
+import { createDeliveryStore, createEvidenceStore } from '../../src/storage.js';
 import { createTxBuilder } from '../../src/tx.js';
 import { FixtureRpc, startRpc } from './rpc.js';
 
@@ -53,6 +59,9 @@ export interface Stack {
   readonly prover: ProverFixture;
   readonly deliveryBaseUrl: string;
   readonly client: ReturnType<typeof createSquareClient>;
+  /** Webhook sırlarının kutusu ve arbitrator seti (bildirim testleri gönderiyi bunlarla kurar). */
+  readonly box: SecretBox;
+  readonly arbitrators: Arbitrators;
   /** İç ve bağımlılık hataları (alarm penceresi). */
   readonly errors: { count(): number };
   api(auth?: { session?: string; apiKey?: string }): SquareApi;
@@ -69,7 +78,10 @@ export async function startStack(options: {
   openapi: OpenApiDocument;
   rateLimit?: { read: number; write: number };
   deliveryMaxBytes?: number;
+  evidenceMaxBytes?: number;
   lookupTable?: PublicKey | null;
+  /** Fixture RPC yerine gerçek bir küme (localnet uçtan uca testi). */
+  rpcUrl?: string;
   clock?: () => number;
   /** Paylaşılan veritabanı yerine başka bir adres (ör. ulaşılamayan veritabanı testi). */
   databaseUrl?: string;
@@ -93,7 +105,7 @@ export async function startStack(options: {
   });
   const proverUrl = await listen(proverServer);
 
-  const connection = new Connection(rpcServer.url, 'confirmed');
+  const connection = new Connection(options.rpcUrl ?? rpcServer.url, 'confirmed');
   const client = createSquareClient({ connection, programIds: PROGRAM_IDS, commitment: 'confirmed' });
   const log = createLogger({ service: 'api-test', level: 'error' });
   const deliveryBaseUrl = `${s3.endpoint}/${s3.bucket}`;
@@ -125,9 +137,32 @@ export async function startStack(options: {
     timeoutMs: 5_000,
     logger: log,
   });
+  const read = createReadApi({ db, chainRef: CHAIN_REF, registryProgramId: PROGRAM_IDS.registry });
+  const tx = createTxBuilder({
+    client,
+    connection,
+    lookupTable: options.lookupTable ?? null,
+    computeUnitPrice: 1_000n,
+  });
+  const evidenceStore = createEvidenceStore({
+    endpoint: s3.endpoint,
+    region: 'us-east-1',
+    bucket: s3.evidenceBucket,
+    accessKeyId: s3.accessKeyId,
+    secretAccessKey: s3.secretAccessKey,
+    forcePathStyle: true,
+  });
+  // Anahtar halkası çalışma anında üretilir.
+  const box = createSecretBox({ keys: { t1: randomBytes(32) }, activeKeyId: 't1' });
+  const arbitrators = createArbitrators({ client, ttlMs: 0, ...(options.clock ? { clock: options.clock } : {}) });
+  const evidence = createEvidenceService({
+    db,
+    store: evidenceStore,
+    parties: createParties({ db, connection, arbitrators }),
+  });
   const app = createApp({
     db,
-    read: createReadApi({ db, chainRef: CHAIN_REF, registryProgramId: PROGRAM_IDS.registry }),
+    read,
     auth: createAuthService({
       db,
       domain: 'app.square.test',
@@ -144,7 +179,24 @@ export async function startStack(options: {
       publicBaseUrl: PUBLIC_BASE_URL,
     }),
     policyMeta: createPolicyMetaService({ db, connection }),
-    tx: createTxBuilder({ client, connection, lookupTable: options.lookupTable ?? null, computeUnitPrice: 1_000n }),
+    tx,
+    evidence,
+    arbitration: createArbitrationService({
+      db,
+      read,
+      client,
+      tx,
+      arbitrators,
+      evidence,
+      ...(options.clock ? { clock: options.clock } : {}),
+    }),
+    webhooks: createWebhookService({
+      db,
+      box,
+      arbitrators,
+      urlPolicy: { allowHttp: false, allowPrivateAddresses: false },
+    }),
+    evidenceMaxBytes: options.evidenceMaxBytes ?? 1024 * 1024,
     prover: createProverProxy({ url: proverUrl, apiKey: 'prover-service-key', timeoutMs: 2_000 }),
     limiters: { read: window(limits.read), write: window(limits.write) },
     openapi: options.openapi,
@@ -166,6 +218,8 @@ export async function startStack(options: {
     prover,
     deliveryBaseUrl,
     client,
+    box,
+    arbitrators,
     errors,
     api: (auth) => createApiClient({ baseUrl: url, ...(auth ? { auth } : {}) }),
     async close() {

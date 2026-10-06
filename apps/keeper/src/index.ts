@@ -1,5 +1,5 @@
-// Süreç giriş noktası: yapılandırma ve program kimlikleri doğrulanmadan servis açılmaz. Tek döngü: finalize
-// crank'i. Tek örnek çalışır: aynı job'a iki keeper aynı anda tx göndermesin. Log, metrik, health ve alarmlar
+// Süreç giriş noktası: yapılandırma ve program kimlikleri doğrulanmadan servis açılmaz. İki döngü: finalize
+// crank'i (BE-15) ve lapse crank'i (BE-22). Tek örnek çalışır: aynı job'a iki keeper aynı anda tx göndermesin. Log, metrik, health ve alarmlar
 // `@squaresdk/solana-observability`'dendir.
 import type { Server } from 'node:http';
 import { createDatabaseClient } from '@squaresdk/solana-db';
@@ -17,7 +17,8 @@ import { keeperAlarmRules } from './alarms.js';
 import { createApp, createMetricsApp } from './app.js';
 import { loadConfig } from './config.js';
 import { createCrank } from './crank.js';
-import { createJournal } from './journal.js';
+import { createJournal, createLapseJournal } from './journal.js';
+import { createLapseCrank } from './lapse.js';
 import { startLoop } from './loop.js';
 import { createMetrics } from './metrics.js';
 import { packageInfo } from './package-info.js';
@@ -63,6 +64,19 @@ async function main(): Promise<void> {
     log,
     onError: () => errors.record(),
   });
+  const lapse = createLapseCrank({
+    client,
+    connection,
+    journal: createLapseJournal(db),
+    keeper: config.keeper,
+    fees: config.economics,
+    backoff: config.backoff,
+    batchSize: config.batchSize,
+    confirmPollMs: config.confirmPollMs,
+    metrics,
+    log,
+    onError: () => errors.record(),
+  });
   const health = createHealth({
     version: packageInfo.version,
     checks: {
@@ -79,7 +93,11 @@ async function main(): Promise<void> {
   const alarms = createAlarms({
     service: packageInfo.name,
     rules: keeperAlarmRules({
-      lastRoundAt: () => crank.lastSuccessAt(),
+      // İki crank'ten geride olanı: biri durursa alarm çalar.
+      lastRoundAt: () => {
+        const rounds = [crank.lastSuccessAt(), lapse.lastSuccessAt()];
+        return rounds.includes(null) ? null : Math.min(...(rounds as number[]));
+      },
       lastBalance: () => crank.lastBalance(),
       startedAt,
       errors,
@@ -89,15 +107,24 @@ async function main(): Promise<void> {
     logger: log,
     registry: metrics.registry,
   });
-  const stop = startLoop({
-    intervalMs: config.pollIntervalMs,
-    immediate: true,
-    run: () => crank.runOnce(),
-    onError: (error) => {
-      errors.record();
-      log.error('round_failed', { error });
-    },
-  });
+  const failed = (stage: string) => (error: unknown) => {
+    errors.record();
+    log.error(`${stage}_failed`, { error });
+  };
+  const stops = [
+    startLoop({
+      intervalMs: config.pollIntervalMs,
+      immediate: true,
+      run: () => crank.runOnce(),
+      onError: failed('round'),
+    }),
+    startLoop({
+      intervalMs: config.pollIntervalMs,
+      immediate: true,
+      run: () => lapse.runOnce(),
+      onError: failed('lapse_round'),
+    }),
+  ];
   const servers = await Promise.all([
     listen(createApp({ health }), config.port),
     listen(createMetricsApp(metrics.registry, log), config.metricsPort),
@@ -114,7 +141,7 @@ async function main(): Promise<void> {
   const shutdown = async (signal: string) => {
     log.info('shutdown', { signal });
     stopAlarms();
-    await stop();
+    await Promise.all(stops.map((stop) => stop()));
     await Promise.all(servers.map(close));
     await db.$disconnect();
     process.exit(0);

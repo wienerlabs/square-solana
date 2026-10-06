@@ -2,6 +2,7 @@
 // değerde servis açılmaz. Varsayılan değer yoktur. Log, hazırlık ve alarm webhook'u değişkenleri servislerde
 // ortaktır (`@squaresdk/solana-observability`). Program kimlikleri veritabanının `programs` tablosundan,
 // ağ referansı (did:aip) RPC'nin genesis hash'inden okunur.
+import { parseSecretBoxKeys } from '@squaresdk/solana-hardening';
 import { parseObservabilityEnv, type ObservabilityConfig } from '@squaresdk/solana-observability';
 import { z } from 'zod';
 
@@ -74,6 +75,27 @@ const EnvSchema = z.object({
   API_DELIVERY_PUBLIC_BASE_URL: baseUrl(httpUrl),
   API_DELIVERY_MAX_BYTES: int(1),
 
+  /** Dispute kanıtlarının kovası (teslimat deposuyla aynı uç ve kimlik); herkese açık okunmaz. */
+  API_EVIDENCE_S3_BUCKET: nonEmpty,
+  API_EVIDENCE_MAX_BYTES: int(1),
+  /** Escrow config'inden okunan arbitrator setinin önbellek süresi. */
+  API_ARBITRATOR_CACHE_SECONDS: int(0),
+
+  /** Webhook sırlarının anahtar halkası (`kimlik:base64,…`, her anahtar 32 bayt) ve etkin anahtar. */
+  API_SECRET_BOX_KEYS: nonEmpty,
+  API_SECRET_BOX_ACTIVE_KEY: nonEmpty,
+  /** Arbitrator bildirim outbox'ının tur aralığı ve tur başına teslimat. */
+  API_NOTIFY_INTERVAL_MS: int(1),
+  API_NOTIFY_BATCH_SIZE: int(1, 1_000),
+  API_NOTIFY_TIMEOUT_MS: int(1),
+  API_NOTIFY_MAX_ATTEMPTS: int(1, 100),
+  API_NOTIFY_BACKOFF_BASE_SECONDS: int(1),
+  API_NOTIFY_BACKOFF_MAX_SECONDS: int(1),
+  /** Son tarihe bu kadar saniye kala oy vermemiş arbitrator'lara `dispute.deadline` gönderilir. */
+  API_NOTIFY_DEADLINE_WARNING_SECONDS: int(1),
+  /** Yalnızca geliştirme: webhook ucu http ya da özel ağ adresi olabilir. */
+  API_NOTIFY_ALLOW_INSECURE: bool,
+
   /** Square address lookup table'ı; verilirse hazırlanan her tx'e eklenir (BC-28). */
   API_LOOKUP_TABLE: optional(z.string().regex(/^[1-9A-HJ-NP-Za-km-z]{32,44}$/, 'base58 adres bekleniyor')),
   /** `computeUnitPrice` verilmeyen tx'lerin priority fee'si (mikro-lamport / CU). */
@@ -100,6 +122,16 @@ export interface DeliveryStoreConfig {
   readonly publicBaseUrl: string;
 }
 
+export interface NotifyConfig {
+  readonly intervalMs: number;
+  readonly batchSize: number;
+  readonly timeoutMs: number;
+  readonly maxAttempts: number;
+  readonly backoff: { readonly baseSeconds: number; readonly maxSeconds: number };
+  readonly deadlineWarningSeconds: number;
+  readonly allowInsecure: boolean;
+}
+
 export interface ApiConfig {
   readonly databaseUrl: string;
   readonly port: number;
@@ -112,6 +144,10 @@ export interface ApiConfig {
   readonly auth: { readonly domain: string; readonly challengeTtlSeconds: number; readonly sessionTtlSeconds: number };
   readonly rateLimit: { readonly windowSeconds: number; readonly read: number; readonly write: number };
   readonly deliveries: { readonly store: DeliveryStoreConfig; readonly maxBytes: number };
+  readonly evidence: { readonly bucket: string; readonly maxBytes: number };
+  readonly arbitratorCacheSeconds: number;
+  readonly secretBox: { readonly keys: Readonly<Record<string, Uint8Array>>; readonly activeKeyId: string };
+  readonly notify: NotifyConfig;
   readonly tx: { readonly lookupTable: string | null; readonly computeUnitPrice: bigint };
   readonly prover: { readonly url: string; readonly apiKey: string; readonly timeoutMs: number };
   readonly alerts: { readonly errors: number; readonly errorWindowSeconds: number };
@@ -125,6 +161,7 @@ export function loadConfig(env: Readonly<Record<string, string | undefined>>): A
     ...(parsed.success ? [] : parsed.error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`)),
     ...(observability.ok ? [] : observability.problems),
   ];
+  let secretKeys: Record<string, Uint8Array> | null = null;
   if (parsed.success) {
     const e = parsed.data;
     if (e.API_PORT === e.API_METRICS_PORT) problems.push('API_METRICS_PORT: API_PORT ile aynı olamaz');
@@ -134,8 +171,24 @@ export function loadConfig(env: Readonly<Record<string, string | undefined>>): A
     if (e.API_DELIVERY_PUBLIC_BASE_URL.length + 1 + 64 > DELIVERY_URI_MAX) {
       problems.push(`API_DELIVERY_PUBLIC_BASE_URL: deliveryUri ${DELIVERY_URI_MAX} karakteri aşar`);
     }
+    if (e.API_EVIDENCE_S3_BUCKET === e.API_DELIVERY_S3_BUCKET) {
+      problems.push('API_EVIDENCE_S3_BUCKET: teslimat kovası herkese açık okunur; kanıt kovası ondan ayrı olmalı');
+    }
+    if (e.API_NOTIFY_BACKOFF_MAX_SECONDS < e.API_NOTIFY_BACKOFF_BASE_SECONDS) {
+      problems.push('API_NOTIFY_BACKOFF_MAX_SECONDS: API_NOTIFY_BACKOFF_BASE_SECONDS’tan küçük olamaz');
+    }
+    try {
+      const keys = parseSecretBoxKeys(e.API_SECRET_BOX_KEYS);
+      if (!Object.hasOwn(keys, e.API_SECRET_BOX_ACTIVE_KEY)) {
+        problems.push('API_SECRET_BOX_ACTIVE_KEY: anahtar halkasında yok');
+      }
+      secretKeys = keys;
+    } catch (error) {
+      // Anahtarın kendisi hata mesajına yazılmaz; ayrıştırıcının mesajı yalnızca kimlik ve biçim içerir.
+      problems.push(`API_SECRET_BOX_KEYS: ${(error as Error).message}`);
+    }
   }
-  if (!parsed.success || !observability.ok || problems.length > 0) {
+  if (!parsed.success || !observability.ok || problems.length > 0 || !secretKeys) {
     throw new Error(`Geçersiz API ortamı:\n${problems.map((problem) => `  ${problem}`).join('\n')}`);
   }
   const e = parsed.data;
@@ -173,6 +226,21 @@ export function loadConfig(env: Readonly<Record<string, string | undefined>>): A
         publicBaseUrl: e.API_DELIVERY_PUBLIC_BASE_URL,
       }),
       maxBytes: e.API_DELIVERY_MAX_BYTES,
+    }),
+    evidence: Object.freeze({ bucket: e.API_EVIDENCE_S3_BUCKET, maxBytes: e.API_EVIDENCE_MAX_BYTES }),
+    arbitratorCacheSeconds: e.API_ARBITRATOR_CACHE_SECONDS,
+    secretBox: Object.freeze({ keys: Object.freeze(secretKeys), activeKeyId: e.API_SECRET_BOX_ACTIVE_KEY }),
+    notify: Object.freeze({
+      intervalMs: e.API_NOTIFY_INTERVAL_MS,
+      batchSize: e.API_NOTIFY_BATCH_SIZE,
+      timeoutMs: e.API_NOTIFY_TIMEOUT_MS,
+      maxAttempts: e.API_NOTIFY_MAX_ATTEMPTS,
+      backoff: Object.freeze({
+        baseSeconds: e.API_NOTIFY_BACKOFF_BASE_SECONDS,
+        maxSeconds: e.API_NOTIFY_BACKOFF_MAX_SECONDS,
+      }),
+      deadlineWarningSeconds: e.API_NOTIFY_DEADLINE_WARNING_SECONDS,
+      allowInsecure: e.API_NOTIFY_ALLOW_INSECURE,
     }),
     tx: Object.freeze({ lookupTable: e.API_LOOKUP_TABLE ?? null, computeUnitPrice: e.API_COMPUTE_UNIT_PRICE }),
     prover: Object.freeze({ url: e.API_PROVER_URL, apiKey: e.API_PROVER_API_KEY, timeoutMs: e.API_PROVER_TIMEOUT_MS }),

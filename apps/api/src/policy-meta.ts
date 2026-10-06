@@ -5,9 +5,9 @@
 //   açabilen (`Initiate`) üyeler yazar. Üyeler multisig hesabından o anda okunur.
 import type { PrismaClient } from '@squaresdk/solana-db';
 import { PolicyMetaSchema } from '@squaresdk/solana-types';
-import { PublicKey, type Connection } from '@solana/web3.js';
-import { HttpError, forbidden, notFound, parse } from './http.js';
-import { PERMISSION_INITIATE, multisigMembers } from './squads.js';
+import type { Connection } from '@solana/web3.js';
+import { forbidden, notFound, parse } from './http.js';
+import { isMultisigInitiator } from './squads.js';
 
 export interface PolicyMetaService {
   /** Meta veriyi yazar; çağıranın yetkisi denetlenir. */
@@ -17,18 +17,7 @@ export interface PolicyMetaService {
 export function createPolicyMetaService(deps: { db: PrismaClient; connection: Connection }): PolicyMetaService {
   const { db, connection } = deps;
 
-  async function isInitiator(multisig: string, wallet: string): Promise<boolean> {
-    let info;
-    try {
-      info = await connection.getAccountInfo(new PublicKey(multisig), 'confirmed');
-    } catch (error) {
-      throw new HttpError(503, 'rpc_unavailable', 'Squads multisig hesabı okunamadı', null, null, error);
-    }
-    const members = info ? multisigMembers(info.owner, info.data) : null;
-    // Bağlama sırasında program hesabı Squads v4 multisig'i olarak denetledi; artık değilse yetkili doğrulanamaz.
-    if (!members) throw forbidden('kurumun multisig hesabı Squads v4 multisig değil; yetkili doğrulanamadı');
-    return members.some((member) => member.key === wallet && (member.permissions & PERMISSION_INITIATE) !== 0);
-  }
+  const isInitiator = (multisig: string, wallet: string) => isMultisigInitiator(connection, multisig, wallet);
 
   return {
     async put({ wallet, policy, meta }) {
