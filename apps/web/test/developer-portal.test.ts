@@ -1,12 +1,13 @@
 // Geliştirici portalının saf parçaları (FE-22): cüzdanla API oturumu (imza gerçekten doğrulanır), ücretli uç
 // nokta formu, fiyat gösterimi, ağ ve USDC sabitlerinin x402 paketi ve API sözleşmesiyle hizası, yapılandırma.
+import { PublicKey } from '@solana/web3.js';
 import { createApiClient } from '@squaresdk/solana-sdk';
 import { ApiKeyScopeSchema, X402NetworkSchema } from '@squaresdk/solana-types';
 import { SOLANA_NETWORKS, usdcMint } from '@squaresdk/solana-x402';
 import { describe, expect, it } from 'vitest';
+import { signInToApi } from '@/lib/api-session';
 import { parseWebConfig } from '@/lib/config';
 import {
-  PortalApiError,
   SCOPE_INFO,
   USDC_MINTS,
   X402_NETWORKS,
@@ -14,19 +15,26 @@ import {
   defaultNetwork,
   formatPrice,
   newEndpointDraft,
-  signInToApi,
 } from '@/lib/developer-portal';
+import { SquareApiError } from '@/lib/square-api';
 import { fakeSquareApi, testWallet } from './helpers/fake-square-api';
 
 const DEVNET = 'solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1' as const;
 const OTHER_MINT = 'So11111111111111111111111111111111111111112';
 
 describe('API session', () => {
+  const domain = 'app.square.test';
+
   it('signs the challenge with the wallet and opens a session', async () => {
     const fake = fakeSquareApi();
     const api = createApiClient({ baseUrl: 'https://api.square.test', fetch: fake.fetch });
     const wallet = testWallet();
-    const session = await signInToApi({ api, wallet: wallet.address, signMessage: wallet.signMessage });
+    const session = await signInToApi({
+      api,
+      wallet: new PublicKey(wallet.address),
+      domain,
+      signMessage: wallet.signMessage,
+    });
     expect(session).toMatchObject({ wallet: wallet.address, token: expect.stringMatching(/^sqs_/) });
     const authed = createApiClient({
       baseUrl: 'https://api.square.test',
@@ -39,10 +47,10 @@ describe('API session', () => {
   it('a signature from another wallet is refused with the API’s error', async () => {
     const fake = fakeSquareApi();
     const api = createApiClient({ baseUrl: 'https://api.square.test', fetch: fake.fetch });
-    const wallet = testWallet();
-    const attempt = signInToApi({ api, wallet: wallet.address, signMessage: testWallet().signMessage });
-    await expect(attempt).rejects.toBeInstanceOf(PortalApiError);
-    await expect(signInToApi({ api, wallet: wallet.address, signMessage: testWallet().signMessage })).rejects.toThrow(
+    const wallet = new PublicKey(testWallet().address);
+    const attempt = signInToApi({ api, wallet, domain, signMessage: testWallet().signMessage });
+    await expect(attempt).rejects.toBeInstanceOf(SquareApiError);
+    await expect(signInToApi({ api, wallet, domain, signMessage: testWallet().signMessage })).rejects.toThrow(
       'imza geçersiz',
     );
   });

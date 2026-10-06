@@ -6,15 +6,14 @@ import { useWallet } from '@solana/wallet-adapter-react';
 import type { PublicKey, VersionedTransaction } from '@solana/web3.js';
 import { sha256 } from '@noble/hashes/sha256';
 import type { JobAccount } from '@squaresdk/solana-sdk';
+import { useApiClient, type ApiClientState } from '@/components/api-client';
 import { ApiSessionPanel } from '@/components/api-session-panel';
 import { EvidencePanel } from '@/components/dispute/evidence-panel';
 import { useNetworkGuard, useSendTransaction } from '@/components/network-guard';
-import { useWebConfig } from '@/components/providers';
 import { Address } from '@/components/ui/address';
 import { Button } from '@/components/ui/button';
 import { StatusBadge, type Tone } from '@/components/ui/status-badge';
 import { TxConfirmation } from '@/components/ui/tx-confirmation';
-import { unwrap, useApiSession, type ApiSessionState } from '@/lib/api-session';
 import {
   describeResolution,
   disputeErrorMessage,
@@ -37,6 +36,7 @@ import { formatDuration, type EscrowSetup } from '@/lib/job-wizard';
 import { bytesToHex, hexToBytes } from '@/lib/policy-draft';
 import { TransactionBlockedError } from '@/lib/send-transaction';
 import { formatUnits, parseUnits, settlementAccount, type SettlementToken } from '@/lib/settlement';
+import { unwrap } from '@/lib/square-api';
 import { useTokenBalance } from '@/lib/use-settlement';
 import { useSignatureStatus } from '@/lib/use-signature-status';
 
@@ -128,8 +128,7 @@ export function JobDispute({
 }) {
   const { publicKey } = useWallet();
   const guard = useNetworkGuard();
-  const { apiUrl } = useWebConfig();
-  const session = useApiSession(apiUrl);
+  const session = useApiClient();
   const action = useEscrowAction(onConfirmed);
 
   // Config her değişiklikte yeniden okunur: arbitrator seti ve eşik oy sayımını belirler.
@@ -521,7 +520,7 @@ function RaiseDispute({
   params: DisputeParams | null;
   token: SettlementToken | null;
   chainNow: number | null;
-  session: ApiSessionState;
+  session: ApiClientState;
   formatAmount(base: bigint): string;
   action: ReturnType<typeof useEscrowAction>;
   canAct: boolean;

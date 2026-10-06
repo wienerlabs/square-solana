@@ -6,7 +6,10 @@ import { useConnection, useWallet } from '@solana/wallet-adapter-react';
 import { PublicKey } from '@solana/web3.js';
 import { squareIdentity } from '@squaresdk/solana-identity';
 import type { ClaimListingAccount, JobAccount } from '@squaresdk/solana-sdk';
+import type { DeliveryReceipt } from '@squaresdk/solana-types';
+import { useApiSession } from '@/components/api-session';
 import { useNetworkGuard, useSendTransaction } from '@/components/network-guard';
+import { useWebConfig } from '@/components/providers';
 import { Address } from '@/components/ui/address';
 import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/ui/status-badge';
@@ -27,9 +30,12 @@ import {
   JOB_POLL_INTERVAL_MS,
   readJobTimeline,
   readNewestSignature,
+  receiptProblem,
   SignatureTracker,
+  uploadErrorMessage,
   type TimelineEntry,
 } from '@/lib/job-detail';
+import { ENV_VARS } from '@/lib/config';
 import { escrowErrorMessage, formatDuration, readEscrowSetup, type EscrowSetupLookup } from '@/lib/job-wizard';
 import { readReleaseState, type ReleaseState } from '@/lib/release-proof';
 import { TransactionBlockedError } from '@/lib/send-transaction';
@@ -70,6 +76,8 @@ export function JobDetail({ jobAddress, escrowProgramId }: { jobAddress: string;
   const { publicKey } = useWallet();
   const guard = useNetworkGuard();
   const send = useSendTransaction();
+  const { apiUrl } = useWebConfig();
+  const apiSession = useApiSession();
   const verified = guard.rpc.state === 'ready' && !guard.rpc.mismatch;
   const genesisHash = guard.rpc.state === 'ready' ? guard.rpc.genesisHash : null;
   const jobKey = useMemo(() => new PublicKey(jobAddress), [jobAddress]);
@@ -188,11 +196,43 @@ export function JobDetail({ jobAddress, escrowProgramId }: { jobAddress: string;
   const fileId = useId();
   const uriId = useId();
   const [deliveryUri, setDeliveryUri] = useState('');
-  const [content, setContent] = useState<{ name: string; hash: Uint8Array } | null>(null);
-  const [busy, setBusy] = useState<'accept' | 'submit' | null>(null);
+  const [content, setContent] = useState<{ file: File; hash: Uint8Array } | null>(null);
+  // API'nin makbuzu: teslim URI'si ondan gelir; dosya değişince geçersizdir.
+  const [receipt, setReceipt] = useState<DeliveryReceipt | null>(null);
+  const [busy, setBusy] = useState<'accept' | 'upload' | 'submit' | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [signature, setSignature] = useState<string | null>(null);
   const status = useSignatureStatus(signature);
+
+  const chooseFile = (file: File | undefined) => {
+    setActionError(null);
+    // Önceki dosyanın makbuzundan gelen URI yeni dosyayı göstermez.
+    if (receipt && deliveryUri === receipt.deliveryUri) setDeliveryUri('');
+    setReceipt(null);
+    if (!file) return setContent(null);
+    void file.arrayBuffer().then((buffer) => setContent({ file, hash: deliveryHash(new Uint8Array(buffer)) }));
+  };
+
+  // Dosya API'nin deposuna yüklenir (oturumla); makbuzun hash'i tarayıcıdakiyle aynıysa URI'si kullanılır.
+  const upload = async () => {
+    if (!content) return;
+    setBusy('upload');
+    setActionError(null);
+    try {
+      const stored = await apiSession.call((api) => api.uploadDelivery(jobKey.toBase58(), content.file));
+      const problem = receiptProblem(stored, content.hash);
+      if (problem) {
+        setActionError(problem);
+        return;
+      }
+      setReceipt(stored);
+      setDeliveryUri(stored.deliveryUri);
+    } catch (error) {
+      setActionError(uploadErrorMessage(error));
+    } finally {
+      setBusy(null);
+    }
+  };
 
   const act = async (kind: 'accept' | 'submit') => {
     if (!escrow || !publicKey) return;
@@ -274,6 +314,9 @@ export function JobDetail({ jobAddress, escrowProgramId }: { jobAddress: string;
           </Row>
           <Row label="Agent">
             <Address value={account.agentRecord.toBase58()} label="agent record" />
+            <Link href={`/app/agents/${account.agentRecord.toBase58()}`} className="text-link underline">
+              Profile
+            </Link>
             {did && (
               <Link href={`/app/did?did=${encodeURIComponent(did)}`} className="text-link underline">
                 Resolve DID
@@ -425,21 +468,46 @@ export function JobDetail({ jobAddress, escrowProgramId }: { jobAddress: string;
                     id={fileId}
                     type="file"
                     className="text-sm"
-                    onChange={(event) => {
-                      const file = event.currentTarget.files?.[0];
-                      if (!file) return setContent(null);
-                      void file
-                        .arrayBuffer()
-                        .then((buffer) => setContent({ name: file.name, hash: deliveryHash(new Uint8Array(buffer)) }));
-                    }}
+                    onChange={(event) => chooseFile(event.currentTarget.files?.[0])}
                     aria-describedby={`${fileId}-hint`}
                   />
                   <p id={`${fileId}-hint`} className="text-caption text-muted">
-                    Hashed in this browser; only its SHA-256 goes on chain. The file is not uploaded.
+                    {apiUrl ? (
+                      'Hashed in this browser; only its SHA-256 goes on chain. Upload it to the Square API, which stores it under that hash and gives its URI, or enter where it is hosted.'
+                    ) : (
+                      <>
+                        Hashed in this browser; only its SHA-256 goes on chain. The file is not uploaded here (
+                        <span className="font-mono">{ENV_VARS.apiUrl}</span> is not set): enter where it is hosted.
+                      </>
+                    )}
                   </p>
                   {content && (
                     <p className="text-caption">
-                      work_hash of {content.name}: <code className="break-all font-mono">{hex(content.hash)}</code>
+                      work_hash of {content.file.name}: <code className="break-all font-mono">{hex(content.hash)}</code>
+                    </p>
+                  )}
+                  {apiUrl && content && !receipt && (
+                    <div className="flex flex-wrap items-center gap-3">
+                      <Button
+                        variant="secondary"
+                        onClick={() => void upload()}
+                        loading={busy === 'upload'}
+                        disabled={busy !== null || pending || !beforeDeadline || Boolean(apiSession.unavailable)}
+                      >
+                        Upload to the Square API
+                      </Button>
+                      <p className="text-caption text-muted">
+                        {apiSession.unavailable ??
+                          (apiSession.session
+                            ? "The upload uses this wallet's Square API session."
+                            : 'Uploading asks this wallet to sign in to the Square API first.')}
+                      </p>
+                    </div>
+                  )}
+                  {receipt && deliveryUri === receipt.deliveryUri && (
+                    <p className="text-caption">
+                      Uploaded {receipt.size.toLocaleString('en-US')} bytes ({receipt.contentType}); the delivery URI
+                      below points to it.
                     </p>
                   )}
                 </div>

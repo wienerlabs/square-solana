@@ -7,7 +7,7 @@
   [R2](../analysis/square-solana-analysis.md#10-riskler); 2026-10-06
 - **Kapsam:** `programs/square-escrow` (`raise_dispute`, `resolve_dispute`, `execute_resolution`,
   `update_arbitrators`, `lapse_dispute`, `escalate_missing_proof`, `update_params`), `programs/square-verifier`
-  (`set_compliance_proof`'un iş durumu), sözleşme v0.5.0
+  (`set_compliance_proof`'un iş durumu), sözleşme v0.6.0
 
 ## Bağlam
 
@@ -98,7 +98,7 @@
   - Kurallar ve birim testleri: `src/dispute.rs`. Settlement yardımcıları `finalize_payment` ile ortak:
     `src/settlement.rs`.
   - Verifier: `programs/square-verifier/src/linked.rs` (`require_bindable`).
-- **Sözleşme v0.5.0:** Yeni hata 6048 `InvalidDisputeTimeout` sona eklendi, mevcut kodların sırası
+- **Sözleşme v0.6.0:** Yeni hata 6048 `InvalidDisputeTimeout` sona eklendi, mevcut kodların sırası
   değişmedi. Dispute talimatlarının ve alanlarının dokümanları taslaktan çıktı. Escrow'un IDL'i sözleşmeyle
   aynı; `scripts/ci/programs.mjs`'te bekleyen öğesi yok.
 - **Testler (LiteSVM):**

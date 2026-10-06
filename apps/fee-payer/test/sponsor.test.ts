@@ -4,7 +4,7 @@ import { ed25519 } from '@noble/curves/ed25519.js';
 import { ComputeBudgetProgram, Keypair, VersionedTransaction } from '@solana/web3.js';
 import bs58 from 'bs58';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { SPONSOR_BALANCE, startStack, truncate, type Stack } from './fixtures/stack.js';
+import { PROGRAM_IDS, SPONSOR_BALANCE, startStack, truncate, type Stack } from './fixtures/stack.js';
 import { encode, signed, squareIx, v0 } from './fixtures/tx.js';
 
 let stack: Stack;
@@ -204,9 +204,9 @@ describe('imza ve gönderim', () => {
       err: { InstructionError: [2, { Custom: 6000 }] },
       logs: [
         `Program ${stack.config.sponsor.publicKey.toBase58()} invoke [1]`,
-        'Program CgchXu2dRV3r9E1YjRhp4kbeLLtv1Xz61yoerJzp1Vbc invoke [1]',
+        `Program ${PROGRAM_IDS.registry.toBase58()} invoke [1]`,
         'Program log: AnchorError occurred. Error Code: AgentIdTooLong. Error Number: 6000. Error Message: x.',
-        'Program CgchXu2dRV3r9E1YjRhp4kbeLLtv1Xz61yoerJzp1Vbc failed: custom program error: 0x1770',
+        `Program ${PROGRAM_IDS.registry.toBase58()} failed: custom program error: 0x1770`,
       ],
       unitsConsumed: 1_000,
       rent: 0,

@@ -7,7 +7,7 @@
 '@squaresdk/solana-web': minor
 ---
 
-Geliştirici portalı: API anahtarları ve x402 ücretli uç noktalar (FE-22, API sözleşmesi v0.19.0, ADR 0023).
+Geliştirici portalı: API anahtarları ve x402 ücretli uç noktalar (FE-22, API sözleşmesi v0.20.0, ADR 0023).
 
 `@squaresdk/solana-types`: `X402Network`, `X402Endpoint`, `X402EndpointCreate`, `X402EndpointUpdate`,
 `X402PaymentReport`, `X402Payment`, `X402UsageTotal`, `X402EndpointUsage` şemaları; `ApiKeyScope`'a `x402:serve`.

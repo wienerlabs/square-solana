@@ -13,4 +13,4 @@ denetim kaydına girer. API: `POST /v1/screenings`, `GET /v1/screenings/{wallet}
 `GET /v1/screenings/{wallet}/history`, `GET /openapi.json`.
 
 `@squaresdk/solana-db`: `screening_decisions` tablosu ve `ScreeningTrigger` / `ScreeningOutcome` enum'ları
-(migration `20261006100000_screener`).
+(migration `20261006115000_screener`).

@@ -87,7 +87,7 @@
 ## Sonuçlar
 
 - **Uygulama:** `apps/screener` (`src/sources/ofac.ts`, `src/sources/chainalysis.ts`, `src/evidence.ts`),
-  `screening_decisions` tablosu (migration `20261006100000_screener`), 2026-10-06.
+  `screening_decisions` tablosu (migration `20261006115000_screener`), 2026-10-06.
 - **Bağımlılık:** Chainalysis'in ücretsiz API'si kayıt ve kullanım koşullarına bağlıdır. Koşullar değişirse
   adaptör değiştirilir; karar kuralı ve kanıt biçimi değişmez (`EVIDENCE_VERSION` yalnızca kanıt alanları
   değişirse artar).

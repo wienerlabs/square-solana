@@ -45,12 +45,14 @@
    - Job zincirde `Open` değilse yazma reddedilir (409). Fonlanan işin commitment'ı değişmez (ADR 0015 §3);
      kaydı da değişmez.
 3. **Şifreleme:**
-   - Zarf şifrelemesi, AES-256-GCM. `{ kayıt, salt }` kayda özgü rastgele 32 baytlık veri anahtarıyla
+   - Zarf şifrelemesi, `@squaresdk/solana-hardening`'in `SecretBox`'ıyla (AES-256-GCM; değer
+     `sq1.<anahtar>.<iv>.<veri>`). `{ kayıt, salt }` kayda özgü rastgele 32 baytlık veri anahtarıyla
      şifrelenir.
    - Veri anahtarı ana anahtar halkasının etkin anahtarıyla sarılır (`API_TRAVEL_RULE_KEYS`,
      `API_TRAVEL_RULE_ACTIVE_KEY_ID`).
-   - Ek doğrulanan veri: şifreli kayıt için `job` ve `commitment`, sarılmış anahtar için `job` ve anahtar
-     kimliği.
+   - Ek doğrulanan veri: şifreli kayıt için `job` ve `commitment`, sarılmış anahtar için `job`. Anahtar
+     kimliği `SecretBox` değerinin içindedir; değiştirilirse değer başka anahtarla açılmaya çalışılır ve
+     doğrulanamaz.
    - Veritabanında düz metin yoktur.
 4. **Anahtar döndürme:**
    - Yeni anahtar halkaya eklenip etkin yapılır.
@@ -74,7 +76,7 @@
    - Yanıt, zincirdeki `Job.travel_rule_commitment`'ı ve eşleşmeyi (`committed`) taşır.
    - Karşı taraf aynı hesabı SDK ile kendisi yapar.
 8. **Saklama süresi:**
-   - Kayıt son yazmadan `API_TRAVEL_RULE_RETENTION_DAYS` gün sonra silinir. Silinenler şifreli kayıt, IV,
+   - Kayıt son yazmadan `API_TRAVEL_RULE_RETENTION_DAYS` gün sonra silinir. Silinenler şifreli kayıt,
      sarılmış veri anahtarı ve anahtar kimliğidir.
    - Commitment, kaydın özeti ve erişim kaydı kalır. Zincirdeki commitment zaten kalıcıdır.
    - Süre hukuki karardır: varsayılan değeri yoktur, kurulumda verilir.
@@ -101,10 +103,14 @@ Bu bölümdeki gerekçeler bu ADR'ındır; kaynaklarda gerekçe yoktur.
 
 - **Uygulama:**
   - `apps/api/src/travel-rule/{crypto,service,maintenance}.ts`, `apps/api/src/routes/travel-rule.ts`.
+  - Şifreleme ve anahtar halkası `@squaresdk/solana-hardening`'in `SecretBox`'ı ve `parseSecretBoxKeys`'idir.
+    `crypto.ts` yalnızca zarfı kurar: veri anahtarı, ek doğrulanan veri, yeniden sarma.
   - Kurum yetkilisi kuralı `apps/api/src/institution-authority.ts`'te ortak; `putPolicyMeta` de onu kullanır.
 - **Veritabanı:**
   - `travel_rule_records` genişledi: özet, yazan, saklama sonu, silinme. `kms_key_id` yerine ana anahtar
     halkasının `key_id`'si geldi.
+  - Şifreli kayıt ve sarılmış anahtar `SecretBox` değeri (metin) olarak durur. IV ve algoritma değerin
+    içindedir; ayrı sütunları yoktur (`20261006113710_travel_rule_secret_box`).
   - Yeni tablolar: `travel_rule_grants`, `travel_rule_accesses`. CHECK kısıtı: silinmiş kaydın şifreli
     alanlarının hepsi boş, silinmemişin hepsi dolu.
 - **Sözleşme v0.15.0:** Beş operasyon: `putTravelRule`, `getTravelRule`, `createTravelRuleGrant`,

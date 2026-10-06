@@ -8,11 +8,18 @@ resolution = true
 skip-lint = false
 
 [programs.localnet]
-# Kaynak programların declare_id! değerleri; yeni Square program ID'leri BC-09'da.
-square_policy = "FXD7ycSguBQw7o3DXqq4VUBHtdx5ZQpu9P2zb4KG4ZEU"
-square_verifier = "AzKirEv7h5PstLNYNqLj7fCXU9EFA6nSnuoed3QkmUfU"
-square_registry = "CgchXu2dRV3r9E1YjRhp4kbeLLtv1Xz61yoerJzp1Vbc"
-square_escrow = "5hstj5grBUL1BeSaPLYpgkD6n3ALasmbseRvKRFfCVNT"
+# Square program kimlikleri (BC-09); scripts/deploy/set-program-ids.mjs yazar.
+square_policy = "63HKPj2L8a9DGeTa9Eh3NaZXthMrFUEgbs9Y28SNEc4"
+square_verifier = "8yLdDR5zoAzeEWzkNX19DKy4HfVYXb7VcU3wWStwTFPh"
+square_registry = "AL5p4aTWrmBmWa4vxJFbBjQG7Xnx2juc15FJRGpwSsA9"
+square_escrow = "6yBTEVbizMVCWAp4c3jx6Xdsay3CiUmrJmTswY7QRWaX"
+
+[programs.devnet]
+# Square program kimlikleri (BC-09); scripts/deploy/set-program-ids.mjs yazar.
+square_policy = "63HKPj2L8a9DGeTa9Eh3NaZXthMrFUEgbs9Y28SNEc4"
+square_verifier = "8yLdDR5zoAzeEWzkNX19DKy4HfVYXb7VcU3wWStwTFPh"
+square_registry = "AL5p4aTWrmBmWa4vxJFbBjQG7Xnx2juc15FJRGpwSsA9"
+square_escrow = "6yBTEVbizMVCWAp4c3jx6Xdsay3CiUmrJmTswY7QRWaX"
 
 [provider]
 cluster = "localnet"

@@ -2,7 +2,7 @@
 // değerde servis açılmaz. Varsayılan değer yoktur. Log, hazırlık ve alarm webhook'u değişkenleri servislerde
 // ortaktır (`@squaresdk/solana-observability`). Program kimlikleri veritabanının `programs` tablosundan,
 // ağ referansı (did:aip) RPC'nin genesis hash'inden okunur.
-import { parseSecretBoxKeys } from '@squaresdk/solana-hardening';
+import { createSecretBox, parseSecretBoxKeys } from '@squaresdk/solana-hardening';
 import { parseObservabilityEnv, type ObservabilityConfig } from '@squaresdk/solana-observability';
 import { z } from 'zod';
 
@@ -35,14 +35,6 @@ const AGENT_CARD_URI_MAX = 200;
 /** `submit_work`'ün `delivery_uri` sınırı (escrow 6007): `<taban>/<64 hex workHash>`. */
 const DELIVERY_URI_MAX = 128;
 const SECONDS_PER_DAY = 86_400;
-/** Travel Rule ana anahtarı: `kimlik:base64`, anahtar 32 bayt (base64'te 44 karakter). */
-const TRAVEL_RULE_KEY = z
-  .string()
-  .regex(
-    /^[a-z0-9][a-z0-9-]{0,31}:[A-Za-z0-9+/]{43}=$/,
-    '`kimlik:base64` bekleniyor (kimlik küçük harf, anahtar 32 bayt)',
-  );
-const TRAVEL_RULE_KEY_ID = z.string().regex(/^[a-z0-9][a-z0-9-]{0,31}$/, 'anahtar kimliği bekleniyor');
 
 const EnvSchema = z.object({
   DATABASE_URL: nonEmpty,
@@ -119,9 +111,9 @@ const EnvSchema = z.object({
    * Travel Rule kayıtlarının ana anahtar halkası (virgülle `kimlik:base64`). Döndürmede yeni anahtar eklenir ve
    * etkin yapılır; eskisi, bakım bütün veri anahtarlarını yeniden sarana kadar halkada kalır (ADR 0017).
    */
-  API_TRAVEL_RULE_KEYS: commaList(TRAVEL_RULE_KEY),
+  API_TRAVEL_RULE_KEYS: nonEmpty,
   /** Yeni kayıtların ve yeniden sarmanın kullandığı anahtar. */
-  API_TRAVEL_RULE_ACTIVE_KEY_ID: TRAVEL_RULE_KEY_ID,
+  API_TRAVEL_RULE_ACTIVE_KEY_ID: nonEmpty,
   /** Kaydın son yazmadan sonra saklandığı gün sayısı; hukuki karar, kurulumda verilir. */
   API_TRAVEL_RULE_RETENTION_DAYS: int(1),
   /** Saklama süresi dolan kayıtların silinmesi ve anahtarların yeniden sarılması aralığı. */
@@ -172,7 +164,8 @@ export interface ApiConfig {
   readonly tx: { readonly lookupTable: string | null; readonly computeUnitPrice: bigint };
   readonly prover: { readonly url: string; readonly apiKey: string; readonly timeoutMs: number };
   readonly travelRule: {
-    readonly keys: ReadonlyMap<string, Buffer>;
+    /** `kimlik → 32 bayt` (`parseSecretBoxKeys`). */
+    readonly keys: Readonly<Record<string, Uint8Array>>;
     readonly activeKeyId: string;
     readonly retentionSeconds: number;
     readonly maintenanceIntervalSeconds: number;
@@ -214,10 +207,12 @@ export function loadConfig(env: Readonly<Record<string, string | undefined>>): A
       // Anahtarın kendisi hata mesajına yazılmaz; ayrıştırıcının mesajı yalnızca kimlik ve biçim içerir.
       problems.push(`API_SECRET_BOX_KEYS: ${(error as Error).message}`);
     }
-    const ids = e.API_TRAVEL_RULE_KEYS.map((entry) => entry.split(':')[0]!);
-    if (new Set(ids).size !== ids.length) problems.push('API_TRAVEL_RULE_KEYS: aynı kimlik iki kez verilmiş');
-    if (!ids.includes(e.API_TRAVEL_RULE_ACTIVE_KEY_ID)) {
-      problems.push('API_TRAVEL_RULE_ACTIVE_KEY_ID: API_TRAVEL_RULE_KEYS içinde yok');
+    // Biçim, uzunluk ve tekrar `@squaresdk/solana-hardening`'in anahtar halkası kurallarıdır.
+    try {
+      const keys = parseSecretBoxKeys(e.API_TRAVEL_RULE_KEYS);
+      createSecretBox({ keys, activeKeyId: e.API_TRAVEL_RULE_ACTIVE_KEY_ID });
+    } catch (error) {
+      problems.push(`API_TRAVEL_RULE_KEYS / API_TRAVEL_RULE_ACTIVE_KEY_ID: ${(error as Error).message}`);
     }
   }
   if (!parsed.success || !observability.ok || problems.length > 0 || !secretKeys) {
@@ -277,12 +272,7 @@ export function loadConfig(env: Readonly<Record<string, string | undefined>>): A
     tx: Object.freeze({ lookupTable: e.API_LOOKUP_TABLE ?? null, computeUnitPrice: e.API_COMPUTE_UNIT_PRICE }),
     prover: Object.freeze({ url: e.API_PROVER_URL, apiKey: e.API_PROVER_API_KEY, timeoutMs: e.API_PROVER_TIMEOUT_MS }),
     travelRule: Object.freeze({
-      keys: new Map(
-        e.API_TRAVEL_RULE_KEYS.map((entry) => {
-          const [id, key] = entry.split(':') as [string, string];
-          return [id, Buffer.from(key, 'base64')] as const;
-        }),
-      ),
+      keys: parseSecretBoxKeys(e.API_TRAVEL_RULE_KEYS),
       activeKeyId: e.API_TRAVEL_RULE_ACTIVE_KEY_ID,
       retentionSeconds: e.API_TRAVEL_RULE_RETENTION_DAYS * SECONDS_PER_DAY,
       maintenanceIntervalSeconds: e.API_TRAVEL_RULE_MAINTENANCE_INTERVAL_SECONDS,

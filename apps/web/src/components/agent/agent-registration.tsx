@@ -221,9 +221,16 @@ export function AgentRegistration({ owner, registryProgramId }: { owner: string;
             <p className="text-sm text-muted">
               This wallet already registered “{agentId}”. An agent ID cannot be registered twice.{' '}
               {identity && (
-                <Link href={`/app/did?did=${encodeURIComponent(identity.did)}`} className="text-link underline">
-                  Resolve its DID
-                </Link>
+                <>
+                  <Link href={`/app/agents/${identity.agentRecord.toBase58()}`} className="text-link underline">
+                    Open its profile
+                  </Link>{' '}
+                  or{' '}
+                  <Link href={`/app/did?did=${encodeURIComponent(identity.did)}`} className="text-link underline">
+                    resolve its DID
+                  </Link>
+                  .
+                </>
               )}
             </p>
           )}

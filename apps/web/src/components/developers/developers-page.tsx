@@ -6,12 +6,13 @@ import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
 import type { ApiKey, X402Endpoint } from '@squaresdk/solana-types';
 import type { SquareApi } from '@squaresdk/solana-sdk';
+import { useApiClient } from '@/components/api-client';
 import { useWebConfig } from '@/components/providers';
 import { Address } from '@/components/ui/address';
 import { Button } from '@/components/ui/button';
 import { ENV_VARS, rpcLabel, type Cluster } from '@/lib/config';
-import { formatTime, unwrap } from '@/lib/developer-portal';
-import { useApiSession } from '@/lib/use-api-session';
+import { formatTime } from '@/lib/developer-portal';
+import { unwrap } from '@/lib/square-api';
 import { ApiKeysPanel } from './api-keys-panel';
 import { ErrorText, headingClass, panelClass } from './field';
 import { SnippetsPanel } from './snippets-panel';
@@ -42,14 +43,14 @@ function Workspace({
 
   const loadKeys = useCallback(async () => {
     try {
-      setKeys(await unwrap(api.listApiKeys()));
+      setKeys(unwrap(await api.listApiKeys()));
     } catch (cause) {
       setError(failed(cause));
     }
   }, [api, failed]);
   const loadEndpoints = useCallback(async () => {
     try {
-      setEndpoints(await unwrap(api.listX402Endpoints()));
+      setEndpoints(unwrap(await api.listX402Endpoints()));
     } catch (cause) {
       setError(failed(cause));
     }
@@ -88,21 +89,10 @@ function Workspace({
 }
 
 /** Bağlı cüzdanın portalı; cüzdan ve API adresi verilmiş olmalı. */
-export function DeveloperPortal({
-  apiUrl,
-  cluster,
-  wallet,
-  signMessage,
-  fetch,
-}: {
-  apiUrl: string;
-  cluster: Cluster;
-  wallet: string;
-  signMessage: ((message: Uint8Array) => Promise<Uint8Array>) | undefined;
-  /** Testler için; verilmezse tarayıcının `fetch`'i. */
-  fetch?: typeof globalThis.fetch;
-}) {
-  const { session, signIn, signOut, failed } = useApiSession({ apiUrl, wallet, signMessage, ...(fetch && { fetch }) });
+export function DeveloperPortal({ apiUrl, cluster, wallet }: { apiUrl: string; cluster: Cluster; wallet: string }) {
+  const client = useApiClient();
+  const { api, session } = client;
+  const problem = api ? null : (client.unavailable ?? client.error);
 
   return (
     <div className="grid gap-6">
@@ -116,35 +106,33 @@ export function DeveloperPortal({
           in this tab.
         </p>
         <div className="mt-4 flex flex-wrap items-center gap-3">
-          {session.state === 'signedIn' ? (
+          {api && session ? (
             <>
-              <span className="text-sm">Signed in until {formatTime(session.session.expiresAt)}</span>
-              <Button variant="secondary" size="sm" onClick={() => void signOut()}>
+              <span className="text-sm">Signed in until {formatTime(session.expiresAt)}</span>
+              <Button variant="secondary" size="sm" onClick={() => void client.signOut()}>
                 Sign out
               </Button>
             </>
           ) : (
-            <Button loading={session.state === 'signingIn'} onClick={() => void signIn()}>
+            <Button loading={client.signingIn} onClick={() => void client.signIn()}>
               Sign in with wallet
             </Button>
           )}
         </div>
-        {session.state === 'signedOut' && session.error && (
+        {problem && (
           <div className="mt-3">
-            <ErrorText>{session.error}</ErrorText>
+            <ErrorText>{problem}</ErrorText>
           </div>
         )}
       </section>
-      {session.state === 'signedIn' && (
-        <Workspace api={session.api} apiUrl={apiUrl} cluster={cluster} wallet={wallet} failed={failed} />
-      )}
+      {api && <Workspace api={api} apiUrl={apiUrl} cluster={cluster} wallet={wallet} failed={client.report} />}
     </div>
   );
 }
 
 export function DevelopersPage() {
   const { apiUrl, cluster } = useWebConfig();
-  const { publicKey, signMessage } = useWallet();
+  const { publicKey } = useWallet();
   if (!apiUrl) {
     return (
       <Notice>
@@ -154,5 +142,5 @@ export function DevelopersPage() {
     );
   }
   if (!publicKey) return <Notice>Connect a wallet to manage its API keys and paid endpoints.</Notice>;
-  return <DeveloperPortal apiUrl={apiUrl} cluster={cluster} wallet={publicKey.toBase58()} signMessage={signMessage} />;
+  return <DeveloperPortal apiUrl={apiUrl} cluster={cluster} wallet={publicKey.toBase58()} />;
 }

@@ -22,12 +22,16 @@
     "prepare": "node scripts/hooks/install.mjs"
   },
   "devDependencies": {
+    "@anchor-lang/core": "1.2.0",
     "@changesets/cli": "^3.0.3",
     "@lezer/highlight": "^1.2.5",
     "@lezer/lr": "^1.4.10",
     "@prometheus-io/lezer-promql": "^0.313.4",
     "@redocly/cli": "^2.57.0",
+    "@solana/web3.js": "^1.99.0",
+    "@sqds/multisig": "^2.1.4",
     "@squaresdk/solana-config": "workspace:*",
+    "@squaresdk/solana-sdk": "workspace:*",
     "@types/node": "^24.0.0",
     "eslint": "^10.12.0",
     "prettier": "^3.9.9",

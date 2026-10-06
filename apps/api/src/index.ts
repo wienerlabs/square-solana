@@ -34,7 +34,6 @@ import { createPolicyMetaService } from './policy-meta.js';
 import { loadProgramIds } from './programs.js';
 import { createProverProxy } from './prover.js';
 import { createDeliveryStore, createEvidenceStore } from './storage.js';
-import { createKeyring } from './travel-rule/crypto.js';
 import { startTravelRuleMaintenance } from './travel-rule/maintenance.js';
 import { createTravelRuleService } from './travel-rule/service.js';
 import { createTxBuilder } from './tx.js';
@@ -93,7 +92,7 @@ async function main(): Promise<void> {
     db,
     client,
     authority,
-    keyring: createKeyring(config.travelRule.keys, config.travelRule.activeKeyId),
+    box: createSecretBox({ keys: config.travelRule.keys, activeKeyId: config.travelRule.activeKeyId }),
     retentionSeconds: config.travelRule.retentionSeconds,
   });
   const rateStore = createPrismaRateLimitStore(db);

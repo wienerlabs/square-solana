@@ -1,12 +1,16 @@
 // İş detayı (FE-07, akışın 4. adımı): job hesabı, işlem loglarındaki escrow event'lerinden zaman çizelgesi,
 // zincir saatine göre challenge sayacı ve agent'ın `accept_job` / `submit_work`'ü. Zaman çizelgesi job
-// hesabına dokunan işlemlerden okunur; indexer gerekmez.
+// hesabına dokunan işlemlerden okunur; indexer gerekmez. Teslim dosyası Square API'ye yüklenebilir
+// (`uploadDelivery`): depo içeriği SHA-256'sıyla adresler, adresi teslim URI'si olur.
 import { BorshCoder, EventParser, type Idl } from '@anchor-lang/core';
 import { PublicKey, SYSVAR_CLOCK_PUBKEY, type Connection } from '@solana/web3.js';
 import { SQUARE_IDLS, workHash } from '@squaresdk/solana-sdk';
+import type { DeliveryReceipt } from '@squaresdk/solana-types';
+import { hex } from './agent-registration';
 import { formatDiscount } from './claim-market';
 import { describeResolution, resolutionOf } from './dispute';
 import { refusalReasons } from './release-proof';
+import { SquareApiError } from './square-api';
 
 /** `Job.delivery_uri` üst sınırı (square_escrow `DELIVERY_URI_MAX_LEN`, `DeliveryUriTooLong`). */
 export const MAX_DELIVERY_URI_BYTES = 128;
@@ -234,3 +238,31 @@ export function deliveryUriProblem(uri: string): string | null {
 
 /** Teslim edilen içeriğin taahhüdü: baytlarının SHA-256'sı (SDK `workHash`). */
 export const deliveryHash = (content: Uint8Array) => workHash(content);
+
+/**
+ * API'nin makbuzu bu içeriğin mi? Zincire tarayıcıda hesaplanan hash yazılır; makbuzun hash'i farklıysa URI
+ * başka bir içeriği gösterir ve kullanılmaz. URI `submit_work`'ün sınırına da uymalıdır.
+ */
+export function receiptProblem(receipt: DeliveryReceipt, hash: Uint8Array): string | null {
+  if (receipt.workHash !== hex(hash)) {
+    return `The Square API stored content with another SHA-256 (${receipt.workHash}), so its URI is not used.`;
+  }
+  return deliveryUriProblem(receipt.deliveryUri);
+}
+
+/** Yükleme hatasının açıklaması; ne yapılacağıyla birlikte. */
+export function uploadErrorMessage(error: unknown): string {
+  if (error instanceof SquareApiError) {
+    switch (error.code) {
+      case 'forbidden':
+        return "Only the job's agent wallet or the agent record's owner can upload its delivery.";
+      case 'not_found':
+        return 'The Square API has not indexed this job yet; try the upload again in a few seconds.';
+      case 'invalid_input':
+        return `The Square API refused the file: ${error.apiMessage}`;
+      case 'rate_limited':
+        return 'The Square API is limiting requests from this wallet; try again shortly.';
+    }
+  }
+  return (error as Error).message;
+}

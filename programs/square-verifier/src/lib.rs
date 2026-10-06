@@ -26,7 +26,7 @@ use instructions::*;
 pub use state::ReleaseVerdict;
 
 // Kaynak programın (Aperture verifier) adresi; Square'in program kimlikleri BC-09'da.
-declare_id!("AzKirEv7h5PstLNYNqLj7fCXU9EFA6nSnuoed3QkmUfU");
+declare_id!("8yLdDR5zoAzeEWzkNX19DKy4HfVYXb7VcU3wWStwTFPh");
 
 square_common::square_verifier_events!();
 
