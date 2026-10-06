@@ -5,8 +5,10 @@
 import type { AgentCard, ApiEnvelope, ApiError, Health } from '@squaresdk/solana-types';
 import type { ApiClientConfig, CreateApiClient, SquareApi } from './api.js';
 
+/** Zarfsız uçların, 204'lerin ve zarf dışı yanıtların hatası. */
 export class ApiClientError extends Error {
   constructor(
+    /** HTTP durumu. */
     readonly status: number,
     message: string,
     /** Yanıt zarfsa hata nesnesi. */
@@ -26,6 +28,7 @@ const isEnvelope = (value: unknown): value is ApiEnvelope<unknown> =>
   typeof (value as { success?: unknown }).success === 'boolean' &&
   'meta' in value;
 
+/** `SquareApi`'nin fetch tabanlı uygulaması. */
 export const createApiClient: CreateApiClient = (config: ApiClientConfig): SquareApi => {
   const base = new URL(config.baseUrl);
   if (base.protocol !== 'https:' && base.protocol !== 'http:') throw new Error('baseUrl http(s) olmalı');

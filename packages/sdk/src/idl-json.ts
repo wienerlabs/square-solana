@@ -9,6 +9,7 @@
 import { BN, type Idl, type IdlDefinedFields, type IdlField, type IdlType, type IdlTypeDef } from '@anchor-lang/core';
 import { PublicKey } from '@solana/web3.js';
 
+/** IDL değerinin JSON kodlaması (API ve indexer; adresler base58, u64 ondalık dize, baytlar hex). */
 export type IdlJson = string | number | boolean | null | IdlJson[] | { [key: string]: IdlJson };
 
 const INT_RANGES: Readonly<Record<string, readonly [number, number]>> = {
