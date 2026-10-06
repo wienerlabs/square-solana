@@ -1,126 +1,207 @@
-# covenant-mcp
+# @squaresdk/solana-mcp
 
-Model Context Protocol server for **Covenant**, the agent-to-agent settlement layer on Solana.
+Square'in Model Context Protocol paketi (BE-28). İki yönlüdür:
 
-**x402 powers paid access. Covenant powers paid work.**
+- **Square MCP sunucusu** (`square-mcp`): Claude Desktop, Claude Code, Cursor ya da otonom bir agent Square'deki
+  işleri bulur, job'ları ve itibarı okur, job açar, işe alır ve teslim eder. Okuma tool'ları cüzdan istemez;
+  yazma tool'ları **imzasız** tx hazırlar, imzayı kullanıcının cüzdanı atar.
+- **Havuzlu MCP istemcisi** (`@squaresdk/solana-mcp/client`): bir agent'ın birden çok MCP sunucusuna (Square MCP,
+  başka agent'ların ya da araçların sunucuları) bağlantılarını tek havuzda yönetir.
 
-This server plugs Covenant into any MCP-speaking agent: Claude Desktop, Claude Code, Cursor, or an autonomous loop. The agent can discover open work, inspect a job's settlement state, read reputation, find capable counterparties, and check the live protocol metrics. Think of it as the Stripe API surface, except the merchant is an AI agent and the rail is Solana.
+Veri kaynağı Square REST API'sidir ([`apps/api`](../../apps/api/README.md), sözleşme
+[`docs/api/openapi.yaml`](../../docs/api/openapi.yaml)); istemci SDK'nın `createApiClient`'ıdır. Zincire yalnızca
+API'nin vermediği üç iş için gidilir: settlement mint'i ve Travel Rule eşiği (`EscrowConfig`), job açılışında
+job hesabının güncel durumu (indexer gecikmesi adımı yanlış seçtirmesin) ve imzalı tx'in gönderimi.
 
-## Status
+## Tool'lar
 
-v0.1 ships the **read-only discovery surface**. No wallet, no credentials, no signing. Any agent can read the entire market.
+Tool açıklamaları ve sonuçları agent'a yöneliktir ve apps/web arayüzü gibi İngilizcedir. Sonuç gövdesi JSON
+metnidir; API hataları kodu ve zincir hatasıyla (`programError`) aynen döner. Tutarlar settlement mint'inin taban
+birimindedir (u64 ondalık dize), zamanlar ISO 8601.
 
-The **write surface** (create_escrow, accept_job, deliver, release, dispute, factor_claim) lands next. It activates when the server is started with `COVENANT_AGENT_KEYPAIR` set, so an autonomous agent becomes its own non-custodial wallet and can both post and earn.
-
-## Tools
-
-| Tool | What it does | Wallet? |
+| Tool | Ne yapar | Kip |
 |---|---|---|
-| `covenant_find_work` | Find open jobs an agent could accept and get paid for, filtered by category and budget | No |
-| `covenant_get_job` | Get the full settlement state of one job (status, escrow, delivery, dispute, challenge-window end) | No |
-| `covenant_settlement_stats` | Live protocol metrics: lifecycle bucket counts, settled volume, escrow locked, auto-release rate, avg settle time | No |
-| `covenant_get_reputation` | A wallet's track record: jobs completed, failed, total earned. The agent economy's credit score | No |
-| `covenant_discover_agents` | Discover capable counterparties by capability and price, ranked by reputation | No |
+| `square_find_work` | İş bulma: varsayılan `funded` (kabul bekleyen) işler; durum, agent, kurum, politika, tutar süzgeci | okuma |
+| `square_get_job` | Job: durum, zaman çizelgesi (indexlenmiş event'ler), dispute, alacak (claim), release proof, validation, sonraki adım | okuma |
+| `square_settlement_stats` | Durum başına job sayıları, kilitli escrow, dispute ve release oranları, keeper sonuçları; isteğe bağlı hacim ve challenge penceresi | okuma |
+| `square_get_reputation` | AgentRecord'a bağlı itibar (tamamlanan / başarısız / dispute, kazanç, başarı oranı) ve ödeme cüzdanının screening'i | okuma |
+| `square_discover_agents` | Agent keşfi: beceri kimliği ya da etiketi, fiyat, doğrulanmış kart; kart bilgisi ve itibara göre sıra | okuma |
+| `square_open_job` | Job açma: aynı spec'le her çağrıda sıradaki tx — `create_job` → (eşik üstünde) `commit_travel_rule` → `fund_job` | yazma |
+| `square_accept_job` | Fonlanmış işi bağlı agent cüzdanıyla kabul (`accept_job`) | yazma |
+| `square_deliver_work` | Teslimatı API'ye yükler (ya da yayımlanmış `workHash` + `deliveryUri`) ve `submit_work` hazırlar | yazma |
+| `square_submit_signed_transaction` | İmzalı tx'i gönderir ve onayı bekler | yazma |
 
-Every tool description teaches the model the settlement semantics (per-job PDA escrow, 24h optimistic challenge window, dispute, factoring) so the agent can reason about next actions, not just fetch data.
+Okuma tool'ları Covenant MCP'nin beş salt okunur tool'unun (`covenant_*`) Square karşılıklarıdır; yazma
+tool'ları yalnızca yazma kipinde kaydedilir.
 
-## Install
+## İmza akışı
 
-Built inside the Square monorepo (not published to npm yet; see BE-28):
+Sunucu özel anahtar tutmaz.
+
+1. Yazma tool'u API'nin `POST /v1/tx` ucundan imzasız v0 tx'i alır (hesap çözümü, compute unit sınırı ve
+   simülasyon sunucuda; düşecek tx `simulation_failed` + `programError` ile döner).
+2. Tool tx'i base64 olarak ve çözülmüş özetiyle döner: fee payer, zorunlu imzacılar ve imza durumları, talimatların
+   programları (`square_escrow`, `compute_budget`), `lastValidBlockHeight`. Özet, API'nin döndürdüğü tx'in istenen
+   fee payer'ı ve yapılandırılmış escrow programını içerdiğini de denetler.
+3. Kullanıcı tx'i kendi cüzdanında imzalar; imzalı tx `square_submit_signed_transaction`'a verilir.
+4. Gönderimden önce her zorunlu imzacının imzası mesaj baytlarına karşı Ed25519 ile doğrulanır. Eksik ya da
+   geçersiz imzalı tx RPC'ye **hiç gönderilmez** (`not_fully_signed`, imzacı başına durumla).
+
+**Yerel imzalayıcı (isteğe bağlı, varsayılan kapalı).** `SQUARE_SIGNER_KEYPAIR` bir keypair dosyasını
+(solana-keygen biçimi) gösterirse yazma tool'larına `sign: true` verilebilir: tx bu anahtarla imzalanır ve aynı
+doğrulamadan geçip gönderilir; cüzdan girdisi verilmezse varsayılanı bu anahtarın adresidir. Başka bir imzacı da
+gerekiyorsa kısmen imzalı tx döner, gönderilmez.
+
+> **Uyarı:** yerel imzalayıcı, bağlı agent'ın (ve onu yönlendiren her girdinin, ör. prompt injection) o anahtarla
+> fon taşıyan tx imzalatabilmesi demektir. Yalnızca ayrı, sınırlı bakiyeli bir anahtarla ve güvendiğiniz bir agent
+> döngüsünde kullanın; kullanıcı onayı gereken her yerde imzasız akışı tercih edin. Streamable HTTP taşımasında
+> yerel imzalayıcı reddedilir: uzak istemci sunucunun anahtarıyla imza attıramaz.
+
+## Yapılandırma
+
+Değerler ortamdan okunur ve açılışta doğrulanır; dağıtıma bağlı hiçbir değerin varsayılanı yoktur.
+
+| Değişken | Kip | Anlamı |
+|---|---|---|
+| `SQUARE_API_URL` | zorunlu | Square REST API'sinin kökü |
+| `SQUARE_NETWORK` | zorunlu | Agent'a bildirilen ağ etiketi |
+| `SQUARE_TIMEOUT_MS` | zorunlu | API ve RPC istek zaman aşımı; tx onayı da en çok bu kadar beklenir |
+| `SQUARE_API_KEY` | yazmada zorunlu | `X-API-Key`; kapsamlar: `read` (verilirse okuma da anahtarla gider), `tx:prepare`, `deliveries:write` |
+| `SQUARE_RPC_URL` | yazma | Solana JSON-RPC ucu |
+| `SQUARE_ESCROW_PROGRAM_ID` | yazma | `square_escrow` program kimliği |
+| `SQUARE_SIGNER_KEYPAIR` | isteğe bağlı | Yerel imzalayıcı keypair dosyası (yalnızca yazma kipi ve stdio) |
+| `SQUARE_MCP_HTTP_HOST`, `SQUARE_MCP_HTTP_PORT` | `--http` | Streamable HTTP dinleme adresi |
+| `SQUARE_MCP_ALLOWED_HOSTS` | isteğe bağlı | Virgülle ayrılmış izinli `Host` adları; verilirse diğerleri 403 (DNS rebinding koruması) |
+
+`SQUARE_RPC_URL` ve `SQUARE_ESCROW_PROGRAM_ID` birlikte verilir; ikisi de yoksa sunucu yalnızca okuma kipinde
+açılır. Teslimat yüklemesinde API anahtarının sahibi job'un agent cüzdanı ya da agent kaydının sahibi olmalıdır.
+
+## Kurulum
+
+Paket ADR 0001'in yayın ön koşulları tamamlanana kadar npm'de değildir (`pnpm pack` tarball'ı kurulabilir,
+`scripts/ci/pack-smoke.mjs`). Depodan:
 
 ```bash
 pnpm install
-pnpm --filter @squaresdk/solana-mcp build
+pnpm turbo run build --filter @squaresdk/solana-mcp...
+node packages/mcp/dist/bin.js --help
 ```
 
-## Use with Claude Desktop
+Yayından sonra `npx -y @squaresdk/solana-mcp` aynı `square-mcp` komutunu çalıştırır.
 
-Add this to your Claude Desktop MCP config:
+### Claude Desktop
 
-- macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
-- Windows: `%APPDATA%\Claude\claude_desktop_config.json`
+`claude_desktop_config.json` (macOS `~/Library/Application Support/Claude/`, Windows `%APPDATA%\Claude\`):
 
 ```json
 {
   "mcpServers": {
-    "covenant": {
+    "square": {
       "command": "node",
-      "args": ["<repo>/packages/mcp/dist/server.js"],
+      "args": ["/path/to/square-solana/packages/mcp/dist/bin.js"],
       "env": {
-        "COVENANT_API_URL": "<API base URL>",
-        "COVENANT_NETWORK": "<cluster label>",
-        "COVENANT_TIMEOUT_MS": "<ms>"
+        "SQUARE_API_URL": "https://api.example.com",
+        "SQUARE_NETWORK": "devnet",
+        "SQUARE_TIMEOUT_MS": "15000",
+        "SQUARE_API_KEY": "sqk_…",
+        "SQUARE_RPC_URL": "https://rpc.example.com",
+        "SQUARE_ESCROW_PROGRAM_ID": "<square_escrow program kimliği>"
       }
     }
   }
 }
 ```
 
-Restart Claude Desktop. You will see a tool icon; ask Claude things like:
+Yalnızca okuma için son üç satır çıkarılır. Claude Desktop yeniden başlatılınca tool'lar görünür; örnek istekler:
+"Square'de agent kaydım `<agentRecord>` için fonlanmış iş var mı?", "`<job>` job'unun durumu ve zaman çizelgesi",
+"çeviri becerisi olan, en az 5 iş tamamlamış agent'lar".
 
-- "Find open Covenant jobs under 10 USDC."
-- "What's the live settlement state on Covenant right now?"
-- "Look up the reputation of wallet `5Tb...RaY9` on Covenant."
-- "Find a Solana analysis agent on Covenant for under 5 USDC."
-
-## Use with Claude Code
+### Claude Code
 
 ```bash
-claude mcp add covenant \
-  -e COVENANT_API_URL=<API base URL> -e COVENANT_NETWORK=<cluster label> -e COVENANT_TIMEOUT_MS=<ms> \
-  -- node <repo>/packages/mcp/dist/server.js
+claude mcp add square \
+  -e SQUARE_API_URL=https://api.example.com -e SQUARE_NETWORK=devnet -e SQUARE_TIMEOUT_MS=15000 \
+  -- node /path/to/square-solana/packages/mcp/dist/bin.js
 ```
 
-## Use with Cursor
+### Streamable HTTP
 
-Add to `.cursor/mcp.json` in your project, or the global Cursor MCP settings:
-
-```json
-{
-  "mcpServers": {
-    "covenant": {
-      "command": "node",
-      "args": ["<repo>/packages/mcp/dist/server.js"],
-      "env": {
-        "COVENANT_API_URL": "<API base URL>",
-        "COVENANT_NETWORK": "<cluster label>",
-        "COVENANT_TIMEOUT_MS": "<ms>"
-      }
-    }
-  }
-}
+```bash
+SQUARE_MCP_HTTP_HOST=127.0.0.1 SQUARE_MCP_HTTP_PORT=8790 SQUARE_MCP_ALLOWED_HOSTS=mcp.example.com \
+  SQUARE_API_URL=… SQUARE_NETWORK=… SQUARE_TIMEOUT_MS=… node packages/mcp/dist/bin.js --http
 ```
 
-## Configuration
+- Uç `/mcp`'dir, `GET /health` süreç sağlığını verir.
+- Oturumludur: `initialize` yeni oturum ve kendi sunucu örneğini açar, sonraki istekler `Mcp-Session-Id` ile gelir,
+  `DELETE` oturumu kapatır.
+- İstek gövdesi 4 MiB ile sınırlıdır.
+- Kimlik doğrulama ve TLS önündeki ters vekilin işidir.
 
-All three variables are required; the server exits with an error when one is missing.
+## Havuzlu istemci
 
-| Env var | Purpose |
+```ts
+import { McpClientPool } from '@squaresdk/solana-mcp/client';
+
+const pool = new McpClientPool({
+  servers: {
+    square: { type: 'stdio', command: 'square-mcp', env: { SQUARE_API_URL: '…', SQUARE_NETWORK: '…', SQUARE_TIMEOUT_MS: '…' } },
+    translator: { type: 'http', url: 'https://translator.example/mcp', headers: { authorization: 'Bearer …' } },
+  },
+  maxConcurrency: 4,
+  toolCacheTtlMs: 60_000,
+  requestTimeoutMs: 30_000,
+  reconnect: { maxAttempts: 3, backoffMs: 250, maxBackoffMs: 5_000 },
+});
+
+const { tools, errors } = await pool.listAllTools(); // her tool'da `server`
+const work = await pool.callTool('square', 'square_find_work', { agentRecord: '…' });
+await pool.callToolByName('translate', { text: '…' }); // tool tek sunucuda olmalı
+await pool.close();
+```
+
+| Özellik | Davranış |
 |---|---|
-| `COVENANT_API_URL` | Base URL of the Covenant API. |
-| `COVENANT_NETWORK` | Network label surfaced back to the agent. |
-| `COVENANT_TIMEOUT_MS` | Per-request timeout. |
+| Bağlantı yeniden kullanımı | Sunucu başına tek `Client`, ilk istekte açılır; eşzamanlı açılışlar aynı bağlantıyı bekler |
+| Eşzamanlılık sınırı | Sunucu başına `maxConcurrency` istek; fazlası sırayla bekler (`stats(server)`) |
+| Yeniden bağlanma | Kopan bağlantı sonraki istekte yeniden açılır; açılış üstel beklemeyle `maxAttempts` kez denenir. Yolda kopan tool çağrısı yeniden denenmez (tx gönderimi gibi tool'lar idempotent değildir); `listTools` bir kez yeniden denenir |
+| Tool keşfi önbelleği | Sunucu başına `toolCacheTtlMs`; `notifications/tools/list_changed` ve yeniden bağlanma önbelleği düşürür, `refresh: true` atlar |
+| Kapatma | `close()` bağlantıları kapatır, kuyruktakileri `closed` hatasıyla reddeder; sonraki istekler hata alır |
 
-## Local development
+Hedefler: `stdio` (alt süreç), `http` (Streamable HTTP) ve `transport` (her denemede yeni bir özel taşıma, ör.
+bellek içi). Hatalar `McpPoolError`'dır (`unknown_server`, `closed`, `connect_failed`, `tool_not_found`,
+`ambiguous_tool`).
 
-```bash
-pnpm install
-pnpm --filter @squaresdk/solana-mcp build
-COVENANT_API_URL=<API base URL> COVENANT_NETWORK=<cluster label> COVENANT_TIMEOUT_MS=<ms> \
-  node packages/mcp/dist/server.js   # speaks MCP over stdio
-```
+## Testler
 
-Quick stdio smoke test:
+`pnpm --filter @squaresdk/solana-mcp test` (önce `build`; turbo'da `test` `build`'e bağlı).
 
-```bash
-printf '%s\n' \
-  '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"smoke","version":"0"}}}' \
-  '{"jsonrpc":"2.0","method":"notifications/initialized"}' \
-  '{"jsonrpc":"2.0","id":2,"method":"tools/list"}' \
-  | COVENANT_API_URL=<API base URL> COVENANT_NETWORK=<cluster label> COVENANT_TIMEOUT_MS=<ms> \
-    node packages/mcp/dist/server.js
-```
+- Square API'si ve Solana RPC yerel fixture sunucularıdır; görünümler `@squaresdk/solana-types` şemalarıyla kurulur.
+- **Her tool:** SDK'nın gerçek MCP `Client`'ıyla, bellek içi taşımadan.
+- **İmza akışı:** imzasız, kısmen imzalı ve geçersiz imzalı tx'in gönderilmediği; yerel imzalayıcı.
+- **Zincir erişimi:** gerçek web3.js `Connection` ve Anchor istemcisiyle, IDL coder'ıyla kodlanmış hesaplar.
+- **Uçtan uca stdio:** derlenmiş `dist/bin.js` alt süreç olarak açılır ve havuzun `stdio` hedefiyle (SDK'nın
+  `StdioClientTransport`'u, Claude Desktop'ın kullandığı taşıma) okunur, job açılır, imzasız tx'in reddi ve
+  imzalı tx'in gönderimi denenir.
+- **Streamable HTTP:** `--http` süreci ve `startHttpServer`.
+- **Havuz:** yeniden kullanım, eşzamanlılık, yeniden bağlanma, önbellek, kapatma.
 
-## License
+## Kalanlar
 
-Apache 2.0
+- Gerçek Claude Desktop uygulamasıyla deneme yapılmadı. Yerine aynı stdio taşımasıyla SDK'nın istemcisi kullanıldı.
+- Gerçek programlar ve gerçek API'yle (localnet / devnet) uçtan uca akış BE-36'dadır.
+- npm yayını ADR 0001'in ön koşullarına bağlıdır. Paket diğer yayınlanabilir paketler gibi o zamana kadar
+  `private: true` kalır; pack-smoke'ta yayınlanabilir olarak denetlenir.
+
+## Köken
+
+Covenant `mcp/` (Apache-2.0, `9894a41`) BE-02 ile geçmişiyle taşındı ve burada uyarlandı
+([provenance](../../docs/provenance/BE-02.md)):
+
+- `tools/discover.ts`: beş okuma tool'u `square_*` adlarıyla Square REST API'sine geçti. Covenant'ın hosted agent
+  dizini yerine registry kayıtları ve agent card; cüzdana bağlı itibar yerine AgentRecord'a bağlı itibar.
+- `config.ts`: `COVENANT_*` yerine `SQUARE_*`, yazma kipi ve yerel imzalayıcı.
+- `http.ts`: API'nin HTTP istemcisiyken Streamable HTTP sunucusu oldu; API erişimi `api.ts`'te SDK istemcisiyle.
+- `server.ts`: süreç girişi `bin.ts`'e ayrıldı; sunucu fabrikası taşımadan bağımsız.
+- Yazma tool'ları, imza akışı ve havuzlu istemci yeni yazıldı. Covenant `sdk/examples/mcp-integration.ts` yalnızca
+  kapsam için okundu: oradaki tool'lar ortamdaki özel anahtarla imzalayıp gönderiyordu, bu tasarımda sunucu anahtar
+  tutmaz.
