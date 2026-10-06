@@ -8,7 +8,8 @@
 // - isteğe bağlı idempotent yanıt (`idempotency`): ödeme kimliğiyle gelen tekrar kayıtlı yanıtı alır
 //   (idempotent.ts);
 // - gözlem olayları (`onEvent`): doğrulandı, tekrar reddedildi, uzlaştırıldı, uzlaştırma başarısız, kayıtlı
-//   yanıt döndü.
+//   yanıt döndü;
+// - route başına uzlaştırma geri çağırması (`onSettled`): kullanım sayacı için zincire yazılan ödeme (FE-22).
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { x402ResourceServer, type FacilitatorClient, type RouteConfig } from '@x402/core/server';
 import type { PaymentPayload, PaymentRequirements, Price } from '@x402/core/types';
@@ -49,6 +50,7 @@ export type X402Event =
       readonly payer: string;
     }
   | { readonly type: 'settle_failed'; readonly fingerprint: string; readonly network: string; readonly reason: string }
+  | { readonly type: 'settled_callback_error'; readonly fingerprint: string; readonly error: unknown };
   | { readonly type: 'idempotent_replay'; readonly key: string; readonly network: string }
   | { readonly type: 'idempotency_error'; readonly error: unknown };
 
@@ -90,6 +92,16 @@ export interface PaidRouteOptions {
    * `getX402Payment(res).settlement` ile görür.
    */
   readonly settle?: 'after-handler' | 'before-handler';
+  /**
+   * Bu route'ta uzlaştırılan her ödeme (iki akışta da, zincire yazıldıktan sonra). Kullanım sayacı ve muhasebe
+   * içindir; geri çağırmanın attığı hata yanıtı etkilemez, `settled_callback_error` olayı olur.
+   */
+  readonly onSettled?: (payment: X402SettledPayment) => void;
+}
+
+/** Zincire yazılmış ödeme: ödeme bilgisi ve uzlaştırma işlemi. */
+export interface X402SettledPayment extends X402Payment {
+  readonly settlement: { readonly transaction: string; readonly network: string };
 }
 
 export interface X402Gateway {
@@ -100,6 +112,7 @@ export interface X402Gateway {
 
 interface RequestState {
   payment?: X402Payment;
+  readonly onSettled?: (payment: X402SettledPayment) => void;
 }
 
 const LOCALS_KEY = 'squareX402';
@@ -185,11 +198,16 @@ export function createX402Gateway(options: X402GatewayOptions): X402Gateway {
     const payer = result.payer ?? '';
     emit({ type: 'settled', fingerprint, network: requirements.network, transaction: result.transaction, payer });
     const state = storage.getStore();
-    if (state && phase === 'before-handler') {
-      state.payment = {
-        ...describe(paymentPayload, requirements, payer),
-        settlement: { transaction: result.transaction, network: result.network },
-      };
+    if (!state) return;
+    const settled: X402SettledPayment = {
+      ...describe(paymentPayload, requirements, payer),
+      settlement: { transaction: result.transaction, network: result.network },
+    };
+    if (phase === 'before-handler') state.payment = settled;
+    try {
+      state.onSettled?.(settled);
+    } catch (error) {
+      emit({ type: 'settled_callback_error', fingerprint, error });
     }
   });
 
@@ -221,7 +239,7 @@ export function createX402Gateway(options: X402GatewayOptions): X402Gateway {
       };
       const middleware = paymentMiddleware(config, server);
       const handler: RequestHandler = (req, res, next) => {
-        const state: RequestState = {};
+        const state: RequestState = route.onSettled ? { onSettled: route.onSettled } : {};
         res.locals[LOCALS_KEY] = state;
         storage.run(state, () => {
           middleware(req, res, next).catch(next);

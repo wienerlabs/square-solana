@@ -591,9 +591,10 @@ model User {
   wallet     String          @id @db.VarChar(44)
   createdAt  DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
   lastSeenAt DateTime?       @map("last_seen_at") @db.Timestamptz(3)
-  challenges AuthChallenge[]
-  sessions   Session[]
-  apiKeys    ApiKey[]
+  challenges    AuthChallenge[]
+  sessions      Session[]
+  apiKeys       ApiKey[]
+  x402Endpoints X402Endpoint[]
 
   @@map("users")
 }
@@ -635,6 +636,7 @@ enum ApiKeyScope {
   agentsWrite     @map("agents:write")
   prove
   disputesWrite   @map("disputes:write")
+  x402Serve       @map("x402:serve")
 }
 
 /// API anahtarı (`ApiKey`). Gizli değer saklanmaz, yalnızca SHA-256'sı; `prefix` listelemede gösterilir.
@@ -652,6 +654,65 @@ model ApiKey {
 
   @@index([wallet])
   @@map("api_keys")
+}
+
+// ---------------------------------------------------------------- x402 ücretli uç noktalar (FE-22)
+
+/// x402 v2'nin Solana ağları; değerler CAIP-2 kimlikleridir (`@squaresdk/solana-types` X402NetworkSchema).
+enum X402Network {
+  mainnet @map("solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp")
+  devnet  @map("solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1")
+  testnet @map("solana:4uhcVJyU9pJkvQyS88uRDiswHXSCkY3z")
+}
+
+/// Geliştiricinin ücretli uç nokta tanımı (`X402Endpoint`, ADR 0023). Ödemeyi geliştiricinin sunucusu ister
+/// (`@squaresdk/solana-x402` `paidRouteFromDefinition`); yol cüzdan başına tekildir.
+model X402Endpoint {
+  id          String        @id @default(uuid()) @db.Uuid
+  wallet      String        @db.VarChar(44)
+  name        String        @db.VarChar(80)
+  /// Geliştiricinin sunucusundaki route yolu.
+  path        String        @db.VarChar(200)
+  description String?       @db.VarChar(500)
+  /// Çağrı başına fiyat, mint'in taban biriminde (> 0).
+  amount      Decimal       @db.Decimal(20, 0)
+  mint        String        @db.VarChar(44)
+  network     X402Network
+  payTo       String        @map("pay_to") @db.VarChar(44)
+  enabled     Boolean
+  createdAt   DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
+  user        User          @relation(fields: [wallet], references: [wallet], onDelete: Cascade)
+  payments    X402Payment[]
+
+  @@unique([wallet, path])
+  @@map("x402_endpoints")
+}
+
+/// Geliştiricinin sunucusunun bildirdiği uzlaştırılmış ödeme (`X402Payment`). `fingerprint` ödeme yükünün
+/// tekrar koruması kimliğidir (`ReplayStore`'daki `(x402:<ağ>, kimlik)`; Postgres deposunda `replay_guards`),
+/// `transaction` uzlaştırma makbuzunun (`PAYMENT-RESPONSE`) işlem imzası. İkisi de ağ başına tekildir: aynı ödeme
+/// iki kez sayılmaz. Tanım silinince ödemeleri de silinir.
+model X402Payment {
+  id          String       @id @default(uuid()) @db.Uuid
+  endpointId  String       @map("endpoint_id") @db.Uuid
+  /// `svm:<64 hex>` ya da `json:<64 hex>`.
+  fingerprint String       @db.VarChar(69)
+  transaction String       @db.VarChar(88)
+  network     X402Network
+  asset       String       @db.VarChar(44)
+  amount      Decimal      @db.Decimal(20, 0)
+  payer       String       @db.VarChar(44)
+  payTo       String       @map("pay_to") @db.VarChar(44)
+  /// Geliştiricinin sunucusunun bildirdiği uzlaştırma anı.
+  settledAt   DateTime     @map("settled_at") @db.Timestamptz(3)
+  reportedAt  DateTime     @default(now()) @map("reported_at") @db.Timestamptz(3)
+  endpoint    X402Endpoint @relation(fields: [endpointId], references: [id], onDelete: Cascade)
+
+  @@unique([network, fingerprint])
+  @@unique([network, transaction])
+  @@index([endpointId, settledAt])
+  @@map("x402_payments")
 }
 
 // ---------------------------------------------------------------- ödeme rayları

@@ -20,7 +20,7 @@ kopyaları `pnpm license:write` yazar, `pnpm license:check` denetler.
 | [`cctp/`](cctp/) | `@squaresdk/solana-cctp` | CCTP relayer'ın çekirdeği: burn kaydı, attestation takibi, Solana'da teslim, fonlamanın izlenmesi, kurumun mint + fonlama tx'i ([tasarım](../docs/design/cctp-funding.md#relayer-be-26)) | [BE-26] |
 | [`a2a/`](a2a/) | `@squaresdk/solana-a2a` | A2A v1.0 görev protokolü (JSON-RPC 2.0 + SSE), görev ↔ job durum eşlemesi, Postgres görev deposu ([tasarım](../docs/design/a2a.md)) | [BE-17] |
 | [`agent-sdk/`](agent-sdk/) | `@squaresdk/solana-agent-sdk` | agent yazma kiti: well-known agent card, A2A uç noktası, job kabulü ve teslimi (teslimat yükleme + `submit_work`), isteğe bağlı `list_claim`, `register_agent` yardımcısı; LLM işleyicisi `/anthropic` alt yolunda | [BE-19] |
-| [`x402/`](x402/) | `@squaresdk/solana-x402` | x402 v2 geçidi (resmi `@x402/*` üzerine): Solana exact şeması, kendi ya da harici facilitator ([ADR 0018](../docs/decisions/0018-x402-facilitator.md)), kalıcı tekrar koruması, ücretli Express route'u, ödeyen `fetch` | [BE-24] |
+| [`x402/`](x402/) | `@squaresdk/solana-x402` | x402 v2 geçidi (resmi `@x402/*` üzerine): Solana exact şeması, kendi ya da harici facilitator ([ADR 0018](../docs/decisions/0018-x402-facilitator.md)), kalıcı tekrar koruması, ücretli Express route'u, portal tanımından ücretli route (`paidRouteFromDefinition`, [ADR 0023](../docs/decisions/0023-x402-ucretli-uc-nokta-tanimlari.md)), ödeyen `fetch` | [BE-24], [FE-22] |
 | [`mcp/`](mcp/) | `@squaresdk/solana-mcp` | Square MCP sunucusu (okuma ve imzasız tx hazırlayan yazma tool'ları, stdio ve Streamable HTTP) + agent'lar için havuzlu MCP istemcisi (`/client`) | [BE-28] |
 | `hosted/` | `@squaresdk/solana-hosted` | konfigürasyondan çalışan kurum agent'ı | [BE-29] |
 | `cli/` | `@squaresdk/solana-cli` | komut satırı aracı | [BE-30] |
@@ -44,6 +44,7 @@ uygulama issue'sunda kaynak commit referansıyla işlenir (eşleme:
 [BE-19]: https://github.com/wienerlabs/square-solana/issues/52
 [BE-24]: https://github.com/wienerlabs/square-solana/issues/79
 [BE-26]: https://github.com/wienerlabs/square-solana/issues/81
+[FE-22]: https://github.com/wienerlabs/square-solana/issues/86
 [BE-28]: https://github.com/wienerlabs/square-solana/issues/87
 [BE-29]: https://github.com/wienerlabs/square-solana/issues/88
 [BE-30]: https://github.com/wienerlabs/square-solana/issues/89

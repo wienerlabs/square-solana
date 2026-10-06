@@ -1,12 +1,13 @@
 # @squaresdk/solana-api
 
-Square'in REST API servisi (BE-18, uyuşmazlık araçları BE-22). Sözleşme
-[`docs/api/openapi.yaml`](../../docs/api/openapi.yaml)'dır (45 operasyon); servis `GET /openapi.json`'da sözleşmenin derlenmiş halini yayımlar. Web uygulaması ve
+Square'in REST API servisi (BE-18; Travel Rule kaydı BE-23, uyuşmazlık araçları BE-22, x402 uç nokta tanımları FE-22). Sözleşme
+[`docs/api/openapi.yaml`](../../docs/api/openapi.yaml)'dır (52 operasyon); servis `GET /openapi.json`'da sözleşmenin derlenmiş halini yayımlar. Web uygulaması ve
 entegrasyonlar SDK'nın `createApiClient`'ıyla bağlanır.
 
 | Etiket | Uygulama |
 |---|---|
 | auth | Cüzdan Ed25519 oturumu ve API anahtarları ([Kimlik](#kimlik)) |
+| x402 | Geliştiricinin ücretli uç nokta tanımları ve kullanımı ([x402 ücretli uç noktalar](#x402-ücretli-uç-noktalar)) |
 | okuma | Job, kurum, politika, agent, alacak, dispute, screening ve event görünümleri indexer'ın tablolarından (`@squaresdk/solana-indexer/read`); keeper günlüğü `keeper_actions`'tan |
 | tx | 8 adımın imzasız v0 tx'i ([Tx hazırlama](#tx-hazırlama)) |
 | teslimat | Dosya S3 uyumlu depoya yüklenir; `submit_work`'ün `workHash` ve `deliveryUri`'si döner ([Teslimat](#teslimat)) |
@@ -40,7 +41,7 @@ başlığıyla aynıdır. Zamanlar Unix saniyesidir.
   - Belirteç `sqs_` + 32 rastgele bayttır; veritabanında yalnızca SHA-256'sı durur.
   - Belirteç `Authorization: Bearer` başlığıyla gönderilir; `DELETE /v1/auth/session` oturumu kapatır.
 - **API anahtarı:** Oturumla oluşturulur; kapsamlar `read`, `tx:prepare`, `deliveries:write`, `agents:write`,
-  `prove`, `disputes:write`.
+  `prove`, `disputes:write`, `x402:serve`.
   - Anahtar `sqk_` + 32 rastgele bayttır ve yalnızca oluşturma yanıtında bir kez döner.
   - Listelemede ilk 12 karakteri (`prefix`) görünür.
   - Anahtar `X-API-Key` başlığıyla gönderilir. İki başlık birlikte gönderilemez.
@@ -53,6 +54,8 @@ başlığıyla aynıdır. Zamanlar Unix saniyesidir.
   | `prove` | Yalnızca `prove` kapsamlı anahtar |
   | `uploadDisputeEvidence` (`disputes:write`), `prepareDisputeVote` (`tx:prepare`), `listDisputeEvidence`, `getDisputeEvidenceContent`, `getArbitrationQueue` (`read`) | Oturum ya da kapsamlı anahtar; kaynak üzerindeki yetki [Uyuşmazlık](#uyuşmazlık)'ta |
   | Webhook abonelikleri | Oturum; yalnızca aktif arbitrator |
+  | `createX402Endpoint`, `updateX402Endpoint`, `deleteX402Endpoint` | Oturum |
+  | `listX402Endpoints`, `getX402Endpoint`, `getX402EndpointUsage`, `recordX402Payment` | Oturum ya da `x402:serve` kapsamlı anahtar |
   | Okuma uçları | Açık; anahtarla gelen istek `read` ister |
 
   Geçersiz bir kimlik herkese açık uçta da 401 alır.
@@ -212,6 +215,25 @@ dispute'u keeper'ın lapse crank'i düşürür ([apps/keeper](../keeper/README.m
   - İmleç yoksa en son event'ten başlanır: geçmiş event'ler bildirilmez. Gövde şeması OpenAPI
     `webhooks.arbitrationNotification`'dadır. Alıcı `verifyWebhook` ile doğrular (`@squaresdk/solana-hardening`).
 
+## x402 ücretli uç noktalar
+
+Geliştirici portalının (FE-22, web `/app/developers`) arka ucu. Karar:
+[ADR 0023](../../docs/decisions/0023-x402-ucretli-uc-nokta-tanimlari.md).
+
+- **Tanım** (`x402_endpoints`) cüzdana aittir:
+  - ad, yol (geliştiricinin sunucusundaki route; cüzdan başına tekil, 409);
+  - fiyat (`amount`, mint'in taban biriminde, > 0), mint ve ağ (CAIP-2);
+  - alıcı (`payTo`), açıklama, etkin / pasif.
+- **Ödeme** geliştiricinin sunucusunda istenir: `@squaresdk/solana-x402` `paidRouteFromDefinition` tanımı
+  `getX402Endpoint` ile okur. Facilitator ve ücret ödeyen cüzdan o sunucudadır; API ödeme yolunda değildir.
+- **Bildirim** (`recordX402Payment`, `x402_payments`): sunucu uzlaştırdığı her ödemeyi bildirir.
+  - `fingerprint` ödeme yükünün tekrar koruması kimliği, `transaction` makbuzun işlem imzasıdır. İkisi de ağ
+    başına tekildir.
+  - Aynı bildirimin tekrarı ilk kaydı 200 ile döner; başka tanıma ya da farklı işlemle bildirim 409 alır.
+  - Ağ, mint ve alıcı tanımınkiyle aynı olmalıdır (400, `details.fields`). Tutar bildirildiği gibi kaydedilir.
+- **Kullanım** (`getX402EndpointUsage`): ödemeli çağrı sayısı, ağ ve mint başına toplam, son ödeme zamanı, son
+  20 ödeme. Tanım silinince kullanım kaydı da silinir.
+
 ## Çalıştırma
 
 Migration'lar ve `programs` tablosunun seed'i API'den önce uygulanır (indexer'la aynı; [apps/indexer](../indexer/README.md#çalıştırma)).
@@ -230,8 +252,18 @@ Ortam değişkenleri [`.env.example`](.env.example)'dadır; varsayılan değer y
 
 `pnpm --filter @squaresdk/solana-api test`. Testler Postgres ve S3 uyumlu depo (SeaweedFS) konteynerleri açar
 (Docker gerekir). Zincir ve prover yerel fixture sunucularıdır. Uçlar SDK'nın `createApiClient`'ıyla denenir.
-Sözleşmedeki 45 operasyonun hepsi ve yetkisiz erişim yolları test edilir. Bildirim outbox'ı yerel bir alıcıya
+Sözleşmedeki 52 operasyonun hepsi ve yetkisiz erişim yolları test edilir. Bildirim outbox'ı yerel bir alıcıya
 imzalı teslimle denenir (`test/notifier.test.ts`).
+
+**x402 kabulü (FE-22):** `test/x402.test.ts` ücretli uç nokta yönetimini uçtan uca dener:
+
+1. Oturumla tanım oluşturulur.
+2. Geliştiricinin sunucusu (`paidRouteFromDefinition`, kendi facilitator'ı, `x402:serve` anahtarı) ödemesiz
+   isteğe 402 döner.
+3. `createPayingFetch` ile ödeme yapılır: resmi exact şeması, x402 paketinin test fikstürü olan Solana JSON-RPC'si (`packages/x402/test/solana-rpc.ts`).
+   İstek 200 alır.
+4. Kullanım sayacı ve tahsil edilen tutar artar.
+5. Pasifleştirilen tanım 503, silinen tanım 404 alır.
 
 **Localnet uçtan uca (BE-22):** `test/localnet.e2e.test.ts`, `SQUARE_LOCALNET=1` ile çalışır (yoksa atlanır).
 Gerçek programları `solana-test-validator`'a yükler; indexer ve keeper'ı gerçek süreç olarak açar. İki senaryo
