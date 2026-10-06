@@ -47,6 +47,23 @@ export function verifyReceipt(receipt: DeliveryReceipt, delivery: NormalizedDeli
   return parsed.data;
 }
 
+export class DeliveryUploadError extends Error {
+  constructor(
+    message: string,
+    readonly retryable: boolean,
+  ) {
+    super(message);
+    this.name = 'DeliveryUploadError';
+  }
+}
+
+const RETRYABLE_UPLOAD_CODES: ReadonlySet<string> = new Set([
+  'rate_limited',
+  'rpc_unavailable',
+  'db_unavailable',
+  'internal_error',
+]);
+
 /** Square API'si üzerinden yükleyici (`deliveries:write` kapsamlı oturum ya da API anahtarı). */
 export function apiDeliveryUploader(api: SquareApi): DeliveryUploader {
   return {
@@ -55,8 +72,10 @@ export function apiDeliveryUploader(api: SquareApi): DeliveryUploader {
       body.set(content);
       const envelope = await api.uploadDelivery(job.toBase58(), new Blob([body], { type: contentType }));
       if (!envelope.success || !envelope.data) {
-        throw new Error(
-          `teslimat yüklenemedi: ${envelope.error?.code ?? 'bilinmiyor'} ${envelope.error?.message ?? ''}`,
+        const code = envelope.error?.code ?? 'bilinmiyor';
+        throw new DeliveryUploadError(
+          `teslimat yüklenemedi: ${code} ${envelope.error?.message ?? ''}`,
+          RETRYABLE_UPLOAD_CODES.has(code),
         );
       }
       return envelope.data;

@@ -11,7 +11,10 @@ sunucusunu kullanır: agent card `/.well-known/agent-card.json`'da RFC 8785 bayt
 mint cinsinden fiyatlar, did:aip v2 Solana DID'i, `supportedInterfaces`), A2A uç noktası `/a2a`'da. Gelen görev
 zincirdeki job'a bağlanır; agent spec, capability, fiyat, cüzdan ve deadline'ı denetleyip `accept_job` gönderir,
 işleyicinin çıktısını teslimat olarak yükler (`uploadDelivery`), makbuzu doğrular ve `submit_work` gönderir.
-`autoListClaim: { discountBps }` teslimden sonra `list_claim` gönderir. `agent.register()` `register_agent` /
+Kabul kararı görev başına bir kez verilir (`admit` ile ek kapı, ör. kapasite); kabulden sonra geçici
+hatalar (RPC, ağ, onay zaman aşımı, deponun geçici retleri) aynı sonuçla yeniden denenir (`retry`), iş yeniden
+yapılmaz; teslimat artefaktı `submit_work` zincire girdikten sonra sunulur. `autoListClaim: { discountBps }`
+teslimden sonra `list_claim` gönderir. `agent.register()` `register_agent` /
 `update_agent` yardımcısıdır (kart agent'ta ya da API'de barındırılır). Standart dışı `task/create` /
 `task/status` ve `/.well-known/agent.json` kaldırıldı. `haiku()` yerine `@squaresdk/solana-agent-sdk/anthropic`
 altında `anthropicHandler` (`@anthropic-ai/sdk` isteğe bağlı peer, varsayılan model

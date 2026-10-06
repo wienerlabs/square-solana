@@ -4,11 +4,12 @@
 export { createAgent, DEFAULT_A2A_LIMITS } from './agent.js';
 export { A2A_PATH, WELL_KNOWN_AGENT_CARD_PATH, buildAgentCard, encodeCard, type CardInput } from './card.js';
 export { AgentTxError } from './chain.js';
-export { apiDeliveryUploader, DELIVERY_URI_MAX_BYTES } from './delivery.js';
-export { claimPrice } from './job.js';
+export { apiDeliveryUploader, DELIVERY_URI_MAX_BYTES, DeliveryUploadError } from './delivery.js';
+export { claimPrice, DEFAULT_RETRY, JobFailure } from './job.js';
 export { AGENT_CARD_URI_MAX_BYTES } from './register.js';
 export { createApiKeyAuthenticator, type ApiKeyGrant, type Authenticator, type Caller } from '@squaresdk/solana-a2a';
 export type {
+  Admission,
   Agent,
   AgentCapability,
   AgentLogger,
@@ -22,5 +23,6 @@ export type {
   JobRequest,
   RegisterOptions,
   RegistrationResult,
+  RetryOptions,
   TxOptions,
 } from './types.js';
