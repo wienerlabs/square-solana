@@ -1,6 +1,6 @@
 // Sahte RPC'nin bilmediği yöntem JSON-RPC hatası döner; bilinmeyen mint hesabı yoktur.
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { startFakeSolanaRpc, type FakeSolanaRpc } from '../src/testing.js';
+import { startFakeSolanaRpc, type FakeSolanaRpc } from './solana-rpc.js';
 
 let rpc: FakeSolanaRpc;
 beforeAll(async () => {

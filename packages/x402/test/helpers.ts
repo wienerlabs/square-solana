@@ -13,7 +13,7 @@ import { createFacilitatorClient } from '../src/facilitator.js';
 import { createX402Gateway, getX402Payment, type X402Event, type X402GatewayOptions } from '../src/gateway.js';
 import { SOLANA_DEVNET } from '../src/networks.js';
 import type { ReplayStore } from '../src/replay.js';
-import { startFakeSolanaRpc, type FakeSolanaRpc } from '../src/testing.js';
+import { startFakeSolanaRpc, type FakeSolanaRpc } from './solana-rpc.js';
 
 export function memoryReplayStore(): ReplayStore & { size(): number } {
   const seen = new Map<string, number>();

@@ -11,7 +11,7 @@ import {
   localFacilitatorClient,
 } from '../src/facilitator.js';
 import { SOLANA_DEVNET, SOLANA_MAINNET, SOLANA_TESTNET } from '../src/networks.js';
-import type { FakeSolanaRpc } from '../src/testing.js';
+import type { FakeSolanaRpc } from './solana-rpc.js';
 import {
   createWallets,
   listen,

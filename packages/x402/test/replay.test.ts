@@ -6,7 +6,7 @@ import { ExactSvmScheme } from '@x402/svm/exact/client';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { SOLANA_DEVNET } from '../src/networks.js';
 import { paymentFingerprint, replayScope } from '../src/replay.js';
-import type { FakeSolanaRpc } from '../src/testing.js';
+import type { FakeSolanaRpc } from './solana-rpc.js';
 import { createWallets, startFakeSolanaRpc, type Wallets } from './helpers.js';
 
 let rpc: FakeSolanaRpc;

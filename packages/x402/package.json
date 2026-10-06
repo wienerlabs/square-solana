@@ -10,11 +10,6 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "default": "./dist/index.js"
-    },
-    "./testing": {
-      "types": "./dist/testing.d.ts",
-      "import": "./dist/testing.js",
-      "default": "./dist/testing.js"
     }
   },
   "files": [
@@ -32,6 +27,7 @@
     "@solana/sysvars": "^5.5.1",
     "@x402/core": "2.28.0",
     "@x402/express": "2.28.0",
+    "@x402/extensions": "2.28.0",
     "@x402/fetch": "2.28.0",
     "@x402/svm": "2.28.0"
   },

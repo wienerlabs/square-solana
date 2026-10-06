@@ -3,7 +3,8 @@
 // denetimi) kaldırıldı: tutar, mint ve alıcı denetlenmiyordu, aynı imza sınırsız tekrar kullanılabiliyordu.
 // Şimdi x402 v2: 402 + `PAYMENT-REQUIRED`, `PAYMENT-SIGNATURE` ile kısmen imzalı SPL aktarımı, resmi exact
 // şemasıyla doğrulama ve uzlaştırma, `PAYMENT-RESPONSE` makbuzu ve Postgres'te kalıcı tekrar koruması.
-// Uzlaştırma işleyiciden önce yapılır (`before-handler`): rapor işlem imzasını içerir.
+// Uzlaştırma işleyiciden önce yapılır (`before-handler`): rapor işlem imzasını içerir. Yanıt yolda kaybolursa
+// aynı ödeme kimliğiyle gelen tekrar kayıtlı raporu ikinci kez ücret alınmadan alır (`idempotency`).
 import type { RequestHandler } from 'express';
 import { createKeyPairSignerFromBytes } from '@solana/kit';
 import bs58 from 'bs58';
@@ -11,6 +12,7 @@ import {
   createFacilitatorClient,
   createX402Gateway,
   type FacilitatorOptions,
+  type IdempotencyOptions,
   type ReplayStore,
   type SolanaNetwork,
   type X402Event,
@@ -21,6 +23,7 @@ export { getX402Payment, type X402Payment } from '@squaresdk/solana-x402';
 export interface ComplianceX402Options {
   readonly facilitator: FacilitatorOptions;
   readonly replay: ReplayStore;
+  readonly idempotency: IdempotencyOptions;
   readonly network: SolanaNetwork;
   readonly paymentMint: string;
   readonly publisherWallet: string;
@@ -36,6 +39,7 @@ export function createComplianceX402(options: ComplianceX402Options): Compliance
   const gateway = createX402Gateway({
     facilitator: createFacilitatorClient(options.facilitator),
     replay: options.replay,
+    idempotency: options.idempotency,
     networks: [options.network],
     ...(options.onEvent ? { onEvent: options.onEvent } : {}),
   });

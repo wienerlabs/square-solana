@@ -91,6 +91,8 @@ const EnvSchema = z
     X402_FEE_PAYER_KEYPAIR: optionalSecret,
     /// Square's single Postgres (db/); x402 payment replay guards live in its `replay_guards` table.
     DATABASE_URL: nonEmpty,
+    /// How long a settled report is kept for a retry with the same payment identifier (`idempotency_records`).
+    X402_IDEMPOTENCY_TTL_SECONDS: intFromEnv(1),
 
     /// Enables the unattested-payment watcher.
     HELIUS_API_KEY: optionalSecret,
@@ -188,6 +190,7 @@ export const config = {
       ? ({ mode: 'remote', url: env.X402_FACILITATOR_URL, token: env.X402_FACILITATOR_TOKEN } as const)
       : ({ mode: 'self', feePayerKeypair: env.X402_FEE_PAYER_KEYPAIR! } as const),
     databaseUrl: env.DATABASE_URL,
+    idempotencyTtlSeconds: env.X402_IDEMPOTENCY_TTL_SECONDS,
   },
   helius:
     env.HELIUS_API_KEY && env.HELIUS_API_URL

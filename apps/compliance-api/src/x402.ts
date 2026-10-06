@@ -1,9 +1,10 @@
 // Servisin x402 kurulumu (BE-24): facilitator ADR 0018'e göre (varsayılan kendi facilitator'ımız),
 // tekrar korumaları Square'in tek veritabanındaki `replay_guards` tablosunda
-// (`@squaresdk/solana-hardening/prisma`). compliance-api'nin kendi tabloları BE-25'e kadar ayrı
+// (`@squaresdk/solana-hardening/prisma`); aynı ödeme kimliğiyle gelen tekrarın kayıtlı yanıtı
+// `idempotency_records`'ta. compliance-api'nin kendi tabloları BE-25'e kadar ayrı
 // veritabanındadır; tekrar koruması ise baştan tek veritabanında tutulur ki diğer servislerle aynı kayıt
 // paylaşılsın.
-import { createPrismaReplayStore } from '@squaresdk/solana-hardening/prisma';
+import { createPrismaIdempotencyStore, createPrismaReplayStore } from '@squaresdk/solana-hardening/prisma';
 import type { RequestHandler } from 'express';
 import type { FacilitatorOptions, X402Event } from '@squaresdk/solana-x402';
 import { config } from './config.js';
@@ -11,9 +12,11 @@ import { createComplianceX402, parseFeePayerKeypair, type ComplianceX402 } from 
 import { logger } from './utils/logger.js';
 
 // db paketi yalnızca ESM `import` koşulunu dışa aktarır; bu servis CommonJS derlendiği için dinamik import.
-const replayStoreReady = import('@squaresdk/solana-db').then(({ createDatabaseClient }) =>
-  createPrismaReplayStore(createDatabaseClient({ connectionString: config.x402.databaseUrl })),
+const databaseReady = import('@squaresdk/solana-db').then(({ createDatabaseClient }) =>
+  createDatabaseClient({ connectionString: config.x402.databaseUrl }),
 );
+const replayStoreReady = databaseReady.then(createPrismaReplayStore);
+const idempotencyStoreReady = databaseReady.then(createPrismaIdempotencyStore);
 
 /** Süresi dolan tekrar kayıtları bu aralıkla silinir. */
 const PURGE_INTERVAL_MS = 60 * 60 * 1000;
@@ -41,6 +44,14 @@ function logEvent(event: X402Event): void {
         error: event.error instanceof Error ? event.error.message : String(event.error),
       });
       return;
+    case 'idempotent_replay':
+      logger.info('x402 stored response replayed', { key: event.key, network: event.network });
+      return;
+    case 'idempotency_error':
+      logger.error('x402 idempotency store unavailable', {
+        error: event.error instanceof Error ? event.error.message : String(event.error),
+      });
+      return;
   }
 }
 
@@ -57,16 +68,20 @@ async function facilitatorOptions(): Promise<FacilitatorOptions> {
 }
 
 /** Kurulum açılışta başlar (ücret ödeyen anahtarı WebCrypto ile içe aktarılır); hata süreci durdurur. */
-export const x402Ready: Promise<ComplianceX402> = Promise.all([facilitatorOptions(), replayStoreReady]).then(
-  ([facilitator, replay]) =>
-    createComplianceX402({
-      facilitator,
-      replay,
-      network: config.x402.network,
-      paymentMint: config.x402.paymentMint,
-      publisherWallet: config.x402.publisherWallet,
-      onEvent: logEvent,
-    }),
+export const x402Ready: Promise<ComplianceX402> = Promise.all([
+  facilitatorOptions(),
+  replayStoreReady,
+  idempotencyStoreReady,
+]).then(([facilitator, replay, idempotencyStore]) =>
+  createComplianceX402({
+    facilitator,
+    replay,
+    idempotency: { store: idempotencyStore, ttlSeconds: config.x402.idempotencyTtlSeconds },
+    network: config.x402.network,
+    paymentMint: config.x402.paymentMint,
+    publisherWallet: config.x402.publisherWallet,
+    onEvent: logEvent,
+  }),
 );
 
 /** Ücretli route ara katmanı; kurulum bitene kadar gelen istek onu bekler. */
@@ -78,11 +93,13 @@ export function x402Paywall(priceBaseUnits: number, description: string): Reques
   };
 }
 
-/** Süresi dolan `replay_guards` satırlarını periyodik siler; durdurma işlevini döner. */
+/** Süresi dolan `replay_guards` ve `idempotency_records` satırlarını periyodik siler; durdurma işlevini döner. */
 export function purgeExpiredReplayGuards(): () => void {
   const timer = setInterval(() => {
-    replayStoreReady
-      .then((store) => store.purgeExpired(new Date()))
+    Promise.all([replayStoreReady, idempotencyStoreReady])
+      .then(([replay, idempotency]) =>
+        Promise.all([replay.purgeExpired(new Date()), idempotency.purgeExpired(new Date())]),
+      )
       .catch((error: unknown) => {
         logger.error('x402 replay guard purge failed', {
           error: error instanceof Error ? error.message : String(error),

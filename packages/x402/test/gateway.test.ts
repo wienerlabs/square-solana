@@ -5,7 +5,7 @@ import { createPayingFetch, readPaymentReceipt, type PayingFetch } from '../src/
 import type { X402Payment } from '../src/gateway.js';
 import { SOLANA_DEVNET } from '../src/networks.js';
 import { paymentFingerprint } from '../src/replay.js';
-import type { FakeSolanaRpc } from '../src/testing.js';
+import type { FakeSolanaRpc } from './solana-rpc.js';
 import {
   buildPaymentHeader,
   createWallets,

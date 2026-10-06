@@ -91,10 +91,11 @@ pnpm license:write
 | `@types/swagger-ui-express` | npm | MIT | dev | `@squaresdk/solana-compliance-api` | ✓ |
 | `@types/uuid` | npm | MIT | dev | `@squaresdk/solana-compliance-api` | ✓ |
 | `@vitest/coverage-v8` | npm | MIT | dev | `@squaresdk/solana-a2a`, `@squaresdk/solana-agent-sdk`, `@squaresdk/solana-api`, `@squaresdk/solana-cctp`, `@squaresdk/solana-hardening`, `@squaresdk/solana-identity`, `@squaresdk/solana-indexer`, `@squaresdk/solana-keeper`, `@squaresdk/solana-mcp`, `@squaresdk/solana-observability`, `@squaresdk/solana-policy`, `@squaresdk/solana-prover`, `@squaresdk/solana-screener`, `@squaresdk/solana-sdk`, `@squaresdk/solana-x402` | ✓ |
-| `@x402/core` | npm | Apache-2.0 | runtime | `@squaresdk/solana-x402` | ✓ |
+| `@x402/core` | npm | Apache-2.0 | runtime | `@squaresdk/solana-compliance-api`, `@squaresdk/solana-x402` | ✓ |
 | `@x402/express` | npm | Apache-2.0 | runtime | `@squaresdk/solana-x402` | ✓ |
+| `@x402/extensions` | npm | Apache-2.0 | runtime | `@squaresdk/solana-x402` | ✓ |
 | `@x402/fetch` | npm | Apache-2.0 | runtime | `@squaresdk/solana-x402` | ✓ |
-| `@x402/svm` | npm | Apache-2.0 | runtime | `@squaresdk/solana-x402` | ✓ |
+| `@x402/svm` | npm | Apache-2.0 | runtime | `@squaresdk/solana-compliance-api`, `@squaresdk/solana-x402` | ✓ |
 | `axe-core` | npm | MPL-2.0 | dev | `@squaresdk/solana-web` | ❌ izinsiz / bilinmiyor |
 | `bn.js` | npm | MIT | runtime | `@squaresdk/solana-policy`, `@squaresdk/solana-sdk`, `@squaresdk/solana-web` | ✓ |
 | `bs58` | npm | MIT | runtime | `@squaresdk/solana-api`, `@squaresdk/solana-cctp`, `@squaresdk/solana-compliance-api`, `@squaresdk/solana-db`, `@squaresdk/solana-hardening`, `@squaresdk/solana-identity`, `@squaresdk/solana-indexer`, `@squaresdk/solana-keeper`, `@squaresdk/solana-mcp`, `@squaresdk/solana-screener`, `@squaresdk/solana-web` | ✓ |
@@ -136,7 +137,7 @@ pnpm license:write
 | `yaml` | npm | ISC | dev | `@squaresdk/solana-monorepo`, `@squaresdk/solana-sdk`, `@squaresdk/solana-types` | ✓ |
 | `zod` | npm | MIT | runtime | `@squaresdk/solana-a2a`, `@squaresdk/solana-api`, `@squaresdk/solana-compliance-api`, `@squaresdk/solana-indexer`, `@squaresdk/solana-keeper`, `@squaresdk/solana-mcp`, `@squaresdk/solana-observability`, `@squaresdk/solana-prover`, `@squaresdk/solana-screener`, `@squaresdk/solana-types`, `@squaresdk/solana-web` | ✓ |
 
-**Özet:** 88 npm, 25 Cargo doğrudan bağımlılık; lisans dağılımı: 61× MIT, 42× Apache-2.0, 3× MIT OR Apache-2.0, 2× GPL-3.0, 1× BSD-2-Clause, 1× ISC, 1× MPL-2.0, 1× OFL-1.1, 1× Unlicense.
+**Özet:** 89 npm, 25 Cargo doğrudan bağımlılık; lisans dağılımı: 61× MIT, 43× Apache-2.0, 3× MIT OR Apache-2.0, 2× GPL-3.0, 1× BSD-2-Clause, 1× ISC, 1× MPL-2.0, 1× OFL-1.1, 1× Unlicense.
 
 **Mainnet öncesi hukuki inceleme gerektirenler:**
 - `circomlibjs` (npm) — GPL-3.0. Poseidon hash (devreyle aynı sabitler); yalnızca apps/compliance-api (BE-02). Yayınlanan bir pakette yok; snarkjs ile aynı onay kapsamında.

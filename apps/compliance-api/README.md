@@ -45,6 +45,9 @@ the amount, the mint nor the recipient. The same signature could also be reused.
 - **`operator_id`:** checked before any payment is asked for.
 - **Replay:** a payment payload is accepted once. The record lives in the `replay_guards` table of Square's
   single database (`DATABASE_URL`), so it survives restarts. Expired rows are purged hourly.
+- **Lost response:** the paying client puts an x402 `payment-identifier` in the payload. A retry with the same
+  payment header gets the stored report without a second charge; the record lives in `idempotency_records` for
+  `X402_IDEMPOTENCY_TTL_SECONDS`.
 - **Facilitator ([ADR 0018](../../docs/decisions/0018-x402-facilitator.md)):**
   - By default it is our own: `X402_FEE_PAYER_KEYPAIR` (SOL only, never the payee) signs as fee payer and
     `SOLANA_RPC_URL` verifies and submits.

@@ -1,17 +1,21 @@
 // x402 v2 geçidi: resmi `x402ResourceServer` + Solana exact şeması + resmi Express ara katmanı
-// (`@x402/express`). Bu dosya protokolü yeniden yazmaz; yalnızca üç şey ekler:
+// (`@x402/express`). Bu dosya protokolü yeniden yazmaz; yalnızca şunları ekler:
 // - kalıcı tekrar koruması: doğrulanan (ya da işleyiciden önce uzlaştırılan) ödeme yükü `ReplayStore`'a
 //   işlenir, aynı yük ikinci kez gelirse istek 402 `payment_replayed` ile reddedilir. Depo hatasında istek
 //   geçirilmez;
 // - işleyiciye ödeme bilgisi: `getX402Payment(res)` ödeyeni, tutarı ve (işleyiciden önce uzlaştırılmışsa)
 //   işlem imzasını verir;
-// - gözlem olayları (`onEvent`): doğrulandı, tekrar reddedildi, uzlaştırıldı, uzlaştırma başarısız.
+// - isteğe bağlı idempotent yanıt (`idempotency`): ödeme kimliğiyle gelen tekrar kayıtlı yanıtı alır
+//   (idempotent.ts);
+// - gözlem olayları (`onEvent`): doğrulandı, tekrar reddedildi, uzlaştırıldı, uzlaştırma başarısız, kayıtlı
+//   yanıt döndü.
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { x402ResourceServer, type FacilitatorClient, type RouteConfig } from '@x402/core/server';
 import type { PaymentPayload, PaymentRequirements, Price } from '@x402/core/types';
 import { paymentMiddleware } from '@x402/express';
 import { registerExactSvmScheme } from '@x402/svm/exact/server';
 import type { RequestHandler, Response } from 'express';
+import { paymentIdentifierDeclaration, withIdempotency, type IdempotencyOptions } from './idempotent.js';
 import type { SolanaNetwork } from './networks.js';
 import { paymentFingerprint, replayScope, type ReplayStore } from './replay.js';
 
@@ -44,7 +48,9 @@ export type X402Event =
       readonly transaction: string;
       readonly payer: string;
     }
-  | { readonly type: 'settle_failed'; readonly fingerprint: string; readonly network: string; readonly reason: string };
+  | { readonly type: 'settle_failed'; readonly fingerprint: string; readonly network: string; readonly reason: string }
+  | { readonly type: 'idempotent_replay'; readonly key: string; readonly network: string }
+  | { readonly type: 'idempotency_error'; readonly error: unknown };
 
 export interface X402GatewayOptions {
   /** `createFacilitatorClient(...)` çıktısı (ADR 0018: varsayılan kendi facilitator'ımız). */
@@ -56,6 +62,11 @@ export interface X402GatewayOptions {
   /** Verilirse 402 yanıtı güncel blok hash'ini taşır; ödeyen istemci RPC'ye gitmeden işlemi kurar. */
   readonly rpcUrl?: string;
   readonly replayTtlSeconds?: number;
+  /**
+   * Verilirse route'lar resmi `payment-identifier` uzantısını duyurur; aynı kimlikle gelen tekrar kayıtlı
+   * yanıtı ikinci kez ücret alınmadan alır (idempotent.ts).
+   */
+  readonly idempotency?: IdempotencyOptions;
   readonly clock?: () => number;
   readonly onEvent?: (event: X402Event) => void;
 }
@@ -206,15 +217,25 @@ export function createX402Gateway(options: X402GatewayOptions): X402Gateway {
         ...(route.description === undefined ? {} : { description: route.description }),
         ...(route.mimeType === undefined ? {} : { mimeType: route.mimeType }),
         ...(route.resource === undefined ? {} : { resource: route.resource }),
+        ...(options.idempotency ? { extensions: paymentIdentifierDeclaration() } : {}),
       };
       const middleware = paymentMiddleware(config, server);
-      return (req, res, next) => {
+      const handler: RequestHandler = (req, res, next) => {
         const state: RequestState = {};
         res.locals[LOCALS_KEY] = state;
         storage.run(state, () => {
           middleware(req, res, next).catch(next);
         });
       };
+      if (!options.idempotency) return handler;
+      return withIdempotency(handler, {
+        ...options.idempotency,
+        clock,
+        events: {
+          onReplay: ({ key, network }) => emit({ type: 'idempotent_replay', key, network }),
+          onStoreError: (error) => emit({ type: 'idempotency_error', error }),
+        },
+      });
     },
   };
 }

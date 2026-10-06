@@ -1,7 +1,7 @@
 // Testler için sahte Solana JSON-RPC sunucusu. Ödeyen istemcinin (mint bilgisi, blok hash'i) ve kendi
 // facilitator'ımızın (simülasyon, gönderme, onay) çağırdığı yöntemleri yanıtlar; zincire bir şey
 // yazılmaz. Böylece resmi exact şemasının istemci ve facilitator yolları ağ olmadan uçtan uca sınanır.
-// Servisler (ör. compliance-api) kendi ücretli route testlerinde de kullanır.
+// Test fikstürüdür, paketle yayınlanmaz; compliance-api'nin ücretli route testi de kullanır.
 import { once } from 'node:events';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';

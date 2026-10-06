@@ -9,7 +9,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createPayingFetch } from '../src/client.js';
 import type { X402Payment } from '../src/gateway.js';
 import { SOLANA_DEVNET } from '../src/networks.js';
-import type { FakeSolanaRpc } from '../src/testing.js';
+import type { FakeSolanaRpc } from './solana-rpc.js';
 import {
   buildPaymentHeader,
   createWallets,

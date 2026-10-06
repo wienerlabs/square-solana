@@ -47,6 +47,8 @@
     "@types/swagger-jsdoc": "^6.0.4",
     "@types/swagger-ui-express": "^4.1.7",
     "@types/uuid": "^10.0.0",
+    "@x402/core": "2.28.0",
+    "@x402/svm": "2.28.0",
     "tsx": "^4.19.2",
     "vitest": "^5.0.3"
   }
