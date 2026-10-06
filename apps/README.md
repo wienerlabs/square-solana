@@ -8,9 +8,9 @@ Uygulama ve servisler (pnpm workspace). `package.json` adları `@squaresdk/solan
 | Dizin | Görev | Issue |
 |---|---|---|
 | [`web/`](web/) | Next.js web uygulaması (`@solana/wallet-adapter-react`); iskelet hazır, 8 adımlı akış ve demo M4'te | [FE-01] |
-| [`api/`](api/) | REST API: cüzdan oturumu ve API anahtarları, okuma uçları, 8 adımın tx hazırlığı, teslimat yükleme, agent card barındırma, prover vekili, `GET /openapi.json` | [BE-18] |
+| [`api/`](api/) | REST API: cüzdan oturumu ve API anahtarları, okuma uçları, 8 adımın tx hazırlığı, teslimat yükleme, agent card barındırma, prover vekili, dispute kanıtı, arbitrator kuyruğu, oyu ve webhook bildirimleri, `GET /openapi.json` | [BE-18], [BE-22] |
 | [`indexer/`](indexer/) | Event tabanlı indexer: kesinleşmiş tx'lerden event'ler ve ayna tablolar, Helius webhook ve RPC backfill, uzlaştırma, okuma API'si (`@squaresdk/solana-indexer/read`) | [BE-14] |
-| [`keeper/`](keeper/) | Finalize crank: zincir doğrulaması, kârlılık eşiği, priority fee, `ProofRequired` ve screening için geri çekilme, `keeper_actions` günlüğü | [BE-15] |
+| [`keeper/`](keeper/) | Finalize crank: zincir doğrulaması, kârlılık eşiği, priority fee, `ProofRequired` ve screening için geri çekilme, `keeper_actions` günlüğü; son tarihi geçmiş dispute'ların `lapse_dispute` crank'i | [BE-15], [BE-22] |
 | [`prover/`](prover/) | Release devresi için Groth16 prover servisi (snarkjs, `POST /v1/prove`); Aperture `prover-service`'ten geçmişiyle taşındı [BE-02], yeni devreye uyarlandı | [BE-11] |
 | [`compliance-api/`](compliance-api/) | Aperture compliance API'si (MPP / Stripe, x402 raporu `@squaresdk/solana-x402` üzerinden [BE-24], kayıtsız ödeme izleyicisi); geçmişiyle taşındı [BE-02], uyarlama [BE-25] ve [BE-18] | [BE-25] |
 | [`fee-payer/`](fee-payer/) | Sponsorlu işlem servisi: kullanıcının v0 tx'ini politikaya göre denetler (izinli program / talimat, sponsor anahtarının rolü, compute budget, ALT, Squads vault mesajları), simüle eder, kullanıcı başına hız sınırı ve günlük lamport bütçesiyle imzalar ya da gönderir; maliyet metrikleri ve `sponsored_txs` günlüğü ([ADR 0022](../docs/decisions/0022-fee-payer-politikasi.md)) | [BE-27] |
@@ -27,6 +27,7 @@ Tüm servisler tek veritabanını ([`db/`](../db/)) kullanır.
 [BE-16]: https://github.com/wienerlabs/square-solana/issues/49
 [BE-18]: https://github.com/wienerlabs/square-solana/issues/51
 [BE-24]: https://github.com/wienerlabs/square-solana/issues/79
+[BE-22]: https://github.com/wienerlabs/square-solana/issues/72
 [BE-25]: https://github.com/wienerlabs/square-solana/issues/80
 [BE-27]: https://github.com/wienerlabs/square-solana/issues/82
 [FE-01]: https://github.com/wienerlabs/square-solana/issues/21

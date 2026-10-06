@@ -137,6 +137,20 @@ describe('createApiClient', () => {
       [() => api.getHealth(), 'GET', '/api/health'],
       [() => api.getReady(), 'GET', '/api/ready'],
       [() => api.getWellKnownAgentCard(job), 'GET', `/api/a/${job}/.well-known/agent-card.json`],
+      [() => api.listDisputeEvidence(job), 'GET', `/api/v1/disputes/${job}/evidence`],
+      [
+        () =>
+          api.prepareDisputeVote(job, { resolution: { kind: 'favorAgent' }, feePayer: null, computeUnitPrice: null }),
+        'POST',
+        `/api/v1/disputes/${job}/votes`,
+      ],
+      [() => api.getArbitrationQueue({ page: 2 }), 'GET', '/api/v1/arbitration/queue?page=2'],
+      [() => api.listArbitrationWebhooks(), 'GET', '/api/v1/arbitration/webhooks'],
+      [
+        () => api.createArbitrationWebhook({ url: 'https://hooks.example.com/a', events: ['dispute.raised'] }),
+        'POST',
+        '/api/v1/arbitration/webhooks',
+      ],
     ];
     for (const [call, method, url] of calls) {
       await call();
@@ -152,6 +166,34 @@ describe('createApiClient', () => {
     expect(last().headers['content-type']).toMatch(/^multipart\/form-data; boundary=/);
     expect(last().body).toContain('name="file"');
     expect(last().body).toContain('merhaba');
+  });
+
+  it('dispute kanıtı multipart gider, içeriği zarfsız baytlardır; abonelik silme gövdesiz', async () => {
+    const api = createApiClient({ baseUrl, auth: { session: 'tok' } });
+    respond = () => ({ ...ok({}), status: 201 });
+    await api.uploadDisputeEvidence(job, new Blob(['gerekçe'], { type: 'text/plain' }));
+    expect(last()).toMatchObject({ method: 'POST', url: `/api/v1/jobs/${job}/dispute/evidence` });
+    expect(last().headers['content-type']).toMatch(/^multipart\/form-data; boundary=/);
+    expect(last().body).toContain('gerekçe');
+
+    respond = () => ({ status: 200, body: 'ham içerik' });
+    const content = await api.getDisputeEvidenceContent(job, 'a/b');
+    expect(last()).toMatchObject({ method: 'GET', url: `/api/v1/disputes/${job}/evidence/a%2Fb` });
+    expect(last().headers.authorization).toBe('Bearer tok');
+    expect(await content.text()).toBe('ham içerik');
+    expect(content.type).toBe('application/json');
+
+    respond = () => fail(403, 'forbidden');
+    await expect(api.getDisputeEvidenceContent(job, 'x')).rejects.toMatchObject({
+      status: 403,
+      error: { code: 'forbidden' },
+    });
+    respond = () => ({ status: 502, body: 'bad gateway' });
+    await expect(api.getDisputeEvidenceContent(job, 'x')).rejects.toThrow(/beklenmeyen yanıt \(502\)/);
+
+    respond = () => ({ status: 204 });
+    await expect(api.deleteArbitrationWebhook('w1')).resolves.toBeUndefined();
+    expect(last()).toMatchObject({ method: 'DELETE', url: '/api/v1/arbitration/webhooks/w1' });
   });
 
   it('hata zarfı döner; zarfsız ve gövdesiz uçların hataları ApiClientError', async () => {

@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Square Solana API
-  version: 0.20.0
+  version: 0.21.0
   summary: Square HTTP API sözleşmesi (BE-35), uygulaması apps/api (BE-18).
   description: |
     Contract-first API sözleşmesi. Zincirdeki hesaplar, event'ler ve instruction argümanları
@@ -26,13 +26,15 @@ tags:
   - name: claims
     description: Alacak piyasası okuma uçları (adım 5).
   - name: disputes
-    description: Dispute okuma uçları.
+    description: Dispute okuma uçları, dispute kanıtı ve arbitrator oyu (BE-22).
+  - name: arbitration
+    description: Arbitrator kuyruğu ve webhook bildirim abonelikleri (BE-22).
   - name: screening
     description: Sanctions screening kayıtları (adım 3).
   - name: events
     description: İndexlenmiş zincir event'leri.
   - name: keeper
-    description: Keeper günlüğü (finalize crank kararları).
+    description: Keeper günlüğü (finalize ve lapse crank kararları).
   - name: travel-rule
     description: |
       Travel Rule kaydı (adım 3, BE-23, ADR 0017). Kayıt API'de zarf şifrelemesiyle saklanır; zincire yalnızca
@@ -592,6 +594,246 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
         '429': { $ref: '#/components/responses/RateLimited' }
 
+  /v1/jobs/{job}/dispute/evidence:
+    post:
+      tags: [disputes]
+      operationId: uploadDisputeEvidence
+      summary: Dispute kanıtını yükler; içeriğin SHA-256'sı `raise_dispute`'un reasonHash'idir.
+      description: |
+        Yükleyen job'un kurumu (dispute açılmadan önce de), agent cüzdanı ya da sahibi ve aktif arbitrator'lardır;
+        agent ve arbitrator'lar dispute açıldıktan sonra yükler. İçerik özel depoda durur, yalnızca
+        `listDisputeEvidence`'ın okuyanları indirir. Aynı içerik ikinci kez yüklenirse ilk kayıt döner.
+      security:
+        - session: []
+        - apiKey: []
+      parameters:
+        - $ref: '#/components/parameters/JobPath'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  contentMediaType: application/octet-stream
+      responses:
+        '201':
+          description: Kanıt kaydı.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessBase'
+                  - properties:
+                      data: { $ref: '#/components/schemas/DisputeEvidence' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+
+  /v1/disputes/{job}/evidence:
+    get:
+      tags: [disputes]
+      operationId: listDisputeEvidence
+      summary: Job'un dispute kanıtları (kurum, agent cüzdanı / sahibi ve aktif arbitrator'lar okur).
+      security:
+        - session: []
+        - apiKey: []
+      parameters:
+        - $ref: '#/components/parameters/JobPath'
+      responses:
+        '200':
+          description: Kanıtlar, eskiden yeniye.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessBase'
+                  - properties:
+                      data:
+                        type: array
+                        items: { $ref: '#/components/schemas/DisputeEvidence' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+
+  /v1/disputes/{job}/evidence/{id}:
+    get:
+      tags: [disputes]
+      operationId: getDisputeEvidenceContent
+      summary: Kanıtın içeriği (zarfsız; içerik tipi yüklemedeki tip).
+      security:
+        - session: []
+        - apiKey: []
+      parameters:
+        - $ref: '#/components/parameters/JobPath'
+        - name: id
+          in: path
+          required: true
+          description: Kanıtın kimliği (`listDisputeEvidence`'taki `id`).
+          schema: { type: string, minLength: 1 }
+      responses:
+        '200':
+          description: Kanıtın baytları.
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                contentMediaType: application/octet-stream
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+
+  /v1/disputes/{job}/votes:
+    post:
+      tags: [disputes]
+      operationId: prepareDisputeVote
+      summary: Arbitrator oyu için imzasız `resolve_dispute` tx'i hazırlar.
+      description: |
+        Ön denetimler (zincirdeki job ve escrow config'ine göre): çağıran aktif arbitrator; dispute açık ve son
+        tarih geçmemiş; arbitrator güncel sayımda oy vermemiş; sayımda bir karar varsa oy ona eşit; `pending`
+        oy değil, `split.agentAmount` escrow'u aşamaz. Uymayan istek 409 `conflict` ya da 400 alır.
+      security:
+        - session: []
+        - apiKey: []
+      parameters:
+        - $ref: '#/components/parameters/JobPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DisputeVoteRequest' }
+      responses:
+        '200':
+          description: İmzasız tx.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessBase'
+                  - properties:
+                      data: { $ref: '#/components/schemas/UnsignedTx' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/SimulationFailed' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+
+  /v1/arbitration/queue:
+    get:
+      tags: [arbitration]
+      operationId: getArbitrationQueue
+      summary: Oturumdaki arbitrator'ın açık dispute'ları; oylar, son tarih ve kanıtlarla.
+      description: Son tarihi en yakın olan önce. Çağıran aktif arbitrator değilse 403.
+      security:
+        - session: []
+        - apiKey: []
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Sayfalı kuyruk.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessBase'
+                  - properties:
+                      data:
+                        type: array
+                        items: { $ref: '#/components/schemas/ArbitrationQueueItem' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+
+  /v1/arbitration/webhooks:
+    get:
+      tags: [arbitration]
+      operationId: listArbitrationWebhooks
+      summary: Oturum sahibinin webhook abonelikleri.
+      security:
+        - session: []
+      responses:
+        '200':
+          description: Abonelikler.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessBase'
+                  - properties:
+                      data:
+                        type: array
+                        items: { $ref: '#/components/schemas/ArbitrationWebhook' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+    post:
+      tags: [arbitration]
+      operationId: createArbitrationWebhook
+      summary: Webhook ucu kaydeder; imza sırrı yalnızca bu yanıtta döner.
+      description: |
+        Yalnızca aktif arbitrator kaydeder. Teslimat `arbitrationNotification` webhook'udur (Standard Webhooks
+        imzası). Bildirimler gönderim anında aktif olan arbitrator'lara gider.
+      security:
+        - session: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ArbitrationWebhookCreate' }
+      responses:
+        '201':
+          description: Abonelik ve sır.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessBase'
+                  - properties:
+                      data: { $ref: '#/components/schemas/ArbitrationWebhookCreated' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+
+  /v1/arbitration/webhooks/{id}:
+    delete:
+      tags: [arbitration]
+      operationId: deleteArbitrationWebhook
+      summary: Aboneliği siler; bekleyen teslimatları da silinir.
+      security:
+        - session: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Aboneliğin kimliği (`listArbitrationWebhooks`'taki `id`).
+          schema: { type: string, minLength: 1 }
+      responses:
+        '204':
+          description: Silindi.
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+
   /v1/screening/{wallet}:
     get:
       tags: [screening]
@@ -1068,6 +1310,44 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Health' }
 
+webhooks:
+  arbitrationNotification:
+    post:
+      tags: [arbitration]
+      operationId: arbitrationNotification
+      summary: Arbitrator'ın kaydettiği uca gönderilen dispute bildirimi.
+      description: |
+        [Standard Webhooks](https://www.standardwebhooks.com) imzası: `webhook-id` (teslimat kimliği; yeniden
+        denemelerde aynı), `webhook-timestamp` (Unix saniyesi), `webhook-signature: v1,<base64>` =
+        HMAC-SHA256(sır, `id.zaman.gövde`). Alıcı `@squaresdk/solana-hardening`'in `verifyWebhook`'uyla doğrular.
+        2xx dışındaki yanıt üstel geri çekilmeyle yeniden denenir.
+      parameters:
+        - name: webhook-id
+          in: header
+          required: true
+          description: Teslimat kimliği; yeniden denemelerde aynı kalır.
+          schema: { type: string }
+        - name: webhook-timestamp
+          in: header
+          required: true
+          description: İmzanın anı, Unix saniyesi.
+          schema: { type: string, pattern: '^[0-9]+$' }
+        - name: webhook-signature
+          in: header
+          required: true
+          description: 'İmza: `v1,<base64>` = HMAC-SHA256(sır, `id.zaman.gövde`).'
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ArbitrationNotification' }
+      responses:
+        '200':
+          description: Alındı (her 2xx teslimatı tamamlar).
+        '400':
+          description: Reddedildi; teslimat yeniden denenir.
+
 components:
   securitySchemes:
     session:
@@ -1523,7 +1803,7 @@ components:
         expiresAt: { type: integer, format: int64 }
     ApiKeyScope:
       type: string
-      enum: [read, 'tx:prepare', 'deliveries:write', 'agents:write', prove]
+      enum: [read, 'tx:prepare', 'deliveries:write', 'agents:write', prove, 'disputes:write']
     ApiKey:
       type: object
       required: [id, label, prefix, scopes, createdAt, lastUsedAt]
@@ -1673,6 +1953,118 @@ components:
             - type: 'null'
         at: { type: integer, format: int64 }
         nextAttemptAt: { type: [integer, 'null'], format: int64 }
+    # ------------------------------------------------------------ uyuşmazlık (BE-22)
+    DisputeEvidenceRole:
+      type: string
+      enum: [institution, agent, arbitrator]
+    DisputeEvidence:
+      type: object
+      required: [id, job, reasonHash, contentType, size, role, uploadedBy, isDisputeReason, createdAt]
+      additionalProperties: false
+      properties:
+        id: { type: string, minLength: 1 }
+        job: { $ref: './schemas/idl.json#/Address' }
+        reasonHash:
+          $ref: './schemas/idl.json#/Hex32'
+          description: İçeriğin SHA-256'sı; kurumun kanıtında raise_dispute'un reason_hash argümanı.
+        contentType: { type: string, minLength: 1, maxLength: 120 }
+        size: { type: integer, minimum: 0 }
+        role: { $ref: '#/components/schemas/DisputeEvidenceRole' }
+        uploadedBy: { $ref: './schemas/idl.json#/Address' }
+        isDisputeReason:
+          type: boolean
+          description: Zincirdeki dispute'un reasonHash'i bu içeriğin hash'i mi.
+        createdAt: { type: integer, format: int64 }
+    DisputeVoteRecord:
+      type: object
+      description: DisputeVote event'inden bir oy.
+      required: [arbitrator, resolution, approvalCount, signature, slot, blockTime]
+      additionalProperties: false
+      properties:
+        arbitrator: { $ref: './schemas/idl.json#/Address' }
+        resolution: { $ref: './schemas/idl.json#/DisputeResolution' }
+        approvalCount: { type: integer, minimum: 1, maximum: 7 }
+        signature: { type: string, pattern: '^[1-9A-HJ-NP-Za-km-z]{64,88}$' }
+        slot: { type: integer, minimum: 0 }
+        blockTime: { type: [integer, 'null'], format: int64 }
+    ArbitrationQueueItem:
+      type: object
+      required: [dispute, votes, hasVoted, canVote, threshold, evidence]
+      additionalProperties: false
+      properties:
+        dispute: { $ref: '#/components/schemas/DisputeView' }
+        votes:
+          type: array
+          description: Dispute açıldıktan sonraki oylar, eskiden yeniye.
+          items: { $ref: '#/components/schemas/DisputeVoteRecord' }
+        hasVoted: { type: boolean, description: Arbitrator güncel sayımda oy verdi mi. }
+        canVote: { type: boolean, description: Oy yok ve son tarih geçmedi. }
+        threshold: { type: integer, minimum: 2, maximum: 7, description: Karar için gereken onay (M). }
+        evidence:
+          type: array
+          items: { $ref: '#/components/schemas/DisputeEvidence' }
+    DisputeVoteRequest:
+      type: object
+      required: [resolution, feePayer, computeUnitPrice]
+      additionalProperties: false
+      properties:
+        resolution: { $ref: './schemas/idl.json#/DisputeResolution' }
+        feePayer:
+          description: Boşsa arbitrator'ın kendisi.
+          oneOf:
+            - $ref: './schemas/idl.json#/Address'
+            - type: 'null'
+        computeUnitPrice:
+          oneOf:
+            - $ref: './schemas/idl.json#/U64'
+            - type: 'null'
+    ArbitrationEventType:
+      type: string
+      enum: [dispute.raised, dispute.escalated, dispute.vote, dispute.decided, dispute.deadline]
+    ArbitrationWebhook:
+      type: object
+      required: [id, url, events, createdAt]
+      additionalProperties: false
+      properties:
+        id: { type: string, minLength: 1 }
+        url: { type: string, format: uri, maxLength: 512 }
+        events:
+          type: array
+          minItems: 1
+          items: { $ref: '#/components/schemas/ArbitrationEventType' }
+        createdAt: { type: integer, format: int64 }
+    ArbitrationWebhookCreate:
+      type: object
+      required: [url, events]
+      additionalProperties: false
+      properties:
+        url: { type: string, format: uri, maxLength: 512, description: https; özel ağ adresleri reddedilir. }
+        events:
+          type: array
+          minItems: 1
+          items: { $ref: '#/components/schemas/ArbitrationEventType' }
+    ArbitrationWebhookCreated:
+      type: object
+      required: [webhook, secret]
+      additionalProperties: false
+      properties:
+        webhook: { $ref: '#/components/schemas/ArbitrationWebhook' }
+        secret: { type: string, minLength: 32, description: 'whsec_ sırrı; yalnızca bu yanıtta döner.' }
+    ArbitrationNotification:
+      type: object
+      required: [type, timestamp, job, deadline, event]
+      additionalProperties: false
+      properties:
+        type: { $ref: '#/components/schemas/ArbitrationEventType' }
+        timestamp: { type: integer, format: int64 }
+        job: { $ref: './schemas/idl.json#/Address' }
+        deadline: { type: [integer, 'null'], format: int64 }
+        event:
+          description: Bildirimi doğuran zincir event'i; dispute.deadline'da null.
+          oneOf:
+            - $ref: '#/components/schemas/IndexedEvent'
+            - type: 'null'
+
     Health:
       type: object
       required: [status, version, checks]
