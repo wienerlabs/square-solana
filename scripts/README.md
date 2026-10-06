@@ -14,6 +14,7 @@ smoke ([§9](../docs/analysis/square-solana-analysis.md#9-%C3%B6nerilen-monorepo
 | Address Lookup Table, compute budget, priority fee | [BC-28] |
 | [`deploy/`](deploy/): ağ yapılandırması (`networks/<ağ>.json`, `network-config.mjs`), config'lerin Squads vault'u adına kurulması (`init-configs.mjs`), Square ALT'ı (`create-lookup-table.mjs`), hız sınırına dayanıklı RPC bağlantısı (`rpc.mjs`); kayıt [`docs/deploy/devnet.md`](../docs/deploy/devnet.md) | [BC-30] |
 | [`deploy/`](deploy/): CCTP V2 ile fonlama: kaynak EVM zincirinde burn (`cctp-burn.mjs`, SDK'nın burn yardımcısıyla), attestation ve tek tx'te mint + `fund_job` devnet koşusu (`cctp-fund-job.mjs`), CCTP ALT'ı (`create-lookup-table.mjs --cctp`); [cctp-funding.md](../docs/design/cctp-funding.md) | [BC-36], [BE-26] |
+| [`deploy/`](deploy/): program upgrade'i Squads vault işlemiyle (`upgrade-program.mjs`); vault işleminin ortak akışı (`squads-vault.mjs`, config kurulumu da kullanır); [upgrade runbook'u](../docs/runbooks/upgrade.md) §6 | [BC-32], [BC-33] |
 | [`deploy/`](deploy/): sanctions screening: OFAC SDN listesinin okunması (`sanctions.mjs`), cüzdanların taranıp `record_screening` ile kaydedilmesi (`record-screening.mjs`); [screener runbook'u](../docs/runbooks/screener.md) | [BE-31] |
 | [`docs/`](docs/): geliştirici dokümantasyonunun sitesi (`site.mjs build`: TypeDoc referansı, rehberler, OpenAPI'den API referansı, `dist/docs/`) ve SDK referansının bütünlüğü (`site.mjs check`) | [BE-31] |
 | Devnet uçtan uca smoke: 8 adım gerçek işlemlerle, tx / CU / ücret raporu | [BC-31] |
@@ -31,3 +32,5 @@ keypair'leri secret store'da tutulur [BC-09].
 [BC-36]: https://github.com/wienerlabs/square-solana/issues/77
 [BE-26]: https://github.com/wienerlabs/square-solana/issues/81
 [BE-31]: https://github.com/wienerlabs/square-solana/issues/90
+[BC-32]: https://github.com/wienerlabs/square-solana/issues/69
+[BC-33]: https://github.com/wienerlabs/square-solana/issues/70

@@ -12,8 +12,8 @@ Square'in web uygulaması: Next.js 16 (App Router), React 19, Tailwind CSS 4 ve 
 | `/app/did` | did:aip çözümü: kayıt zincirden, kart kendi adresinden; DID belgesi ve meta verisi. `?did=` ile paylaşılır (FE-05) |
 | `/app/agents` | Agent dizini: beceri, fiyat ve tamamlanmış iş filtresi, sıralama (FE-05) |
 | `/app/agents/[agentRecord]` | Agent profili: kayıt ve kart, beceriler ve fiyatlar, itibar, validation geçmişi, işler (FE-05) |
-| `/app/jobs/new` | İş açma ve fonlama: agent, tutar, deadline, challenge süresi, politika bağlama, iş tanımı ve hash'i, iki tarafın screening'i, `create_job` + `fund_job` (FE-06) |
-| `/app/jobs/[job]` | İş detayı: zincirdeki job, event'lerden canlı zaman çizelgesi, zincir saatine göre challenge sayacı; agent cüzdanı için kabul ve teslim (FE-07); alacağın listelenmesi, geri çekilmesi ve onaylı alıcının alımı, payee (FE-08); uyum ispatının durumu, kurumun ispatı üretip bağlaması (FE-09); herkesin tetikleyebildiği finalize, ödeme, validation, itibar ve keeper günlüğü (FE-10) |
+| `/app/jobs/new` | İş açma ve fonlama: agent, tutar, deadline, challenge süresi, politika bağlama, iş tanımı ve hash'i, iki tarafın screening'i, `create_job` + `fund_job` (FE-06); eşik üstünde Travel Rule formu ve `commit_travel_rule` (FE-18) |
+| `/app/jobs/[job]` | İş detayı: zincirdeki job, event'lerden canlı zaman çizelgesi, zincir saatine göre challenge sayacı; agent cüzdanı için kabul ve teslim (FE-07); alacağın listelenmesi, geri çekilmesi ve onaylı alıcının alımı, payee (FE-08); uyum ispatının durumu, kurumun ispatı üretip bağlaması (FE-09); herkesin tetikleyebildiği finalize, ödeme, validation, itibar ve keeper günlüğü (FE-10); Travel Rule durumu, commitment ve API'de saklanan kayıtla doğrulama (FE-18) |
 | `/app/claims` | Alacak piyasası: satıştaki alacaklar, fiyat, iskonto, kimin alabileceği (FE-08) |
 | `/audit/[job]` | Denetim görünümü: job'un herkese açık uyum geçmişi; event'ler ve işlemleri, ispatın kararı ve geçmişi, validation kaydı. Politikanın içeriği yok (FE-12) |
 | `/design` | Bileşen kataloğu |
@@ -110,8 +110,8 @@ hesabından okunur (program arayüzü §4). Tx'ler SDK'nın akışıyla (`flow.c
 | Şartlar | Tutar USDC olarak (mint'in ondalığıyla), deadline yerel saatle, challenge süresi dakika olarak config'in sınırlarında. Politika, bu tarayıcıda commit edilmiş etkin politikalardan seçilir (FE-04); bağlanırsa release ispata bağlanır. Tutar politikanın public tavanını aşarsa uyarı |
 | İş tanımı | JSON nesnesi; A2A ile agent'a gider, zincire yalnızca RFC 8785 kanonik biçiminin SHA-256'sı (`spec_hash`). Job adresi kurum + hash'ten türer; aynı tanımla açılmış iş varsa durumu gösterilir ve fonlanabilir |
 | Screening | Kurumun ve agent cüzdanının `ScreeningRecord`'u, escrow'un kuralıyla (`square_common::screening`): kayıt yok, işaretli, süresi dolmuş. Biri temiz değilse fonlama kapanır ve hangi cüzdanın neden kapattığı yazılır; program yine reddederse `ScreeningRequired` / `ScreeningExpired` / `ScreeningFlagged` aynı açıklamayla gösterilir, iş açık kalır |
-| Fonlama | Kurumun USDC bakiyesi yetmiyorsa ya da tutar Travel Rule eşiğindeyse (BC-34) fonlama kapanır |
-| Tx | İki tx, kurum cüzdanının imzasıyla: `create_job` (iş ve vault), `fund_job` (tutar vault'a). Escrow hata kodu IDL'deki mesajıyla. Hesaplar ağ doğrulanmadan okunmaz |
+| Fonlama | Kurumun USDC bakiyesi yetmiyorsa fonlama kapanır. Tutar Travel Rule eşiğinde ya da üstündeyse zincirdeki commitment bu tarayıcıdaki kayıtla eşleşene kadar kapalıdır (FE-18, aşağıda) |
+| Tx | Kurum cüzdanının imzasıyla: `create_job` (iş ve vault), eşik üstünde `commit_travel_rule`, `fund_job` (tutar vault'a). Escrow hata kodu IDL'deki mesajıyla. Hesaplar ağ doğrulanmadan okunmaz |
 
 ## İş detayı (FE-07)
 
@@ -193,6 +193,20 @@ Politikaya bağlı işte escrow, kurumun bağladığı release ispatına (`Relea
 | Keeper ücreti | `EscrowParams.keeper_fee_bps` ve sözleşmedeki açıklaması |
 | ALT | `SQUARE_LOOKUP_TABLE`: authority (dondurulmuş mu), etkin mi, son genişletme slot'u, girdiler. Program kimliklerinin dördü de tanımlıysa içerik SDK'nın beklediği adreslerle (`squareLookupTableAddresses`, escrow config'inin settlement mint'iyle) karşılaştırılır; her girdinin ne olduğu yazılır, eksik ve fazla adresler listelenir |
 | Square API | `SQUARE_API_URL` tanımlıysa `/ready`: durum, sürüm ve bağımlılıkların (veritabanı, RPC, depo) denetimi |
+
+## Travel Rule (FE-18)
+
+Eşiği aşan işte kurum, fonlamadan önce Travel Rule kaydının salt'lı commitment'ını işe bağlar ([ADR 0015](../../docs/decisions/0015-travel-rule-commitment-ve-esik.md)). Eşik escrow config'indeki `travel_rule_threshold`'dur (0 = kapalı; `amount >= eşik` ise gerekir). Kayıt Square API'sinde şifreli saklanır (BE-23, [ADR 0017](../../docs/decisions/0017-travel-rule-saklama-erisim-ve-paylasim.md)); zincirde yalnızca 32 baytlık commitment vardır. `SQUARE_API_URL` tanımlı değilse kayıt saklanamaz ve eşik üstündeki iş bu sayfadan fonlanamaz.
+
+| Parça | Davranış |
+|---|---|
+| Form | Originator (kurum) ve beneficiary (agent'ın işletmecisi), `@squaresdk/solana-types`'ın `TravelRuleRecord` biçiminde (IVMS101 alt kümesi): kişi türü (tüzel / gerçek), ad (tüzelde unvan, gerçekte soyad ve adlar), adres (sokak, şehir, posta kodu, ISO 3166-1 alfa-2 ülke), ulusal kimlik (IVMS101 kimlik türü, değeri, veren ülke; LEI'de ülke yok, ISO 17442 kontrol haneleri denetlenir), gerçek kişide doğum tarihi ve yeri, ikamet ülkesi; isteğe bağlı originating ve beneficiary VASP (ad, LEI). Originator adres, ulusal kimlik ya da doğum tarihi ve yerinden birini verir (FATF Tavsiye 16). Hesaplar girilmez: kurum cüzdanı ve işin agent cüzdanı; tutar ve mint işinkidir. Kayıt API'ye gitmeden ortak şemadan geçer (`src/lib/travel-rule.ts`) |
+| Saklama ve bağlama | İş `Open`'ken, sihirbazda ya da iş sayfasında, Square API oturumuyla (FE-03): `PUT /v1/jobs/{job}/travel-rule` kaydı şifreler, yeni bir salt üretir ve commitment'ı döner; ardından `commit_travel_rule` (SDK `flow.commitTravelRule`) yalnızca o commitment'ı zincire yazar. Fonlamaya kadar yeni kayıtla değiştirilebilir, son bağlanan geçerlidir |
+| Doğrulama | "Check against the stored record": `GET /v1/jobs/{job}/travel-rule` kaydı ve salt'ı açar (okuma API'nin erişim kaydına yazılır), commitment bu tarayıcıda SDK'nın `travelRule.commitment`'ıyla yeniden hesaplanıp zincirdekiyle karşılaştırılır: API'nin sözüne güvenilmez. Saklama zamanı ve saklama süresinin sonu gösterilir. Commitment'ın zincirdeki uygulamayla aynılığı ortak vektörlerle (`crates/square-common/tests/fixtures/travel-rule-vectors.json`) test edilir |
+| Fonlama kapısı | Eşik üstünde fonlama, zincirdeki commitment API'de saklanan kaydın salt'ı ve içeriğinden yeniden hesaplanan commitment'a eşit olana kadar kapalıdır: bu oturumda saklanıp bağlanan kayıt kendiliğinden, sonrası doğrulamayla. Commitment yoksa, API'de kayıt yoksa ya da eşleşmiyorsa sebebi yazılır. Program yine reddederse `TravelRuleCommitmentRequired` ne yapılacağıyla gösterilir |
+| Durum (iş sayfası) | Herkese açık: "Not required", "Waiting for the commitment" (eşik üstü, `Open`), "Commitment bound" (commitment hex), "No commitment" (eşik sonradan yükseldi). Zaman çizelgesinde `TravelRuleCommitted` |
+
+Karşı VASP'a ya da denetçiye erişim izni (`createTravelRuleGrant`) ve erişim kaydı API'de (BE-23) vardır; bu sayfada henüz yok.
 
 ## Tasarım sistemi
 

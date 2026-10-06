@@ -1115,6 +1115,11 @@ export const IDL_PROGRAMS = {
         "code": 6047,
         "name": "TravelRuleCommitmentRequired",
         "msg": "Travel Rule commitment required above the threshold"
+      },
+      {
+        "code": 6048,
+        "name": "InvalidDisputeTimeout",
+        "msg": "Dispute timeout must be positive and proof timeout must not be negative"
       }
     ]
   }

@@ -37,17 +37,5 @@ export const PROGRAMS = Object.freeze([
     status: 'contract',
     pending: [{ issue: 'BC-37 (#78)', instructions: ['verify_mpp_payment_proof', 'update_mpp_authority'] }],
   },
-  {
-    name: 'square_escrow',
-    crate: 'square-escrow',
-    contract: 'square_escrow_contract',
-    status: 'contract',
-    pending: [
-      {
-        issue: 'BC-32 (#69)',
-        instructions: ['raise_dispute', 'resolve_dispute', 'execute_resolution', 'update_arbitrators'],
-      },
-      { issue: 'BC-33 (#70)', instructions: ['lapse_dispute', 'escalate_missing_proof'] },
-    ],
-  },
+  { name: 'square_escrow', crate: 'square-escrow', contract: 'square_escrow_contract', status: 'contract' },
 ]);

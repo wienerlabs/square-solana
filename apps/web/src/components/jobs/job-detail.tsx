@@ -7,6 +7,7 @@ import { PublicKey } from '@solana/web3.js';
 import { squareIdentity } from '@squaresdk/solana-identity';
 import type { ClaimListingAccount, JobAccount } from '@squaresdk/solana-sdk';
 import type { DeliveryReceipt } from '@squaresdk/solana-types';
+import { useApiClient } from '@/components/api-client';
 import { useApiSession } from '@/components/api-session';
 import { useNetworkGuard, useSendTransaction } from '@/components/network-guard';
 import { useWebConfig } from '@/components/providers';
@@ -17,6 +18,7 @@ import { TxConfirmation } from '@/components/ui/tx-confirmation';
 import { JobClaim } from './job-claim';
 import { JobRelease } from './job-release';
 import { JobSettlement } from './job-settlement';
+import { JobTravelRule } from './job-travel-rule';
 import { chainRefOf, hex } from '@/lib/agent-registration';
 import { payoutOf, type Payout } from '@/lib/claim-market';
 import { claimListingAddress } from '@/lib/idl-pda';
@@ -40,6 +42,7 @@ import { readReleaseState, type ReleaseState } from '@/lib/release-proof';
 import { TransactionBlockedError } from '@/lib/send-transaction';
 import { formatUnits } from '@/lib/settlement';
 import { JOB_STATUS_TONE, statusLabel } from '@/lib/status';
+import type { TravelRuleVerification } from '@/lib/travel-rule';
 import { useSettlementToken } from '@/lib/use-settlement';
 import { useSignatureStatus } from '@/lib/use-signature-status';
 
@@ -206,6 +209,9 @@ export function JobDetail({ jobAddress, escrowProgramId }: { jobAddress: string;
 
   // Agent eylemleri: yalnızca job'un agent cüzdanı.
   const isAgent = Boolean(account && publicKey?.equals(account.agentWallet));
+  const institutionKey = account && publicKey?.equals(account.institution) ? publicKey : null;
+  const apiClient = useApiClient();
+  const [travelVerification, setTravelVerification] = useState<TravelRuleVerification | null>(null);
   const fileId = useId();
   const uriId = useId();
   const [deliveryUri, setDeliveryUri] = useState('');
@@ -391,6 +397,24 @@ export function JobDetail({ jobAddress, escrowProgramId }: { jobAddress: string;
           )}
         </section>
       )}
+
+      <JobTravelRule
+        setup={escrow}
+        jobAddress={jobAddress}
+        job={{
+          status: jobStatus,
+          amount: BigInt(account.amount.toString()),
+          mint: account.mint,
+          agentWallet: account.agentWallet,
+          commitment: Uint8Array.from(account.travelRuleCommitment),
+        }}
+        institution={institutionKey}
+        api={apiClient}
+        verification={travelVerification}
+        onVerification={setTravelVerification}
+        formatAmount={formatAmount}
+        onConfirmed={refresh}
+      />
 
       <JobRelease
         escrow={escrow}

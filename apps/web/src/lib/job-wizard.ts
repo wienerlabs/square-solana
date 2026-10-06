@@ -234,6 +234,9 @@ export function escrowErrorMessage(error: unknown): string | null {
   if (/ScreeningRequired|ScreeningExpired|ScreeningFlagged/i.test(message)) {
     return `${message}. Funding was refused by sanctions screening; the job stays open and can be funded once both wallets are screened clear.`;
   }
+  if (/TravelRuleCommitmentRequired/.test(message)) {
+    return `${message}. The job stays open: bind the Travel Rule commitment, then fund it.`;
+  }
   return message;
 }
 
