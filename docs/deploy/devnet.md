@@ -190,6 +190,36 @@ Her kayıtta zincirdeki `source_hash` denetim kaydındakidir; `expires_at − sc
 | Kimliksiz aynı başlıkla eşzamanlı iki istek | Biri 200, diğeri 402 (`replay_rejected`) | `2MYysDru1hnH4jjvj7gdfL9135BKzhjoRqgSdg7ZmroHChXcPPcyvm9V8zCeizcxZedQJ4WBbspyxsHxg9Htr51W` |
 | Uzlaşmış başlık yeniden | 402: facilitator'ın simülasyonu işlenmiş işlemi reddetti | — |
 
+## Fee payer ve Squads smart account (BE-27)
+
+Uçtan uca koşu, 2026-10-06 (`apps/fee-payer/test/squads-devnet.e2e.test.ts`).
+- **Smart account'lar:** Kurum, agent ve alıcı rolleri gerçek Squads v4 smart account'larının vault'larıdır. Her
+  birinin tek üyesi ve eşiği 1'dir.
+- **Sponsor:** Fee payer servisi (testin Postgres'iyle). Sponsor deployer'dır; 22 tx'in ücretini ve rent'ini o
+  ödedi. Vault'lar hiç SOL tutmadı.
+- **Kurulum (sponsorsuz):**
+  - BC-36'nın kurumu vault'ların USDC hesaplarını açtı ve doldurdu.
+  - Screener authority vault'ları temiz kaydetti.
+- **İspat:** Zincirden kurulan witness'la üretilen gerçek Groth16 ispatı.
+- **Ödeme:** İş 1 USDC; alacak 0,9 USDC'ye alıcı vault'una satıldı. Finalize'da alıcı vault'una net 995 000 gitti,
+  keeper'a 5 000 (50 bps).
+
+| Adım | Tx (yürütme; öneri tx'leri test raporunda) |
+|---|---|
+| Smart account'lar (`multisig_create_v2`) | `5XX214pW9iY7Cv4e7h9G5x1vvWBgcJNvBxS53MNY5DUtp4qDvBwa9nv3qUpano5aq92jSqsNYf7WfSpVfcwDjmv3`, `3tGx9LjQ11Vi574wsh9qUXKgqxZorARu3J1nvT23J6nwvyrPCp3bQ3eahYXxydeuoGTJP17yFKXcGGfpmCaz95ro`, `3D1QpkJBNnbtfQWwtDNFRkLc46iUqgFspyDTcQ3aQDR7MgVKqB9Y1nTkwCpKxUEJRzi16GsovnZCrFme8vRrrnnA` |
+| 1. `init_institution` + `set_policy` + `set_buyer_root` | `4TxZvqidcpW24EZeiLNuz8WhYj5RnmDYeQPbSs957BBy3aN2pfsRfRWVvP161hE1UQ5ra5HejnTiEdRoZqEASkZc` |
+| 2. `register_agent` | `5t16zTqhEzRdMs4sHpBhvbrxwAD2gehKPR8v46bMvytwFByHFSv52HA2da6gN6ncce5t7fo4RWVLYtYEeugX5QVP` |
+| 3. `create_job` | `5H1WxNAqYtwTDGiFdJYk3SQDteikunYQvs7ecjPiUoBv6YPNNtgbeMNpNFsu5eyXaN5kM13hTBWGCM1YkAczXDGS` |
+| 3. `fund_job` | `RckLucP1g3YQwNZ7tiqXTsAYEj8kpk4PBD12efh2LSNQBMgGXDSBMKhvozqYk2oT4Et6X9gXvrxioQz4X7ZyzRT` |
+| 4. `accept_job` | `RR1t9Ah4cvekFiZDKfM5gL6u16godCMtwu45qo7a1TZ56ZDYuX6sULYRhfZifHQg7ZcEYRPwZKw8KwrV2AeoZKQ` |
+| 4. `submit_work` | `4QWM8p3QSzMRMgSg99XKYMtPYpSxC5Ykhxoz3k5BBfsb4x4rr6sY4LzpcCFbHz443CCGcQ5UFjqDqm6hBrCqaaAM` |
+| 5. `list_claim` | `2cccN6GWgBQnfBV831Q7zFvHcA3HT3X3rpmA1kWRwmVm2Cq4a6Z4SNxoCG4zGx9JYNrnf9brWTtxiZFSJp3J7fAX` |
+| 5. `buy_claim` | `5N2dj7eNnJdbZxKUbQDnfkCmn1x4dnPUCgMVgVSe8oZusQgVVW4CvNzrE8YYgC1gq6EwzgjkzPDeNY45jYtJv7Am` |
+| 7. `set_compliance_proof` | `5Lk7VtSaQ9cvdeTs5E6S6hKLvJmU6ABdDyTaXrzn5hde6apCikpmtCwt6h2tJ2r91kD4h1bzryvFuALP6Ny4C6Mi` |
+| 8. `finalize_payment` (keeper, sponsorlu) | `3duiU4XxhReQqTMMabuxx6FkCMMLy1z7BdikRcpntM9X9DKeyBY3AWf4pv8oTfo5gsTeSu9msXVqWmAUdBad8v5y` |
+
+CU ve boyut ölçümleri: [tx-budget.md §8](../design/tx-budget.md#8-sponsorlu-tx-ve-squads-vaultu).
+
 ## Yükseltmeler
 
 ### Escrow v0.6.0: dispute (BC-32, BC-33), 2026-10-06
