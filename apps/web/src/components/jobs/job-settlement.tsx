@@ -28,7 +28,7 @@ import type { EscrowSetup } from '@/lib/job-wizard';
 import { refusalReasons, releaseOutlook, type ReleaseState } from '@/lib/release-proof';
 import { TransactionBlockedError } from '@/lib/send-transaction';
 import { settlementAccount, type SettlementToken } from '@/lib/settlement';
-import { readKeeperJournal, squareApi } from '@/lib/square-api';
+import { KEEPER_JOURNAL_POLL_MS, readKeeperJournal, squareApi } from '@/lib/square-api';
 import { KEEPER_OUTCOME_TONE, statusLabel, VALIDATION_OUTCOME_TONE } from '@/lib/status';
 import { useTokenBalance, type TokenBalance } from '@/lib/use-settlement';
 import { useSignatureStatus } from '@/lib/use-signature-status';
@@ -235,7 +235,12 @@ export function JobSettlement({
         )}
       </div>
 
-      <KeeperJournal job={jobKey.toBase58()} revision={revision} formatAmount={formatAmount} />
+      <KeeperJournal
+        job={jobKey.toBase58()}
+        live={status === 'delivered'}
+        revision={revision}
+        formatAmount={formatAmount}
+      />
     </section>
   );
 }
@@ -373,26 +378,39 @@ function Finalize({
 
 function KeeperJournal({
   job,
+  live,
   revision,
   formatAmount,
 }: {
   job: string;
+  /** Job teslim edilmiş ve ödenmemişken günlük aralıkla yeniden okunur. */
+  live: boolean;
   revision: number;
   formatAmount(base: bigint): string;
 }) {
   const { apiUrl } = useWebConfig();
   const [journal, setJournal] = useState<Load<{ items: KeeperAction[]; total: number }>>({ state: 'loading' });
+  // Gönderilmiş ama onayı yazılmamış deneme: keeper onayı tx'ten sonra kaydeder, job ödenmiş olsa da beklenir.
+  const awaiting = journal.state === 'ready' && journal.value.items[0]?.outcome === 'submitted';
+  const polling = live || awaiting;
   useEffect(() => {
     if (!apiUrl) return;
     let active = true;
-    readKeeperJournal(squareApi(apiUrl), job).then(
-      (value) => active && setJournal({ state: 'ready', value }),
-      (error: Error) => active && setJournal({ state: 'error', message: error.message }),
-    );
+    const api = squareApi(apiUrl);
+    const read = () =>
+      readKeeperJournal(api, job).then(
+        (value) => active && setJournal({ state: 'ready', value }),
+        (error: Error) => active && setJournal({ state: 'error', message: error.message }),
+      );
+    void read();
+    const poll = polling
+      ? setInterval(() => document.visibilityState !== 'hidden' && void read(), KEEPER_JOURNAL_POLL_MS)
+      : undefined;
     return () => {
       active = false;
+      clearInterval(poll);
     };
-  }, [apiUrl, job, revision]);
+  }, [apiUrl, job, polling, revision]);
 
   return (
     <div className="mt-4 border-t border-border pt-4">

@@ -8,6 +8,12 @@ export const squareApi = (apiUrl: string): SquareApi => createApiClient({ baseUr
 /** Keeper günlüğünde bir job için okunan en fazla deneme. */
 export const KEEPER_JOURNAL_LIMIT = 20;
 
+/**
+ * Teslim edilmiş job'un (ya da onayı beklenen denemenin) günlüğünün yeniden okunma aralığı. Keeper'ın
+ * bekletme ve onay kayıtları zincirde işlem üretmez; sayfanın log aboneliği onları getirmez.
+ */
+export const KEEPER_JOURNAL_POLL_MS = 15_000;
+
 /** Job'un keeper günlüğü (`listKeeperActions`), yeniden eskiye; `total` bütün denemelerin sayısı. */
 export async function readKeeperJournal(
   api: SquareApi,
