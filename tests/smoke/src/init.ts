@@ -253,6 +253,11 @@ async function setUpLookupTable(
       entries: entries(value.state.addresses),
     };
   }
+  if (config.cluster !== 'localnet') {
+    throw new Error(
+      `${config.cluster}: Square ALT'ı deploy kaydındadır (docs/deploy/${config.cluster}.md); yapılandırmaya "lookupTable" olarak yazın, ikinci bir ALT açılmaz`,
+    );
+  }
   const payer = roleKey(context.keys, 'payer');
   const authority = context.keys.lookupTableAuthority ?? payer;
   const recentSlot = await connection.getSlot('finalized');
