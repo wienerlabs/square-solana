@@ -22,9 +22,10 @@ import {
   settlementEvents,
   VALIDATION_TEXT,
   type FinalizeReadiness,
+  type PayeeScreening,
   type Settlement,
 } from '@/lib/job-settlement';
-import type { EscrowSetup } from '@/lib/job-wizard';
+import { readScreening, type EscrowSetup } from '@/lib/job-wizard';
 import { refusalReasons, releaseOutlook, type ReleaseState } from '@/lib/release-proof';
 import { TransactionBlockedError } from '@/lib/send-transaction';
 import { settlementAccount, type SettlementToken } from '@/lib/settlement';
@@ -103,13 +104,35 @@ export function JobSettlement({
     };
   }, [escrow, jobKey, account, revision]);
 
+  // Ödemede escrow payee'nin screening'ini arar. Kayıt işten bağımsız yenilenebilir: teslim edilmiş işte
+  // dakikada bir yeniden okunur; süresi finalizeReadiness'ta zincir saatine göre değerlendirilir.
+  const [payeeScreening, setPayeeScreening] = useState<PayeeScreening>({ state: 'loading' });
+  const chainMinute = chainNow === null ? null : Math.floor(chainNow / 60);
+  useEffect(() => {
+    if (status !== 'delivered' || chainMinute === null) return;
+    let active = true;
+    readScreening(escrow, payee, chainMinute * 60).then(
+      (value) => active && setPayeeScreening({ state: 'ready', value }),
+      (error: Error) => active && setPayeeScreening({ state: 'error', message: error.message }),
+    );
+    return () => {
+      active = false;
+    };
+  }, [escrow, payee, status, chainMinute, revision]);
+
   if (status !== 'delivered' && !settled) return null;
   const outlook =
     release?.state === 'ready' && chainNow !== null ? releaseOutlook(release.value, account, listing, chainNow) : null;
   const readiness =
     chainNow === null
       ? null
-      : finalizeReadiness({ job: account, chainNow, keeperFeeBps: escrow.keeperFeeBps, release: outlook });
+      : finalizeReadiness({
+          job: account,
+          chainNow,
+          keeperFeeBps: escrow.keeperFeeBps,
+          release: outlook,
+          payeeScreening,
+        });
   const sold = listing !== null && payee.equals(listing.buyer);
   const validation = settlement.state === 'ready' ? settlement.value.validation : null;
   const reputation = settlement.state === 'ready' ? settlement.value.reputation : null;

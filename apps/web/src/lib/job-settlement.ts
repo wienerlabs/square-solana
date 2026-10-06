@@ -1,13 +1,14 @@
 // Finalize, ödeme ve itibar (FE-10, akışın 6. ve 8. adımları). Challenge penceresi kapanınca finalize'ı herkes
 // tetikleyebilir; keeper ücreti tetikleyene gider. Escrow politikalı işte bağlı ispata göre öder ya da kuruma
-// iade eder, politikasız işte payee'ye öder; her settlement bir validation kaydı ve agent'ın itibarını yazar.
-// Sonuç job'un event'lerinden, `ValidationRecord`'dan ve `AgentReputation`'dan okunur.
+// iade eder, politikasız işte payee'ye öder; ödemede payee'nin screening'i temiz ve taze olmalıdır. Her
+// settlement bir validation kaydı ve agent'ın itibarını yazar. Sonuç job'un event'lerinden,
+// `ValidationRecord`'dan ve `AgentReputation`'dan okunur.
 import { PublicKey } from '@solana/web3.js';
 import { releaseNetAmount } from '@squaresdk/solana-policy';
 import { SQUARE_IDLS, type JobAccount } from '@squaresdk/solana-sdk';
 import type { KeeperAction, ValidationOutcome } from '@squaresdk/solana-types';
 import type { TimelineEntry } from './job-detail';
-import type { EscrowSetup } from './job-wizard';
+import { screeningState, type EscrowSetup, type ScreeningState } from './job-wizard';
 import { programErrorMessage } from './program-error';
 import type { ReleaseOutlook } from './release-proof';
 
@@ -21,18 +22,51 @@ export const keeperFeeOf = (amount: bigint, keeperFeeBps: number): bigint =>
 export type FinalizeReadiness =
   { ready: true; outcome: 'pays' | 'refunds'; net: bigint; keeperFee: bigint } | { ready: false; reason: string };
 
+/** Payee'nin screening kaydının okunuşu (`readScreening`). */
+export type PayeeScreening =
+  { state: 'loading' } | { state: 'ready'; value: ScreeningState } | { state: 'error'; message: string };
+
+/** Kayıt okunduğundan beri süresi dolmuş olabilir: durum zincir saatine göre yeniden değerlendirilir. */
+function screeningAt(screening: ScreeningState, now: number): ScreeningState {
+  if (screening.state === 'missing') return screening;
+  const { expiresAt, screenedAt } = screening;
+  return screeningState({ flagged: screening.state === 'flagged', expiresAt, screenedAt }, now);
+}
+
+/**
+ * Ödeme dalında payee'nin screening'i (`require_payee_ready`): kayıt temiz ve taze değilse escrow ödemez,
+ * iade de etmez, bekler. Temizse null.
+ */
+function screeningWait(screening: PayeeScreening, now: number): string | null {
+  if (screening.state === 'loading') return "Reading the payee's sanctions screening…";
+  if (screening.state === 'error') return `The payee's sanctions screening could not be read: ${screening.message}`;
+  const current = screeningAt(screening.value, now);
+  switch (current.state) {
+    case 'clear':
+      return null;
+    case 'missing':
+      return 'The payee has no sanctions screening on chain, so the escrow would wait (ScreeningRequired).';
+    case 'flagged':
+      return 'The payee is flagged by sanctions screening, so the escrow would wait (ScreeningFlagged).';
+    case 'expired':
+      return `The payee's sanctions screening expired at ${iso(current.expiresAt)} (chain time), so the escrow would wait (ScreeningExpired).`;
+  }
+}
+
 /**
  * Finalize şimdi geçer mi (`finalize_payment`'ın denetimleri, zincir saatine göre)? İş teslim edilmiş ve
  * challenge penceresi kapanmış olmalı; politikalı işte bağlı ispat taze olmalı ve ya uyumlu (ödeme) ya da
- * kesin retle (iade) olmalı. `release` politikasız işte null'dır.
+ * kesin retle (iade) olmalı. Ödemede payee'nin screening'i temiz ve taze olmalı; kesin retle iadede aranmaz.
+ * `release` politikasız işte null'dır.
  */
 export function finalizeReadiness(params: {
   job: JobAccount;
   chainNow: number;
   keeperFeeBps: number;
   release: ReleaseOutlook | null;
+  payeeScreening: PayeeScreening;
 }): FinalizeReadiness {
-  const { job, chainNow, keeperFeeBps, release } = params;
+  const { job, chainNow, keeperFeeBps, release, payeeScreening } = params;
   if (!('delivered' in job.status)) return { ready: false, reason: 'Only a delivered job can be finalized.' };
   const challengeEnd = job.challengeEnd.toNumber();
   if (chainNow < challengeEnd) {
@@ -43,11 +77,15 @@ export function finalizeReadiness(params: {
   }
   const amount = big(job.amount);
   const fees = { net: releaseNetAmount(amount, keeperFeeBps), keeperFee: keeperFeeOf(amount, keeperFeeBps) };
-  if (!job.policy) return { ready: true, outcome: 'pays', ...fees };
+  const pays = (): FinalizeReadiness => {
+    const wait = screeningWait(payeeScreening, chainNow);
+    return wait ? { ready: false, reason: wait } : { ready: true, outcome: 'pays', ...fees };
+  };
+  if (!job.policy) return pays();
   if (!release) return { ready: false, reason: 'Reading the compliance proof…' };
   switch (release.kind) {
     case 'pays':
-      return { ready: true, outcome: 'pays', ...fees };
+      return pays();
     case 'refunds':
       return { ready: true, outcome: 'refunds', ...fees };
     case 'noProof':
