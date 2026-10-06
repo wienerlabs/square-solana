@@ -40,7 +40,8 @@ pub const RELEASE_PROOF_SEED: &[u8] = square_common::seeds::RELEASE_PROOF_SEED;
 
 /// İspatın anı (`proof_timestamp`, sinyal 9) ile zincirin saati arasındaki en büyük fark (ADR 0012).
 pub const CLOCK_TOLERANCE_SECS: i64 = 600;
-/// Gömülü doğrulama anahtarının sürümü: BC-20'nin geliştirme anahtarı. Kamusal tören (BC-38) artırır.
+/// Gömülü doğrulama anahtarının sürümü: BC-20'nin geliştirme anahtarı. Kamusal tören (BC-38) artırır; upgrade'den
+/// sonra `sync_vk_version` config'e yazar.
 pub const RELEASE_VK_VERSION: u16 = 1;
 
 #[program]
@@ -99,5 +100,12 @@ pub mod square_verifier {
             net_amount,
             proof_timestamp,
         )
+    }
+
+    /// After an upgrade that embeds a new verifying key (phase-2 ceremony, BC-38), records the program's
+    /// `RELEASE_VK_VERSION` in the config. Only the config admin (Squads vault) can call it, in a vault
+    /// transaction after the upgrade; it fails when the config already records this version.
+    pub fn sync_vk_version(ctx: Context<SyncVkVersion>) -> Result<()> {
+        instructions::sync_vk_version::handler(ctx)
     }
 }

@@ -425,6 +425,62 @@ export type SquareVerifierContract = {
       ]
     },
     {
+      "name": "syncVkVersion",
+      "docs": [
+        "After an upgrade that embeds a new verifying key (phase-2 ceremony, BC-38), records the program's",
+        "`RELEASE_VK_VERSION` in the config. Only the config admin (Squads vault) can call it, in a vault",
+        "transaction after the upgrade; it fails when the config already records this version."
+      ],
+      "discriminator": [
+        62,
+        198,
+        127,
+        133,
+        41,
+        112,
+        200,
+        253
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "signer": true,
+          "relations": [
+            "config"
+          ]
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  101,
+                  114,
+                  105,
+                  102,
+                  105,
+                  101,
+                  114,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "updateMppAuthority",
       "docs": [
         "DRAFT (M6, BC-37): rotates the MPP attestation authority (replaces Aperture's compile-time key)."
@@ -777,6 +833,11 @@ export type SquareVerifierContract = {
       "code": 6010,
       "name": "invalidMppAttestation",
       "msg": "MPP attestation missing or signed by an unexpected key"
+    },
+    {
+      "code": 6011,
+      "name": "vkVersionAlreadySynced",
+      "msg": "Config already records the embedded verifying key version"
     }
   ],
   "types": [

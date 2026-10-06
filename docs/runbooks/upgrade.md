@@ -167,6 +167,10 @@ Kontrol listesi:
   IDL ve türetilen dosyalar aynı commit'tedir; istemciler (web, SDK sürümü) upgrade'le birlikte yayımlanır.
 - **Hesap düzeni:** Hesap düzeni değişen bir upgrade, mevcut hesaplar için geçiş planı olmadan yapılmaz.
   1.0.0'a kadar düzen değişikliği MINOR sürümdür.
+- **Doğrulama anahtarı:** `square_verifier`'ın `RELEASE_VK_VERSION`'ı arttıysa (yeni doğrulama anahtarı, BC-38),
+  upgrade yürütülüp onaylandıktan sonra ikinci bir vault işlemiyle `sync_vk_version` çağrılır. Config sonra
+  okunur: `vk_version` programın sürümünü göstermelidir. Talimat config programla aynı sürümdeyse
+  `VkVersionAlreadySynced` ile düşer; bu, upgrade'in yürütülmediğini ya da eski kodun çalıştığını gösterir.
 - **Kayıt:** Deploy kaydına sürüm, commit, hash, Squads işlem adresi ve imzalar yazılır.
 
 ## 7. Olağan dışı durumlar

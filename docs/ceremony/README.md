@@ -76,8 +76,8 @@ Sırasıyla ([running.md](running.md#kapanış)):
 
 1. **Anahtar ve kayıt:** `finalize` son anahtarı, transcript'i ve beacon turunu `artifacts/`'a koyar, doğrulama anahtarını, Rust sabitini (`release_vk.rs`) ve manifest'i release hattıyla yazar.
 2. **Testler:** Program testlerinin ispatları yeni anahtarla yeniden üretilir (`npm run program-proofs`); `cargo test -p square-verifier` ve program testleri.
-3. **Verifier'ın VK sürümü:** `RELEASE_VK_VERSION` artırılır. `VerifierConfig.vk_version` bugün yalnızca `init_verifier_config`'te yazılır. Upgrade'den sonra config'in programın sürümünü göstermesi için bir program değişikliği gerekir (eşitleyen bir yönetici talimatı). Bu değişiklik VK değişikliğiyle aynı upgrade'e girer.
-4. **Devnet:** `square_verifier`, Squads üzerinden yükseltilir ([runbooks/upgrade.md](../runbooks/upgrade.md) §6) ve [deploy kaydına](../deploy/devnet.md) yazılır.
+3. **Verifier'ın VK sürümü:** `RELEASE_VK_VERSION` artırılır. Config'in `vk_version`'ını programınkine eşitleyen talimat (`sync_vk_version`, yalnızca config'in admin'i) programdadır ve tören anahtarıyla aynı upgrade'de zincire çıkar.
+4. **Devnet:** `square_verifier`, Squads üzerinden yükseltilir ([runbooks/upgrade.md](../runbooks/upgrade.md) §6). Upgrade onaylandıktan sonra ikinci bir vault işlemi `sync_vk_version`'ı çağırır; config'in `vk_version`'ı yeni sürümü göstermelidir. İkisi de [deploy kaydına](../deploy/devnet.md) yazılır.
 5. **Disclosure:** Devrenin README'sindeki geliştirme dili yalnızca o zaman kalkar; yerine törenin kaydı gelir.
 6. **Kabul:** Dev anahtarıyla üretilmiş bir ispat devnet'teki verifier'da reddedilir.
 

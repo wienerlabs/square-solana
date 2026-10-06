@@ -119,6 +119,18 @@ pub fn init_config_ix(admin: &Pubkey, mpp_authority: Pubkey) -> Instruction {
     }
 }
 
+pub fn sync_vk_version_ix(admin: &Pubkey) -> Instruction {
+    Instruction {
+        program_id: square_verifier::ID,
+        accounts: square_verifier::accounts::SyncVkVersion {
+            admin: *admin,
+            config: verifier_config_address(),
+        }
+        .to_account_metas(None),
+        data: square_verifier::instruction::SyncVkVersion {}.data(),
+    }
+}
+
 /// Fikstürün dünyası: escrow, registry, policy ve verifier yüklü ve kurulu; kurum, agent ve politika
 /// devrenin etiketlerinden.
 pub struct ReleaseWorld {

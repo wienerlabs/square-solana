@@ -27,4 +27,6 @@ pub enum VerifierError {
     InvalidJobState,
     #[msg("MPP attestation missing or signed by an unexpected key")]
     InvalidMppAttestation,
+    #[msg("Config already records the embedded verifying key version")]
+    VkVersionAlreadySynced,
 }

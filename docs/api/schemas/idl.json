@@ -3727,6 +3727,35 @@
       }
     }
   },
+  "SyncVkVersionArgs": {
+    "type": "object",
+    "required": [],
+    "additionalProperties": false,
+    "properties": {}
+  },
+  "SyncVkVersionCall": {
+    "type": "object",
+    "description": "After an upgrade that embeds a new verifying key (phase-2 ceremony, BC-38), records the program's `RELEASE_VK_VERSION` in the config. Only the config admin (Squads vault) can call it, in a vault transaction after the upgrade; it fails when the config already records this version.",
+    "required": [
+      "program",
+      "instruction",
+      "args"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "program": {
+        "type": "string",
+        "const": "verifier"
+      },
+      "instruction": {
+        "type": "string",
+        "const": "syncVkVersion"
+      },
+      "args": {
+        "$ref": "#/SyncVkVersionArgs"
+      }
+    }
+  },
   "UpdateMppAuthorityArgs": {
     "type": "object",
     "required": [
@@ -4550,6 +4579,9 @@
         "$ref": "#/SetComplianceProofCall"
       },
       {
+        "$ref": "#/SyncVkVersionCall"
+      },
+      {
         "$ref": "#/UpdateMppAuthorityCall"
       },
       {
@@ -4633,6 +4665,7 @@
         "initVerifierConfig": "#/InitVerifierConfigCall",
         "recordRelease": "#/RecordReleaseCall",
         "setComplianceProof": "#/SetComplianceProofCall",
+        "syncVkVersion": "#/SyncVkVersionCall",
         "updateMppAuthority": "#/UpdateMppAuthorityCall",
         "verifyMppPaymentProof": "#/VerifyMppPaymentProofCall",
         "acceptJob": "#/AcceptJobCall",

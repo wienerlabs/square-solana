@@ -568,7 +568,8 @@ export function ceremony(options = {}) {
       '\nfinalised. Next, in order (docs/ceremony/running.md):\n' +
         "  node scripts/program-proofs.mjs        the program tests' proofs, under the new key\n" +
         '  cargo test -p square-verifier          the proof vector against the new key\n' +
-        '  bump RELEASE_VK_VERSION, commit, and upgrade square_verifier through Squads (docs/runbooks/upgrade.md)\n',
+        '  bump RELEASE_VK_VERSION, commit, and upgrade square_verifier through Squads (docs/runbooks/upgrade.md)\n' +
+        '  then sync_vk_version in a second vault transaction, so the config records the new version\n',
     );
   }
 

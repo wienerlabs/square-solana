@@ -1,6 +1,6 @@
 # Program arayüz sözleşmesi
 
-**Sözleşme sürümü:** v0.5.1 (taslak) · **Issue:** BC-44 (#101), BC-47 (#119), BE-10 (#42), BC-17 (#25), BC-15 (#24), BC-21 (#29), BC-34 (#71), BC-09 (#9), BC-36 (#77) · **IDL'ler:** [`idl/`](../../idl/)
+**Sözleşme sürümü:** v0.6.0 (taslak) · **Issue:** BC-44 (#101), BC-47 (#119), BE-10 (#42), BC-17 (#25), BC-15 (#24), BC-21 (#29), BC-34 (#71), BC-09 (#9), BC-36 (#77), BC-38 (#92) · **IDL'ler:** [`idl/`](../../idl/)
 
 Bu doküman Square'in dört Solana programının (`square_registry`, `square_policy`, `square_verifier`, `square_escrow`) dış arayüzünü sabitler: instruction adları ve argümanları, hesap sırası ve imzacılar, account düzenleri, PDA seed'leri, event'ler ve hata kodları. Backend (BE-35 API/SDK sözleşmesi, servisler) ve frontend (FE-24 veri katmanı) bu sözleşmeye göre geliştirir. Gerçek programlar `programs/` altında taşındıkça ve değiştikçe bu arayüze uyar; uyum BC-13 ile CI'da denetlenir.
 
@@ -306,13 +306,14 @@ IDL'den üretilmiştir; instruction'lar alfabetik sıradadır. "(w)" yazılabili
 
 ### 10.3 square_verifier
 
-#### Instruction'lar (5)
+#### Instruction'lar (6)
 
 | Instruction | Argümanlar | İmzacılar | Yazılabilir diğer hesaplar | Opsiyonel hesaplar |
 |---|---|---|---|---|
 | `init_verifier_config` | `escrow_program: pubkey`, `policy_program: pubkey`, `mpp_authority: pubkey` | `admin` (w) | `config` | — |
 | `record_release` | — | `escrow_authority` | `release_proof`, `operator_state` | — |
 | `set_compliance_proof` | `proof_a: [u8; 64]`, `proof_b: [u8; 128]`, `proof_c: [u8; 64]`, `refusal_code: u16`, `net_amount: u64`, `proof_timestamp: i64` | `payer` (w), `authority` | `operator_state`, `release_proof` | — |
+| `sync_vk_version` | — | `admin` | `config` | — |
 | `update_mpp_authority` | `mpp_authority: pubkey` | `admin` | `config` | — |
 | `verify_mpp_payment_proof` | `proof_a: [u8; 64]`, `proof_b: [u8; 128]`, `proof_c: [u8; 64]`, `public_inputs: [[u8; 32]; 10]` | `payer` (w), `authority` | `operator_state` | — |
 
@@ -325,7 +326,7 @@ IDL'den üretilmiştir; instruction'lar alfabetik sıradadır. "(w)" yazılabili
 | `ReleaseRecorded` | `job: pubkey`, `institution: pubkey`, `net_amount: u64`, `daily_spent: u64`, `day_start_unix: i64` |
 | `VerifierConfigUpdated` | `admin: pubkey`, `escrow_program: pubkey`, `policy_program: pubkey`, `mpp_authority: pubkey`, `vk_version: u16` |
 
-#### Hata kodları (11)
+#### Hata kodları (12)
 
 | Kod | Ad | Mesaj |
 |---|---|---|
@@ -340,6 +341,7 @@ IDL'den üretilmiştir; instruction'lar alfabetik sıradadır. "(w)" yazılabili
 | 6008 | `InvalidLinkedAccount` | Account owner or seeds do not match the linked program |
 | 6009 | `InvalidJobState` | Job is not in a state that accepts a release proof |
 | 6010 | `InvalidMppAttestation` | MPP attestation missing or signed by an unexpected key |
+| 6011 | `VkVersionAlreadySynced` | Config already records the embedded verifying key version |
 
 ### 10.4 square_escrow
 
@@ -459,6 +461,7 @@ IDL'den üretilmiştir; instruction'lar alfabetik sıradadır. "(w)" yazılabili
 | v0.3.0 | `set_institution_multisig` multisig hesabını da alır (`squads_multisig`, salt okunur): program, hesabın Squads v4'e ait ve başlatılmış bir `Multisig` olduğunu doğrular; yanlış ya da var olmayan bir multisig bağlanıp kurum kilitlenemez. Hata 6004 `InvalidMultisigVault` → `InvalidSquadsMultisig` ("Account is not an initialized Squads v4 multisig"); kodlar ve sıraları değişmedi. Program ilk kez bu arayüzle yazıldı (BC-17); IDL'i `set_buyer_root` (BC-18) dışında sözleşmeyle aynı | BC-17 (#25) |
 | v0.4.0 | Registry'nin agent kuralları did:aip v2 Solana profili §4.2'yle hizalandı. `AgentIdInvalid` (6000) kimliğin alfabesini de kapsar: `[A-Za-z0-9_-]{1,32}`. Yeni hata 6007 `AgentCardHashInvalid`: kart hash'i tam olarak URI boşken sıfırdır (§4.2/4; dolu URI'nin hash'i kartın SHA-256'sıdır). `transfer_agent_ownership` `wallet`'ı yeni sahibe sıfırlar (§4.2/5), dokümanı buna göre. Mevcut kodlar ve sıraları değişmedi. Program ilk kez bu arayüzle yazıldı (BC-15); IDL'i `init_registry_config`, `update_registry_config`, `record_screening` ve `RegistryConfig` / `ScreeningRecord` (BC-27) dışında sözleşmeyle aynı | BC-15 (#24) |
 | v0.4.1 | Yalnızca doküman: `set_compliance_proof`'un `refusal_code`, `net_amount` ve `proof_timestamp` argümanlarındaki doküman satırları talimatın dokümanına taşındı. Rust fonksiyon argümanları doküman taşıyamadığı için Anchor argümana doküman üretemez; v0.2.0'da IDL'e elle yazılan bu satırları hiçbir program üretemiyordu. Argümanlar, tipleri ve sıraları değişmedi. Verifier ilk kez bu arayüzle yazıldı (BC-21); IDL'i `verify_mpp_payment_proof` ve `update_mpp_authority` (BC-37) dışında sözleşmeyle aynı | BC-21 (#29) |
+| v0.6.0 | Verifier: yeni talimat `sync_vk_version` (argümansız; `admin` imzacı, config'in admin'i; `config` yazılabilir) ve yeni hata 6011 `VkVersionAlreadySynced`. Gömülü doğrulama anahtarının sürümü (`RELEASE_VK_VERSION`) değişen bir upgrade'den sonra config'in `vk_version`'ını programınkine eşitler ve `VerifierConfigUpdated` yayar; config aynı sürümdeyse düşer. `vk_version` daha önce yalnızca `init_verifier_config`'te yazılıyordu: kamusal phase-2 töreninin anahtarına geçen upgrade'den (BC-38) sonra config geliştirme anahtarının sürümünü göstermeye devam ederdi. Mevcut talimatlar, hesaplar, event'ler ve kodlar değişmedi | BC-38 (#92) |
 | v0.5.1 | Yalnızca doküman: CCTP fonlaması taslaktan çıktı ([cctp-funding.md](cctp-funding.md)). Escrow'a talimat eklenmedi: Circle'ın `receive_message`'ı ile `fund_job` aynı tx'te art arda çalışır, devnet'te Sepolia'dan gerçek bir burn'le denendi. Talimatlar, hesaplar ve kodlar değişmedi | BC-36 (#77) |
 | v0.5.0 | Square program kimlikleri (BC-09): IDL `address` alanları ve programların `declare_id!`'i kaynak programların kimliklerinden Square'in kendi kimliklerine geçti. Registry `AL5p4aTWrmBmWa4vxJFbBjQG7Xnx2juc15FJRGpwSsA9`, policy `63HKPj2L8a9DGeTa9Eh3NaZXthMrFUEgbs9Y28SNEc4`, verifier `8yLdDR5zoAzeEWzkNX19DKy4HfVYXb7VcU3wWStwTFPh`, escrow `6yBTEVbizMVCWAp4c3jx6Xdsay3CiUmrJmTswY7QRWaX`. PDA'lar program kimliğinden türediği için bütün PDA adresleri değişti; instruction, argüman, hesap, event ve hata kodları değişmedi. Registry artık did:aip v1 programının (`CgchXu…`) kimliğini taşımıyor | BC-09 (#9) |
 | v0.4.2 | Yalnızca doküman: Travel Rule yüzeyi taslaktan çıktı ([ADR 0015](../decisions/0015-travel-rule-commitment-ve-esik.md)). `commit_travel_rule` yalnızca `Open` işe bağlar ve `fund_job`'a kadar değiştirilebilir; `EscrowParams.travel_rule_threshold`, `Job.travel_rule_commitment` ve `TravelRuleCommitted` dokümanları buna göre. Alanlar, talimat, event ve kodlar değişmedi. Escrow'un IDL'i dispute talimatları (BC-32, BC-33) dışında sözleşmeyle aynı | BC-34 (#71) |

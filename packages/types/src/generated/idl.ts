@@ -751,6 +751,7 @@ export const IDL_PROGRAMS = {
       "init_verifier_config",
       "record_release",
       "set_compliance_proof",
+      "sync_vk_version",
       "update_mpp_authority",
       "verify_mpp_payment_proof"
     ],
@@ -809,6 +810,11 @@ export const IDL_PROGRAMS = {
         "code": 6010,
         "name": "InvalidMppAttestation",
         "msg": "MPP attestation missing or signed by an unexpected key"
+      },
+      {
+        "code": 6011,
+        "name": "VkVersionAlreadySynced",
+        "msg": "Config already records the embedded verifying key version"
       }
     ]
   },
@@ -1276,6 +1282,10 @@ export const SetComplianceProofArgsSchema = z.object({
 });
 export type SetComplianceProofArgs = z.infer<typeof SetComplianceProofArgsSchema>;
 
+/** verifier.sync_vk_version argümanları. */
+export const SyncVkVersionArgsSchema = z.object({});
+export type SyncVkVersionArgs = z.infer<typeof SyncVkVersionArgsSchema>;
+
 /** verifier.update_mpp_authority argümanları. */
 export const UpdateMppAuthorityArgsSchema = z.object({
   mppAuthority: Address,
@@ -1420,6 +1430,7 @@ export const InstructionCallSchema = z.discriminatedUnion('instruction', [
   z.object({ program: z.literal('verifier'), instruction: z.literal('initVerifierConfig'), args: InitVerifierConfigArgsSchema }),
   z.object({ program: z.literal('verifier'), instruction: z.literal('recordRelease'), args: RecordReleaseArgsSchema }),
   z.object({ program: z.literal('verifier'), instruction: z.literal('setComplianceProof'), args: SetComplianceProofArgsSchema }),
+  z.object({ program: z.literal('verifier'), instruction: z.literal('syncVkVersion'), args: SyncVkVersionArgsSchema }),
   z.object({ program: z.literal('verifier'), instruction: z.literal('updateMppAuthority'), args: UpdateMppAuthorityArgsSchema }),
   z.object({ program: z.literal('verifier'), instruction: z.literal('verifyMppPaymentProof'), args: VerifyMppPaymentProofArgsSchema }),
   z.object({ program: z.literal('escrow'), instruction: z.literal('acceptJob'), args: AcceptJobArgsSchema }),

@@ -68,6 +68,91 @@ fn only_the_upgrade_authority_initializes_the_config() {
 }
 
 #[test]
+fn after_an_upgrade_the_admin_records_the_embedded_key_version() {
+    let mut r = ReleaseWorld::deployed(true);
+    let admin = r.w.admin.insecure_clone();
+    let mpp = Pubkey::new_unique();
+    r.w.h
+        .send(&[init_config_ix(&admin.pubkey(), mpp)], &[&admin])
+        .expect("init_verifier_config");
+
+    // Config programla aynı sürümde: eşitlenecek bir şey yok, çağrı düşer.
+    r.w.h
+        .send(&[sync_vk_version_ix(&admin.pubkey())], &[&admin])
+        .expect_err("aynı sürüm")
+        .assert_error(anchor_error(VerifierError::VkVersionAlreadySynced));
+
+    // Upgrade'den önceki programın yazdığı config: anahtarın bir önceki sürümü (BC-38'de geliştirme
+    // anahtarıyla kurulmuş config, tören anahtarını taşıyan programa yükseltilir).
+    let address = verifier_config_address();
+    let config: VerifierConfig = r.w.h.account(&address).unwrap();
+    let mut account = r.w.h.raw_account(&address).unwrap();
+    account.data.clear();
+    anchor_lang::AccountSerialize::try_serialize(
+        &VerifierConfig {
+            vk_version: RELEASE_VK_VERSION - 1,
+            ..config
+        },
+        &mut account.data,
+    )
+    .unwrap();
+    r.w.h.set_account(address, account);
+
+    let stranger = r.w.h.funded(1_000_000_000);
+    r.w.h
+        .send(&[sync_vk_version_ix(&stranger.pubkey())], &[&stranger])
+        .expect_err("config'in admin'i değil")
+        .assert_error(anchor_error(VerifierError::Unauthorized));
+
+    let executed =
+        r.w.h
+            .send(&[sync_vk_version_ix(&admin.pubkey())], &[&admin])
+            .expect("sync_vk_version");
+    let synced: VerifierConfig = r.w.h.account(&address).unwrap();
+    assert_eq!(synced.vk_version, RELEASE_VK_VERSION);
+    // Yalnızca sürüm değişir.
+    assert_eq!(
+        (
+            synced.admin,
+            synced.escrow_program,
+            synced.policy_program,
+            synced.mpp_authority,
+            synced.bump
+        ),
+        (
+            config.admin,
+            config.escrow_program,
+            config.policy_program,
+            config.mpp_authority,
+            config.bump
+        )
+    );
+    let updated: VerifierConfigUpdated = event(&executed);
+    assert_eq!(
+        (
+            updated.admin,
+            updated.escrow_program,
+            updated.policy_program,
+            updated.mpp_authority,
+            updated.vk_version
+        ),
+        (
+            admin.pubkey(),
+            square_escrow::ID,
+            square_policy::ID,
+            mpp,
+            RELEASE_VK_VERSION
+        )
+    );
+
+    // Eşitlendikten sonra ikinci çağrı yine düşer.
+    r.w.h
+        .send(&[sync_vk_version_ix(&admin.pubkey())], &[&admin])
+        .expect_err("eşitlendi")
+        .assert_error(anchor_error(VerifierError::VkVersionAlreadySynced));
+}
+
+#[test]
 fn a_valid_proof_writes_a_compliant_release_proof() {
     let mut r = ReleaseWorld::new(true);
     let job = r.delivered_job("a");

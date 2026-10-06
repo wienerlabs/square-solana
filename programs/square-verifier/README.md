@@ -11,6 +11,7 @@ IDL'iyle (`idl/square_verifier_contract.json`) aynıdır, Stripe MPP yolu (`veri
 | `init_verifier_config` | Tekil `VerifierConfig`'i açar; yalnızca programın yükseltme yetkilisi (`program` + `program_data`). Okunan escrow ve policy programlarının kimlikleri, MPP yetkilisi, doğrulama anahtarının sürümü |
 | `set_compliance_proof` | İspatı release devresinin 13 sinyaline karşı doğrular ve `ReleaseProof`'u yazar (ret kodu 0 ise `Compliant`, değilse `Refused` + kod). Tüketilene kadar yeniden bağlanabilir |
 | `record_release` | Yalnızca escrow'un `["escrow_authority"]` PDA'sıyla (CPI): ispatı tüketir, `Compliant` ise günlük sayacı net tutar kadar ilerletir |
+| `sync_vk_version` | Yalnızca config'in admin'i (Squads vault'u): doğrulama anahtarı değişen bir upgrade'den sonra config'in `vk_version`'ını programın `RELEASE_VK_VERSION`'ına eşitler. Config aynı sürümdeyse düşer (`VkVersionAlreadySynced`) |
 
 - **Sinyaller** ([`src/signals.rs`](src/signals.rs), [release-circuit.md](../../docs/design/release-circuit.md)
   §2, §6 yol A): 10'unu program hesaplardan kurar. Bunlar:
@@ -42,7 +43,9 @@ IDL'iyle (`idl/square_verifier_contract.json`) aynıdır, Stripe MPP yolu (`veri
 `SQUARE_RELEASE_VK` (13 sinyal), [`src/release_vk.rs`](src/release_vk.rs).
 `circuits/payment-compliance/scripts/release-artifacts.mjs` üretir ve commit'lenmiş zkey'e karşı denetler.
 `RELEASE_VK_VERSION = 1`: BC-20'nin geliştirme phase-2'si. Bu anahtar herhangi bir güvence taşımaz
-(devre README'si, Disclosure); kamusal tören BC-38'de.
+(devre README'si, Disclosure); kamusal tören BC-38'de. Anahtarı değiştiren upgrade sürümü artırır; config'in
+`vk_version`'ı upgrade'den sonra ayrı bir vault işlemiyle `sync_vk_version` çağrılarak eşitlenir
+([upgrade runbook'u](../../docs/runbooks/upgrade.md#6-upgrade)).
 
 ## Testler
 
