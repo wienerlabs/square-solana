@@ -6,13 +6,20 @@ import { getAssociatedTokenAddressSync, TOKEN_PROGRAM_ID } from '@solana/spl-tok
 import {
   ComputeBudgetProgram,
   SystemProgram,
+  TransactionInstruction,
   TransactionMessage,
   VersionedTransaction,
   type PublicKey,
 } from '@solana/web3.js';
-import { createPda, SQUARE_IDLS } from '@squaresdk/solana-sdk';
+import { createPda, MAX_COMPUTE_UNIT_LIMIT, SQUARE_IDLS } from '@squaresdk/solana-sdk';
 import { describe, expect, it } from 'vitest';
-import { decodeUnsignedTransaction, parseSplitAmount, voteRequest, voteTransactionProblem } from '@/lib/arbitration';
+import {
+  decodeUnsignedTransaction,
+  parseSplitAmount,
+  VOTE_MAX_COMPUTE_UNIT_PRICE,
+  voteRequest,
+  voteTransactionProblem,
+} from '@/lib/arbitration';
 import { resolutionOf, toAnchorResolution } from '@/lib/dispute';
 import { bytesToHex } from '@/lib/policy-draft';
 import { settlementAccount } from '@/lib/settlement';
@@ -215,6 +222,67 @@ describe('the arbitrator’s vote', () => {
       ],
     }).compileToV0Message();
     expect(voteTransactionProblem(new VersionedTransaction(message), expected())).toMatch(/program other than/);
+  });
+
+  it('refuses a priority fee above the ceiling and any other compute budget instruction', async () => {
+    const { client } = await chainWith();
+    const honest = (
+      await client.flow.resolveDispute(
+        { arbitrator, job, resolution: toAnchorResolution({ kind: 'favorAgent' }) },
+        { feePayer: arbitrator },
+      )
+    ).transaction;
+    const keys = honest.message.staticAccountKeys;
+    const voteIx = honest.message.compiledInstructions.find((i) => keys[i.programIdIndex]!.equals(escrow))!;
+    const withBudget = (...budget: TransactionInstruction[]) =>
+      fromApi(
+        new VersionedTransaction(
+          new TransactionMessage({
+            payerKey: arbitrator,
+            recentBlockhash: honest.message.recentBlockhash,
+            instructions: [
+              ...budget,
+              {
+                programId: escrow,
+                keys: voteIx.accountKeyIndexes.map((i) => ({
+                  pubkey: keys[i]!,
+                  isSigner: i === 0,
+                  isWritable: i !== 1,
+                })),
+                data: Buffer.from(voteIx.data),
+              },
+            ],
+          }).compileToV0Message(),
+        ),
+      );
+    const limit = (units: number) => ComputeBudgetProgram.setComputeUnitLimit({ units });
+    const price = (microLamports: bigint) => ComputeBudgetProgram.setComputeUnitPrice({ microLamports });
+
+    expect(
+      voteTransactionProblem(withBudget(limit(50_000), price(VOTE_MAX_COMPUTE_UNIT_PRICE)), expected()),
+    ).toBeNull();
+    expect(
+      voteTransactionProblem(withBudget(limit(50_000), price(VOTE_MAX_COMPUTE_UNIT_PRICE + 1n)), expected()),
+    ).toMatch(/priority fee is above/);
+    expect(voteTransactionProblem(withBudget(limit(MAX_COMPUTE_UNIT_LIMIT + 1)), expected())).toMatch(
+      /more compute units/,
+    );
+    expect(voteTransactionProblem(withBudget(price(1n), price(1n)), expected())).toMatch(/repeats/);
+    expect(
+      voteTransactionProblem(withBudget(ComputeBudgetProgram.requestHeapFrame({ bytes: 64 * 1024 })), expected()),
+    ).toMatch(/more than a compute unit limit and price/);
+    expect(
+      voteTransactionProblem(
+        withBudget(
+          new TransactionInstruction({
+            programId: ComputeBudgetProgram.programId,
+            keys: [],
+            data: Buffer.from([3, 1]),
+          }),
+        ),
+        expected(),
+      ),
+    ).toMatch(/malformed/);
   });
 
   it('keeps a split within the escrowed amount', () => {

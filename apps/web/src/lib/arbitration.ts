@@ -4,13 +4,15 @@
 // `resolve_dispute` (ve compute budget talimatları) taşıyorsa cüzdana gider.
 import { BorshInstructionCoder, type Idl } from '@anchor-lang/core';
 import {
+  ComputeBudgetInstruction,
   ComputeBudgetProgram,
+  TransactionInstruction,
   VersionedTransaction,
   type AddressLookupTableAccount,
   type Connection,
   type PublicKey,
 } from '@solana/web3.js';
-import { SQUARE_IDLS } from '@squaresdk/solana-sdk';
+import { MAX_COMPUTE_UNIT_LIMIT, SQUARE_IDLS } from '@squaresdk/solana-sdk';
 import type { ArbitrationEventType, DisputeVoteRequest } from '@squaresdk/solana-types';
 import { resolutionOf, sameResolution, type DisputeResolution } from './dispute';
 import { parseUnits, type ParsedUnits } from './settlement';
@@ -27,6 +29,36 @@ export const voteRequest = (resolution: DisputeResolution): DisputeVoteRequest =
 /** API'nin base64 v0 tx'i. */
 export const decodeUnsignedTransaction = (base64: string) =>
   VersionedTransaction.deserialize(Uint8Array.from(Buffer.from(base64, 'base64')));
+
+export const VOTE_MAX_COMPUTE_UNIT_PRICE = 1_000_000n;
+
+function computeBudgetProblem(data: Uint8Array, seen: Set<string>): string | null {
+  const instruction = new TransactionInstruction({
+    programId: ComputeBudgetProgram.programId,
+    keys: [],
+    data: Buffer.from(data),
+  });
+  try {
+    const type = ComputeBudgetInstruction.decodeInstructionType(instruction);
+    if (seen.has(type)) return 'The transaction repeats a compute budget instruction.';
+    seen.add(type);
+    if (type === 'SetComputeUnitLimit') {
+      const { units } = ComputeBudgetInstruction.decodeSetComputeUnitLimit(instruction);
+      return units > MAX_COMPUTE_UNIT_LIMIT
+        ? 'The transaction asks for more compute units than a transaction can use.'
+        : null;
+    }
+    if (type === 'SetComputeUnitPrice') {
+      const { microLamports } = ComputeBudgetInstruction.decodeSetComputeUnitPrice(instruction);
+      return BigInt(microLamports) > VOTE_MAX_COMPUTE_UNIT_PRICE
+        ? 'The priority fee is above 1,000,000 micro-lamports per compute unit.'
+        : null;
+    }
+    return 'The transaction sets more than a compute unit limit and price.';
+  } catch {
+    return 'The transaction carries a malformed compute budget instruction.';
+  }
+}
 
 /** Tx'in kullandığı address lookup table'lar, zincirden. */
 export async function readLookupTables(
@@ -61,9 +93,14 @@ export function voteTransactionProblem(
   if (!keys.get(0)?.equals(expected.arbitrator)) return 'The fee payer is not your wallet.';
   if (message.header.numRequiredSignatures !== 1) return 'The transaction asks for more than your signature.';
   const votes = [];
+  const budget = new Set<string>();
   for (const ix of message.compiledInstructions) {
     const program = keys.get(ix.programIdIndex);
-    if (program?.equals(ComputeBudgetProgram.programId)) continue;
+    if (program?.equals(ComputeBudgetProgram.programId)) {
+      const problem = computeBudgetProblem(ix.data, budget);
+      if (problem) return problem;
+      continue;
+    }
     if (!program?.equals(expected.escrowProgramId)) return 'The transaction calls a program other than the escrow.';
     votes.push(ix);
   }
