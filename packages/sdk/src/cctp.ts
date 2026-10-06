@@ -143,6 +143,31 @@ export function cctpStaticAccounts(context: CctpReceiveContext) {
   };
 }
 
+/**
+ * Mesajın bağlamı: kaynak domain ve yakılan token mesajın kendisinden. Kaynağın token'ının Solana'daki USDC'ye
+ * eşlendiğini Circle'ın `token_pair` hesabı söyler; eşlenmemiş token'ın mesajı zincirde reddedilir.
+ */
+export function cctpContextForMessage(
+  message: CctpMessage,
+  base: Omit<CctpReceiveContext, 'sourceDomain' | 'burnToken'>,
+): CctpReceiveContext {
+  return { ...base, sourceDomain: message.sourceDomain, burnToken: message.burn.burnToken };
+}
+
+/** Nonce'un kullanıldığını işaretleyen hesap (`["used_nonce", nonce]`); `receive_message` onu açar. */
+export const cctpUsedNonceAddress = (programs: CctpPrograms, nonce: Uint8Array): PublicKey =>
+  pda(programs.messageTransmitter, 'used_nonce', nonce);
+
+/** Mesaj Solana'da teslim edildi mi: nonce hesabı varsa mint yapılmıştır (kim teslim ettiyse). */
+export async function isCctpNonceUsed(
+  connection: Connection,
+  programs: CctpPrograms,
+  nonce: Uint8Array,
+): Promise<boolean> {
+  const info = await connection.getAccountInfo(cctpUsedNonceAddress(programs, nonce), 'confirmed');
+  return info !== null && info.owner.equals(programs.messageTransmitter);
+}
+
 /** Tek tx'te mint + fonlama için ALT adresleri: programlar ve sabit CCTP hesapları. */
 export function cctpLookupTableAddresses(context: CctpReceiveContext): PublicKey[] {
   const accounts = cctpStaticAccounts(context);
@@ -202,7 +227,7 @@ export function receiveMessageInstruction(params: {
       meta(params.caller, false, true),
       meta(accounts.authorityPda, false),
       meta(accounts.messageTransmitterState, false),
-      meta(pda(messageTransmitter, 'used_nonce', decoded.nonce), true),
+      meta(cctpUsedNonceAddress(context.programs, decoded.nonce), true),
       meta(tokenMessengerMinter, false),
       meta(SystemProgram.programId, false),
       meta(accounts.messageTransmitterEventAuthority, false),

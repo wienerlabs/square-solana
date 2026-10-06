@@ -129,6 +129,35 @@ Ethereum Sepolia'dan Solana devnet'e CCTP V2 ile 5 USDC: tasarım ve tx örnekle
 | `receive_message` + `fund_job` | `2qfMga78K7aTAx9ichvTyiMTeUEr3DzzJZNVB5nyNqpX5qe5q3nNeq5XQHyMdVEXooy6NfjYmZ13o1cmV3xg7rq2` (1 082 bayt, 202 865 CU) |
 | Job | `DYog8N8bftM5cAY2xop7BzLjMmZqgW9wTAJek4LXbfGC`, `Funded`; vault `5HfGjn6fbSJoKo1oJnksH8Q2igtW8uf7cwsPdQGxwY3S`'de 5 000 000 |
 
+## CCTP relayer (BE-26)
+
+Relayer'ın uçtan uca koşusu, 2026-10-06 (`packages/cctp/test/devnet.e2e.test.ts`; [tasarım](../design/cctp-funding.md#relayer-be-26)).
+Sepolia'da iki kez 1 USDC yakıldı (hızlı kesinlik, `maxFee` 100, alınan ücret 100); job'lar mint edilen tutarla
+(999 900) açıldı. Kurum ve agent BC-36'dakilerdir; relayer cüzdanı deployer'dır. Burn'ler `registerCctpTransfer`'ın
+mantığıyla kaydedildi (ikinci kayıt aynı transferi döndü); attestation'ı relayer izledi; veritabanı testin kendi
+Postgres'iydi.
+
+| Adım | A: kurumun tek tx'i | B: relayer'ın teslimi |
+|---|---|---|
+| Sepolia `approve` | `0x3a02d3ff1c0134eebc778c5f4ec9911b80729847a06f1f047d6c39c9499e86f6` | `0xe7fc673b461322c44dc046e1e71c375029c76b88e64ac99d7741bfe7ec79e1b2` |
+| Sepolia `depositForBurn` | `0xde63214e295c4f916322b2ad042edc799069207c74a46e0f6aa637eebe36de7f` | `0x3b53e8385f0267b20191fb2a3dcc60b7ebbc41309a825dbd65b757f84cc7d122` |
+| Attestation nonce | `0x39d2dc9019f609f0793bb9c790016aba7294770b697997ad8ff8fefe6cefab7f` | `0x450b04a0cf515f57f0467e76b3b4cde3693853d7f8f653e15407e5ba7c62c42b` |
+| `create_job` | `vAnfQ2Fqp3LFPHsPeR4diYWCUpJhgi1eKtPhv1oQmAWUkb2wqvEh8n6qWhWVY4YdkHYEnBHgUcz6PW5bzn2UwkC` | `5zX2VBrCo1txUXtp1M41TodX1S6Dvndi1TLQAgouqzXSsQbg1P386ZNS12FFkCWiiNkqvCY69wFk8DKL3xpeYpAa` |
+| `receive_message` | Kurumun tx'inde, `fund_job` ile (aşağıda) | Relayer: `3A18dF3u5Yg979qapN2jPU6qXkXPReC4xNmmaqFgGVGgqdxiA6ee4pVwZoyMTMSu2WKXMWZeJ92yGhqmEogHFKgZ` (940 bayt, yalnızca CCTP ALT'ı; 182 676 CU) |
+| Yarıda kalan tur | — | Transfer `attested`'a geri alındı; relayer nonce hesabından teslimi gördü, tx göndermedi (relayer bakiyesi değişmedi), aynı imzayla `received` |
+| Kurumun tx'i (`prepareCctpFundTx` mantığı) | `receiveAndFund`: `3kVtrhkqYKj7q4oRFwiufTtfKuwStDYZ7ZBicKXxQZdeHWwFesszrwaHS3XkdZLgnUxSEE3itHjvBpSN1nM5Ddr5` (1 094 bayt, iki ALT; 204 372 CU) | `fund`: `26bGXaaQ35wcUua75rT7rXFXyiUECwRrvYETiYYq2Qdx68a6y1n46doNpAtHWxjoKXdfzhD1YJ5UtydFBesbQm3m` (437 bayt, Square ALT'ı; 23 478 CU) |
+| Job | `BjQ8W97SxsXpULU4RvUxVNdWVzR9331Yy53bm4qtWJAN`, `Funded`, vault'ta 999 900 | `9yEtKmbcz51i1KRoaUBXStaAksJzw1NXTKoeADkELVKJ`, `Funded`, vault'ta 999 900 |
+| Transfer | `funded`; teslim ve fonlama imzası aynı tx | `funded`; teslim relayer'ın, fonlama kurumun tx'i |
+
+Servislerin değerleri:
+
+| Değişken | Değer |
+|---|---|
+| `API_CCTP_MESSAGE_TRANSMITTER`, `KEEPER_CCTP_MESSAGE_TRANSMITTER` | `CCTPV2Sm4AdWt5296sk4P66VBZ7bEhcARwFaaS9YPbeC` |
+| `API_CCTP_TOKEN_MESSENGER_MINTER`, `KEEPER_CCTP_TOKEN_MESSENGER_MINTER` | `CCTPV2vPZJS2u2BBsUoscuikbYjnpFmbFsvVuJdgUMQe` |
+| `API_CCTP_LOOKUP_TABLES`, `KEEPER_CCTP_LOOKUP_TABLES` | `0:2Zg2NRhkLqdFHq3SZcxqHmZkTTLXmKx4yeZNbfSqPbUY` |
+| `KEEPER_CCTP_ATTESTATION_URL` | `https://iris-api-sandbox.circle.com` |
+
 ## Sonraki yükseltme
 
 Kh0ra'nın #184'ü (dispute talimatları, BC-32 ve BC-33) hesap düzenini değiştirmiyor; yalnızca talimat ekliyor.

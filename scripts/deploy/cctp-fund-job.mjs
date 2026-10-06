@@ -12,7 +12,14 @@
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { cctpMintedAmount, createSquareClient, decodeCctpMessage, fetchCctpFeeRecipient } from '@squaresdk/solana-sdk';
+import {
+  cctpMintedAmount,
+  cctpMintRecipient,
+  createSquareClient,
+  decodeCctpMessage,
+  fetchCctpAttestation,
+  fetchCctpFeeRecipient,
+} from '@squaresdk/solana-sdk';
 import {
   Keypair,
   LAMPORTS_PER_SOL,
@@ -21,7 +28,6 @@ import {
   TransactionMessage,
   VersionedTransaction,
 } from '@solana/web3.js';
-import { fetchAttestation, mintRecipientFor } from './cctp.mjs';
 import { loadNetwork } from './network-config.mjs';
 import { connectionFor } from './rpc.mjs';
 
@@ -37,7 +43,6 @@ const ATTESTATION_POLL_MS = 15_000;
 const ATTESTATION_TIMEOUT_MS = 60 * 60_000;
 
 const keypair = (path) => Keypair.fromSecretKey(Uint8Array.from(JSON.parse(readFileSync(path, 'utf8'))));
-const hexBytes = (value) => new Uint8Array(Buffer.from(value.replace(/^0x/, ''), 'hex'));
 
 function parseArgs(argv) {
   const names = {
@@ -85,12 +90,15 @@ async function sendInstructions(connection, payer, instructions, signers) {
 async function waitForAttestation(network, source, transactionHash) {
   const deadline = Date.now() + ATTESTATION_TIMEOUT_MS;
   for (;;) {
-    const attested = await fetchAttestation({
+    const lookup = await fetchCctpAttestation({
       api: network.cctp.attestationApi,
       sourceDomain: source.domain,
       transactionHash,
     });
-    if (attested) return attested;
+    if (lookup.state === 'complete') {
+      if (lookup.messages.length !== 1) throw new Error(`burn tx'inde ${lookup.messages.length} mesaj var`);
+      return lookup.messages[0];
+    }
     if (Date.now() > deadline) throw new Error(`attestation gelmedi: ${transactionHash}`);
     await new Promise((resolve) => setTimeout(resolve, ATTESTATION_POLL_MS));
   }
@@ -133,10 +141,10 @@ async function main() {
 
   // 1. Attestation ve mesaj.
   const attested = await waitForAttestation(network, source, args.burnTx);
-  const message = hexBytes(attested.message);
+  const { message } = attested;
   const decoded = decodeCctpMessage(message);
   const minted = cctpMintedAmount(decoded);
-  if (!decoded.burn.mintRecipient.equals(mintRecipientFor(institution.publicKey, usdcMint))) {
+  if (!decoded.burn.mintRecipient.equals(cctpMintRecipient(institution.publicKey, usdcMint))) {
     throw new Error(`mesajın mint alıcısı kurumun USDC hesabı değil: ${decoded.burn.mintRecipient.toBase58()}`);
   }
   Object.assign(result, {
@@ -255,7 +263,7 @@ async function main() {
         feeRecipient: await fetchCctpFeeRecipient(connection, programs),
       },
       message,
-      attestation: hexBytes(attested.attestation),
+      attestation: attested.attestation,
       institution: institution.publicKey,
       job,
     },

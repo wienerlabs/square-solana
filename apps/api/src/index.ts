@@ -13,6 +13,7 @@ import {
   createLogger,
   createServiceMetrics,
 } from '@squaresdk/solana-observability';
+import { createTransferStore } from '@squaresdk/solana-cctp';
 import { createSquareClient } from '@squaresdk/solana-sdk';
 import { Connection, PublicKey } from '@solana/web3.js';
 import { createApp, createMetricsApp } from './app.js';
@@ -30,6 +31,7 @@ import { createDeliveryStore } from './storage.js';
 import { startTravelRuleMaintenance } from './travel-rule/maintenance.js';
 import { createTravelRuleService } from './travel-rule/service.js';
 import { createTxBuilder } from './tx.js';
+import { createCctpService } from './cctp.js';
 
 const MS_PER_SECOND = 1000;
 /** did:aip v2 Solana ağ referansı: genesis hash'inin ilk 32 karakteri (CAIP-2). */
@@ -101,6 +103,24 @@ async function main(): Promise<void> {
     logger: log,
     registry: metrics.registry,
   });
+  const tx = createTxBuilder({
+    client,
+    connection,
+    lookupTable: config.tx.lookupTable ? new PublicKey(config.tx.lookupTable) : null,
+    computeUnitPrice: config.tx.computeUnitPrice,
+  });
+  const cctp = createCctpService({
+    store: createTransferStore(db),
+    env: config.cctp && {
+      client,
+      connection,
+      programs: config.cctp.programs,
+      cctpLookupTables: config.cctp.lookupTables,
+      squareLookupTable: config.tx.lookupTable ? new PublicKey(config.tx.lookupTable) : null,
+    },
+    tx,
+    computeUnitPrice: config.tx.computeUnitPrice,
+  });
   const app = createApp({
     db,
     read: createReadApi({ db, chainRef, registryProgramId: programIds.registry }),
@@ -119,14 +139,10 @@ async function main(): Promise<void> {
       publicBaseUrl: config.publicBaseUrl,
     }),
     policyMeta: createPolicyMetaService({ db, authority }),
-    tx: createTxBuilder({
-      client,
-      connection,
-      lookupTable: config.tx.lookupTable ? new PublicKey(config.tx.lookupTable) : null,
-      computeUnitPrice: config.tx.computeUnitPrice,
-    }),
+    tx,
     prover: createProverProxy(config.prover),
     travelRule,
+    cctp,
     limiters: { read: window(config.rateLimit.read), write: window(config.rateLimit.write) },
     openapi,
     health,

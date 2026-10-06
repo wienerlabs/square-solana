@@ -4,14 +4,17 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { getAssociatedTokenAddressSync, TOKEN_PROGRAM_ID } from '@solana/spl-token';
-import { Keypair, PublicKey, SystemProgram } from '@solana/web3.js';
+import { Keypair, PublicKey, SystemProgram, type Connection } from '@solana/web3.js';
 import { describe, expect, it } from 'vitest';
 import {
   CCTP_SOLANA_DOMAIN,
   cctpLookupTableAddresses,
+  cctpContextForMessage,
   cctpMintedAmount,
   cctpStaticAccounts,
+  cctpUsedNonceAddress,
   decodeCctpMessage,
+  isCctpNonceUsed,
   RECEIVE_MESSAGE_DISCRIMINATOR,
   receiveMessageInstruction,
   type CctpReceiveContext,
@@ -226,5 +229,36 @@ describe('gerçek bir attestation’lı mesaj', () => {
     expect(cctpMintedAmount(decoded)).toBe(5_000_000n);
     // İki attester imzası (65'er bayt).
     expect(hexBytes(fixture.attestation)).toHaveLength(130);
+  });
+});
+
+describe('nonce hesabı ve mesajın bağlamı', () => {
+  const nonce = Buffer.alloc(32, 7);
+
+  it('used_nonce PDA’sı Circle’ın tohumuyla; bağlam mesajın kaynağından', () => {
+    expect(
+      cctpUsedNonceAddress(programs, nonce).equals(
+        PublicKey.findProgramAddressSync([Buffer.from('used_nonce'), nonce], programs.messageTransmitter)[0],
+      ),
+    ).toBe(true);
+    const decoded = decodeCctpMessage(
+      message({ sourceDomain: 6, recipient: Keypair.generate().publicKey, amount: 1n, feeExecuted: 0n, nonce }),
+    );
+    const { sourceDomain, burnToken, ...base } = context;
+    expect(sourceDomain).toBe(0);
+    expect(cctpContextForMessage(decoded, base)).toMatchObject({ sourceDomain: 6, usdcMint });
+    expect(Buffer.from(cctpContextForMessage(decoded, base).burnToken)).toEqual(Buffer.from(burnToken));
+  });
+
+  it('nonce hesabı Circle’ın programına aitse mesaj teslim edilmiştir', async () => {
+    const accounts = new Map<string, { owner: PublicKey }>();
+    const connection = {
+      getAccountInfo: async (address: PublicKey) => accounts.get(address.toBase58()) ?? null,
+    } as unknown as Connection;
+    expect(await isCctpNonceUsed(connection, programs, nonce)).toBe(false);
+    accounts.set(cctpUsedNonceAddress(programs, nonce).toBase58(), { owner: SystemProgram.programId });
+    expect(await isCctpNonceUsed(connection, programs, nonce)).toBe(false);
+    accounts.set(cctpUsedNonceAddress(programs, nonce).toBase58(), { owner: programs.messageTransmitter });
+    expect(await isCctpNonceUsed(connection, programs, nonce)).toBe(true);
   });
 });

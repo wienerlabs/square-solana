@@ -1,0 +1,45 @@
+{
+  "name": "@squaresdk/solana-cctp",
+  "version": "0.1.0",
+  "description": "CCTP relayer'ın çekirdeği: burn kaydı, Circle attestation takibi, Solana'da teslim ve fonlamanın izlenmesi (cctp_transfers), kurumun imzalayacağı mint + fonlama tx'i; BE-26",
+  "license": "Apache-2.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run --coverage"
+  },
+  "dependencies": {
+    "@solana/spl-token": "^0.4.15",
+    "@solana/web3.js": "^1.99.0",
+    "@squaresdk/solana-db": "workspace:*",
+    "@squaresdk/solana-sdk": "workspace:*",
+    "@squaresdk/solana-types": "workspace:*"
+  },
+  "devDependencies": {
+    "@anchor-lang/core": "1.2.0",
+    "@squaresdk/solana-config": "workspace:*",
+    "@testcontainers/postgresql": "^12.2.0",
+    "@types/node": "^24.0.0",
+    "@vitest/coverage-v8": "^5.0.3",
+    "bs58": "^6.0.0",
+    "viem": "^2.57.3",
+    "vitest": "^5.0.3"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}
