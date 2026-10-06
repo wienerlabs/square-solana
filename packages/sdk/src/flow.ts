@@ -240,8 +240,11 @@ export function createFlow(deps: FlowDeps): SquareFlow {
         job: params.job,
         institutionTokenAccount,
       });
+      // Mint alıcısı token hesabı olmalı: kurumun USDC hesabı yoksa aynı tx'te açılır (rent'i fee payer öder).
+      const recipient = ata(params.institution, account.mint, program, options.feePayer);
+      const prepend = (await connection.getAccountInfo(recipient.address)) ? [] : [recipient.create];
       const built = await deps.buildTx(
-        [receive, fund],
+        [...prepend, receive, fund],
         options.computeUnitLimit !== undefined
           ? options
           : { ...options, computeUnitLimit: computeUnitLimitFor(['fundJob']) + CCTP_RECEIVE_COMPUTE_UNITS },

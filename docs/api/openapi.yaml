@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Square Solana API
-  version: 0.17.0
+  version: 0.18.0
   summary: Square HTTP API sözleşmesi (BE-35), uygulaması apps/api (BE-18).
   description: |
     Contract-first API sözleşmesi. Zincirdeki hesaplar, event'ler ve instruction argümanları
@@ -38,6 +38,11 @@ tags:
       Travel Rule kaydı (adım 3, BE-23, ADR 0017). Kayıt API'de zarf şifrelemesiyle saklanır; zincire yalnızca
       salt'lı commitment'ı gider (`commitTravelRule`). Kaydı kurumun güncel yetkilisi yazar ve izin verdiği
       cüzdanlar (karşı VASP, denetçi) okur. Kişisel veriye dokunan her işlem erişim kaydına yazılır.
+  - name: cctp
+    description: |
+      CCTP ile cross-chain fonlama (BE-26, docs/design/cctp-funding.md). Kurum kaynak zincirdeki burn tx'ini bir
+      job'a bağlar; relayer Circle'ın attestation'ını izler. Mesaj imzalanınca kurum mint ile fonlamayı tek tx'te
+      imzalar; relayer mesajı önce teslim ettiyse yalnızca fonlamayı.
   - name: tx
     description: 8 adımın imzasız tx hazırlığı.
   - name: prover
@@ -810,6 +815,140 @@ paths:
         '429': { $ref: '#/components/responses/RateLimited' }
         '503': { $ref: '#/components/responses/Unavailable' }
 
+  /v1/cctp/transfers:
+    post:
+      tags: [cctp]
+      operationId: registerCctpTransfer
+      summary: Kaynak zincirdeki burn tx'ini bir job'a bağlar; aynı burn yeniden kaydedilirse aynı transfer döner.
+      description: |
+        Job `Open` olmalı, mint'i settlement mint'i (USDC) olmalı ve `institution`'ı isteği yapan cüzdan olmalı.
+        Burn'ün mint alıcısı kurumun USDC token hesabıdır (`mintRecipient`); başka hesaba yapılan burn relayer'da
+        `failed` olur. Aynı burn başka bir job'a kayıtlıysa 409.
+      security:
+        - session: []
+        - apiKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CctpTransferCreate' }
+      responses:
+        '200':
+          description: Bu burn bu job'a zaten kayıtlı.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessBase'
+                  - properties:
+                      data: { $ref: '#/components/schemas/CctpTransfer' }
+        '201':
+          description: Kayıt.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessBase'
+                  - properties:
+                      data: { $ref: '#/components/schemas/CctpTransfer' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+    get:
+      tags: [cctp]
+      operationId: listCctpTransfers
+      summary: CCTP transferleri, yeniden eskiye.
+      parameters:
+        - name: job
+          in: query
+          schema: { $ref: './schemas/idl.json#/Address' }
+        - name: institution
+          in: query
+          schema: { $ref: './schemas/idl.json#/Address' }
+        - name: status
+          in: query
+          schema: { $ref: '#/components/schemas/CctpTransferStatus' }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Sayfalı transfer listesi.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessBase'
+                  - properties:
+                      data:
+                        type: array
+                        items: { $ref: '#/components/schemas/CctpTransfer' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+
+  /v1/cctp/transfers/{transfer}:
+    get:
+      tags: [cctp]
+      operationId: getCctpTransfer
+      summary: Tek transfer; attestation'ın ve teslimin durumu.
+      parameters:
+        - $ref: '#/components/parameters/TransferPath'
+      responses:
+        '200':
+          description: Transfer.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessBase'
+                  - properties:
+                      data: { $ref: '#/components/schemas/CctpTransfer' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+
+  /v1/cctp/transfers/{transfer}/tx:
+    post:
+      tags: [cctp]
+      operationId: prepareCctpFundTx
+      summary: Kurumun imzalayacağı imzasız tx; mesaj teslim edilmediyse mint ile fonlama tek tx'te.
+      description: |
+        Mesaj Solana'da teslim edilmediyse `receive_message` ve `fund_job` tek tx'tedir (`receiveAndFund`); relayer
+        ya da başkası teslim ettiyse yalnızca `fund_job` (`fund`). Kurumun USDC hesabı yoksa aynı tx'te açılır.
+        Tx simüle edilir; zincirde düşecek tx 422 döner. Attestation yoksa, job artık `Open` değilse ya da transfer
+        `failed` ise 409.
+      security:
+        - session: []
+        - apiKey: []
+      parameters:
+        - $ref: '#/components/parameters/TransferPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CctpFundTxRequest' }
+      responses:
+        '200':
+          description: İmzasız tx.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessBase'
+                  - properties:
+                      data: { $ref: '#/components/schemas/CctpFundTx' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/SimulationFailed' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+
   /v1/tx:
     post:
       tags: [tx]
@@ -944,6 +1083,12 @@ components:
       required: true
       description: AgentRecord PDA adresi (did:aip v2 Solana tanımlayıcısının son parçası).
       schema: { $ref: './schemas/idl.json#/Address' }
+    TransferPath:
+      name: transfer
+      in: path
+      required: true
+      description: CCTP transferinin kimliği.
+      schema: { type: string, format: uuid }
 
   responses:
     BadRequest:
@@ -1665,3 +1810,95 @@ components:
             - type: 'null'
         requestId: { type: [string, 'null'] }
         at: { type: integer, format: int64 }
+    CctpTransferStatus:
+      type: string
+      enum: [pendingAttestation, attested, received, funded, failed]
+    CctpTransferCreate:
+      type: object
+      required: [sourceDomain, sourceTxHash, job]
+      additionalProperties: false
+      properties:
+        sourceDomain:
+          { type: integer, minimum: 0, maximum: 4294967295, description: Burn'ün yapıldığı zincirin Circle domain'i. }
+        sourceTxHash: { type: string, pattern: '^0x[0-9a-fA-F]{64}$', description: Burn tx'i (EVM). }
+        job: { $ref: './schemas/idl.json#/Address' }
+    CctpTransfer:
+      type: object
+      required:
+        - id
+        - sourceDomain
+        - sourceTxHash
+        - job
+        - institution
+        - mintRecipient
+        - status
+        - nonce
+        - message
+        - attestation
+        - amount
+        - feeExecuted
+        - minted
+        - attestedAt
+        - receiveSignature
+        - fundSignature
+        - error
+        - attempts
+        - nextAttemptAt
+        - createdAt
+        - updatedAt
+      additionalProperties: false
+      properties:
+        id: { type: string, format: uuid }
+        sourceDomain: { type: integer, minimum: 0, maximum: 4294967295 }
+        sourceTxHash: { type: string, pattern: '^0x[0-9a-f]{64}$' }
+        job: { $ref: './schemas/idl.json#/Address' }
+        institution: { $ref: './schemas/idl.json#/Address' }
+        mintRecipient:
+          allOf:
+            - $ref: './schemas/idl.json#/Address'
+          description: Beklenen mint alıcısı, kurumun USDC token hesabı.
+        status: { $ref: '#/components/schemas/CctpTransferStatus' }
+        nonce:
+          oneOf:
+            - $ref: './schemas/idl.json#/Hex32'
+            - type: 'null'
+        message: { type: [string, 'null'], pattern: '^(?:[0-9a-f]{2})+$', description: "Attestation'lı mesaj, hex." }
+        attestation: { type: [string, 'null'], pattern: '^(?:[0-9a-f]{2})+$' }
+        amount:
+          oneOf:
+            - $ref: './schemas/idl.json#/U64'
+            - type: 'null'
+        feeExecuted:
+          oneOf:
+            - $ref: './schemas/idl.json#/U64'
+            - type: 'null'
+        minted:
+          oneOf:
+            - $ref: './schemas/idl.json#/U64'
+            - type: 'null'
+        attestedAt: { type: [integer, 'null'], format: int64 }
+        receiveSignature: { type: [string, 'null'], pattern: '^[1-9A-HJ-NP-Za-km-z]{64,88}$' }
+        fundSignature: { type: [string, 'null'], pattern: '^[1-9A-HJ-NP-Za-km-z]{64,88}$' }
+        error: { type: [string, 'null'] }
+        attempts: { type: integer, minimum: 0 }
+        nextAttemptAt: { type: [integer, 'null'], format: int64 }
+        createdAt: { type: integer, format: int64 }
+        updatedAt: { type: integer, format: int64 }
+    CctpFundTxRequest:
+      type: object
+      required: [feePayer, computeUnitPrice]
+      additionalProperties: false
+      properties:
+        feePayer: { $ref: './schemas/idl.json#/Address' }
+        computeUnitPrice:
+          oneOf:
+            - $ref: './schemas/idl.json#/U64'
+            - type: 'null'
+    CctpFundTx:
+      type: object
+      required: [step, transfer, tx]
+      additionalProperties: false
+      properties:
+        step: { type: string, enum: [receiveAndFund, fund] }
+        transfer: { $ref: '#/components/schemas/CctpTransfer' }
+        tx: { $ref: '#/components/schemas/UnsignedTx' }

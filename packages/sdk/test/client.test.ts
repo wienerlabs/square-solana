@@ -2,7 +2,12 @@ import { randomBytes } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { BN, type BorshInstructionCoder, type Idl, type Program } from '@anchor-lang/core';
-import { getAssociatedTokenAddressSync, TOKEN_2022_PROGRAM_ID, TOKEN_PROGRAM_ID } from '@solana/spl-token';
+import {
+  ASSOCIATED_TOKEN_PROGRAM_ID,
+  getAssociatedTokenAddressSync,
+  TOKEN_2022_PROGRAM_ID,
+  TOKEN_PROGRAM_ID,
+} from '@solana/spl-token';
 import { ComputeBudgetProgram, Connection, Keypair, PublicKey, SystemProgram } from '@solana/web3.js';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { squareLookupTableAddresses, TX_COMPUTE_UNIT_LIMITS, type TxKind } from '../src/budget.js';
@@ -471,8 +476,11 @@ describe('receiveAndFundJob (BC-36)', () => {
     feeRecipient: new PublicKey('AYG63YgrKLbp9B23ntcRemU8kSD7rZ7cNFGDo8DbEfTd'),
   };
 
+  const recipient = getAssociatedTokenAddressSync(usdcMint, institution, true, TOKEN_PROGRAM_ID);
+
   it('mint ve fonlama tek tx’te: Circle’ın talimatı, ardından fund_job; compute payı ikisinin toplamı', async () => {
     chain.setAccount(usdcMint, TOKEN_PROGRAM_ID, Buffer.alloc(82));
+    chain.setAccount(recipient, TOKEN_PROGRAM_ID, Buffer.alloc(165));
     const { address } = await jobAccount({ mint: usdcMint, institution, agentWallet: key(), agentRecord: key() });
     const square = key();
     const cctpTable = key();
@@ -500,7 +508,6 @@ describe('receiveAndFundJob (BC-36)', () => {
     expect(receive!.program.equals(cctp.programs.messageTransmitter)).toBe(true);
     expect(receive!.data.subarray(0, 8)).toEqual(Buffer.from(RECEIVE_MESSAGE_DISCRIMINATOR));
     // Circle'ın talimatında payer ücret ödeyici, caller kurum; mint alıcısı (16.) kurumun USDC hesabı.
-    const recipient = getAssociatedTokenAddressSync(usdcMint, institution, true, TOKEN_PROGRAM_ID);
     expect([receive!.keys[0], receive!.keys[1], receive!.keys[15]].map(b58)).toEqual([
       b58(feePayer),
       b58(institution),
@@ -510,6 +517,44 @@ describe('receiveAndFundJob (BC-36)', () => {
     const { name } = (escrow().coder.instruction as BorshInstructionCoder).decode(fund!.data)!;
     expect(name).toBe('fundJob');
     expect(fund!.keys.map(b58)).toContain(b58(recipient));
+  });
+
+  it('kurumun USDC hesabı yoksa aynı tx’te, mint’ten önce idempotent açılır (rent’i fee payer öder)', async () => {
+    chain.setAccount(usdcMint, TOKEN_PROGRAM_ID, Buffer.alloc(82));
+    const { address } = await jobAccount({ mint: usdcMint, institution, agentWallet: key(), agentRecord: key() });
+    const square = key();
+    const cctpTable = key();
+    chain.setLookupTable(
+      square,
+      squareLookupTableAddresses({ programIds: PROGRAM_IDS, pda: client.pda, settlementMint: usdcMint }),
+    );
+    chain.setLookupTable(cctpTable, cctpLookupTableAddresses({ ...cctp, tokenProgram: TOKEN_PROGRAM_ID }));
+    const built = await client.flow.receiveAndFundJob(
+      { cctp, message: bytes(fixture.message), attestation: bytes(fixture.attestation), institution, job: address },
+      { feePayer, addressLookupTables: [square, cctpTable] },
+    );
+    const keys = built.transaction.message.getAccountKeys({
+      addressLookupTableAccounts: [square, cctpTable].map((table) => chain.lookupTable(table)),
+    });
+    const programs = built.transaction.message.compiledInstructions
+      .map((ix) => keys.get(ix.programIdIndex)!)
+      .filter((program) => !program.equals(ComputeBudgetProgram.programId));
+    expect(programs.map(b58)).toEqual([
+      b58(ASSOCIATED_TOKEN_PROGRAM_ID),
+      b58(cctp.programs.messageTransmitter),
+      b58(PROGRAM_IDS.escrow),
+    ]);
+    const create = built.transaction.message.compiledInstructions.find((ix) =>
+      keys.get(ix.programIdIndex)!.equals(ASSOCIATED_TOKEN_PROGRAM_ID),
+    )!;
+    // createIdempotent (1): payer, hesap, sahip, mint.
+    expect(create.data[0]).toBe(1);
+    expect(create.accountKeyIndexes.slice(0, 4).map((i) => b58(keys.get(i)))).toEqual([
+      b58(feePayer),
+      b58(recipient),
+      b58(institution),
+      b58(usdcMint),
+    ]);
   });
 
   it('mint alıcısı kurumun USDC hesabı değilse ya da job başka mint’teyse reddedilir', async () => {

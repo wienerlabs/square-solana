@@ -5,6 +5,7 @@ import { randomBytes } from 'node:crypto';
 import { once } from 'node:events';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
+import { createTransferStore, type CctpSettings } from '@squaresdk/solana-cctp';
 import { createDatabaseClient, type PrismaClient } from '@squaresdk/solana-db';
 import { createRateLimiter, createSecretBox, type SecretBox } from '@squaresdk/solana-hardening';
 import { createPrismaRateLimitStore } from '@squaresdk/solana-hardening/prisma';
@@ -22,6 +23,7 @@ import { inject } from 'vitest';
 import { createApp } from '../../src/app.js';
 import { createAuthService } from '../../src/auth/service.js';
 import { createCardService } from '../../src/cards.js';
+import { createCctpService } from '../../src/cctp.js';
 import { createDeliveryService } from '../../src/deliveries.js';
 import { createInstitutionAuthority } from '../../src/institution-authority.js';
 import type { OpenApiDocument } from '../../src/openapi.js';
@@ -79,6 +81,8 @@ export async function startStack(options: {
   databaseUrl?: string;
   /** Travel Rule ana anahtar halkası ve saklama süresi. */
   travelRule?: { box: SecretBox; retentionSeconds: number };
+  /** CCTP ile fonlama; verilmezse kapalı. */
+  cctp?: CctpSettings;
 }): Promise<Stack> {
   const db = createDatabaseClient({ connectionString: options.databaseUrl ?? inject('databaseUrl') });
   const s3 = inject('s3');
@@ -140,6 +144,26 @@ export async function startStack(options: {
     timeoutMs: 5_000,
     logger: log,
   });
+  const tx = createTxBuilder({
+    client,
+    connection,
+    lookupTable: options.lookupTable ?? null,
+    computeUnitPrice: 1_000n,
+  });
+  const cctp = createCctpService({
+    store: createTransferStore(db),
+    env: options.cctp
+      ? {
+          client,
+          connection,
+          programs: options.cctp.programs,
+          cctpLookupTables: options.cctp.lookupTables,
+          squareLookupTable: options.lookupTable ?? null,
+        }
+      : null,
+    tx,
+    computeUnitPrice: 1_000n,
+  });
   const app = createApp({
     db,
     read: createReadApi({ db, chainRef: CHAIN_REF, registryProgramId: PROGRAM_IDS.registry }),
@@ -159,9 +183,10 @@ export async function startStack(options: {
       publicBaseUrl: PUBLIC_BASE_URL,
     }),
     policyMeta: createPolicyMetaService({ db, authority }),
-    tx: createTxBuilder({ client, connection, lookupTable: options.lookupTable ?? null, computeUnitPrice: 1_000n }),
+    tx,
     prover: createProverProxy({ url: proverUrl, apiKey: 'prover-service-key', timeoutMs: 2_000 }),
     travelRule,
+    cctp,
     limiters: { read: window(limits.read), write: window(limits.write) },
     openapi: options.openapi,
     health,

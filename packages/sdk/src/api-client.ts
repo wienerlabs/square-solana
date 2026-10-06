@@ -139,6 +139,11 @@ export const createApiClient: CreateApiClient = (config: ApiClientConfig): Squar
     listTravelRuleAccess: (job, query = {}) =>
       envelope('GET', `/v1/jobs/${segment(job)}/travel-rule/access`, { query }),
 
+    registerCctpTransfer: (body) => envelope('POST', '/v1/cctp/transfers', { json: body }),
+    listCctpTransfers: (query = {}) => envelope('GET', '/v1/cctp/transfers', { query }),
+    getCctpTransfer: (id) => envelope('GET', `/v1/cctp/transfers/${segment(id)}`),
+    prepareCctpFundTx: (id, body) => envelope('POST', `/v1/cctp/transfers/${segment(id)}/tx`, { json: body }),
+
     prepareTx: (body) => envelope('POST', '/v1/tx', { json: body }),
     prove: (body) => envelope('POST', '/v1/prove', { json: body }),
     // 503 de sözleşmedeki `Health` gövdesidir.

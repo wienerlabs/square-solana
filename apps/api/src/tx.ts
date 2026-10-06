@@ -26,6 +26,11 @@ const LIMIT_STEP = 10_000;
 
 export interface TxBuilder {
   prepare(request: TxRequest): Promise<UnsignedTx>;
+  /** Başka bir akışın kurduğu tx'i (ör. CCTP mint + fonlama) simüle edip imzasız tx olarak paketler. */
+  finalize(
+    built: BuiltTx,
+    meta: { feePayer: PublicKey; computeUnitLimit: number; addressLookupTables: readonly PublicKey[] },
+  ): Promise<UnsignedTx>;
 }
 
 interface Simulation {
@@ -145,7 +150,26 @@ export function createTxBuilder(deps: {
     );
   }
 
+  async function packaged(
+    built: BuiltTx,
+    meta: { feePayer: PublicKey; computeUnitLimit: number; addressLookupTables: readonly PublicKey[] },
+  ): Promise<UnsignedTx> {
+    const simulation = await simulate(built);
+    if (simulation.err !== null) throw failure(simulation);
+    return {
+      transaction: Buffer.from(built.transaction.serialize()).toString('base64'),
+      blockhash: built.blockhash,
+      lastValidBlockHeight: built.lastValidBlockHeight,
+      feePayer: meta.feePayer.toBase58(),
+      signers: built.signers.map((signer) => signer.toBase58()),
+      addressLookupTables: meta.addressLookupTables.map((table) => table.toBase58()),
+      computeUnitLimit: meta.computeUnitLimit,
+      simulatedUnits: simulation.unitsConsumed,
+    };
+  }
+
   return {
+    finalize: packaged,
     async prepare(request) {
       const ix = await instruction(request);
       const kind = request.call.instruction as TxKind;
@@ -158,19 +182,11 @@ export function createTxBuilder(deps: {
         const units = measured.unitsConsumed ?? MAX_COMPUTE_UNIT_LIMIT;
         limit = Math.min(MAX_COMPUTE_UNIT_LIMIT, Math.ceil((units * MEASURED_MULTIPLIER) / LIMIT_STEP) * LIMIT_STEP);
       }
-      const built = await build(ix, request, limit);
-      const simulation = await simulate(built);
-      if (simulation.err !== null) throw failure(simulation);
-      return {
-        transaction: Buffer.from(built.transaction.serialize()).toString('base64'),
-        blockhash: built.blockhash,
-        lastValidBlockHeight: built.lastValidBlockHeight,
-        feePayer: request.feePayer,
-        signers: built.signers.map((signer) => signer.toBase58()),
-        addressLookupTables: deps.lookupTable ? [deps.lookupTable.toBase58()] : [],
+      return packaged(await build(ix, request, limit), {
+        feePayer: new PublicKey(request.feePayer),
         computeUnitLimit: limit,
-        simulatedUnits: simulation.unitsConsumed,
-      };
+        addressLookupTables: deps.lookupTable ? [deps.lookupTable] : [],
+      });
     },
   };
 }

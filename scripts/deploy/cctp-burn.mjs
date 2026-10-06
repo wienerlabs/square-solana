@@ -1,27 +1,20 @@
-// BC-36: USDC'yi bir EVM kaynak zincirinde Solana'ya yakar (CCTP V2). Mint alıcısı, verilen Solana sahibinin
-// settlement mint'indeki associated token hesabıdır. Allowance yetmiyorsa önce `approve` gönderilir. Kaynak
-// zincir, adresler ve attestation servisi `scripts/deploy/networks/<ağ>.json`'un `cctp` bölümündendir.
-// Anahtar dosyası `{ "privateKey": "0x…" }`'tir ve repoda tutulmaz.
+// BC-36, BE-26: USDC'yi bir EVM kaynak zincirinde Solana'ya yakar (CCTP V2). Çağrılar SDK'nın burn yardımcısıdır
+// (`cctpBurnCall`, `cctpApproveCall`; viem ile gönderilir). Mint alıcısı, verilen Solana sahibinin settlement
+// mint'indeki associated token hesabıdır. Allowance yetmiyorsa önce `approve` gönderilir. Ücret servisin
+// tablosundandır. Kaynak zincir, adresler ve attestation servisi `scripts/deploy/networks/<ağ>.json`'un `cctp`
+// bölümündendir. Anahtar dosyası `{ "privateKey": "0x…" }`'tir ve repoda tutulmaz.
 //
 //   node scripts/deploy/cctp-burn.mjs --network devnet --source sepolia --key <dosya> \
 //     --recipient <Solana sahibi> --amount <taban birim> [--finality standard|fast]
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { PublicKey } from '@solana/web3.js';
-import { createPublicClient, createWalletClient, defineChain, http, parseAbi } from 'viem';
+import { CCTP_ERC20_ABI, cctpApproveCall, cctpBurnCall, cctpMintRecipient, fetchCctpFees } from '@squaresdk/solana-sdk';
+import { createPublicClient, createWalletClient, defineChain, http } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
-import { burnArguments, mintRecipientFor, SOLANA_DOMAIN } from './cctp.mjs';
 import { loadNetwork } from './network-config.mjs';
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
-const ERC20 = parseAbi([
-  'function allowance(address owner, address spender) view returns (uint256)',
-  'function approve(address spender, uint256 amount) returns (bool)',
-  'function balanceOf(address owner) view returns (uint256)',
-]);
-const TOKEN_MESSENGER = parseAbi([
-  'function depositForBurn(uint256 amount, uint32 destinationDomain, bytes32 mintRecipient, address burnToken, bytes32 destinationCaller, uint256 maxFee, uint32 minFinalityThreshold)',
-]);
 
 function parseArgs(argv) {
   const args = { finality: 'standard' };
@@ -62,57 +55,43 @@ async function main() {
   const writer = createWalletClient({ account, chain, transport: http(source.rpc) });
   const amount = BigInt(args.amount);
   const owner = new PublicKey(args.recipient);
-  const recipient = mintRecipientFor(owner, new PublicKey(network.escrow.settlementMint));
+  const recipient = cctpMintRecipient(owner, new PublicKey(network.escrow.settlementMint));
 
   const balance = await reader.readContract({
     address: source.usdc,
-    abi: ERC20,
+    abi: CCTP_ERC20_ABI,
     functionName: 'balanceOf',
     args: [account.address],
   });
   if (balance < amount) throw new Error(`${account.address} bakiyesi ${balance}, gereken ${amount}`);
-  const feesResponse = await fetch(
-    `${network.cctp.attestationApi}/v2/burn/USDC/fees/${source.domain}/${SOLANA_DOMAIN}`,
-  );
-  if (!feesResponse.ok) throw new Error(`ücret servisi ${feesResponse.status}`);
-  const burn = burnArguments({
+  const burn = cctpBurnCall({
+    tokenMessenger: source.tokenMessenger,
+    burnToken: source.usdc,
     amount,
     finality: args.finality,
-    recipient,
-    burnToken: source.usdc,
-    fees: await feesResponse.json(),
+    mintRecipient: recipient,
+    fees: await fetchCctpFees({ api: network.cctp.attestationApi, sourceDomain: source.domain }),
   });
 
   let approveTx = null;
   const allowance = await reader.readContract({
     address: source.usdc,
-    abi: ERC20,
+    abi: CCTP_ERC20_ABI,
     functionName: 'allowance',
     args: [account.address, source.tokenMessenger],
   });
   if (allowance < amount) {
-    approveTx = await writer.writeContract({
-      address: source.usdc,
-      abi: ERC20,
-      functionName: 'approve',
-      args: [source.tokenMessenger, amount],
-    });
+    approveTx = await writer.writeContract(
+      cctpApproveCall({ token: source.usdc, tokenMessenger: source.tokenMessenger, amount }),
+    );
     const receipt = await reader.waitForTransactionReceipt({ hash: approveTx });
     if (receipt.status !== 'success') throw new Error(`approve başarısız: ${approveTx}`);
   }
   const burnTx = await writer.writeContract({
-    address: source.tokenMessenger,
-    abi: TOKEN_MESSENGER,
-    functionName: 'depositForBurn',
-    args: [
-      burn.amount,
-      burn.destinationDomain,
-      burn.mintRecipient,
-      burn.burnToken,
-      burn.destinationCaller,
-      burn.maxFee,
-      burn.minFinalityThreshold,
-    ],
+    address: burn.address,
+    abi: burn.abi,
+    functionName: burn.functionName,
+    args: burn.args,
   });
   const receipt = await reader.waitForTransactionReceipt({ hash: burnTx });
   if (receipt.status !== 'success') throw new Error(`depositForBurn başarısız: ${burnTx}`);
@@ -125,7 +104,7 @@ async function main() {
         approveTx,
         burnTx,
         block: receipt.blockNumber.toString(),
-        amount: burn.amount.toString(),
+        amount: amount.toString(),
         maxFee: burn.maxFee.toString(),
         finality: args.finality,
         recipientOwner: owner.toBase58(),

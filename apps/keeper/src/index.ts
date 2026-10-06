@@ -1,5 +1,5 @@
-// Süreç giriş noktası: yapılandırma ve program kimlikleri doğrulanmadan servis açılmaz. Tek döngü: finalize
-// crank'i. Tek örnek çalışır: aynı job'a iki keeper aynı anda tx göndermesin. Log, metrik, health ve alarmlar
+// Süreç giriş noktası: yapılandırma ve program kimlikleri doğrulanmadan servis açılmaz. Döngüler: finalize
+// crank'i ve yapılandırılmışsa CCTP relayer'ı (BE-26). Tek örnek çalışır: aynı job'a iki keeper aynı anda tx göndermesin. Log, metrik, health ve alarmlar
 // `@squaresdk/solana-observability`'dendir.
 import type { Server } from 'node:http';
 import { createDatabaseClient } from '@squaresdk/solana-db';
@@ -15,6 +15,7 @@ import { createSquareClient } from '@squaresdk/solana-sdk';
 import { Connection } from '@solana/web3.js';
 import { keeperAlarmRules } from './alarms.js';
 import { createApp, createMetricsApp } from './app.js';
+import { createCctpRound } from './cctp.js';
 import { loadConfig } from './config.js';
 import { createCrank } from './crank.js';
 import { createJournal } from './journal.js';
@@ -99,6 +100,32 @@ async function main(): Promise<void> {
       log.error('round_failed', { error });
     },
   });
+  const cctp =
+    config.cctp &&
+    createCctpRound({
+      db,
+      client,
+      connection,
+      keeper: config.keeper,
+      config: config.cctp,
+      economics: config.economics,
+      batchSize: config.batchSize,
+      confirmPollMs: config.confirmPollMs,
+      metrics,
+      log,
+      onError: () => errors.record(),
+    });
+  const stopCctp = cctp
+    ? startLoop({
+        intervalMs: config.pollIntervalMs,
+        immediate: true,
+        run: () => cctp.runOnce(),
+        onError: (error) => {
+          errors.record();
+          log.error('cctp_round_failed', { error });
+        },
+      })
+    : null;
   const servers = await Promise.all([
     listen(createApp({ health }), config.port),
     listen(createMetricsApp(metrics.registry, log), config.metricsPort),
@@ -110,12 +137,14 @@ async function main(): Promise<void> {
     metricsPort: config.metricsPort,
     keeper: config.keeper.publicKey.toBase58(),
     rpc: fetch.endpoint(),
+    cctp: config.cctp ? [...config.cctp.settings.lookupTables.keys()] : null,
   });
 
   const shutdown = async (signal: string) => {
     log.info('shutdown', { signal });
     stopAlarms();
     await stop();
+    await stopCctp?.();
     await Promise.all(servers.map(close));
     await db.$disconnect();
     process.exit(0);

@@ -118,7 +118,7 @@ değildir.
   3. ALT'ın adresi tx'lere `BuildOptions.addressLookupTables` ile verilir.
 - **Paket sınırı:** `buildTx` pakete sığmayan tx'i kurarken reddeder ve ALT'ı önerir.
 
-## 7. CCTP ile fonlama (BC-36)
+## 7. CCTP ile fonlama (BC-36, BE-26)
 
 `flow.receiveAndFundJob` Circle'ın `receive_message`'ını ve `fund_job`'u tek tx'te kurar
 ([cctp-funding.md](cctp-funding.md)).
@@ -129,3 +129,8 @@ değildir.
   - **Gerçek koşu:** 202 865 CU.
 - **Boyut:** Tx, Square ALT'ı ve kaynak zincirin CCTP ALT'ı (`cctpLookupTableAddresses`, 13 adres) ile 1 082
   bayttır. Mesaj 376 bayt, attestation iki imzayla 130 bayttır. ALT'sız sığmaz.
+- **Relayer (BE-26):** Relayer'ın tek başına gönderdiği `receive_message` yalnızca CCTP ALT'ıyla 940 bayt, 182 676
+  CU'dur; sınırı `CCTP_RECEIVE_COMPUTE_UNITS`. Hızlı kesinlikteki mesaj Circle'da
+  `handle_receive_unfinalized_message`'a gider; hesapları aynıdır, mint + fonlama 204 372 CU, 1 094 bayt
+  ([deploy kaydı](../deploy/devnet.md#cctp-relayer-be-26)). Kurumun USDC hesabı yoksa aynı tx'te açılır
+  (`createAssociatedTokenAccountIdempotent`).

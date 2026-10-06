@@ -116,6 +116,22 @@ describe('createApiClient', () => {
         `/api/v1/jobs/${job}/travel-rule/grants`,
       ],
       [() => api.listTravelRuleAccess(job, { page: 2 }), 'GET', `/api/v1/jobs/${job}/travel-rule/access?page=2`],
+      [
+        () => api.registerCctpTransfer({ sourceDomain: 0, sourceTxHash: `0x${'ab'.repeat(32)}`, job }),
+        'POST',
+        '/api/v1/cctp/transfers',
+      ],
+      [
+        () => api.listCctpTransfers({ job, status: 'attested' }),
+        'GET',
+        `/api/v1/cctp/transfers?job=${job}&status=attested`,
+      ],
+      [() => api.getCctpTransfer('t-1'), 'GET', '/api/v1/cctp/transfers/t-1'],
+      [
+        () => api.prepareCctpFundTx('t-1', { feePayer: job, computeUnitPrice: null }),
+        'POST',
+        '/api/v1/cctp/transfers/t-1/tx',
+      ],
       [() => api.prepareTx({} as never), 'POST', '/api/v1/tx'],
       [() => api.prove({} as never), 'POST', '/api/v1/prove'],
       [() => api.getHealth(), 'GET', '/api/health'],
