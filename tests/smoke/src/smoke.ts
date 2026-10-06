@@ -7,6 +7,8 @@
 //              5 alacak list + buy · 7 ispat · 6 + 8 finalize (keeper) → alıcıya ödeme, itibar, ValidationRecord
 //   ispat-ret  ayrı, işlem başı tavanı düşük bir politika: kesin ret (PER_TX) → finalize net'i kuruma iade eder
 //   ispat-yok  finalize `ProofRequired` ile düşer, escrow bekler; ispat bağlanınca aynı iş ödenir
+//   fiat       (MPP authority anahtarı yapılandırılmışsa) vault'suz iş, MPP attestation'ı + ispat, ödemesiz
+//              kapanış; admin yerel anahtarsa authority rotasyonu (BC-37, fiat.ts)
 //
 // Saat: ispatın anı zincirin saatidir (Clock sysvar'ı; verifier ±600 s tolerans ister) ve finalize ispatla
 // aynı UTC gününde olmalıdır (ADR 0012). Gün dönümüne challenge süresi + pay kadar kalmışsa ispat yeni güne
@@ -44,6 +46,7 @@ import { chainTime, waitForChainTime } from './chain.js';
 import { requireSection } from './config.js';
 import { buildOptions, currentCommit, isoNow, type Context } from './context.js';
 import { roleKey } from './keys.js';
+import { runFiatVariant } from './fiat.js';
 import { grouped, rpcHost, type InitRecord, type Section, type SectionedTx, type SmokeReport } from './render.js';
 
 /** Finalize'ın ispatla aynı UTC gününde kalması için challenge sonrasına bırakılan pay (saniye). */
@@ -668,6 +671,34 @@ export async function runSmoke(context: Context, options: SmokeOptions): Promise
   await finalize(waitingJob);
   check((await jobStatus(waitingJob.address)) === 'released', 'ispat bağlandıktan sonra job `Released`');
   check((await balance(key.agent.publicKey)) - agentBeforeRelease === net, `agent'a ödendi: ${units(net)}`);
+
+  // --- Varyant: fiat (BC-37) ------------------------------------------------------------------------------
+  const mpp = context.keys.mppAuthority;
+  if (mpp) {
+    section = 'fiat';
+    await runFiatVariant({
+      context,
+      key,
+      mpp,
+      admin: context.keys.admin,
+      agentRecord,
+      institutionPda,
+      policy: okPolicy,
+      runId,
+      amount,
+      paymentCategory: values.paymentCategory,
+      deadlineSecs: values.deadlineSecs,
+      prover: options.prover,
+      send,
+      check,
+      recordProof: (job, verdict, refusalCode, provingMs) =>
+        proofs.push({ section, job: job.toBase58(), verdict, refusalCode, provingMs }),
+      units,
+      balance,
+    });
+  } else {
+    context.log('  fiat varyantı koşmadı: MPP authority anahtarı yapılandırmada yok (BC-37)');
+  }
 
   return {
     cluster: config.cluster,

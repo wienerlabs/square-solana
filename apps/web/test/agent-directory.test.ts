@@ -211,6 +211,7 @@ describe('profile', () => {
           resolution: { kind: 'pending' },
         },
         deliveryUri: 'https://deliveries.example/report',
+        rail: 'escrow',
       },
       payee: wallet,
       claim: null,

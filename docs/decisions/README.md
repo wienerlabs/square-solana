@@ -27,6 +27,7 @@ Mimari karar kayıtları (ADR). Her karar ayrı bir dosyada, sıra numarasıyla 
 | [0020](0020-sanctions-screening-kaynaklari-ve-saglayici.md) | Sanctions screening: OFAC SDN listesi ve Chainalysis sanctions API birlikte, herhangi biri işaretlerse `Flagged`, kaynak hatasında karar yok, `source_hash` kanıt belgesinin hash'i | BE-16 (#49) |
 | [0022](0022-hosted-agent-calisma-zamani-izolasyonu.md) | Hosted agent çalışma zamanı izolasyonu: süreç içi, capability başına bağlam (ayrı MCP havuzu, tool allowlist'i, zaman / token / eşzamanlılık sınırları, hata yalıtımı); worker ve alt süreç seçilmedi | BE-29 (#88) |
 | [0023](0023-x402-ucretli-uc-nokta-tanimlari.md) | x402 ücretli uç nokta tanımları: tanım ve kullanım Square API'sinde, ödeme geliştiricinin sunucusunda (`paidRouteFromDefinition`, kendi facilitator'ı), uzlaştırılan ödeme `x402:serve` anahtarıyla bildirilir ve tekrar koruması kimliğiyle bir kez sayılır | FE-22 (#86) |
+| [0024](0024-stripe-mpp-fiat-rayi.md) | Stripe MPP fiat rayı: vault'suz fiat iş (`Job.rail`), işe ve tutara bağlı Ed25519 attestation'ı ve yol A'da 13 sinyalli ispat (`verify_mpp_payment_proof`), ödemesiz kapanış (`finalize_fiat_payment`), MPP authority config'te ve upgrade'siz döner | BC-37 (#78) |
 
 ## §12 kararlarının karşılığı
 

@@ -27,6 +27,8 @@ pub enum VerifierError {
     InvalidJobState,
     #[msg("MPP attestation missing or signed by an unexpected key")]
     InvalidMppAttestation,
+    #[msg("Instruction does not apply to the job's settlement rail")]
+    RailMismatch,
     #[msg("Config already records the embedded verifying key version")]
     VkVersionAlreadySynced,
 }

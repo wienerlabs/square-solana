@@ -9,12 +9,16 @@
 // - System, SPL Token, Token-2022: talimat indeksleri; ödeyici yeri yoktur (sponsor bu talimatların hiçbir
 //   hesabında duramaz).
 // - Compute Budget: hesapsız; fiyat ve sınır tavanla denetlenir.
+// - Ed25519 precompile: hesapsız; yalnızca tek imzalı doğrulama (`verify`) tanınır. Fiat rayında MPP
+//   attestation'ı `verify_mpp_payment_proof`'tan hemen önce gelir (ADR 0024). İmza sayısı ücreti artırdığından
+//   çok imzalı talimat tanınmaz.
 import { SQUARE_IDLS, type SquareProgramIds, type SquareProgramName } from '@squaresdk/solana-sdk';
 import { SQUADS_INSTRUCTIONS, SQUADS_PROGRAM_ID, squadsInstructionName } from '@squaresdk/solana-sdk/squads';
 import { ASSOCIATED_TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID, TOKEN_PROGRAM_ID } from '@solana/spl-token';
-import { ComputeBudgetProgram, SystemProgram, type PublicKey } from '@solana/web3.js';
+import { ComputeBudgetProgram, Ed25519Program, SystemProgram, type PublicKey } from '@solana/web3.js';
 
-export type ProgramKind = SquareProgramName | 'squads' | 'system' | 'token' | 'token2022' | 'ata' | 'computeBudget';
+export type ProgramKind =
+  SquareProgramName | 'squads' | 'system' | 'token' | 'token2022' | 'ata' | 'computeBudget' | 'ed25519';
 
 export const SQUARE_PROGRAMS: readonly SquareProgramName[] = ['registry', 'policy', 'verifier', 'escrow'];
 
@@ -115,6 +119,9 @@ const COMPUTE_BUDGET_NAMES: Readonly<Record<number, string>> = {
   4: 'set_loaded_accounts_data_size_limit',
 };
 
+/** Ed25519 precompile'ın tek imzalı doğrulaması (ilk bayt imza sayısı). */
+const ED25519_VERIFY = 'verify';
+
 const NONE: ReadonlySet<number> = new Set();
 const plain = (name: string): KnownInstruction => ({ name, accounts: [], payerSlots: NONE });
 
@@ -151,6 +158,8 @@ export function identify(kind: ProgramKind, data: Uint8Array): KnownInstruction 
     }
     case 'computeBudget':
       return plain(COMPUTE_BUDGET_NAMES[data[0] ?? -1] ?? unknownName(data, 1));
+    case 'ed25519':
+      return plain(data[0] === 1 ? ED25519_VERIFY : unknownName(data, 1));
   }
 }
 
@@ -164,6 +173,7 @@ export function programKinds(programIds: SquareProgramIds): ReadonlyMap<string, 
     [TOKEN_2022_PROGRAM_ID, 'token2022'],
     [ASSOCIATED_TOKEN_PROGRAM_ID, 'ata'],
     [ComputeBudgetProgram.programId, 'computeBudget'],
+    [Ed25519Program.programId, 'ed25519'],
   ];
   return new Map(entries.map(([id, kind]) => [id.toBase58(), kind]));
 }
@@ -187,6 +197,8 @@ function knownNames(kind: ProgramKind): readonly string[] {
       return ATA_NAMES;
     case 'computeBudget':
       return Object.values(COMPUTE_BUDGET_NAMES);
+    case 'ed25519':
+      return [ED25519_VERIFY];
   }
 }
 
@@ -198,11 +210,13 @@ const KINDS: readonly ProgramKind[] = [
   'token2022',
   'ata',
   'computeBudget',
+  'ed25519',
 ];
 
 /**
- * Varsayılan izin listesi (ADR 0019): 8 adımın ve kullanıcı tarafı dispute / iptal akışlarının Square talimatları,
- * smart account kurulumu ve vault tx akışı, ATA açılışı, compute budget ve kullanıcı fonlu aktarımlar.
+ * Varsayılan izin listesi (ADR 0019): 8 adımın, fiat rayının (ADR 0024) ve kullanıcı tarafı dispute / iptal
+ * akışlarının Square talimatları, MPP attestation'ının Ed25519 doğrulaması, smart account kurulumu ve vault tx akışı,
+ * ATA açılışı, compute budget ve kullanıcı fonlu aktarımlar.
  * Yönetici talimatları (`init_*config`, `update_registry_config`, `update_params`, `update_arbitrators`,
  * `update_mpp_authority`), screener (`record_screening`), hakem (`resolve_dispute`) ve CPI'ye özel
  * `record_release` listede yoktur.
@@ -222,6 +236,7 @@ export const DEFAULT_ALLOWED_INSTRUCTIONS: readonly string[] = Object.freeze([
   'verifier:set_compliance_proof',
   'verifier:verify_mpp_payment_proof',
   'escrow:create_job',
+  'escrow:create_fiat_job',
   'escrow:commit_travel_rule',
   'escrow:fund_job',
   'escrow:accept_job',
@@ -230,7 +245,9 @@ export const DEFAULT_ALLOWED_INSTRUCTIONS: readonly string[] = Object.freeze([
   'escrow:buy_claim',
   'escrow:cancel_claim',
   'escrow:cancel_job',
+  'escrow:cancel_fiat_job',
   'escrow:finalize_payment',
+  'escrow:finalize_fiat_payment',
   'escrow:raise_dispute',
   'escrow:execute_resolution',
   'escrow:lapse_dispute',
@@ -245,6 +262,7 @@ export const DEFAULT_ALLOWED_INSTRUCTIONS: readonly string[] = Object.freeze([
   'ata:create_idempotent',
   'computeBudget:set_compute_unit_limit',
   'computeBudget:set_compute_unit_price',
+  'ed25519:verify',
   'system:transfer',
   'token:transfer_checked',
   'token2022:transfer_checked',

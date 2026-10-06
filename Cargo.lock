@@ -2539,6 +2539,8 @@ version = "0.3.0"
 dependencies = [
  "anchor-lang",
  "groth16-solana",
+ "solana-instructions-sysvar",
+ "solana-sdk-ids",
  "square-common",
 ]
 

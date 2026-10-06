@@ -80,6 +80,23 @@ pub struct Job {
     pub dispute: DisputeInfo,
     #[max_len(DELIVERY_URI_MAX_LEN)]
     pub delivery_uri: String,
+    /// How the job is paid (ADR 0024). Appended last: accounts created before the field read their
+    /// zero padding as `Escrow`.
+    pub rail: SettlementRail,
+}
+
+/// Settlement rail of a job (ADR 0024).
+#[derive(
+    AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq, Debug, Default, InitSpace,
+)]
+pub enum SettlementRail {
+    /// The institution funds the vault in the settlement mint; release pays from it.
+    #[default]
+    Escrow,
+    /// The institution pays off-chain through Stripe (MPP); no vault, no dispute or claim. The
+    /// verifier's `verify_mpp_payment_proof` binds the attested payment, `finalize_fiat_payment` records
+    /// it.
+    Fiat,
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq, Debug, InitSpace)]

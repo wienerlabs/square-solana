@@ -1,6 +1,6 @@
 # Program arayüz sözleşmesi
 
-**Sözleşme sürümü:** v0.7.0 (taslak) · **Issue:** BC-44 (#101), BC-47 (#119), BE-10 (#42), BC-17 (#25), BC-15 (#24), BC-21 (#29), BC-34 (#71), BC-09 (#9), BC-36 (#77), BC-32 (#69), BC-33 (#70), BC-38 (#92) · **IDL'ler:** [`idl/`](../../idl/)
+**Sözleşme sürümü:** v0.8.0 (taslak) · **Issue:** BC-44 (#101), BC-47 (#119), BE-10 (#42), BC-17 (#25), BC-15 (#24), BC-21 (#29), BC-34 (#71), BC-09 (#9), BC-36 (#77), BC-32 (#69), BC-33 (#70), BC-37 (#78), BC-38 (#92) · **IDL'ler:** [`idl/`](../../idl/)
 
 Bu doküman Square'in dört Solana programının (`square_registry`, `square_policy`, `square_verifier`, `square_escrow`) dış arayüzünü sabitler: instruction adları ve argümanları, hesap sırası ve imzacılar, account düzenleri, PDA seed'leri, event'ler ve hata kodları. Backend (BE-35 API/SDK sözleşmesi, servisler) ve frontend (FE-24 veri katmanı) bu sözleşmeye göre geliştirir. Gerçek programlar `programs/` altında taşındıkça ve değiştikçe bu arayüze uyar; uyum BC-13 ile CI'da denetlenir.
 
@@ -66,6 +66,7 @@ Bir program gerçek uygulamasına kavuştuğunda, o programın `anchor build` il
 | 7 | Kurumun yazılımı | `set_compliance_proof(proof_a, proof_b, proof_c, public_inputs)` → `ReleaseProof` | verifier | `Institution`, `Policy`, `Job`, `ClaimListing` |
 | 6 + 8 | Keeper | `finalize_payment`: keeper ücreti, proof gate, ödeme, itibar, validation kaydı, `record_release` CPI | escrow → verifier | `ReleaseProof`, `OperatorState`, payee `ScreeningRecord` |
 | — | Kurum / arbitrator / herkes | `raise_dispute` / `escalate_missing_proof` → `resolve_dispute` oyları (M) → `execute_resolution`; karar çıkmazsa `lapse_dispute` | escrow | `ReleaseProof` (agent tarafına ödeme varsa) |
+| Fiat | Kurum, agent, MPP authority, herkes | `create_fiat_job(spec_hash, amount, deadline)` (vault yok, policy zorunlu) → `accept_job` (açıkken) → `submit_work` → kurum Stripe ile öder → Ed25519 attestation + `verify_mpp_payment_proof` → `finalize_fiat_payment` ([ADR 0024](../decisions/0024-stripe-mpp-fiat-rayi.md)) | escrow, verifier | `AgentRecord`, `Policy`, `Institution`, iki `ScreeningRecord`; `Job`, Instructions sysvar; `ReleaseProof`, `OperatorState` |
 
 Policy'li işlerde 7. adım, 6. adımdaki finalize'dan **önce** gelir (Arc modeli): kurum ispatı release'den önce job'a bağlar, keeper ispattan habersizdir. İspat yoksa `finalize_payment` `ProofRequired` ile reddedilir ve escrow bekler. Agent'ın bu durumdaki başvuru yolu `escalate_missing_proof`'tur ([ADR 0016](../decisions/0016-dispute-m-of-n-zaman-asimi-ve-ispatsiz-bekleme.md)).
 
@@ -90,6 +91,11 @@ Policy'li işlerde 7. adım, 6. adımdaki finalize'dan **önce** gelir (Arc mode
 | verifier `set_compliance_proof` | `Institution`, `Policy` (policy) | yukarıdaki gibi | owner; imzacı kurumun güncel yetkilisi; `policy.institution == institution` | — |
 | verifier `set_compliance_proof` | `Job` (escrow) | `["job", institution_wallet, spec_hash]` | owner; durum Delivered/Disputed/Resolved; `job.policy == policy`; ispat `job.policy_commitment` ve `policy_daily_ceiling`'e karşı doğrulanır | — |
 | verifier `set_compliance_proof` | `ClaimListing` (escrow) | `["claim", job]` | yoksa payee agent; `Bought` ise payee alıcı | ✓ |
+| escrow `create_fiat_job` | `AgentRecord`, `Policy`, `Institution` (registry, policy) | `create_job`'daki gibi | `create_job`'daki gibi; policy zorunlu | — |
+| escrow `create_fiat_job` | `ScreeningRecord` ×2 (registry) | `["screening", wallet]` | kurum ve `AgentRecord.wallet`: temiz ve taze (`fund_job`'ın kuralı) | — |
+| escrow `finalize_fiat_payment` | `ReleaseProof`, `OperatorState`, `VerifierConfig` (verifier) | `finalize_payment`'taki gibi | payee `job.agent_wallet`, net `job.amount`; uyumlu ve taze; `record_release` CPI | ✓ (`ReleaseProof`, `VerifierConfig`) |
+| verifier `verify_mpp_payment_proof` | `Institution`, `Policy` (policy), `Job` (escrow) | `set_compliance_proof`'taki gibi | `job.rail == Fiat`, `Delivered`, `job.policy == policy`; ispat 13 sinyale (payee agent, net `job.amount`, sinyal 12 makbuz) karşı | — |
+| verifier `verify_mpp_payment_proof` | Instructions sysvar | — | önceki talimat Ed25519 precompile; tek imza, kendi verisinde; imzacı `config.mpp_authority`, mesaj `"square/mpp-attestation/v1" ‖ job ‖ stripe_receipt_hash ‖ amount (u64 LE)` | — |
 
 **Kontrollerin paylaşımı:** Verifier ispatı job'un policy snapshot'ına karşı doğrular; payee ve mint'i `Job` / `ClaimListing`'den bağlar. Net tutarı ise doğrulamaz, ispattaki değeri kaydeder. Escrow release anında net tutarı kendi config'iyle (`amount − keeper fee`, dispute'ta agent tarafı tutarı) hesaplar ve ispattaki payee, tutar, mint ve günlük sayaçla karşılaştırır. Herhangi biri farklıysa `StaleReleaseProof` döner ve kurum ispatı yeniden bağlar.
 
@@ -157,6 +163,18 @@ stateDiagram-v2
   Accepted --> Cancelled: cancel_job (deadline sonrası)
 ```
 
+Fiat işin ([ADR 0024](../decisions/0024-stripe-mpp-fiat-rayi.md)) vault'u, fonlama adımı, challenge penceresi, dispute'u ve alacağı yoktur:
+
+```mermaid
+stateDiagram-v2
+  [*] --> Open: create_fiat_job
+  Open --> Accepted: accept_job
+  Accepted --> Delivered: submit_work
+  Delivered --> Released: verify_mpp_payment_proof (verifier) + finalize_fiat_payment
+  Open --> Cancelled: cancel_fiat_job
+  Accepted --> Cancelled: cancel_fiat_job (deadline sonrası)
+```
+
 - `finalize_payment` yalnızca `challenge_end` geçtikten sonra ve aktif dispute yokken çalışır. Keeper ücreti her dalda ödenir: `net = amount − amount × keeper_fee_bps / 10 000`.
 - Payee çözümlemesi her yerde aynıdır: `ClaimListing.status == Bought` ise alıcı, değilse `Job.agent_wallet`. İspat bağlama (`ReleaseProof.payee`) ve ödeme aynı kuralı kullanır. Settlement'ta listeleme `Settled` olur; iş kuruma iade edilirse `Defaulted` olur ve alıcıya ödeme yapılmaz.
 - Dispute iki adımlıdır: arbitrator oyları (`resolve_dispute`) yalnızca kararı kaydeder. Ödemeyi `execute_resolution` yapar, böylece settlement hesapları ve rentler tek bir çağrıda kullanılır. Her job'da en fazla bir dispute açılabilir.
@@ -174,7 +192,7 @@ Aşağıdakiler sözleşmede **taslak** olarak yer alır; ayrıntılar ilgili is
 | İspatsız bekleme | `EscrowParams.proof_timeout_secs` (>= 0), `escalate_missing_proof`: policy'li işte `challenge_end + proof_timeout_secs` (lapse'tan sonra kapanıştan) sonra, bugün işi kapatabilecek bir ispat yoksa agent bond'suz dispute açar; `MissingProofEscalated`, `ProofTimeoutNotReached` | BC-33: v0.6.0'da kesinleşti (ADR 0016) |
 | Travel Rule | `EscrowParams.travel_rule_threshold` (0 = kapalı), `commit_travel_rule(commitment)`, `Job.travel_rule_commitment`, `TravelRuleCommitted`, `TravelRuleCommitmentRequired` | BC-34: v0.4.2'de kesinleşti ([ADR 0015](../decisions/0015-travel-rule-commitment-ve-esik.md)) |
 | CCTP fonlama | Ayrı instruction yok: CCTP `receive_message` USDC'yi kurumun token hesabına mint eder, aynı tx'te `fund_job` çalışır | BC-36: v0.5.1'de kesinleşti ([cctp-funding.md](cctp-funding.md)) |
-| Stripe MPP | `verify_mpp_payment_proof` (Ed25519 precompile + Sysvar Instructions), `update_mpp_authority`, `VerifierConfig.mpp_authority`, `MppPaymentVerified` | BC-37 |
+| Stripe MPP | `verify_mpp_payment_proof` (Ed25519 precompile + Sysvar Instructions), `update_mpp_authority`, `VerifierConfig.mpp_authority`, `MppPaymentVerified` | BC-37: v0.7.0'da kesinleşti ([ADR 0024](../decisions/0024-stripe-mpp-fiat-rayi.md)); fiat iş (`create_fiat_job`, `cancel_fiat_job`, `finalize_fiat_payment`, `Job.rail`), attestation işe ve tutara bağlı, ispat yol A'da 13 sinyal |
 
 ## 8. Kaynak programlardan farklar ve tasarım kararları
 
@@ -186,6 +204,7 @@ Aşağıdakiler sözleşmede **taslak** olarak yer alır; ayrıntılar ilgili is
 | Aperture policy-registry | `*_multisig` instruction'ları kalkar. Yetkili, multisig bağlanana kadar kurum anahtarı, sonrasında yalnızca bağlı Squads vault'udur | BC-17, BC-35 |
 | Aperture policy-registry | `merkle_root` / `policy_data_hash` yerine salt'lı Poseidon `commitment` + public `daily_ceiling`; `buyer_root` eklenir | BC-17, BC-18 |
 | Aperture verifier | `verify_payment_proof` (RISC Zero), `verify_batch_attestation`, `record_payment` ve `ComplianceStatus` / `ProofRecord` hesapları kalkar; yerine `set_compliance_proof` → `ReleaseProof` ve CPI-only `record_release` gelir | BC-11, BC-21 |
+| Aperture verifier | `verify_mpp_payment_proof`: derleme zamanı `MPP_AUTHORITY_PUBKEY` yerine `VerifierConfig.mpp_authority` (`update_mpp_authority`); imzalanan mesaj commitment'tan `job ‖ commitment ‖ amount`'a genişler; 10 sinyal argümanı yerine yol A'da 13 sinyal; `ProofRecord` yerine `ReleaseProof`, sayaç `finalize_fiat_payment`'ın `record_release` CPI'ıyla ilerler | BC-37 |
 | Covenant | `create_job` (oluştur + fonla) ikiye ayrılır: `create_job` + `fund_job`; job bir `AgentRecord`'a ve opsiyonel bir `Policy`'ye bağlanır, policy snapshot'ı alır; tek settlement mint'i (`EscrowConfig.settlement_mint`) | BC-22 |
 | Covenant | `JobEscrow` → `Job`; `ProtocolConfig` → `EscrowConfig` (seed `["config"]` korunur); sabit 3 arbitrator slotu → en fazla 7 (M-of-N); oylama (`resolve_dispute`) ile ödeme (`execute_resolution`) ayrılır | BC-22, BC-32 |
 | Covenant | `FavorTaker` / `FavorPoster` → `FavorAgent` / `FavorInstitution`; `Split { taker_amount }` → `Split { agent_amount }` | BC-22 |
@@ -204,7 +223,7 @@ Sözleşme bu konularda bir varsayımla yazıldı. Varsayım, ilgili issue'nun A
 6. **Aktif dispute'ta arbitrator seti değişimi (BC-32):** Dispute, açıldığı andaki `arbitrator_set_version`'ı saklar; oylamanın hangi sete göre yapılacağı issue'da kesinleşir. **Karar (ADR 0016):** oylar oy anındaki sete göre sayılır; sürüm eskiyse sonraki oy sayımı sıfırlar, son tarih değişmez.
 7. **Keeper ücreti üst sınırı (BC-23):** `InvalidKeeperFee` için en yüksek bps değeri belirlenmeli.
 8. **Aynı token hesabının birden çok rolde geçmesi (BC-23):** Örneğin keeper kurumun kendisiyse, `finalize_payment`'te aynı token hesabı iki kez yazılabilir olarak geçebilir. Anchor 1.2.0'da (BC-08) aynı yazılabilir hesabın iki kez geçmesi varsayılan olarak reddedilir (2040); izin verilecek hesaba `dup` kısıtı yazılmalı.
-9. **İşlem boyutu (BC-19, BC-21, BC-28):** v0.2.0'dan itibaren `set_compliance_proof` 13 public sinyalin 10'unu hesaplardan kendisi kurar ([release-circuit.md](release-circuit.md) §6, yol A); instruction verisi 8 + 256 + 2 + 8 + 8 = 282 bayttır. `verify_mpp_payment_proof` hâlâ 10 sinyali argüman olarak taşır ve Ed25519 instruction'ıyla birlikte sınırı aşar; 13 sinyale ve aynı yola geçişi BC-37'de. 8 adımın tx'lerinin ölçümü ve Square ALT'ı: [tx-budget.md](tx-budget.md) (BC-28); `set_compliance_proof` ALT'sız 868 bayttır.
+9. **İşlem boyutu (BC-19, BC-21, BC-28):** v0.2.0'dan itibaren `set_compliance_proof` 13 public sinyalin 10'unu hesaplardan kendisi kurar ([release-circuit.md](release-circuit.md) §6, yol A); instruction verisi 8 + 256 + 2 + 8 + 8 = 282 bayttır. `verify_mpp_payment_proof` v0.7.0'dan itibaren aynı yoldadır (BC-37): argümanları ispat, `stripe_receipt_hash` ve `proof_timestamp`'tir (8 + 256 + 32 + 8 = 304 bayt); Ed25519 talimatıyla birlikte tx ALT'sız 1135, Square ALT'ıyla 1076 bayttır. 8 adımın tx'lerinin ölçümü ve Square ALT'ı: [tx-budget.md](tx-budget.md) (BC-28); `set_compliance_proof` ALT'sız 868 bayttır.
 10. **`emit!` / `emit_cpi!` (BC-16):** Karar `emit!`; gerekçe, istisna kuralı ve sürümleme [events.md](events.md)'de. Programlar event'leri `square_common::square_<program>_events!()` ile tanımlar.
 11. **Tek settlement mint'i (BC-22):** v0.1.0 yalnızca `EscrowConfig.settlement_mint` (USDC) ile çalışır. Policy tavanı ve günlük sayaç bu mint'in birimindedir. Çoklu mint ve Token-2022 uzantıları kapsam dışıdır.
 
@@ -315,18 +334,18 @@ IDL'den üretilmiştir; instruction'lar alfabetik sıradadır. "(w)" yazılabili
 | `set_compliance_proof` | `proof_a: [u8; 64]`, `proof_b: [u8; 128]`, `proof_c: [u8; 64]`, `refusal_code: u16`, `net_amount: u64`, `proof_timestamp: i64` | `payer` (w), `authority` | `operator_state`, `release_proof` | — |
 | `sync_vk_version` | — | `admin` | `config` | — |
 | `update_mpp_authority` | `mpp_authority: pubkey` | `admin` | `config` | — |
-| `verify_mpp_payment_proof` | `proof_a: [u8; 64]`, `proof_b: [u8; 128]`, `proof_c: [u8; 64]`, `public_inputs: [[u8; 32]; 10]` | `payer` (w), `authority` | `operator_state` | — |
+| `verify_mpp_payment_proof` | `proof_a: [u8; 64]`, `proof_b: [u8; 128]`, `proof_c: [u8; 64]`, `stripe_receipt_hash: [u8; 32]`, `proof_timestamp: i64` | `payer` (w), `authority` | `operator_state`, `release_proof` | — |
 
 #### Event'ler (4)
 
 | Event | Alanlar |
 |---|---|
 | `ComplianceProofSet` | `job: pubkey`, `policy: pubkey`, `verdict: ReleaseVerdict`, `refusal_code: u16`, `payee: pubkey`, `net_amount: u64`, `mint: pubkey`, `daily_spent_before: u64` |
-| `MppPaymentVerified` | `institution: pubkey`, `policy: pubkey`, `stripe_receipt_hash: [u8; 32]`, `amount: u64` |
+| `MppPaymentVerified` | `job: pubkey`, `institution: pubkey`, `policy: pubkey`, `stripe_receipt_hash: [u8; 32]`, `amount: u64` |
 | `ReleaseRecorded` | `job: pubkey`, `institution: pubkey`, `net_amount: u64`, `daily_spent: u64`, `day_start_unix: i64` |
 | `VerifierConfigUpdated` | `admin: pubkey`, `escrow_program: pubkey`, `policy_program: pubkey`, `mpp_authority: pubkey`, `vk_version: u16` |
 
-#### Hata kodları (12)
+#### Hata kodları (13)
 
 | Kod | Ad | Mesaj |
 |---|---|---|
@@ -341,22 +360,26 @@ IDL'den üretilmiştir; instruction'lar alfabetik sıradadır. "(w)" yazılabili
 | 6008 | `InvalidLinkedAccount` | Account owner or seeds do not match the linked program |
 | 6009 | `InvalidJobState` | Job is not in a state that accepts a release proof |
 | 6010 | `InvalidMppAttestation` | MPP attestation missing or signed by an unexpected key |
-| 6011 | `VkVersionAlreadySynced` | Config already records the embedded verifying key version |
+| 6011 | `RailMismatch` | Instruction does not apply to the job's settlement rail |
+| 6012 | `VkVersionAlreadySynced` | Config already records the embedded verifying key version |
 
 ### 10.4 square_escrow
 
-#### Instruction'lar (19)
+#### Instruction'lar (22)
 
 | Instruction | Argümanlar | İmzacılar | Yazılabilir diğer hesaplar | Opsiyonel hesaplar |
 |---|---|---|---|---|
 | `accept_job` | `spec_hash: [u8; 32]` | `agent` | `job` | — |
 | `buy_claim` | `price: u64`, `leaf_salt: [u8; 32]`, `merkle_proof: Vec<[u8; 32]>` | `buyer` | `claim_listing`, `buyer_token_account`, `seller_token_account` | `policy` |
 | `cancel_claim` | — | `seller` | `claim_listing`, `rent_payer` | — |
+| `cancel_fiat_job` | — | `institution` | `job` | — |
 | `cancel_job` | — | `institution` | `job`, `vault`, `institution_token_account`, `rent_payer` | — |
 | `commit_travel_rule` | `commitment: [u8; 32]` | `institution` | `job` | — |
+| `create_fiat_job` | `spec_hash: [u8; 32]`, `amount: u64`, `deadline: i64` | `payer` (w), `institution` | `job` | — |
 | `create_job` | `spec_hash: [u8; 32]`, `amount: u64`, `deadline: i64`, `challenge_period: u64` | `payer` (w), `institution` | `job`, `vault` | `policy`, `policy_institution` |
 | `escalate_missing_proof` | — | `agent` | `job` | — |
 | `execute_resolution` | — | `payer` (w) | `job`, `vault`, `bond_vault`, `claim_listing`, `payee_token_account`, `institution_token_account`, `release_proof`, `operator_state`, `agent_reputation`, `validation_record`, `rent_payer` | `bond_vault`, `release_proof`, `operator_state`, `verifier_config`, `verifier_program` |
+| `finalize_fiat_payment` | — | `payer` (w) | `job`, `release_proof`, `operator_state`, `agent_reputation`, `validation_record` | — |
 | `finalize_payment` | — | `keeper` (w) | `job`, `vault`, `claim_listing`, `payee_token_account`, `institution_token_account`, `keeper_token_account`, `release_proof`, `operator_state`, `agent_reputation`, `validation_record`, `rent_payer` | `release_proof`, `operator_state`, `verifier_config`, `verifier_program` |
 | `fund_job` | — | `institution` | `job`, `vault`, `institution_token_account` | — |
 | `init_config` | `settlement_mint: pubkey`, `arbitrators: Vec<pubkey>`, `threshold: u8`, `params: EscrowParams`, `linked: LinkedPrograms` | `admin` (w) | `config` | — |
@@ -369,7 +392,7 @@ IDL'den üretilmiştir; instruction'lar alfabetik sıradadır. "(w)" yazılabili
 | `update_arbitrators` | `arbitrators: Vec<pubkey>`, `threshold: u8` | `admin` | `config` | — |
 | `update_params` | `params: EscrowParams` | `admin` | `config` | — |
 
-#### Event'ler (23)
+#### Event'ler (24)
 
 | Event | Alanlar |
 |---|---|
@@ -383,6 +406,7 @@ IDL'den üretilmiştir; instruction'lar alfabetik sıradadır. "(w)" yazılabili
 | `DisputeResolved` | `job: pubkey`, `resolution: DisputeResolution`, `agent_side_amount: u64`, `institution_refund: u64`, `bond_to_agent_side: u64`, `bond_returned: u64` |
 | `DisputeVote` | `job: pubkey`, `arbitrator: pubkey`, `resolution: DisputeResolution`, `approval_count: u8` |
 | `EscrowConfigUpdated` | `admin: pubkey`, `settlement_mint: pubkey`, `params: EscrowParams` |
+| `FiatJobCreated` | `job: pubkey`, `institution: pubkey`, `agent_record: pubkey`, `agent_wallet: pubkey`, `policy: pubkey`, `policy_version: u32`, `mint: pubkey`, `amount: u64`, `spec_hash: [u8; 32]`, `deadline: i64` |
 | `Finalized` | `job: pubkey`, `keeper: pubkey`, `keeper_fee: u64` |
 | `JobAccepted` | `job: pubkey`, `agent_record: pubkey`, `agent_wallet: pubkey` |
 | `JobAgentWalletSynced` | `job: pubkey`, `agent_wallet: pubkey` |
@@ -397,7 +421,7 @@ IDL'den üretilmiştir; instruction'lar alfabetik sıradadır. "(w)" yazılabili
 | `ValidationRecorded` | `job: pubkey`, `agent_record: pubkey`, `outcome: ValidationOutcome`, `refusal_code: u16` |
 | `WorkSubmitted` | `job: pubkey`, `work_hash: [u8; 32]`, `delivery_uri: string`, `challenge_end: i64` |
 
-#### Hata kodları (49)
+#### Hata kodları (50)
 
 | Kod | Ad | Mesaj |
 |---|---|---|
@@ -450,6 +474,7 @@ IDL'den üretilmiştir; instruction'lar alfabetik sıradadır. "(w)" yazılabili
 | 6046 | `ProofTimeoutNotReached` | Proof timeout has not passed yet |
 | 6047 | `TravelRuleCommitmentRequired` | Travel Rule commitment required above the threshold |
 | 6048 | `InvalidDisputeTimeout` | Dispute timeout must be positive and proof timeout must not be negative |
+| 6049 | `RailMismatch` | Instruction does not apply to the job's settlement rail |
 
 ## 11. Sözleşme değişiklik kaydı
 
@@ -462,7 +487,8 @@ IDL'den üretilmiştir; instruction'lar alfabetik sıradadır. "(w)" yazılabili
 | v0.3.0 | `set_institution_multisig` multisig hesabını da alır (`squads_multisig`, salt okunur): program, hesabın Squads v4'e ait ve başlatılmış bir `Multisig` olduğunu doğrular; yanlış ya da var olmayan bir multisig bağlanıp kurum kilitlenemez. Hata 6004 `InvalidMultisigVault` → `InvalidSquadsMultisig` ("Account is not an initialized Squads v4 multisig"); kodlar ve sıraları değişmedi. Program ilk kez bu arayüzle yazıldı (BC-17); IDL'i `set_buyer_root` (BC-18) dışında sözleşmeyle aynı | BC-17 (#25) |
 | v0.4.0 | Registry'nin agent kuralları did:aip v2 Solana profili §4.2'yle hizalandı. `AgentIdInvalid` (6000) kimliğin alfabesini de kapsar: `[A-Za-z0-9_-]{1,32}`. Yeni hata 6007 `AgentCardHashInvalid`: kart hash'i tam olarak URI boşken sıfırdır (§4.2/4; dolu URI'nin hash'i kartın SHA-256'sıdır). `transfer_agent_ownership` `wallet`'ı yeni sahibe sıfırlar (§4.2/5), dokümanı buna göre. Mevcut kodlar ve sıraları değişmedi. Program ilk kez bu arayüzle yazıldı (BC-15); IDL'i `init_registry_config`, `update_registry_config`, `record_screening` ve `RegistryConfig` / `ScreeningRecord` (BC-27) dışında sözleşmeyle aynı | BC-15 (#24) |
 | v0.4.1 | Yalnızca doküman: `set_compliance_proof`'un `refusal_code`, `net_amount` ve `proof_timestamp` argümanlarındaki doküman satırları talimatın dokümanına taşındı. Rust fonksiyon argümanları doküman taşıyamadığı için Anchor argümana doküman üretemez; v0.2.0'da IDL'e elle yazılan bu satırları hiçbir program üretemiyordu. Argümanlar, tipleri ve sıraları değişmedi. Verifier ilk kez bu arayüzle yazıldı (BC-21); IDL'i `verify_mpp_payment_proof` ve `update_mpp_authority` (BC-37) dışında sözleşmeyle aynı | BC-21 (#29) |
-| v0.7.0 | Verifier: yeni talimat `sync_vk_version` (argümansız; `admin` imzacı, config'in admin'i; `config` yazılabilir) ve yeni hata 6011 `VkVersionAlreadySynced`. Gömülü doğrulama anahtarının sürümü (`RELEASE_VK_VERSION`) değişen bir upgrade'den sonra config'in `vk_version`'ını programınkine eşitler ve `VerifierConfigUpdated` yayar; config aynı sürümdeyse düşer. `vk_version` daha önce yalnızca `init_verifier_config`'te yazılıyordu: kamusal phase-2 töreninin anahtarına geçen upgrade'den (BC-38) sonra config geliştirme anahtarının sürümünü göstermeye devam ederdi. Mevcut talimatlar, hesaplar, event'ler ve kodlar değişmedi | BC-38 (#92) |
+| v0.8.0 | Verifier: yeni talimat `sync_vk_version` (argümansız; `admin` imzacı, config'in admin'i; `config` yazılabilir) ve yeni hata 6012 `VkVersionAlreadySynced` (BC-37'nin 6011 `RailMismatch`'ından sonra). Gömülü doğrulama anahtarının sürümü (`RELEASE_VK_VERSION`) değişen bir upgrade'den sonra config'in `vk_version`'ını programınkine eşitler ve `VerifierConfigUpdated` yayar; config aynı sürümdeyse düşer. `vk_version` daha önce yalnızca `init_verifier_config`'te yazılıyordu: kamusal phase-2 töreninin anahtarına geçen upgrade'den (BC-38) sonra config geliştirme anahtarının sürümünü göstermeye devam ederdi. Mevcut talimatlar, hesaplar, event'ler ve kodlar değişmedi | BC-38 (#92) |
+| v0.7.0 | Stripe MPP fiat rayı taslaktan çıktı ([ADR 0024](../decisions/0024-stripe-mpp-fiat-rayi.md)). Escrow: `Job.rail: SettlementRail { Escrow, Fiat }` hesabın sonuna eklendi (eski hesaplar dolgusunu `Escrow` okur); yeni talimatlar `create_fiat_job(spec_hash, amount, deadline)`, `cancel_fiat_job`, `finalize_fiat_payment`; yeni event `FiatJobCreated`; yeni hata 6049 `RailMismatch` (fiat işte fonlama, dispute, alacak, Travel Rule; escrow işinde fiat talimatları). `accept_job` fiat işi `Open`'ken kabul eder. Verifier: `verify_mpp_payment_proof` yol A'ya geçti (argümanlar `proof_a/b/c`, `stripe_receipt_hash: [u8; 32]`, `proof_timestamp: i64`; hesaplar `release_proof` ve Instructions sysvar'ı eklendi), `update_mpp_authority` yazıldı, `MppPaymentVerified`'a `job` eklendi (taslak event, daha önce yayımlanmadı), yeni hata 6011 `RailMismatch`; `set_compliance_proof` fiat işi reddeder. Mevcut kodlar ve sıraları değişmedi. Programların IDL'leri sözleşmeyle aynı; `scripts/ci/programs.mjs`'te bekleyen öğe yok | BC-37 (#78) |
 | v0.6.0 | Dispute yüzeyi taslaktan çıktı ([ADR 0016](../decisions/0016-dispute-m-of-n-zaman-asimi-ve-ispatsiz-bekleme.md)). Escrow: yeni hata 6048 `InvalidDisputeTimeout` (`update_params` / `init_config`: `dispute_timeout_secs > 0`, `proof_timeout_secs >= 0`), sona eklendi, mevcut kodlar ve sıraları değişmedi; `raise_dispute`, `resolve_dispute`, `execute_resolution`, `update_arbitrators`, `lapse_dispute`, `escalate_missing_proof` ve `DisputeInfo` / `EscrowParams` alanlarının dokümanları kesinleşen kurallara göre. Verifier: `set_compliance_proof` `Resolved` işe de ispat bağlar (IDL değişmedi). Talimatlar, hesap sıraları, argümanlar ve event'ler değişmedi. Escrow'un IDL'i sözleşmeyle aynı | BC-32 (#69), BC-33 (#70) |
 | v0.5.1 | Yalnızca doküman: CCTP fonlaması taslaktan çıktı ([cctp-funding.md](cctp-funding.md)). Escrow'a talimat eklenmedi: Circle'ın `receive_message`'ı ile `fund_job` aynı tx'te art arda çalışır, devnet'te Sepolia'dan gerçek bir burn'le denendi. Talimatlar, hesaplar ve kodlar değişmedi | BC-36 (#77) |
 | v0.5.0 | Square program kimlikleri (BC-09): IDL `address` alanları ve programların `declare_id!`'i kaynak programların kimliklerinden Square'in kendi kimliklerine geçti. Registry `AL5p4aTWrmBmWa4vxJFbBjQG7Xnx2juc15FJRGpwSsA9`, policy `63HKPj2L8a9DGeTa9Eh3NaZXthMrFUEgbs9Y28SNEc4`, verifier `8yLdDR5zoAzeEWzkNX19DKy4HfVYXb7VcU3wWStwTFPh`, escrow `6yBTEVbizMVCWAp4c3jx6Xdsay3CiUmrJmTswY7QRWaX`. PDA'lar program kimliğinden türediği için bütün PDA adresleri değişti; instruction, argüman, hesap, event ve hata kodları değişmedi. Registry artık did:aip v1 programının (`CgchXu…`) kimliğini taşımıyor | BC-09 (#9) |

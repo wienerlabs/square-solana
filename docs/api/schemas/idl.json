@@ -864,6 +864,58 @@
       }
     }
   },
+  "FiatJobCreated": {
+    "type": "object",
+    "description": "A fiat job was opened by `create_fiat_job` (ADR 0024): no vault, always proof-gated.",
+    "required": [
+      "job",
+      "institution",
+      "agentRecord",
+      "agentWallet",
+      "policy",
+      "policyVersion",
+      "mint",
+      "amount",
+      "specHash",
+      "deadline"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "job": {
+        "$ref": "#/Address"
+      },
+      "institution": {
+        "$ref": "#/Address"
+      },
+      "agentRecord": {
+        "$ref": "#/Address"
+      },
+      "agentWallet": {
+        "$ref": "#/Address"
+      },
+      "policy": {
+        "$ref": "#/Address"
+      },
+      "policyVersion": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 4294967295
+      },
+      "mint": {
+        "$ref": "#/Address"
+      },
+      "amount": {
+        "$ref": "#/U64"
+      },
+      "specHash": {
+        "$ref": "#/Hex32"
+      },
+      "deadline": {
+        "type": "integer",
+        "format": "int64"
+      }
+    }
+  },
   "Finalized": {
     "type": "object",
     "required": [
@@ -997,6 +1049,14 @@
       "cancelled"
     ]
   },
+  "SettlementRail": {
+    "type": "string",
+    "description": "Settlement rail of a job (ADR 0024).",
+    "enum": [
+      "escrow",
+      "fiat"
+    ]
+  },
   "Job": {
     "type": "object",
     "description": "seeds = [\"job\", institution, spec_hash]; vault = [\"escrow_token\", job], bond vault = [\"bond\", job] (token authority of both = job).",
@@ -1026,7 +1086,8 @@
       "bondBump",
       "policy",
       "dispute",
-      "deliveryUri"
+      "deliveryUri",
+      "rail"
     ],
     "additionalProperties": false,
     "properties": {
@@ -1139,6 +1200,10 @@
       },
       "deliveryUri": {
         "type": "string"
+      },
+      "rail": {
+        "$ref": "#/SettlementRail",
+        "description": "How the job is paid (ADR 0024). Appended last: accounts created before the field read their zero padding as `Escrow`."
       }
     }
   },
@@ -1311,8 +1376,9 @@
   },
   "MppPaymentVerified": {
     "type": "object",
-    "description": "DRAFT (M6).",
+    "description": "A Stripe (MPP) payment bound to a fiat job by `verify_mpp_payment_proof` (ADR 0024).",
     "required": [
+      "job",
       "institution",
       "policy",
       "stripeReceiptHash",
@@ -1320,6 +1386,9 @@
     ],
     "additionalProperties": false,
     "properties": {
+      "job": {
+        "$ref": "#/Address"
+      },
       "institution": {
         "$ref": "#/Address"
       },
@@ -1942,7 +2011,7 @@
       },
       "mppAuthority": {
         "$ref": "#/Address",
-        "description": "DRAFT (M6): ed25519 key of the compliance-api MPP attestations."
+        "description": "Ed25519 key whose attestations bind Stripe (MPP) payments to fiat jobs; rotated by the admin with `update_mpp_authority` (ADR 0024)."
       },
       "vkVersion": {
         "type": "integer",
@@ -2606,6 +2675,28 @@
       }
     }
   },
+  "FiatJobCreatedEvent": {
+    "type": "object",
+    "required": [
+      "program",
+      "name",
+      "data"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "program": {
+        "type": "string",
+        "const": "escrow"
+      },
+      "name": {
+        "type": "string",
+        "const": "FiatJobCreated"
+      },
+      "data": {
+        "$ref": "#/FiatJobCreated"
+      }
+    }
+  },
   "FinalizedEvent": {
     "type": "object",
     "required": [
@@ -2976,6 +3067,9 @@
         "$ref": "#/EscrowConfigUpdatedEvent"
       },
       {
+        "$ref": "#/FiatJobCreatedEvent"
+      },
+      {
         "$ref": "#/FinalizedEvent"
       },
       {
@@ -3045,6 +3139,7 @@
         "DisputeResolved": "#/DisputeResolvedEvent",
         "DisputeVote": "#/DisputeVoteEvent",
         "EscrowConfigUpdated": "#/EscrowConfigUpdatedEvent",
+        "FiatJobCreated": "#/FiatJobCreatedEvent",
         "Finalized": "#/FinalizedEvent",
         "JobAccepted": "#/JobAcceptedEvent",
         "JobAgentWalletSynced": "#/JobAgentWalletSyncedEvent",
@@ -3771,7 +3866,7 @@
   },
   "UpdateMppAuthorityCall": {
     "type": "object",
-    "description": "DRAFT (M6, BC-37): rotates the MPP attestation authority (replaces Aperture's compile-time key).",
+    "description": "The config admin (Squads vault) rotates the MPP attestation key without a program upgrade. A zero key disables the fiat rail: no attestation can verify.",
     "required": [
       "program",
       "instruction",
@@ -3798,7 +3893,8 @@
       "proofA",
       "proofB",
       "proofC",
-      "publicInputs"
+      "stripeReceiptHash",
+      "proofTimestamp"
     ],
     "additionalProperties": false,
     "properties": {
@@ -3814,19 +3910,18 @@
         "type": "string",
         "pattern": "^[0-9a-f]{128}$"
       },
-      "publicInputs": {
-        "type": "array",
-        "items": {
-          "$ref": "#/Hex32"
-        },
-        "minItems": 10,
-        "maxItems": 10
+      "stripeReceiptHash": {
+        "$ref": "#/Hex32"
+      },
+      "proofTimestamp": {
+        "type": "integer",
+        "format": "int64"
       }
     }
   },
   "VerifyMppPaymentProofCall": {
     "type": "object",
-    "description": "DRAFT (M6, BC-37): Stripe MPP path — checks the compliance-api ed25519 attestation from the preceding Ed25519 precompile instruction and records the payment proof.",
+    "description": "Fiat rail (ADR 0024): binds a Stripe (MPP) payment to a delivered fiat job. The instruction right before it must be the Ed25519 precompile verifying `config.mpp_authority`'s signature on `\"square/mpp-attestation/v1\" || job || stripe_receipt_hash || amount (u64 LE)`, `amount` being the job amount. The Groth16 proof is checked against the same 13 signals as `set_compliance_proof` with `refusal_code` 0, `net_amount` = job amount, payee = agent wallet and the non-zero `stripe_receipt_hash` (public signal 12). Writes a `Compliant` `ReleaseProof` that `finalize_fiat_payment` consumes. Arguments: `stripe_receipt_hash` is the Poseidon commitment of the Stripe receipt; `proof_timestamp` is public signal 9 (Unix seconds).",
     "required": [
       "program",
       "instruction",
@@ -3861,7 +3956,7 @@
   },
   "AcceptJobCall": {
     "type": "object",
-    "description": "The job's agent wallet accepts a funded job; the agent record must be Active. `spec_hash` guards against a swapped spec.",
+    "description": "The job's agent wallet accepts a funded job (a fiat job while Open); the agent record must be Active. `spec_hash` guards against a swapped spec.",
     "required": [
       "program",
       "instruction",
@@ -3957,6 +4052,35 @@
       }
     }
   },
+  "CancelFiatJobArgs": {
+    "type": "object",
+    "required": [],
+    "additionalProperties": false,
+    "properties": {}
+  },
+  "CancelFiatJobCall": {
+    "type": "object",
+    "description": "Fiat rail (ADR 0024): the institution cancels an Open job, or an Accepted job after `deadline`. There is no vault and nothing to refund.",
+    "required": [
+      "program",
+      "instruction",
+      "args"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "program": {
+        "type": "string",
+        "const": "escrow"
+      },
+      "instruction": {
+        "type": "string",
+        "const": "cancelFiatJob"
+      },
+      "args": {
+        "$ref": "#/CancelFiatJobArgs"
+      }
+    }
+  },
   "CancelJobArgs": {
     "type": "object",
     "required": [],
@@ -4018,6 +4142,50 @@
       },
       "args": {
         "$ref": "#/CommitTravelRuleArgs"
+      }
+    }
+  },
+  "CreateFiatJobArgs": {
+    "type": "object",
+    "required": [
+      "specHash",
+      "amount",
+      "deadline"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "specHash": {
+        "$ref": "#/Hex32"
+      },
+      "amount": {
+        "$ref": "#/U64"
+      },
+      "deadline": {
+        "type": "integer",
+        "format": "int64"
+      }
+    }
+  },
+  "CreateFiatJobCall": {
+    "type": "object",
+    "description": "Fiat rail (ADR 0024): the institution opens a job it pays off-chain through Stripe (MPP). The job has no vault, no funding step, no challenge window, dispute or claim; it is always proof-gated by `policy` (snapshotted like `create_job`). Both parties need a fresh, clear screening record. The agent accepts it while Open.",
+    "required": [
+      "program",
+      "instruction",
+      "args"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "program": {
+        "type": "string",
+        "const": "escrow"
+      },
+      "instruction": {
+        "type": "string",
+        "const": "createFiatJob"
+      },
+      "args": {
+        "$ref": "#/CreateFiatJobArgs"
       }
     }
   },
@@ -4124,6 +4292,35 @@
       },
       "args": {
         "$ref": "#/ExecuteResolutionArgs"
+      }
+    }
+  },
+  "FinalizeFiatPaymentArgs": {
+    "type": "object",
+    "required": [],
+    "additionalProperties": false,
+    "properties": {}
+  },
+  "FinalizeFiatPaymentCall": {
+    "type": "object",
+    "description": "Fiat rail (ADR 0024), permissionless: records a delivered fiat job as paid once the verifier's `verify_mpp_payment_proof` bound a compliant `ReleaseProof` (payee = agent wallet, net = full `amount`, fresh daily counter). CPIs `record_release`, writes reputation and a `Verified` `ValidationRecord`, moves the job to `Released`. No funds move and no keeper fee is paid.",
+    "required": [
+      "program",
+      "instruction",
+      "args"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "program": {
+        "type": "string",
+        "const": "escrow"
+      },
+      "instruction": {
+        "type": "string",
+        "const": "finalizeFiatPayment"
+      },
+      "args": {
+        "$ref": "#/FinalizeFiatPaymentArgs"
       }
     }
   },
@@ -4598,10 +4795,16 @@
         "$ref": "#/CancelClaimCall"
       },
       {
+        "$ref": "#/CancelFiatJobCall"
+      },
+      {
         "$ref": "#/CancelJobCall"
       },
       {
         "$ref": "#/CommitTravelRuleCall"
+      },
+      {
+        "$ref": "#/CreateFiatJobCall"
       },
       {
         "$ref": "#/CreateJobCall"
@@ -4611,6 +4814,9 @@
       },
       {
         "$ref": "#/ExecuteResolutionCall"
+      },
+      {
+        "$ref": "#/FinalizeFiatPaymentCall"
       },
       {
         "$ref": "#/FinalizePaymentCall"
@@ -4672,11 +4878,14 @@
         "acceptJob": "#/AcceptJobCall",
         "buyClaim": "#/BuyClaimCall",
         "cancelClaim": "#/CancelClaimCall",
+        "cancelFiatJob": "#/CancelFiatJobCall",
         "cancelJob": "#/CancelJobCall",
         "commitTravelRule": "#/CommitTravelRuleCall",
+        "createFiatJob": "#/CreateFiatJobCall",
         "createJob": "#/CreateJobCall",
         "escalateMissingProof": "#/EscalateMissingProofCall",
         "executeResolution": "#/ExecuteResolutionCall",
+        "finalizeFiatPayment": "#/FinalizeFiatPaymentCall",
         "finalizePayment": "#/FinalizePaymentCall",
         "fundJob": "#/FundJobCall",
         "initConfig": "#/InitConfigCall",

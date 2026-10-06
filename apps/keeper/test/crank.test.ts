@@ -223,6 +223,13 @@ describe('bekletme', () => {
     await world.job({ challengeEnd: NOW + 600 });
     expect(await crank().runOnce()).toEqual({ evaluated: 0, confirmed: 0 });
   });
+
+  it('fiat iş aday değil ve birikime girmez: finalize_fiat_payment kapatır (ADR 0024)', async () => {
+    await world.job({ rail: 'fiat', policy: 'compliant' });
+    const keeperCrank = crank();
+    expect(await keeperCrank.runOnce()).toEqual({ evaluated: 0, confirmed: 0 });
+    expect(keeperCrank.oldestDueSeconds()).toBe(0);
+  });
 });
 
 describe('gecikme ölçümü', () => {

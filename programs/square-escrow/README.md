@@ -16,7 +16,7 @@ IDL'i sözleşme IDL'iyle (`idl/square_escrow_contract.json`) aynıdır; sözle�
 | `create_job` | İşi ve boş vault'unu açar. Agent kaydı registry'ye ait, PDA'sı doğru ve `Active` olmalı; `wallet`'ı job'a kopyalanır. Opsiyonel `policy` + `policy_institution`: policy programına ait, etkin, imzacı kurumun güncel yetkilisi (multisig bağlıysa vault'u); commitment, günlük tavan ve sürüm job'a kopyalanır. Rent'i `payer` öder |
 | `commit_travel_rule` | Kurum `Open` işe Travel Rule kaydının salt'lı commitment'ını bağlar (zincirde yalnızca 32 bayt); fonlamaya kadar değiştirilebilir, sıfır commitment bağlanamaz |
 | `fund_job` | `amount`'u kurumun token hesabından vault'a kilitler. Kurumun ve `job.agent_wallet`'ın screening kaydı temiz ve taze olmalı; eşik açıksa ve tutar eşiğe eşit ya da üstündeyse Travel Rule commitment'ı bağlanmış olmalı |
-| `accept_job` | Fonlanmış işi job'un agent cüzdanı kabul eder; kayıt `Active`, spec hash aynı, deadline geçmemiş |
+| `accept_job` | Fonlanmış işi (fiat işi açıkken) job'un agent cüzdanı kabul eder; kayıt `Active`, spec hash aynı, deadline geçmemiş |
 | `submit_work` | Teslim: `work_hash`, `delivery_uri` (en fazla 128 bayt); challenge penceresi açılır (`challenge_end = now + challenge_period`). Kabul edilmiş iş `Inactive` kayıtla da teslim edilir, silinmiş kayıtla edilmez |
 | `cancel_job` | Kurum `Open` / `Funded` işi, ya da deadline'ı geçmiş `Accepted` işi iptal eder: vault bakiyesi kuruma döner, vault kapanır, rent'i `job.rent_payer`'a |
 | `sync_agent_wallet` | Registry'de cüzdanı değişen agent'ın kayıt sahibi, kapanmamış işi kaydın güncel cüzdanına taşır |
@@ -29,6 +29,9 @@ IDL'i sözleşme IDL'iyle (`idl/square_escrow_contract.json`) aynıdır; sözle�
 | `resolve_dispute` | Bir arbitrator oyu; ilk oy kararı belirler, sonrakiler aynı olmalı, kimse iki kez oy vermez. M oyda iş `Resolved` olur. Son tarihten sonra oy yok |
 | `execute_resolution` | Permissionless: kararı öder. Agent tarafı tutarı (FavorAgent'ta tamamı, Split'te payı; keeper ücreti yok) payee çözümü ve ispat kapısından geçer; kalan kuruma döner. Bond FavorAgent'ta agent tarafına kesilir, diğer kararlarda kuruma döner. İtibar (`jobs_disputed`), `ValidationRecord`, alacak `Settled` / `Defaulted`, vault'lar kapanır |
 | `lapse_dispute` | Permissionless: son tarihte ve sonrasında karara bağlanmamış dispute'un bond'unu kuruma iade eder, iş `Delivered`'a döner ve `finalize_payment` ile çözülür |
+| `create_fiat_job` | Fiat rayı (ADR 0024): kurumun Stripe ile ödeyeceği iş. Vault ve fonlama yok, `challenge_period` 0; politika zorunlu, anlık görüntüsü alınır; kurumun ve agent cüzdanının screening kaydı temiz ve taze. Event `FiatJobCreated` |
+| `cancel_fiat_job` | Kurum `Open` fiat işi ya da deadline'ı geçmiş `Accepted` fiat işi iptal eder; iade yok |
+| `finalize_fiat_payment` | Permissionless: verifier'ın `verify_mpp_payment_proof`'uyla bağlanmış uyumlu ve taze ispatı (payee agent, net işin tamamı) `record_release` CPI'ıyla tüketir; itibar, `Verified` `ValidationRecord`, iş `Released`. Challenge beklenmez; token hareketi ve keeper ücreti yok. Fiat işte fonlama, dispute, alacak ve Travel Rule `RailMismatch` alır |
 
 ```
 Open (-(commit_travel_rule)) -(fund_job)-> Funded -(accept_job)-> Accepted -(submit_work)-> Delivered
@@ -40,6 +43,10 @@ Open | Funded | Accepted (deadline sonrası) -(cancel_job)-> Cancelled
 
 Alacak (Delivered iş): -(list_claim)-> Listed -(buy_claim)-> Bought
 Listed -(cancel_claim)-> kapanır; finalize_payment: Listed | Bought -> Settled (ödeme) | Defaulted (iade)
+
+Fiat rayı (ADR 0024): Open -(accept_job)-> Accepted -(submit_work)-> Delivered
+Delivered -(verifier verify_mpp_payment_proof, finalize_fiat_payment)-> Released
+Open | Accepted (deadline sonrası) -(cancel_fiat_job)-> Cancelled
 ```
 
 - **Diğer programların hesapları** CPI'sız okunur ([`src/linked.rs`](src/linked.rs)): owner
@@ -60,6 +67,8 @@ Listed -(cancel_claim)-> kapanır; finalize_payment: Listed | Bought -> Settled 
 - **Travel Rule:** commitment'ın tanımı, eşik ve bağlama kuralları
   [ADR 0015](../../docs/decisions/0015-travel-rule-commitment-ve-esik.md)'te; hesaplama
   `square_common::travel_rule` (SDK'da `travelRule`).
+- **Fiat rayı:** `Job.rail` (hesabın sonunda; eski hesaplar `Escrow` okunur), attestation, ispat ve kapanış
+  kuralları [ADR 0024](../../docs/decisions/0024-stripe-mpp-fiat-rayi.md)'te.
 - **Uyuşmazlık:** M-of-N oy, set değişimi, son tarih, lapse, ispatsız bekleme başvurusu ve kararın ödenmesi
   [ADR 0016](../../docs/decisions/0016-dispute-m-of-n-zaman-asimi-ve-ispatsiz-bekleme.md)'da; kurallar
   [`src/dispute.rs`](src/dispute.rs)'te (birim testli), settlement yardımcıları `finalize_payment` ile ortak
@@ -70,18 +79,19 @@ Listed -(cancel_claim)-> kapanır; finalize_payment: Listed | Bought -> Settled 
 
 ```bash
 anchor build
-cargo test --manifest-path tests/programs/Cargo.toml --test escrow --test escrow_lifecycle --test travel_rule --test claim --test finalize --test release_gate --test dispute --test dispute_gate
+cargo test --manifest-path tests/programs/Cargo.toml --test escrow --test escrow_lifecycle --test travel_rule --test claim --test finalize --test release_gate --test dispute --test dispute_gate --test mpp
 ```
 
 Testler [`tests/programs/tests/`](../../tests/programs/tests/)'tedir: `escrow.rs`, `escrow_lifecycle.rs`,
-`travel_rule.rs`, `claim.rs`, `finalize.rs`, `release_gate.rs`, `dispute.rs`, `dispute_gate.rs`. Derlenmiş escrow, registry, policy ve verifier programlarını LiteSVM'de
+`travel_rule.rs`, `claim.rs`, `finalize.rs`, `release_gate.rs`, `dispute.rs`, `dispute_gate.rs`, `mpp.rs`. Derlenmiş escrow, registry, policy ve verifier programlarını LiteSVM'de
 çalıştırır. Agent kaydı, screening, kurum ve politika programların kendi instruction'larıyla, USDC SPL Token
 programıyla kurulur. İspat kapısı testlerinin ispatları gerçek Groth16 ispatlarıdır.
 
 CU (LiteSVM): `finalize_payment` gate'siz ~48 bin, uyumlu ispatla (record_release CPI dahil) ~74 bin;
 `list_claim` ~18 bin, `buy_claim` ~23 bin (16 kardeşli en derin listede de), `cancel_claim` ~4 bin;
 `raise_dispute` ~24 bin, `resolve_dispute` ~9 bin, `lapse_dispute` ~18 bin, `escalate_missing_proof` ~12 bin;
-`execute_resolution` gate'siz ~66 bin, ispat kapısıyla ~80 bin.
+`execute_resolution` gate'siz ~66 bin, ispat kapısıyla ~80 bin; `create_fiat_job` ~32 bin, `finalize_fiat_payment`
+~47 bin, `cancel_fiat_job` ~6,5 bin.
 
 ## Köken
 

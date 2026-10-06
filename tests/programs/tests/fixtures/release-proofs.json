@@ -12,12 +12,14 @@
   "specs": {
     "a": "job spec: market research report",
     "b": "job spec: data cleaning",
-    "c": "job spec: field survey"
+    "c": "job spec: field survey",
+    "d": "job spec: fiat market research"
   },
   "amounts": {
     "a": "25000000",
     "b": "40000000",
-    "c": "150000000"
+    "c": "150000000",
+    "d": "30000000"
   },
   "keeper_fee_bps": 50,
   "timestamp": 1790000000,
@@ -194,6 +196,21 @@
       "proof_a": "11846a85dd1dc7e11d0e80dfa57a5e246993a33b93f1b70e758178ae987854dc13787b03f6f66066a43ca46a0eba23db06d5c8e1c3bb6de52c49c02cf8a9ae56",
       "proof_b": "2fad214cbf58ea198be05633cdb532281fc6305218b4700d668b3d3692680daf058fa95b468c8fcf9355dd6ec726b3c02f7ee94a0d250cfa4a561f52ce41407713b9298bd7c649a68ee157f32495cc54256b721a2e2449a59607dfab9f3ed3e504757c0e63316367d55e3cd7849152bdc82fa1121685e6bedaa98fdcbf51c0b2",
       "proof_c": "0448ad535592b5592dcfe039be50f2efd5733be3f01a75c9ab5b17c29cce05bd279c673d3f6ecadadb5fdb5c0678576f7208ed867c18296a6a79b7a887fd133f"
+    },
+    {
+      "name": "mpp_fiat",
+      "job": "d",
+      "payee": "agentWallet",
+      "mint": "settlementMint",
+      "net_amount": "30000000",
+      "refusal_code": 0,
+      "daily_spent_before": "0",
+      "timestamp": 1790000000,
+      "policy_commitment": "187d65241c9a9bda93f1a7510506d85e50ed9da5fe91cb88e25f0db2d90082f5",
+      "stripe_receipt_hash": "062426892f0128f3ebafebd760832d8d50bd69034e2cec2ca7089303a0574e34",
+      "proof_a": "026f0d9cb189827f0c205db3e5dda4648f3e04789e3e5a12c75b1ca406b11c570e22db9d1f1d279c3a9b627876bd2fc1adac9648bd2b4d2880f6f5e63e59dd8d",
+      "proof_b": "07b4b5bb436874b65a5c56f580065b8f1a136dbe7ec2ac60da52c46573c1614204d5a153606a7413ade9b133bbadf2f55ddd7face0a14a24741b7c3a6e159a8b21a2bdbfb8973091c9412955374dedfff1af73d007fcb6bd9083b51d2b491d7f002452836469da5029c5886a6ca61a990649aaf68d583b6e4ace3c3880f5c263",
+      "proof_c": "1f76f6effbc2aee4998ee69647997e4a544ba16f54015c61a2235c9876be146504517dc1cbaefb8d91b5c8356dc165f0a77ef452365c99d163d8829edfc51689"
     }
   ]
 }

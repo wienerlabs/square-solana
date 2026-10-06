@@ -256,6 +256,21 @@ export const EscrowConfigUpdatedSchema = z.object({
 });
 export type EscrowConfigUpdated = z.infer<typeof EscrowConfigUpdatedSchema>;
 
+/** escrow: A fiat job was opened by `create_fiat_job` (ADR 0024): no vault, always proof-gated. */
+export const FiatJobCreatedSchema = z.object({
+  job: Address,
+  institution: Address,
+  agentRecord: Address,
+  agentWallet: Address,
+  policy: Address,
+  policyVersion: z.number().int().min(0).max(4294967295),
+  mint: Address,
+  amount: U64,
+  specHash: Hex32,
+  deadline: I64,
+});
+export type FiatJobCreated = z.infer<typeof FiatJobCreatedSchema>;
+
 /** escrow: Finalized */
 export const FinalizedSchema = z.object({
   job: Address,
@@ -296,6 +311,10 @@ export type InstitutionMultisigSet = z.infer<typeof InstitutionMultisigSetSchema
 export const JobStatusSchema = z.enum(['open', 'funded', 'accepted', 'delivered', 'disputed', 'resolved', 'released', 'refunded', 'cancelled']);
 export type JobStatus = z.infer<typeof JobStatusSchema>;
 
+/** escrow: Settlement rail of a job (ADR 0024). */
+export const SettlementRailSchema = z.enum(['escrow', 'fiat']);
+export type SettlementRail = z.infer<typeof SettlementRailSchema>;
+
 /** escrow: seeds = ["job", institution, spec_hash]; vault = ["escrow_token", job], bond vault = ["bond", job] (token authority of both = job). */
 export const JobSchema = z.object({
   institution: Address,
@@ -324,6 +343,7 @@ export const JobSchema = z.object({
   policy: Address.nullable(),
   dispute: DisputeInfoSchema,
   deliveryUri: z.string(),
+  rail: SettlementRailSchema,
 });
 export type Job = z.infer<typeof JobSchema>;
 
@@ -387,8 +407,9 @@ export const MissingProofEscalatedSchema = z.object({
 });
 export type MissingProofEscalated = z.infer<typeof MissingProofEscalatedSchema>;
 
-/** verifier: DRAFT (M6). */
+/** verifier: A Stripe (MPP) payment bound to a fiat job by `verify_mpp_payment_proof` (ADR 0024). */
 export const MppPaymentVerifiedSchema = z.object({
+  job: Address,
   institution: Address,
   policy: Address,
   stripeReceiptHash: Hex32,
@@ -813,6 +834,11 @@ export const IDL_PROGRAMS = {
       },
       {
         "code": 6011,
+        "name": "RailMismatch",
+        "msg": "Instruction does not apply to the job's settlement rail"
+      },
+      {
+        "code": 6012,
         "name": "VkVersionAlreadySynced",
         "msg": "Config already records the embedded verifying key version"
       }
@@ -840,6 +866,7 @@ export const IDL_PROGRAMS = {
       "DisputeResolved",
       "DisputeVote",
       "EscrowConfigUpdated",
+      "FiatJobCreated",
       "Finalized",
       "JobAccepted",
       "JobAgentWalletSynced",
@@ -858,11 +885,14 @@ export const IDL_PROGRAMS = {
       "accept_job",
       "buy_claim",
       "cancel_claim",
+      "cancel_fiat_job",
       "cancel_job",
       "commit_travel_rule",
+      "create_fiat_job",
       "create_job",
       "escalate_missing_proof",
       "execute_resolution",
+      "finalize_fiat_payment",
       "finalize_payment",
       "fund_job",
       "init_config",
@@ -1120,6 +1150,11 @@ export const IDL_PROGRAMS = {
         "code": 6048,
         "name": "InvalidDisputeTimeout",
         "msg": "Dispute timeout must be positive and proof timeout must not be negative"
+      },
+      {
+        "code": 6049,
+        "name": "RailMismatch",
+        "msg": "Instruction does not apply to the job's settlement rail"
       }
     ]
   }
@@ -1155,6 +1190,7 @@ export const ProgramEventPayloadSchema = z.discriminatedUnion('name', [
   z.object({ program: z.literal('escrow'), name: z.literal('DisputeResolved'), data: DisputeResolvedSchema }),
   z.object({ program: z.literal('escrow'), name: z.literal('DisputeVote'), data: DisputeVoteSchema }),
   z.object({ program: z.literal('escrow'), name: z.literal('EscrowConfigUpdated'), data: EscrowConfigUpdatedSchema }),
+  z.object({ program: z.literal('escrow'), name: z.literal('FiatJobCreated'), data: FiatJobCreatedSchema }),
   z.object({ program: z.literal('escrow'), name: z.literal('Finalized'), data: FinalizedSchema }),
   z.object({ program: z.literal('escrow'), name: z.literal('JobAccepted'), data: JobAcceptedSchema }),
   z.object({ program: z.literal('escrow'), name: z.literal('JobAgentWalletSynced'), data: JobAgentWalletSyncedSchema }),
@@ -1302,7 +1338,8 @@ export const VerifyMppPaymentProofArgsSchema = z.object({
   proofA: hexBytes(64),
   proofB: hexBytes(128),
   proofC: hexBytes(64),
-  publicInputs: z.array(Hex32).length(10),
+  stripeReceiptHash: Hex32,
+  proofTimestamp: I64,
 });
 export type VerifyMppPaymentProofArgs = z.infer<typeof VerifyMppPaymentProofArgsSchema>;
 
@@ -1324,6 +1361,10 @@ export type BuyClaimArgs = z.infer<typeof BuyClaimArgsSchema>;
 export const CancelClaimArgsSchema = z.object({});
 export type CancelClaimArgs = z.infer<typeof CancelClaimArgsSchema>;
 
+/** escrow.cancel_fiat_job argümanları. */
+export const CancelFiatJobArgsSchema = z.object({});
+export type CancelFiatJobArgs = z.infer<typeof CancelFiatJobArgsSchema>;
+
 /** escrow.cancel_job argümanları. */
 export const CancelJobArgsSchema = z.object({});
 export type CancelJobArgs = z.infer<typeof CancelJobArgsSchema>;
@@ -1333,6 +1374,14 @@ export const CommitTravelRuleArgsSchema = z.object({
   commitment: Hex32,
 });
 export type CommitTravelRuleArgs = z.infer<typeof CommitTravelRuleArgsSchema>;
+
+/** escrow.create_fiat_job argümanları. */
+export const CreateFiatJobArgsSchema = z.object({
+  specHash: Hex32,
+  amount: U64,
+  deadline: I64,
+});
+export type CreateFiatJobArgs = z.infer<typeof CreateFiatJobArgsSchema>;
 
 /** escrow.create_job argümanları. */
 export const CreateJobArgsSchema = z.object({
@@ -1350,6 +1399,10 @@ export type EscalateMissingProofArgs = z.infer<typeof EscalateMissingProofArgsSc
 /** escrow.execute_resolution argümanları. */
 export const ExecuteResolutionArgsSchema = z.object({});
 export type ExecuteResolutionArgs = z.infer<typeof ExecuteResolutionArgsSchema>;
+
+/** escrow.finalize_fiat_payment argümanları. */
+export const FinalizeFiatPaymentArgsSchema = z.object({});
+export type FinalizeFiatPaymentArgs = z.infer<typeof FinalizeFiatPaymentArgsSchema>;
 
 /** escrow.finalize_payment argümanları. */
 export const FinalizePaymentArgsSchema = z.object({});
@@ -1441,11 +1494,14 @@ export const InstructionCallSchema = z.discriminatedUnion('instruction', [
   z.object({ program: z.literal('escrow'), instruction: z.literal('acceptJob'), args: AcceptJobArgsSchema }),
   z.object({ program: z.literal('escrow'), instruction: z.literal('buyClaim'), args: BuyClaimArgsSchema }),
   z.object({ program: z.literal('escrow'), instruction: z.literal('cancelClaim'), args: CancelClaimArgsSchema }),
+  z.object({ program: z.literal('escrow'), instruction: z.literal('cancelFiatJob'), args: CancelFiatJobArgsSchema }),
   z.object({ program: z.literal('escrow'), instruction: z.literal('cancelJob'), args: CancelJobArgsSchema }),
   z.object({ program: z.literal('escrow'), instruction: z.literal('commitTravelRule'), args: CommitTravelRuleArgsSchema }),
+  z.object({ program: z.literal('escrow'), instruction: z.literal('createFiatJob'), args: CreateFiatJobArgsSchema }),
   z.object({ program: z.literal('escrow'), instruction: z.literal('createJob'), args: CreateJobArgsSchema }),
   z.object({ program: z.literal('escrow'), instruction: z.literal('escalateMissingProof'), args: EscalateMissingProofArgsSchema }),
   z.object({ program: z.literal('escrow'), instruction: z.literal('executeResolution'), args: ExecuteResolutionArgsSchema }),
+  z.object({ program: z.literal('escrow'), instruction: z.literal('finalizeFiatPayment'), args: FinalizeFiatPaymentArgsSchema }),
   z.object({ program: z.literal('escrow'), instruction: z.literal('finalizePayment'), args: FinalizePaymentArgsSchema }),
   z.object({ program: z.literal('escrow'), instruction: z.literal('fundJob'), args: FundJobArgsSchema }),
   z.object({ program: z.literal('escrow'), instruction: z.literal('initConfig'), args: InitConfigArgsSchema }),

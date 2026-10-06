@@ -29,3 +29,6 @@ unexpected_cfgs = { level = "warn", check-cfg = ['cfg(target_os, values("solana"
 square-common = { path = "../../crates/square-common" }
 anchor-lang = { version = "1.2.0", features = ["init-if-needed"] }
 groth16-solana = "0.2"
+# MPP yolu: aynı tx'teki Ed25519 precompile talimatı (Instructions sysvar'ı).
+solana-instructions-sysvar = "3"
+solana-sdk-ids = "3"

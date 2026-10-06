@@ -32,11 +32,12 @@ pnpm license:write
 | `solana-address-lookup-table-interface` | cargo | Apache-2.0 | dev | `square-program-tests` | ✓ |
 | `solana-compute-budget-interface` | cargo | Apache-2.0 | dev | `square-program-tests` | ✓ |
 | `solana-instruction-error` | cargo | Apache-2.0 | dev | `square-program-tests` | ✓ |
+| `solana-instructions-sysvar` | cargo | Apache-2.0 | runtime | `square-verifier` | ✓ |
 | `solana-keypair` | cargo | Apache-2.0 | dev | `square-program-tests` | ✓ |
 | `solana-loader-v3-interface` | cargo | Apache-2.0 | dev | `square-program-tests` | ✓ |
 | `solana-message` | cargo | Apache-2.0 | dev | `square-program-tests` | ✓ |
 | `solana-program-pack` | cargo | Apache-2.0 | dev | `square-program-tests` | ✓ |
-| `solana-sdk-ids` | cargo | Apache-2.0 | dev | `square-program-tests` | ✓ |
+| `solana-sdk-ids` | cargo | Apache-2.0 | runtime | `square-program-tests`, `square-verifier` | ✓ |
 | `solana-sha256-hasher` | cargo | Apache-2.0 | runtime | `square-common`, `square-program-tests` | ✓ |
 | `solana-signature` | cargo | Apache-2.0 | dev | `square-program-tests` | ✓ |
 | `solana-signer` | cargo | Apache-2.0 | dev | `square-program-tests` | ✓ |
@@ -138,7 +139,7 @@ pnpm license:write
 | `yaml` | npm | ISC | runtime | `@squaresdk/solana-hosted`, `@squaresdk/solana-monorepo`, `@squaresdk/solana-sdk`, `@squaresdk/solana-types` | ✓ |
 | `zod` | npm | MIT | runtime | `@squaresdk/solana-a2a`, `@squaresdk/solana-api`, `@squaresdk/solana-compliance-api`, `@squaresdk/solana-fee-payer`, `@squaresdk/solana-hosted`, `@squaresdk/solana-indexer`, `@squaresdk/solana-keeper`, `@squaresdk/solana-mcp`, `@squaresdk/solana-observability`, `@squaresdk/solana-prover`, `@squaresdk/solana-screener`, `@squaresdk/solana-smoke`, `@squaresdk/solana-types`, `@squaresdk/solana-web` | ✓ |
 
-**Özet:** 90 npm, 25 Cargo doğrudan bağımlılık; lisans dağılımı: 61× MIT, 44× Apache-2.0, 3× MIT OR Apache-2.0, 2× GPL-3.0, 1× BSD-2-Clause, 1× ISC, 1× MPL-2.0, 1× OFL-1.1, 1× Unlicense.
+**Özet:** 90 npm, 26 Cargo doğrudan bağımlılık; lisans dağılımı: 61× MIT, 45× Apache-2.0, 3× MIT OR Apache-2.0, 2× GPL-3.0, 1× BSD-2-Clause, 1× ISC, 1× MPL-2.0, 1× OFL-1.1, 1× Unlicense.
 
 **Mainnet öncesi hukuki inceleme gerektirenler:**
 - `circomlibjs` (npm) — GPL-3.0. Poseidon hash (devreyle aynı sabitler); yalnızca apps/compliance-api (BE-02). Yayınlanan bir pakette yok; snarkjs ile aynı onay kapsamında.

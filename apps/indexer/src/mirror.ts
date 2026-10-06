@@ -115,6 +115,7 @@ export const TABLES: Readonly<Record<MirroredAccount, TableSpec>> = {
       createdAt: big(j, 'createdAt'),
       deadline: big(j, 'deadline'),
       challengeEnd: big(j, 'challengeEnd'),
+      rail: str(j, 'rail'),
     }),
   },
   ClaimListing: {

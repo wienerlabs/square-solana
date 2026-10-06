@@ -95,6 +95,7 @@ const job = (
         resolution: { kind: 'pending' },
       },
       deliveryUri: '',
+      rail: 'escrow',
     },
     payee: wallet,
     claim: fields.claim ? claimListing(address, fields.claim.status, fields.claim.price, amount) : null,

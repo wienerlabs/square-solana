@@ -8,6 +8,7 @@ import {
 } from '@solana/spl-token';
 import {
   ComputeBudgetProgram,
+  Ed25519Program,
   Keypair,
   PublicKey,
   SystemProgram,
@@ -139,6 +140,43 @@ describe('kabul', () => {
     const tx = v0(S, [ix], [lookup]);
     expect(tx.message.addressTableLookups).toHaveLength(1);
     expect((await inspect(tx, { tables: [lookup] })).instructions).toEqual(['registry:register_agent']);
+  });
+});
+
+describe('fiat rayı (ADR 0024)', () => {
+  const mpp = Keypair.generate();
+  const attestation = () =>
+    Ed25519Program.createInstructionWithPrivateKey({ privateKey: mpp.secretKey, message: new Uint8Array(97) });
+
+  it('MPP attestation’ı (tek imzalı Ed25519) ve verify_mpp_payment_proof; fiat iş talimatları', async () => {
+    const tx = v0(S, [
+      limit(360_000),
+      attestation(),
+      squareIx('verifier', 'verify_mpp_payment_proof', { payer: S, authority: U }),
+    ]);
+    expect((await inspect(tx)).instructions).toEqual([
+      'computeBudget:set_compute_unit_limit',
+      'ed25519:verify',
+      'verifier:verify_mpp_payment_proof',
+    ]);
+    const fiat = v0(S, [
+      squareIx('escrow', 'create_fiat_job', { payer: S, institution: U }),
+      squareIx('escrow', 'cancel_fiat_job', { institution: U }),
+      squareIx('escrow', 'finalize_fiat_payment', { payer: S }),
+    ]);
+    expect((await inspect(fiat)).instructions).toEqual([
+      'escrow:create_fiat_job',
+      'escrow:cancel_fiat_job',
+      'escrow:finalize_fiat_payment',
+    ]);
+  });
+
+  it('çok imzalı Ed25519 talimatı tanınmaz: imza sayısı ücreti artırır', async () => {
+    const ix = attestation();
+    const data = Buffer.from(ix.data);
+    data[0] = 2;
+    const tx = v0(S, [new TransactionInstruction({ programId: ix.programId, keys: [], data }), registerAgent()]);
+    await expectReject(inspect(tx), 'instruction_not_allowed', { instruction: 'ed25519:#02' });
   });
 });
 

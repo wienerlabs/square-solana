@@ -64,5 +64,5 @@ export {
   type ReleaseTarget,
   type Staleness,
 } from './release.js';
-export { SIGNAL, buildSetComplianceProofTx } from './tx.js';
+export { SIGNAL, buildSetComplianceProofTx, buildVerifyMppPaymentProofTx } from './tx.js';
 export { watchJobProof, type WatchJobProofParams } from './watch.js';

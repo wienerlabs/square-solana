@@ -3,7 +3,7 @@
 import type { PublicKey } from '@solana/web3.js';
 import type { SquareClient } from '@squaresdk/solana-sdk';
 import type { PolicyDocument } from '@squaresdk/solana-types';
-import { categoryField, splitBytes32 } from './fields.js';
+import { BN254_R, categoryField, splitBytes32 } from './fields.js';
 import { normalizePolicy, policyCommitmentField, commitmentFromBytes, type PolicySalts } from './policy.js';
 import { dailySpentAt, releaseNetAmount } from './release.js';
 
@@ -19,7 +19,7 @@ export interface ReleaseFacts {
   dailySpentBefore: bigint;
   /** İspatın değerlendirildiği an, unix saniyesi. */
   timestamp: number;
-  /** MPP yolu dışında 0. */
+  /** Fiat işte (MPP yolu, ADR 0024) Stripe makbuzunun Poseidon commitment'ı; escrow release yolunda 0. */
   stripeReceiptHash: bigint;
 }
 
@@ -73,8 +73,9 @@ const toBigInt = (value: { toString(): string }) => BigInt(value.toString());
 
 /**
  * Zincirden release değerlerini okuyup witness'ı kurar:
- * - payee: alacak satılmışsa alıcı, değilse job'daki agent cüzdanı;
- * - net: `amount − amount × keeper_fee_bps / 10 000`;
+ * - payee: alacak satılmışsa alıcı, değilse job'daki agent cüzdanı (fiat işte her zaman agent cüzdanı);
+ * - net: `amount − amount × keeper_fee_bps / 10 000`; fiat işte (ADR 0024) tutarın tamamı;
+ * - makbuz: fiat işte `stripeReceiptHash` gerekir (MPP authority'nin imzaladığı commitment), escrow işinde 0;
  * - günlük sayaç: `OperatorState`, sayacın günü ispat anının UTC gününden eskiyse 0; daha yeniyse
  *   o an için sayaç bilinemez ve fırlatır (verifier `StaleProof` döner).
  * Yerel politika job'un snapshot'ıyla (commitment ve public tavan) aynı değilse fırlatır.
@@ -87,6 +88,8 @@ export async function buildReleaseWitness(params: {
   paymentCategory: string;
   /** İspat anı (unix saniyesi); verilmezse şimdi. */
   now?: number;
+  /** Fiat iş: Stripe makbuzunun Poseidon commitment'ı (alan elemanı, sıfırdan farklı). */
+  stripeReceiptHash?: bigint;
 }): Promise<ReleaseWitness> {
   const { client, job } = params;
   const account = await client.escrow.fetch('job', job);
@@ -94,6 +97,15 @@ export async function buildReleaseWitness(params: {
   if (!account.policy) throw new Error(`job bir politikaya bağlı değil: ${job.toBase58()}`);
   const onChainPolicy = await client.policy.fetch('policy', account.policy);
   if (!onChainPolicy) throw new Error(`politika hesabı bulunamadı: ${account.policy.toBase58()}`);
+
+  const fiat = 'fiat' in account.rail;
+  const stripeReceiptHash = params.stripeReceiptHash ?? 0n;
+  if (fiat && (stripeReceiptHash <= 0n || stripeReceiptHash >= BN254_R)) {
+    throw new Error(
+      "fiat iş: Stripe makbuzunun commitment'ı (stripeReceiptHash) sıfırdan farklı bir alan elemanı olmalı",
+    );
+  }
+  if (!fiat && stripeReceiptHash !== 0n) throw new Error("escrow işinin ispatında makbuz commitment'ı olmaz");
 
   const commitment = policyCommitmentField(params.policy, params.salts);
   if (commitment !== commitmentFromBytes(Uint8Array.from(account.policyCommitment))) {
@@ -118,12 +130,13 @@ export async function buildReleaseWitness(params: {
   }
   const facts: ReleaseFacts = {
     job,
-    payee: listing && 'bought' in listing.status ? listing.buyer : account.agentWallet,
-    netAmount: releaseNetAmount(toBigInt(account.amount), config.params.keeperFeeBps),
+    // Fiat işin alacağı satılmaz ve keeper ücreti yoktur: payee agent, net tutarın tamamı (ADR 0024).
+    payee: !fiat && listing && 'bought' in listing.status ? listing.buyer : account.agentWallet,
+    netAmount: fiat ? toBigInt(account.amount) : releaseNetAmount(toBigInt(account.amount), config.params.keeperFeeBps),
     mint: account.mint,
     dailySpentBefore,
     timestamp,
-    stripeReceiptHash: 0n,
+    stripeReceiptHash,
   };
   return { ...facts, inputs: releaseInputs(params.policy, params.salts, params.paymentCategory, facts) };
 }

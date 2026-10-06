@@ -6,8 +6,12 @@ pub mod init_verifier_config;
 pub mod record_release;
 pub mod set_compliance_proof;
 pub mod sync_vk_version;
+pub mod update_mpp_authority;
+pub mod verify_mpp_payment_proof;
 
 pub use init_verifier_config::*;
 pub use record_release::*;
 pub use set_compliance_proof::*;
 pub use sync_vk_version::*;
+pub use update_mpp_authority::*;
+pub use verify_mpp_payment_proof::*;

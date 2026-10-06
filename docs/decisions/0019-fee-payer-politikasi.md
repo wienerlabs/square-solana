@@ -37,11 +37,13 @@
    - **verifier:** `set_compliance_proof`, `verify_mpp_payment_proof`.
    - **escrow:** `create_job`, `commit_travel_rule`, `fund_job`, `accept_job`, `submit_work`, `list_claim`,
      `buy_claim`, `cancel_claim`, `cancel_job`, `finalize_payment`, `raise_dispute`, `execute_resolution`,
-     `lapse_dispute`, `escalate_missing_proof`, `sync_agent_wallet`.
+     `lapse_dispute`, `escalate_missing_proof`, `sync_agent_wallet`; fiat rayı (BC-37, ADR 0024)
+     `create_fiat_job`, `cancel_fiat_job`, `finalize_fiat_payment`.
    - **squads:** `multisig_create_v2`, `vault_transaction_create`, `proposal_create`, `proposal_approve`,
      `vault_transaction_execute`.
    - **Diğer:** `ata:create`, `ata:create_idempotent`, `computeBudget:set_compute_unit_limit`,
-     `computeBudget:set_compute_unit_price`, `system:transfer`, `token:transfer_checked`,
+     `computeBudget:set_compute_unit_price`, `ed25519:verify` (yalnızca tek imzalı precompile talimatı: MPP
+     attestation'ı, ADR 0024), `system:transfer`, `token:transfer_checked`,
      `token2022:transfer_checked`.
 
    Listede olmayanlar:

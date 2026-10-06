@@ -407,6 +407,68 @@ describe('flow', () => {
     ).rejects.toThrow(/politikası bulunamadı/);
   });
 
+  it('fiat rayı (BC-37): createFiatJob, cancelFiatJob, finalizeFiatPayment', async () => {
+    const institution = key();
+    const policyInstitution = key();
+    const policy = await policyAccount(policyInstitution);
+    const registry = asIdl(client.registry.program);
+    const wallet = key();
+    const agentRecord = await setProgramAccount(registry, 'agentRecord', key(), {
+      ...createSampler(registry.idl).struct('agentRecord'),
+      wallet,
+    });
+    const spec = { task: 'pazar araştırması', rail: 'fiat' };
+    const built = await client.flow.createFiatJob(
+      { institution, agentRecord, policy, spec, amount: 30_000_000n, deadline: 1_790_000_000 },
+      options(),
+    );
+    const ix = decoded(built, escrow());
+    expect(ix.name).toBe('createFiatJob');
+    expect(b58(built.job)).toBe(b58(client.pda.job(institution, specHashing.specHash(spec))[0]));
+    expect(ix.accounts).toMatchObject({
+      payer: b58(feePayer),
+      institution: b58(institution),
+      agentRecord: b58(agentRecord),
+      policy: b58(policy),
+      policyInstitution: b58(policyInstitution),
+      institutionScreening: b58(client.pda.screeningRecord(institution)[0]),
+      agentScreening: b58(client.pda.screeningRecord(wallet)[0]),
+      job: b58(built.job),
+    });
+    expect(ix.data).toMatchObject({ amount: '30000000', deadline: '1790000000' });
+    await expect(
+      client.flow.createFiatJob({ institution, agentRecord, policy: key(), spec, amount: 1n, deadline: 1 }, options()),
+    ).rejects.toThrow(/politika bulunamadı/);
+    await expect(
+      client.flow.createFiatJob({ institution, agentRecord: key(), policy, spec, amount: 1n, deadline: 1 }, options()),
+    ).rejects.toThrow(/agent kaydı/);
+
+    const cancel = decoded(await client.flow.cancelFiatJob({ institution, job: built.job }, options()), escrow());
+    expect(cancel.name).toBe('cancelFiatJob');
+    expect(cancel.accounts).toMatchObject({ institution: b58(institution), job: b58(built.job) });
+
+    const agentRecordOfJob = key();
+    const { address } = await jobAccount({ policy, agentRecord: agentRecordOfJob });
+    const payer = key();
+    const finalize = decoded(await client.flow.finalizeFiatPayment({ payer, job: address }, options()), escrow());
+    expect(finalize.name).toBe('finalizeFiatPayment');
+    expect(finalize.accounts).toMatchObject({
+      payer: b58(payer),
+      job: b58(address),
+      releaseProof: b58(client.pda.releaseProof(address)[0]),
+      operatorState: b58(client.pda.operatorState(policyInstitution)[0]),
+      verifierConfig: b58(client.pda.verifierConfig()[0]),
+      verifierProgram: b58(PROGRAM_IDS.verifier),
+      escrowAuthority: b58(client.pda.escrowAuthority()[0]),
+      agentReputation: b58(client.pda.agentReputation(agentRecordOfJob)[0]),
+      validationRecord: b58(client.pda.validationRecord(address)[0]),
+    });
+    const noPolicy = await jobAccount({});
+    await expect(client.flow.finalizeFiatPayment({ payer, job: noPolicy.address }, options())).rejects.toThrow(
+      /politikaya bağlı değil/,
+    );
+  });
+
   it('raiseDispute, resolveDispute, executeResolution, lapseDispute, escalateMissingProof, updateArbitrators, cancelJob', async () => {
     const institution = key();
     const { address, account } = await jobAccount({ mint: mint(), institution });

@@ -16,7 +16,8 @@ export type SquareEscrowContract = {
     {
       "name": "acceptJob",
       "docs": [
-        "The job's agent wallet accepts a funded job; the agent record must be Active. `spec_hash`",
+        "The job's agent wallet accepts a funded job (a fiat job while Open); the agent record must be",
+        "Active. `spec_hash`",
         "guards against a swapped spec."
       ],
       "discriminator": [
@@ -314,6 +315,59 @@ export type SquareEscrowContract = {
       "args": []
     },
     {
+      "name": "cancelFiatJob",
+      "docs": [
+        "Fiat rail (ADR 0024): the institution cancels an Open job, or an Accepted job after `deadline`.",
+        "There is no vault and nothing to refund."
+      ],
+      "discriminator": [
+        204,
+        46,
+        71,
+        36,
+        253,
+        27,
+        29,
+        134
+      ],
+      "accounts": [
+        {
+          "name": "institution",
+          "signer": true,
+          "relations": [
+            "job"
+          ]
+        },
+        {
+          "name": "job",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  106,
+                  111,
+                  98
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "job.institution",
+                "account": "job"
+              },
+              {
+                "kind": "account",
+                "path": "job.specHash",
+                "account": "job"
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "cancelJob",
       "docs": [
         "The institution cancels an Open / Funded job, or an Accepted job after `deadline`; the vault",
@@ -476,6 +530,152 @@ export type SquareEscrowContract = {
               32
             ]
           }
+        }
+      ]
+    },
+    {
+      "name": "createFiatJob",
+      "docs": [
+        "Fiat rail (ADR 0024): the institution opens a job it pays off-chain through Stripe (MPP). The",
+        "job has no vault, no funding step, no challenge window, dispute or claim; it is always",
+        "proof-gated by `policy` (snapshotted like `create_job`). Both parties need a fresh, clear",
+        "screening record. The agent accepts it while Open."
+      ],
+      "discriminator": [
+        72,
+        9,
+        20,
+        59,
+        183,
+        67,
+        138,
+        217
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "docs": [
+            "Pays rent and fees; separate from the role signer (fee payer / sponsored transactions)."
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "institution",
+          "docs": [
+            "Institution wallet or its Squads vault; pays the agent off-chain through Stripe."
+          ],
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "agentRecord"
+        },
+        {
+          "name": "policy",
+          "docs": [
+            "proof-gated and snapshots it."
+          ]
+        },
+        {
+          "name": "policyInstitution"
+        },
+        {
+          "name": "institutionScreening",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  99,
+                  114,
+                  101,
+                  101,
+                  110,
+                  105,
+                  110,
+                  103
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "institution"
+              }
+            ],
+            "program": {
+              "kind": "account",
+              "path": "config.registryProgram",
+              "account": "escrowConfig"
+            }
+          }
+        },
+        {
+          "name": "agentScreening"
+        },
+        {
+          "name": "job",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  106,
+                  111,
+                  98
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "institution"
+              },
+              {
+                "kind": "arg",
+                "path": "specHash"
+              }
+            ]
+          }
+        },
+        {
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "specHash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "amount",
+          "type": "u64"
+        },
+        {
+          "name": "deadline",
+          "type": "i64"
         }
       ]
     },
@@ -1071,6 +1271,247 @@ export type SquareEscrowContract = {
         },
         {
           "name": "tokenProgram"
+        },
+        {
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "finalizeFiatPayment",
+      "docs": [
+        "Fiat rail (ADR 0024), permissionless: records a delivered fiat job as paid once the verifier's",
+        "`verify_mpp_payment_proof` bound a compliant `ReleaseProof` (payee = agent wallet, net = full",
+        "`amount`, fresh daily counter). CPIs `record_release`, writes reputation and a `Verified`",
+        "`ValidationRecord`, moves the job to `Released`. No funds move and no keeper fee is paid."
+      ],
+      "discriminator": [
+        194,
+        91,
+        34,
+        163,
+        143,
+        208,
+        202,
+        58
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "docs": [
+            "Permissionless caller; pays rent of the reputation/validation PDAs. No keeper fee (no vault)."
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "job",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  106,
+                  111,
+                  98
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "job.institution",
+                "account": "job"
+              },
+              {
+                "kind": "account",
+                "path": "job.specHash",
+                "account": "job"
+              }
+            ]
+          }
+        },
+        {
+          "name": "releaseProof",
+          "docs": [
+            "`record_release` CPI."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  101,
+                  108,
+                  101,
+                  97,
+                  115,
+                  101,
+                  95,
+                  112,
+                  114,
+                  111,
+                  111,
+                  102
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "job"
+              }
+            ],
+            "program": {
+              "kind": "account",
+              "path": "config.verifierProgram",
+              "account": "escrowConfig"
+            }
+          }
+        },
+        {
+          "name": "operatorState",
+          "docs": [
+            "for freshness and advanced by the CPI."
+          ],
+          "writable": true
+        },
+        {
+          "name": "verifierConfig",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  101,
+                  114,
+                  105,
+                  102,
+                  105,
+                  101,
+                  114,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ],
+            "program": {
+              "kind": "account",
+              "path": "config.verifierProgram",
+              "account": "escrowConfig"
+            }
+          }
+        },
+        {
+          "name": "verifierProgram"
+        },
+        {
+          "name": "escrowAuthority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  115,
+                  99,
+                  114,
+                  111,
+                  119,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "agentReputation",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  101,
+                  112,
+                  117,
+                  116,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "job.agentRecord",
+                "account": "job"
+              }
+            ]
+          }
+        },
+        {
+          "name": "validationRecord",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  108,
+                  105,
+                  100,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "job"
+              }
+            ]
+          }
         },
         {
           "name": "systemProgram",
@@ -2539,6 +2980,19 @@ export type SquareEscrowContract = {
       ]
     },
     {
+      "name": "fiatJobCreated",
+      "discriminator": [
+        64,
+        144,
+        66,
+        11,
+        232,
+        216,
+        23,
+        23
+      ]
+    },
+    {
       "name": "finalized",
       "discriminator": [
         4,
@@ -2953,6 +3407,11 @@ export type SquareEscrowContract = {
       "code": 6048,
       "name": "invalidDisputeTimeout",
       "msg": "Dispute timeout must be positive and proof timeout must not be negative"
+    },
+    {
+      "code": 6049,
+      "name": "railMismatch",
+      "msg": "Instruction does not apply to the job's settlement rail"
     }
   ],
   "types": [
@@ -3584,6 +4043,62 @@ export type SquareEscrowContract = {
       }
     },
     {
+      "name": "fiatJobCreated",
+      "docs": [
+        "A fiat job was opened by `create_fiat_job` (ADR 0024): no vault, always proof-gated."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "job",
+            "type": "pubkey"
+          },
+          {
+            "name": "institution",
+            "type": "pubkey"
+          },
+          {
+            "name": "agentRecord",
+            "type": "pubkey"
+          },
+          {
+            "name": "agentWallet",
+            "type": "pubkey"
+          },
+          {
+            "name": "policy",
+            "type": "pubkey"
+          },
+          {
+            "name": "policyVersion",
+            "type": "u32"
+          },
+          {
+            "name": "mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "specHash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "deadline",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
       "name": "finalized",
       "type": {
         "kind": "struct",
@@ -3780,6 +4295,18 @@ export type SquareEscrowContract = {
           {
             "name": "deliveryUri",
             "type": "string"
+          },
+          {
+            "name": "rail",
+            "docs": [
+              "How the job is paid (ADR 0024). Appended last: accounts created before the field read their",
+              "zero padding as `Escrow`."
+            ],
+            "type": {
+              "defined": {
+                "name": "settlementRail"
+              }
+            }
           }
         ]
       }
@@ -4063,6 +4590,23 @@ export type SquareEscrowContract = {
           {
             "name": "totalEarned",
             "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "settlementRail",
+      "docs": [
+        "Settlement rail of a job (ADR 0024)."
+      ],
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "escrow"
+          },
+          {
+            "name": "fiat"
           }
         ]
       }

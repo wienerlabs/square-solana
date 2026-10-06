@@ -11,7 +11,8 @@ pub struct VerifierConfig {
     pub escrow_program: Pubkey,
     /// Owner of `Institution` / `Policy` accounts read by the verifier.
     pub policy_program: Pubkey,
-    /// DRAFT (M6): ed25519 key of the compliance-api MPP attestations.
+    /// Ed25519 key whose attestations bind Stripe (MPP) payments to fiat jobs; rotated by the admin
+    /// with `update_mpp_authority` (ADR 0024).
     pub mpp_authority: Pubkey,
     /// Version of the embedded verifying key (bumped after the phase-2 ceremony, BC-38).
     pub vk_version: u16,
