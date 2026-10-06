@@ -31,7 +31,7 @@ Proje belgeleri. Mevcut olanlar bağlantılı; diğerleri ilgili issue ile eklen
 | [`licensing.md`](licensing.md) | lisans politikası: proje lisansı, taşınan kodun bildirimleri, bağımlılık lisansları | [BC-02] |
 | [`THIRD_PARTY_LICENSES.md`](THIRD_PARTY_LICENSES.md) | üçüncü taraf lisans envanteri (üretilir) | [BC-02] |
 | `legal/relicensing/` | Covenant LGPL kodu için yazılı yeniden lisanslama onayları | [BC-03] |
-| [`deploy/`](deploy/) | ağ bazında deploy kayıtları ([`devnet.md`](deploy/devnet.md)) ve smoke raporları ([`smoke-localnet.md`](deploy/smoke-localnet.md), [`smoke-devnet.md`](deploy/smoke-devnet.md); üreten [`tests/smoke`](../tests/smoke/)) | [BC-30], [BC-31] |
+| [`deploy/`](deploy/) | ağ bazında deploy kayıtları ([`devnet.md`](deploy/devnet.md)) ve smoke raporları ([`smoke-localnet.md`](deploy/smoke-localnet.md), [`smoke-devnet.md`](deploy/smoke-devnet.md); üreten [`tests/smoke`](../tests/smoke/)), CLI'nin devnet kabul koşusu ([`cli-devnet.md`](deploy/cli-devnet.md)) | [BC-30], [BC-31], [BE-30] |
 | [`runbooks/`](runbooks/README.md) | operasyon runbook'ları: [program deploy ve upgrade](runbooks/upgrade.md), [servisler](runbooks/services.md), [keeper](runbooks/keeper.md), [screener](runbooks/screener.md) | [BC-09], [BE-31] |
 
 [BC-02]: https://github.com/wienerlabs/square-solana/issues/2

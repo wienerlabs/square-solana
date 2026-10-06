@@ -258,6 +258,11 @@ Lapse (dispute son tarihi devnet'te 7 gün) localnet testinde gerçek keeper sü
 (`tests/smoke`). Kurum ve agent BC-36'nınkiler; alıcı `H19475gy…` ve keeper `GCKxtmGg…` koşu için üretildi, kurum
 alıcıya 1 USDC, deployer keeper'a 0,1 SOL gönderdi.
 
+## CLI (BE-30)
+
+8 adım `squaresdk-solana` komutlarıyla, 2026-10-06: [cli-devnet.md](cli-devnet.md). Kurum, agent, alıcı ve keeper
+smoke'unkiler; ücretleri deployer ödedi, ispatı yerelde çalışan prover servisi üretti.
+
 ## Yükseltmeler
 
 ### Escrow v0.6.0: dispute (BC-32, BC-33), 2026-10-06
