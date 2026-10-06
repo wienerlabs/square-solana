@@ -4,6 +4,7 @@ import {
   JobStatusSchema,
   ReleaseVerdictSchema,
   ScreeningStatusSchema,
+  ValidationOutcomeSchema,
 } from '@squaresdk/solana-types';
 import { describe, expect, it } from 'vitest';
 import { shorten, shortenDid } from '@/components/ui/address';
@@ -32,6 +33,7 @@ describe('status tones', () => {
       ReleaseVerdictSchema,
       AgentStatusSchema,
       ScreeningStatusSchema,
+      ValidationOutcomeSchema,
     ];
     expect(STATUS_SETS.map((s) => s.items.map((i) => i.value))).toEqual(sources.map((s) => s.options));
     for (const set of STATUS_SETS)

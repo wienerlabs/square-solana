@@ -176,6 +176,7 @@ describe('registry accounts', () => {
     minChallengePeriod: 60n,
     maxChallengePeriod: 604_800n,
     travelRuleThreshold: 0n,
+    keeperFeeBps: 50,
   };
   const coder = client.registry.program.coder.accounts;
   const wallet = key();
