@@ -1,7 +1,8 @@
 # scripts/
 
-Repo düzeyindeki operasyon script'leri: deploy, init, Address Lookup Table kurulumu ve devnet
-smoke ([§9](../docs/analysis/square-solana-analysis.md#9-%C3%B6nerilen-monorepo-yap%C4%B1s%C4%B1)).
+Repo düzeyindeki operasyon script'leri ([§9](../docs/analysis/square-solana-analysis.md#9-%C3%B6nerilen-monorepo-yap%C4%B1s%C4%B1)).
+Init, Address Lookup Table kurulumu ve smoke SDK'yı kullandığı için bir workspace paketidir:
+[`tests/smoke`](../tests/smoke/).
 
 | Konu | Issue |
 |---|---|
@@ -17,7 +18,7 @@ smoke ([§9](../docs/analysis/square-solana-analysis.md#9-%C3%B6nerilen-monorepo
 | [`deploy/`](deploy/): program upgrade'i Squads vault işlemiyle (`upgrade-program.mjs`); vault işleminin ortak akışı (`squads-vault.mjs`, config kurulumu da kullanır); [upgrade runbook'u](../docs/runbooks/upgrade.md) §6 | [BC-32], [BC-33] |
 | [`deploy/`](deploy/): sanctions screening: OFAC SDN listesinin okunması (`sanctions.mjs`), cüzdanların taranıp `record_screening` ile kaydedilmesi (`record-screening.mjs`); [screener runbook'u](../docs/runbooks/screener.md) | [BE-31] |
 | [`docs/`](docs/): geliştirici dokümantasyonunun sitesi (`site.mjs build`: TypeDoc referansı, rehberler, OpenAPI'den API referansı, `dist/docs/`) ve SDK referansının bütünlüğü (`site.mjs check`) | [BE-31] |
-| Devnet uçtan uca smoke: 8 adım gerçek işlemlerle, tx / CU / ücret raporu | [BC-31] |
+| Uçtan uca smoke: 8 adım ve iki varyant gerçek işlemlerle, tx / CU / ücret raporu: [`tests/smoke`](../tests/smoke/) `smoke` ve `smoke:localnet`; `init` kümenin programlarını, config'lerini ve ALT'ını okur ve doğrular (localnet'te kurar); CI [`smoke.yml`](../.github/workflows/smoke.yml) | [BC-31] |
 
 Anahtarlar ve secret'lar repoya girmez (`.gitignore`: `*keypair*.json`, `.env*`); deploy
 keypair'leri secret store'da tutulur [BC-09].
