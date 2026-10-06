@@ -53,3 +53,34 @@ test('AipV1AgentCard: tutar ondalık sayı olmalı (kaynaktaki parseFloat açı�
   assert.ok(!t.AipV1AgentCardSchema.safeParse(amount('-1')).success);
   assert.ok(!t.AipV1AgentCardSchema.safeParse(amount('')).success);
 });
+
+const squareCard = (overrides = {}) => ({
+  type: t.AGENT_CARD_TYPE,
+  name: 'Metin Ajanı',
+  description: 'Metin istatistikleri',
+  url: 'https://agent.square.test/a2a',
+  version: '1.0.0',
+  capabilities: { streaming: true, pushNotifications: false },
+  defaultInputModes: ['application/json'],
+  defaultOutputModes: ['application/json'],
+  skills: [{ id: 'text.stats', name: 'Metin istatistiği', description: 'Sayımlar', tags: ['text'] }],
+  services: [{ name: 'A2A', endpoint: 'https://agent.square.test/a2a', version: '1.0' }],
+  registrations: [{ agentRegistry: `solana:${'1'.repeat(32)}:${WALLET}`, agentId: WALLET }],
+  ...overrides,
+});
+
+test('AgentCard: A2A v1.0 supportedInterfaces isteğe bağlı ve url ile eşleşmeli', () => {
+  assert.ok(t.AgentCardSchema.safeParse(squareCard()).success);
+  const entry = (url) => ({ url, protocolBinding: 'JSONRPC', protocolVersion: '1.0' });
+  const ok = t.AgentCardSchema.safeParse(squareCard({ supportedInterfaces: [entry('https://agent.square.test/a2a')] }));
+  assert.ok(ok.success, JSON.stringify(ok.error?.issues));
+  assert.deepEqual(ok.data.supportedInterfaces, [entry('https://agent.square.test/a2a')]);
+  assert.ok(
+    !t.AgentCardSchema.safeParse(squareCard({ supportedInterfaces: [entry('https://other.test/a2a')] })).success,
+  );
+  assert.ok(!t.AgentCardSchema.safeParse(squareCard({ supportedInterfaces: [] })).success);
+  const grpc = { ...entry('https://agent.square.test/a2a'), protocolBinding: 'GRPC' };
+  assert.ok(!t.AgentCardSchema.safeParse(squareCard({ supportedInterfaces: [grpc] })).success);
+  const http = entry('http://agent.square.test/a2a');
+  assert.ok(!t.AgentCardSchema.safeParse(squareCard({ supportedInterfaces: [http] })).success);
+});

@@ -42,6 +42,17 @@ export const AgentPricingSchema = z.object({
 });
 export type AgentPricing = z.infer<typeof AgentPricingSchema>;
 
+/**
+ * A2A v1.0 `AgentInterface`: istemcinin uç noktayı ve bağlamayı okuduğu girdi. Square yalnızca
+ * JSON-RPC bağlamasını sunar (docs/design/a2a.md §1).
+ */
+export const AgentInterfaceSchema = z.object({
+  url: HttpsUrl,
+  protocolBinding: z.literal('JSONRPC'),
+  protocolVersion: z.string().regex(/^\d{1,4}\.\d{1,4}$/),
+});
+export type AgentInterface = z.infer<typeof AgentInterfaceSchema>;
+
 export const AgentCardSchema = z
   .object({
     type: z.literal(AGENT_CARD_TYPE),
@@ -65,10 +76,16 @@ export const AgentCardSchema = z
     /** `false`: sahip ajanı kart üzerinden duraklattı (did:aip Solana §5.6). */
     active: z.boolean().optional(),
     x402Support: z.boolean().optional(),
+    /** A2A v1.0 istemcilerinin uç noktayı okuduğu alan; verilirse `url` ile aynı bir girdi içerir. */
+    supportedInterfaces: z.array(AgentInterfaceSchema).min(1).max(8).optional(),
   })
   .refine((card) => card.services.some((service) => service.name === 'A2A' && service.endpoint === card.url), {
     message: "services, endpoint'i url ile aynı bir A2A girdisi içermeli",
     path: ['services'],
+  })
+  .refine((card) => !card.supportedInterfaces || card.supportedInterfaces.some((entry) => entry.url === card.url), {
+    message: "supportedInterfaces, url'i kartın url'i ile aynı bir girdi içermeli",
+    path: ['supportedInterfaces'],
   });
 export type AgentCard = z.infer<typeof AgentCardSchema>;
 
