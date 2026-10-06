@@ -138,6 +138,12 @@ describe('tarama', () => {
       resolution: 'pending',
       lapsed: false,
       raisedAt: 1_790_000_500n,
+      deadline: 1_790_259_700n,
+      decidedAt: 0n,
+      closedAt: 0n,
+      approvalMask: 0b101,
+      approvalCount: 2,
+      arbitratorSetVersion: 3n,
     });
     expect(await client.dispute.count()).toBe(1);
     expect(await client.claim.findUniqueOrThrow({ where: { address: address(scenario.claim) } })).toMatchObject({
@@ -332,6 +338,16 @@ describe('uzlaştırma', () => {
     expect(
       (await db.client.claim.findUniqueOrThrow({ where: { address: address(scenario.claim) } })).closedSlot,
     ).toBeNull();
+
+    // Oy sayımı sütunları (BE-22) zincirdekinden farklı: sapma sayılır ve onarılır.
+    await db.client.dispute.updateMany({ data: { approvalMask: 0, approvalCount: 0, arbitratorSetVersion: 0n } });
+    const tally = await stack.reconciler.run({ repair: true });
+    expect(tally.tables.find((t) => t.table === 'disputes')).toMatchObject({ stale: 1 });
+    expect(await db.client.dispute.findFirstOrThrow()).toMatchObject({
+      approvalMask: 0b101,
+      approvalCount: 2,
+      arbitratorSetVersion: 3n,
+    });
 
     // Okumadan yeni slot'ta yazılmış satır sapma sayılmaz.
     await db.client.policy.update({

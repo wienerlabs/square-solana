@@ -2,7 +2,7 @@
   "name": "@squaresdk/solana-api",
   "version": "0.1.0",
   "private": true,
-  "description": "Square REST API: cüzdan Ed25519 oturumu ve API anahtarları, indexer veritabanından okuma uçları, 8 adımın imzasız tx hazırlığı, teslimat yükleme, agent card barındırma, prover vekili, OpenAPI 3.1 (BE-18)",
+  "description": "Square REST API: cüzdan Ed25519 oturumu ve API anahtarları, indexer veritabanından okuma uçları, 8 adımın imzasız tx hazırlığı, teslimat yükleme, agent card barındırma, prover vekili, dispute kanıtı, arbitrator kuyruğu, oyu ve webhook bildirimleri, OpenAPI 3.1 (BE-18, BE-22)",
   "license": "Apache-2.0",
   "type": "module",
   "main": "dist/index.js",
@@ -35,7 +35,9 @@
     "zod": "^4.6.5"
   },
   "devDependencies": {
+    "@solana/spl-token": "^0.4.15",
     "@squaresdk/solana-config": "workspace:*",
+    "@squaresdk/solana-keeper": "workspace:*",
     "@testcontainers/postgresql": "^12.2.0",
     "@types/busboy": "^1.5.4",
     "@types/cors": "^2.8.17",

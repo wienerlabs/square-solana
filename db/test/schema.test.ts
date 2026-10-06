@@ -5,7 +5,9 @@ import { SQUARE_IDLS } from '@squaresdk/solana-sdk';
 import {
   AgentStatusSchema,
   ApiKeyScopeSchema,
+  ArbitrationEventTypeSchema,
   ClaimStatusSchema,
+  DisputeEvidenceRoleSchema,
   DisputeResolutionSchema,
   JobStatusSchema,
   KeeperActionKindSchema,
@@ -108,6 +110,8 @@ describe('@squaresdk/solana-types ile hiza', () => {
       KeeperOutcome: KeeperOutcomeSchema.options,
       KeeperReason: KeeperReasonSchema.options,
       ApiKeyScope: ApiKeyScopeSchema.options,
+      EvidenceRole: DisputeEvidenceRoleSchema.options,
+      ArbitrationEvent: ArbitrationEventTypeSchema.options,
     };
     for (const [type, values] of Object.entries(expected)) {
       expect(labels(type), type).toEqual([...values]);
@@ -177,6 +181,33 @@ describe('ilişkiler ve sorgular', () => {
     await db.client.agentCard.createMany({ data: [card(['translate', 'summarize']), card(['wallet-analysis'])] });
     const found = await db.client.agentCard.findMany({ where: { skills: { has: 'summarize' } } });
     expect(found).toHaveLength(1);
+  });
+
+  it('bildirim outbox’ı: aynı olay bir uca bir kez; abonelik silinince teslimatları da silinir', async () => {
+    const webhook = await db.client.arbitrationWebhook.create({
+      data: { wallet: address(), url: 'https://hooks.example.com/a', events: ['disputeRaised'], secret: 'sq1.x' },
+    });
+    const delivery = {
+      webhookId: webhook.id,
+      eventKey: 'event:1',
+      type: 'disputeRaised' as const,
+      job: address(),
+      payload: {},
+      nextAttemptAt: new Date(),
+    };
+    await db.client.notificationDelivery.create({ data: delivery });
+    await expect(db.client.notificationDelivery.create({ data: delivery })).rejects.toThrow();
+    const [raw] = await db.client.$queryRaw<
+      { events: string }[]
+    >`SELECT events::text AS events FROM arbitration_webhooks`;
+    expect(raw?.events).toBe('{dispute.raised}');
+    await expect(
+      db.client.arbitrationWebhook.create({
+        data: { wallet: address(), url: 'https://hooks.example.com/b', events: [], secret: 'sq1.x' },
+      }),
+    ).rejects.toThrow();
+    await db.client.arbitrationWebhook.delete({ where: { id: webhook.id } });
+    expect(await db.client.notificationDelivery.count()).toBe(0);
   });
 
   it("keeper sorgusu: teslim edilmiş ve challenge süresi dolmuş job'lar", async () => {

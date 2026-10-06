@@ -399,7 +399,7 @@ describe('flow', () => {
     ).rejects.toThrow(/politikası bulunamadı/);
   });
 
-  it('raiseDispute, resolveDispute, executeResolution, cancelJob', async () => {
+  it('raiseDispute, resolveDispute, executeResolution, lapseDispute, escalateMissingProof, updateArbitrators, cancelJob', async () => {
     const institution = key();
     const { address, account } = await jobAccount({ mint: mint(), institution });
     const raise = decoded(
@@ -437,6 +437,50 @@ describe('flow', () => {
       escrow(),
     );
     expect(withBond.accounts.bondVault).toBe(b58(client.pda.bondVault(bonded.address)[0]));
+
+    const lapseNoBond = decoded(
+      await client.flow.lapseDispute({ caller: arbitrator, job: address }, options()),
+      escrow(),
+    );
+    expect(lapseNoBond.name).toBe('lapseDispute');
+    expect(lapseNoBond.accounts).toMatchObject({
+      caller: b58(arbitrator),
+      config: b58(client.pda.escrowConfig()[0]),
+      bondVault: b58(PROGRAM_IDS.escrow),
+      institutionTokenAccount: b58(getAssociatedTokenAddressSync(account.mint, institution, true, TOKEN_PROGRAM_ID)),
+      mint: b58(account.mint),
+      rentPayer: b58(account.rentPayer as PublicKey),
+      tokenProgram: b58(TOKEN_PROGRAM_ID),
+    });
+    // Kurumun token hesabı aynı tx'te idempotent açılır; ödeyici fee payer.
+    expect(lapseNoBond.all).toHaveLength(2);
+    expect(b58(lapseNoBond.all[0]!.keys[0])).toBe(b58(feePayer));
+    const lapseBonded = decoded(
+      await client.flow.lapseDispute({ caller: arbitrator, job: bonded.address }, options()),
+      escrow(),
+    );
+    expect(lapseBonded.accounts.bondVault).toBe(b58(client.pda.bondVault(bonded.address)[0]));
+
+    const agent = key();
+    const escalate = decoded(await client.flow.escalateMissingProof({ agent, job: address }, options()), escrow());
+    expect(escalate.name).toBe('escalateMissingProof');
+    expect(escalate.accounts).toMatchObject({
+      agent: b58(agent),
+      job: b58(address),
+      releaseProof: b58(client.pda.releaseProof(address)[0]),
+    });
+
+    const admin = key();
+    const panel = [key(), key(), key()];
+    const update = decoded(
+      await client.flow.updateArbitrators({ admin, arbitrators: panel, threshold: 2 }, options()),
+      escrow(),
+    );
+    expect(update.accounts).toMatchObject({ admin: b58(admin), config: b58(client.pda.escrowConfig()[0]) });
+    expect(update.data).toEqual({ arbitrators: panel.map(b58), threshold: 2 });
+    await expect(
+      client.flow.updateArbitrators({ admin, arbitrators: panel, threshold: 256 }, options()),
+    ).rejects.toThrow(/u8/);
 
     const cancel = decoded(
       await client.flow.cancelJob({ institution, job: address, institutionTokenAccount: key() }, options()),

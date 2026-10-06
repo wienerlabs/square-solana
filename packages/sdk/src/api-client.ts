@@ -89,7 +89,34 @@ export const createApiClient: CreateApiClient = (config: ApiClientConfig): Squar
     return body as T;
   }
 
+  /** Zarfsız ikili yanıt (kanıt içeriği): 200'de baytlar, diğerlerinde hata zarfı `ApiClientError` olur. */
+  async function binary(path: string): Promise<Blob> {
+    const response = await send(url(path), { method: 'GET', headers: headers({ accept: '*/*' }) });
+    if (response.status === 200) {
+      const type = response.headers.get('content-type') ?? 'application/octet-stream';
+      return new Blob([await response.arrayBuffer()], { type });
+    }
+    const text = await response.text();
+    let body: unknown;
+    try {
+      body = JSON.parse(text);
+    } catch {
+      body = null;
+    }
+    const error = isEnvelope(body) && !body.success ? body.error : null;
+    throw new ApiClientError(
+      response.status,
+      error?.message ?? `beklenmeyen yanıt (${response.status}): ${text.slice(0, 200)}`,
+      error,
+    );
+  }
+
   const segment = (value: string) => encodeURIComponent(value);
+  const upload = (file: Blob) => {
+    const form = new FormData();
+    form.append('file', file);
+    return form;
+  };
 
   return {
     createAuthChallenge: (body) => envelope('POST', '/v1/auth/challenge', { json: body }),
@@ -101,11 +128,7 @@ export const createApiClient: CreateApiClient = (config: ApiClientConfig): Squar
 
     listJobs: (query = {}) => envelope('GET', '/v1/jobs', { query }),
     getJob: (job) => envelope('GET', `/v1/jobs/${segment(job)}`),
-    uploadDelivery: (job, file) => {
-      const form = new FormData();
-      form.append('file', file);
-      return envelope('POST', `/v1/jobs/${segment(job)}/deliveries`, { form });
-    },
+    uploadDelivery: (job, file) => envelope('POST', `/v1/jobs/${segment(job)}/deliveries`, { form: upload(file) }),
 
     getInstitution: (institution) => envelope('GET', `/v1/institutions/${segment(institution)}`),
     listPolicies: (query = {}) => envelope('GET', '/v1/policies', { query }),
@@ -126,6 +149,15 @@ export const createApiClient: CreateApiClient = (config: ApiClientConfig): Squar
     getClaim: (job) => envelope('GET', `/v1/claims/${segment(job)}`),
     listDisputes: (query = {}) => envelope('GET', '/v1/disputes', { query }),
     getDispute: (job) => envelope('GET', `/v1/disputes/${segment(job)}`),
+    uploadDisputeEvidence: (job, file) =>
+      envelope('POST', `/v1/jobs/${segment(job)}/dispute/evidence`, { form: upload(file) }),
+    listDisputeEvidence: (job) => envelope('GET', `/v1/disputes/${segment(job)}/evidence`),
+    getDisputeEvidenceContent: (job, id) => binary(`/v1/disputes/${segment(job)}/evidence/${segment(id)}`),
+    prepareDisputeVote: (job, body) => envelope('POST', `/v1/disputes/${segment(job)}/votes`, { json: body }),
+    getArbitrationQueue: (query = {}) => envelope('GET', '/v1/arbitration/queue', { query }),
+    listArbitrationWebhooks: () => envelope('GET', '/v1/arbitration/webhooks'),
+    createArbitrationWebhook: (body) => envelope('POST', '/v1/arbitration/webhooks', { json: body }),
+    deleteArbitrationWebhook: (id) => empty('DELETE', `/v1/arbitration/webhooks/${segment(id)}`),
     getScreening: (wallet) => envelope('GET', `/v1/screening/${segment(wallet)}`),
     listEvents: (query = {}) => envelope('GET', '/v1/events', { query }),
     listKeeperActions: (query = {}) => envelope('GET', '/v1/keeper/actions', { query }),

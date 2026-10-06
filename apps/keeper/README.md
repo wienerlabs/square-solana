@@ -1,6 +1,7 @@
 # @squaresdk/solana-keeper
 
-8 adımın 6.sı: challenge penceresi itirazsız biten job'ların permissionless `finalize_payment`'ı (BE-15).
+8 adımın 6.sı: challenge penceresi itirazsız biten job'ların permissionless `finalize_payment`'ı (BE-15) ve son tarihi
+geçmiş dispute'ların `lapse_dispute`'u ([lapse crank'i](#lapse-cranki-be-22), BE-22).
 Finalize'ı çağıran keeper ücretini alır (ADR 0013): `amount × keeper_fee_bps / 10 000`. Covenant'ın crank'i
 GitHub Actions cron'uyla bir HTTP ucunu tetikliyordu ve ücretsizdi; burada ayrı, ücretli bir servis.
 
@@ -40,6 +41,35 @@ GitHub Actions cron'uyla bir HTTP ucunu tetikliyordu ve ücretsizdi; burada ayr�
    - Tx hatası `programError` olur.
    - Blockhash'in süresi dolarsa `rpcError` olur.
 
+## Lapse crank'i (BE-22)
+
+Son tarihi geçmiş açık dispute'ların permissionless `lapse_dispute`'u
+([ADR 0016](../../docs/decisions/0016-dispute-m-of-n-zaman-asimi-ve-ispatsiz-bekleme.md) madde 3–4). Karar
+çıkmazsa ne bond ne escrow kilitli kalır. Finalize'la aynı süreçte, ayrı bir döngüdedir (`src/lapse.ts`).
+
+1. **Adaylar** indexer'ın dispute aynasındandır: `jobStatus = disputed`, `deadline <= now`, job hesabı açık. Son
+   tarihi en eski önce, en çok `KEEPER_BATCH_SIZE`.
+2. **Zincir doğrulaması:** Job zincirden okunur.
+   - Artık `Disputed` değilse (karar verilmiş, lapse edilmiş ya da ayna geride) atlanır, günlüğe yazılmaz.
+   - Zincirdeki son tarih gelmediyse (lapse sonrası yeniden açılmış dispute) son tarihe kadar bekletilir
+     (`challengeOpen`).
+3. **Tx:** SDK'nın `flow.lapseDispute`'u.
+   - Bond varsa bond vault'u verilir; bond'suz başvuruda (`escalate_missing_proof`) verilmez.
+   - Kurumun token hesabı yoksa aynı tx'te açılır.
+   - Priority fee job'un son ücretlerinin yüzdeliğidir (finalize'la aynı ayar).
+   - Keeper ücreti yoktur. İşlem ücretini ve gerekirse kurumun token hesabının rent'ini keeper öder.
+4. **Simülasyon:**
+   - `DisputeNotExpired` (zincir saati geride) → `challengeOpen`;
+   - `NoActiveDispute` → atlanır;
+   - diğerleri → `failed` / `programError`.
+5. **Gönderim ve onay** finalize'daki gibidir.
+   - Onaylanan kayıt da `nextAttemptAt` taşır (`KEEPER_BACKOFF_BASE_SECONDS` sonra): ayna güncellenene kadar
+     aynı işe yeniden gönderilmez.
+   - Bond kuruma döner, iş `Delivered`'a geçer ve finalize crank'inin yolundan çözülür.
+
+Günlükte kayıtlar talimatla (`action`: `finalizePayment`, `lapseDispute`) ayrılır. Bir crank'in bekletmesi ve
+ardışık sayımı diğerini etkilemez.
+
 ## Bekletme ve günlük
 
 Her karar `keeper_actions`'a yazılır; API bunu `GET /v1/keeper/actions` ile sunar (BE-18).
@@ -75,7 +105,7 @@ Her karar `keeper_actions`'a yazılır; API bunu `GET /v1/keeper/actions` ile su
 | `GET /metrics` | `KEEPER_METRICS_PORT` (iç ağ) |
 
 **Metrikler:**
-- `keeper_actions_total{outcome,reason}`
+- `keeper_actions_total{action,outcome,reason}`
 - `keeper_fees_earned_total`
 - `keeper_balance_lamports`
 - `keeper_last_round_timestamp_seconds`
@@ -83,8 +113,8 @@ Her karar `keeper_actions`'a yazılır; API bunu `GET /v1/keeper/actions` ile su
 **Alarmlar:**
 - `keeper_low_balance`: Bakiye `KEEPER_ALERT_MIN_BALANCE_LAMPORTS`'un altında; işlem ücreti ve rent
   ödenemeyebilir.
-- `keeper_stalled`: Son başarılı tur `KEEPER_ALERT_STALL_SECONDS` önce.
-- `keeper_errors`: Başarısız finalize ve tur hataları pencerede eşiğin üstünde.
+- `keeper_stalled`: İki crank'ten birinin son başarılı turu `KEEPER_ALERT_STALL_SECONDS` önce.
+- `keeper_errors`: Başarısız finalize / lapse ve tur hataları pencerede eşiğin üstünde.
 
 ## Testler
 
@@ -97,7 +127,11 @@ Her karar `keeper_actions`'a yazılır; API bunu `GET /v1/keeper/actions` ile su
   - `ProofRequired`'ın geri çekilmesi ve ispat gelince yeniden denenmesi;
   - screening;
   - simülasyon, onay ve RPC hataları.
-- **Gerçek programlarla finalize:** BE-36 (localnet).
+- **Lapse** (`test/lapse.test.ts`): aday seçimi, bond'lu ve bond'suz dispute, zincirde yeniden açılmış dispute'un
+  beklemesi, simülasyon hataları, onay ve RPC hataları, iki crank'in günlüklerinin ayrılığı.
+- **Gerçek programlarla lapse:** apps/api'nin localnet uçtan uca testi keeper'ı süreç olarak açar ve
+  `lapse_dispute`'un onaylandığını denetler ([apps/api](../api/README.md#testler)). Gerçek programlarla
+  finalize BE-36'dadır.
 
 ## Kaynak
 

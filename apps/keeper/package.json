@@ -2,7 +2,7 @@
   "name": "@squaresdk/solana-keeper",
   "version": "0.1.0",
   "private": true,
-  "description": "Permissionless finalize crank: challenge'ı biten job'ları zincirde doğrular, kârlılık eşiği ve priority fee ile finalize eder; ProofRequired ve temiz olmayan screening'de geri çekilerek bekler, kararları keeper_actions günlüğüne yazar (BE-15)",
+  "description": "Permissionless finalize crank: challenge'ı biten job'ları zincirde doğrular, kârlılık eşiği ve priority fee ile finalize eder; ProofRequired ve temiz olmayan screening'de geri çekilerek bekler, kararları keeper_actions günlüğüne yazar (BE-15); son tarihi geçmiş dispute'ların lapse_dispute crank'i (BE-22)",
   "license": "Apache-2.0",
   "type": "module",
   "main": "dist/index.js",

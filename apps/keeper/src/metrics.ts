@@ -3,8 +3,8 @@
 import { Counter, Gauge, createServiceMetrics, type ServiceMetrics } from '@squaresdk/solana-observability';
 
 export interface KeeperMetrics extends ServiceMetrics {
-  /** Günlüğe yazılan kararlar: `outcome` (submitted, confirmed, skipped, failed) ve `reason`. */
-  readonly actions: Counter<'outcome' | 'reason'>;
+  /** Günlüğe yazılan kararlar: `action` (finalizePayment, lapseDispute), `outcome` ve `reason`. */
+  readonly actions: Counter<'action' | 'outcome' | 'reason'>;
   /** Onaylanan finalize'ların keeper ücreti toplamı (settlement mint'inin taban birimi). */
   readonly feesEarned: Counter;
   /** Keeper cüzdanının SOL bakiyesi (lamport). */
@@ -20,8 +20,8 @@ export function createMetrics(params: { service: string; version: string }): Kee
     ...base,
     actions: new Counter({
       name: 'keeper_actions_total',
-      help: 'Keeper kararları, sonuca ve sebebe göre',
-      labelNames: ['outcome', 'reason'],
+      help: 'Keeper kararları, talimata, sonuca ve sebebe göre',
+      labelNames: ['action', 'outcome', 'reason'],
       registers,
     }),
     feesEarned: new Counter({

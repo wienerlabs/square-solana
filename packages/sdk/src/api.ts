@@ -8,6 +8,10 @@ import type {
   AgentStatus,
   AgentView,
   ApiEnvelope,
+  ArbitrationQueueItem,
+  ArbitrationWebhook,
+  ArbitrationWebhookCreate,
+  ArbitrationWebhookCreated,
   ApiKey,
   ApiKeyCreate,
   ApiKeyCreated,
@@ -16,7 +20,9 @@ import type {
   ClaimStatus,
   ClaimView,
   DeliveryReceipt,
+  DisputeEvidence,
   DisputeView,
+  DisputeVoteRequest,
   Health,
   IndexedEvent,
   InstitutionView,
@@ -80,6 +86,17 @@ export interface SquareApi {
   getClaim(job: Address): Promise<ApiEnvelope<ClaimView>>;
   listDisputes(query?: PageParams & { jobStatus?: JobStatus }): Promise<ApiEnvelope<DisputeView[]>>;
   getDispute(job: Address): Promise<ApiEnvelope<DisputeView>>;
+  /** Dispute kanıtı; dönen `reasonHash` kurumun `raise_dispute` argümanıdır. */
+  uploadDisputeEvidence(job: Address, file: Blob): Promise<ApiEnvelope<DisputeEvidence>>;
+  listDisputeEvidence(job: Address): Promise<ApiEnvelope<DisputeEvidence[]>>;
+  /** Kanıtın baytları (zarfsız); içerik tipi `Blob.type`'tadır. */
+  getDisputeEvidenceContent(job: Address, id: string): Promise<Blob>;
+  /** Arbitrator oyu için imzasız `resolve_dispute` tx'i (ön denetimli). */
+  prepareDisputeVote(job: Address, body: DisputeVoteRequest): Promise<ApiEnvelope<UnsignedTx>>;
+  getArbitrationQueue(query?: PageParams): Promise<ApiEnvelope<ArbitrationQueueItem[]>>;
+  listArbitrationWebhooks(): Promise<ApiEnvelope<ArbitrationWebhook[]>>;
+  createArbitrationWebhook(body: ArbitrationWebhookCreate): Promise<ApiEnvelope<ArbitrationWebhookCreated>>;
+  deleteArbitrationWebhook(id: string): Promise<void>;
   getScreening(wallet: Address): Promise<ApiEnvelope<ScreeningView>>;
   listEvents(
     query?: PageParams & { job?: Address; program?: SquareProgram; name?: string; fromSlot?: number },
@@ -117,6 +134,14 @@ export const API_OPERATIONS = [
   'getClaim',
   'listDisputes',
   'getDispute',
+  'uploadDisputeEvidence',
+  'listDisputeEvidence',
+  'getDisputeEvidenceContent',
+  'prepareDisputeVote',
+  'getArbitrationQueue',
+  'listArbitrationWebhooks',
+  'createArbitrationWebhook',
+  'deleteArbitrationWebhook',
   'getScreening',
   'listEvents',
   'listKeeperActions',

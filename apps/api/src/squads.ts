@@ -6,7 +6,8 @@
 // Program kimliği, discriminator ve yetki bitleri SDK'nın Squads yardımcılarındandır
 // (`@squaresdk/solana-sdk/squads`, crate'teki `square_common::squads` ile aynı).
 import { SQUADS_MULTISIG_DISCRIMINATOR, SQUADS_PROGRAM_ID, SquadsPermission } from '@squaresdk/solana-sdk/squads';
-import { PublicKey } from '@solana/web3.js';
+import { PublicKey, type Connection } from '@solana/web3.js';
+import { HttpError, forbidden } from './http.js';
 
 export { SQUADS_PROGRAM_ID };
 const MULTISIG_DISCRIMINATOR = Buffer.from(SQUADS_MULTISIG_DISCRIMINATOR);
@@ -42,4 +43,21 @@ export function multisigMembers(owner: PublicKey, data: Buffer): SquadsMember[] 
       permissions: data[start + KEY]!,
     };
   });
+}
+
+/**
+ * Cüzdan, multisig'te öneri açabilen (`Initiate`) bir üye mi; üyeler hesaptan o anda okunur. Hesap Squads v4
+ * multisig'i değilse yetkili doğrulanamaz (403), RPC düşerse 503.
+ */
+export async function isMultisigInitiator(connection: Connection, multisig: string, wallet: string): Promise<boolean> {
+  let info;
+  try {
+    info = await connection.getAccountInfo(new PublicKey(multisig), 'confirmed');
+  } catch (error) {
+    throw new HttpError(503, 'rpc_unavailable', 'Squads multisig hesabı okunamadı', null, null, error);
+  }
+  const members = info ? multisigMembers(info.owner, info.data) : null;
+  // Bağlama sırasında program hesabı Squads v4 multisig'i olarak denetledi; artık değilse yetkili doğrulanamaz.
+  if (!members) throw forbidden('kurumun multisig hesabı Squads v4 multisig değil; yetkili doğrulanamadı');
+  return members.some((member) => member.key === wallet && (member.permissions & PERMISSION_INITIATE) !== 0);
 }

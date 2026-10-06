@@ -114,5 +114,6 @@
 ## Açık noktalar
 
 - Arbitrator kararının gerekçesi zincirde tutulmaz. Kanıtın saklanması (`reason_hash` ↔ off-chain kanıt) ve
-  arbitrator bildirimi BE-22'dedir.
-- `lapse_dispute`'un otomatik çağrılması (keeper crank'i) BE-22 / BE-15'tedir.
+  arbitrator bildirimi BE-22'de uygulandı ([apps/api](../../apps/api/README.md#uyuşmazlık)).
+- `lapse_dispute`'un otomatik çağrılması BE-22'de keeper'ın lapse crank'i olarak uygulandı
+  ([apps/keeper](../../apps/keeper/README.md#lapse-cranki-be-22)).
