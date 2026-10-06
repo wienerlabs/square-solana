@@ -4,6 +4,7 @@ import { createHash } from 'node:crypto';
 import { BN } from '@anchor-lang/core';
 import { VersionedTransaction, PublicKey } from '@solana/web3.js';
 import type { BorshInstructionCoder } from '@anchor-lang/core';
+import { squadsVaultAddress } from '@squaresdk/solana-sdk/squads';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { inject } from 'vitest';
 import { loadOpenApi } from '../src/openapi.js';
@@ -173,6 +174,31 @@ describe('dispute kanıtı', () => {
     });
     const uploaded = await (await session(member)).uploadDisputeEvidence(job.address, new Blob(['multisig gerekçesi']));
     expect(uploaded).toMatchObject({ success: true, data: { role: 'institution' } });
+  });
+
+  it('agent smart account vault’uysa üye X-Square-Smart-Account ile agent tarafıdır', async () => {
+    const [member, voter] = [wallet(), wallet()];
+    const multisig = world.squadsMultisig([
+      { key: member.address, permissions: PERMISSION_INITIATE | 2 },
+      { key: voter.address, permissions: 2 },
+    ]);
+    const vault = squadsVaultAddress(multisig, 0)[0].toBase58();
+    const job = await world.job({
+      institution: institution.address,
+      agentRecord: await world.agent(vault, vault),
+      agentWallet: vault,
+      disputed: true,
+    });
+    const via = async (who: Wallet) =>
+      stack.api({ session: await login(stack.api(), who), smartAccount: multisig.toBase58() });
+
+    expect(await (await session(member)).uploadDisputeEvidence(job.address, new Blob(['x']))).toMatchObject({
+      error: { code: 'forbidden' },
+    });
+    const uploaded = await (await via(member)).uploadDisputeEvidence(job.address, new Blob(['vault kanıtı']));
+    expect(uploaded).toMatchObject({ success: true, data: { role: 'agent', uploadedBy: member.address } });
+    expect((await (await via(member)).listDisputeEvidence(job.address)).success).toBe(true);
+    expect(await (await via(voter)).listDisputeEvidence(job.address)).toMatchObject({ error: { code: 'forbidden' } });
   });
 
   it('yetki, kapsam, boyut ve bilinmeyen job', async () => {

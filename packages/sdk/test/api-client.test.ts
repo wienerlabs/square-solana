@@ -77,6 +77,17 @@ describe('createApiClient', () => {
     expect(last()).toMatchObject({ method: 'PUT', url: `/api/v1/agents/${job}/card?agentId=research-1` });
     expect(JSON.parse(last().body)).toEqual({ name: 'x' });
     expect(last().headers['content-type']).toBe('application/json');
+    expect(last().headers['x-square-smart-account']).toBeUndefined();
+  });
+
+  it('smart account verilirse her istek X-Square-Smart-Account başlığını taşır', async () => {
+    const multisig = '11111111111111111111111111111113';
+    const api = createApiClient({ baseUrl, auth: { session: 'tok', smartAccount: multisig } });
+    respond = () => ok([]);
+    await api.listJobs({});
+    expect(last().headers['x-square-smart-account']).toBe(multisig);
+    await api.putAgentCard(job, { name: 'x' } as never, { agentId: 'research-1' });
+    expect(last().headers).toMatchObject({ authorization: 'Bearer tok', 'x-square-smart-account': multisig });
   });
 
   it('bütün uçların yolları', async () => {

@@ -266,8 +266,12 @@ void _allOperationsListed;
 export interface ApiClientConfig {
   /** API'nin kök adresi (sonda `/` olmadan da olur). */
   baseUrl: string;
-  /** Oturum belirteci (`createSession`) ya da API anahtarı. */
-  auth?: { session?: string; apiKey?: string };
+  /**
+   * Oturum belirteci (`createSession`) ya da API anahtarı. `smartAccount`: Squads v4 multisig adresi; verilirse
+   * istekler `X-Square-Smart-Account` başlığını taşır ve cüzdan, multisig'te `Initiate` yetkili üyeyse multisig'in
+   * vault'u adına yazar (teslimat, kart, politika meta verisi, Travel Rule, dispute kanıtı; FE-21).
+   */
+  auth?: { session?: string; apiKey?: string; smartAccount?: string };
   /** İstekleri gönderen fetch; verilmezse global `fetch`. */
   fetch?: typeof fetch;
 }

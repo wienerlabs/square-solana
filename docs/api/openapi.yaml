@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Square Solana API
-  version: 0.22.0
+  version: 0.23.0
   summary: Square HTTP API sözleşmesi (BE-35), uygulaması apps/api (BE-18).
   description: |
     Contract-first API sözleşmesi. Zincirdeki hesaplar, event'ler ve instruction argümanları
@@ -437,6 +437,7 @@ paths:
         - session: []
         - apiKey: []
       parameters:
+        - $ref: '#/components/parameters/SmartAccount'
         - $ref: '#/components/parameters/JobPath'
       requestBody:
         required: true
@@ -464,6 +465,7 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '429': { $ref: '#/components/responses/RateLimited' }
+        '503': { $ref: '#/components/responses/Unavailable' }
 
   /v1/institutions/{institution}:
     get:
@@ -548,6 +550,7 @@ paths:
       security:
         - session: []
       parameters:
+        - $ref: '#/components/parameters/SmartAccount'
         - $ref: '#/components/parameters/PolicyPath'
       requestBody:
         required: true
@@ -640,6 +643,7 @@ paths:
         (`["agent", owner, agent_id]`) olmalıdır. Kartın `registrations`'ı bu kaydı içermelidir. Saklanan
         baytlar kartın RFC 8785 kanonik JSON'udur; `agentCardHash` bu baytların SHA-256'sıdır.
       parameters:
+        - $ref: '#/components/parameters/SmartAccount'
         - $ref: '#/components/parameters/AgentRecordPath'
         - name: agentId
           in: query
@@ -665,6 +669,7 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '429': { $ref: '#/components/responses/RateLimited' }
+        '503': { $ref: '#/components/responses/Unavailable' }
 
   /a/{agentRecord}/.well-known/agent-card.json:
     get:
@@ -797,6 +802,7 @@ paths:
         - session: []
         - apiKey: []
       parameters:
+        - $ref: '#/components/parameters/SmartAccount'
         - $ref: '#/components/parameters/JobPath'
       requestBody:
         required: true
@@ -836,6 +842,7 @@ paths:
         - session: []
         - apiKey: []
       parameters:
+        - $ref: '#/components/parameters/SmartAccount'
         - $ref: '#/components/parameters/JobPath'
       responses:
         '200':
@@ -849,6 +856,7 @@ paths:
                       data:
                         type: array
                         items: { $ref: '#/components/schemas/DisputeEvidence' }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
@@ -864,6 +872,7 @@ paths:
         - session: []
         - apiKey: []
       parameters:
+        - $ref: '#/components/parameters/SmartAccount'
         - $ref: '#/components/parameters/JobPath'
         - name: id
           in: path
@@ -878,6 +887,7 @@ paths:
               schema:
                 type: string
                 contentMediaType: application/octet-stream
+        '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
@@ -1132,6 +1142,7 @@ paths:
       security:
         - session: []
       parameters:
+        - $ref: '#/components/parameters/SmartAccount'
         - $ref: '#/components/parameters/JobPath'
       requestBody:
         required: true
@@ -1166,6 +1177,7 @@ paths:
       security:
         - session: []
       parameters:
+        - $ref: '#/components/parameters/SmartAccount'
         - $ref: '#/components/parameters/JobPath'
       responses:
         '200':
@@ -1177,6 +1189,7 @@ paths:
                   - $ref: '#/components/schemas/SuccessBase'
                   - properties:
                       data: { $ref: '#/components/schemas/TravelRuleDisclosure' }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
@@ -1191,6 +1204,7 @@ paths:
       security:
         - session: []
       parameters:
+        - $ref: '#/components/parameters/SmartAccount'
         - $ref: '#/components/parameters/JobPath'
       requestBody:
         required: true
@@ -1222,6 +1236,7 @@ paths:
       security:
         - session: []
       parameters:
+        - $ref: '#/components/parameters/SmartAccount'
         - $ref: '#/components/parameters/JobPath'
         - name: grantee
           in: path
@@ -1246,6 +1261,7 @@ paths:
       security:
         - session: []
       parameters:
+        - $ref: '#/components/parameters/SmartAccount'
         - $ref: '#/components/parameters/JobPath'
         - $ref: '#/components/parameters/Page'
         - $ref: '#/components/parameters/Limit'
@@ -1561,6 +1577,18 @@ components:
       in: query
       description: 'Sayfa başına kayıt (1–200).'
       schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
+    SmartAccount:
+      name: X-Square-Smart-Account
+      in: header
+      required: false
+      description: >-
+        Smart account (Squads v4 multisig) adresi (FE-21). Verilirse çağıran, multisig'in 0 numaralı vault'u adına da
+        yazar ve okur: kaynağın sahibi (kurum anahtarı, agent cüzdanı ya da sahibi) bu vault olabilir. Koşul, oturumun
+        ya da API anahtarının cüzdanının multisig'te öneri açabilen (`Initiate`) bir üye olmasıdır; üyelik vault adına
+        yapılan denetimde zincirden o anda okunur. Hesap Squads v4 multisig'i değilse ya da cüzdan Initiate yetkili
+        üye değilse vault adına yetki verilmez (403); multisig okunamazsa 503. Geçersiz adres 400. Kayıtlara (yükleyen,
+        erişim kaydı, `updatedBy`) cüzdan yazılır.
+      schema: { $ref: './schemas/idl.json#/Address' }
     JobPath:
       name: job
       in: path

@@ -1,10 +1,12 @@
 // Yazma uçları: teslimat yükleme, agent card barındırma ve A2A keşif yolu, politika meta verisi, tx hazırlama,
-// prover vekili. Yetki OpenAPI `security`'sidir (auth/middleware.ts); kaynak üzerindeki yetki servislerdedir.
+// prover vekili. Yetki OpenAPI `security`'sidir (auth/middleware.ts); kaynak üzerindeki yetki servislerdedir. Teslimat,
+// kart ve meta veri çağıranı `X-Square-Smart-Account` başlığıyla bir smart account'un vault'u adına yazabilir (caller.ts).
 import type { ReadApi } from '@squaresdk/solana-indexer/read';
 import { Address, ProveRequestSchema, TxRequestSchema } from '@squaresdk/solana-types';
 import { Router, type Request, type RequestHandler } from 'express';
 import { z } from 'zod';
 import { principalOf, requireActor, requireSession } from '../auth/middleware.js';
+import { callerOf } from '../caller.js';
 import type { CardService } from '../cards.js';
 import type { DeliveryService } from '../deliveries.js';
 import { badRequest, notFound, parse, route, sendOk, unauthorized } from '../http.js';
@@ -36,14 +38,14 @@ export function writeRoutes(deps: {
     writeLimit,
     route(async (req, res) => {
       // Yetki ve yol gövde okunmadan denetlenir: yetkisiz istek dosyayı belleğe almaz.
-      const principal = requireActor(res, 'deliveries:write');
+      const caller = callerOf(res, requireActor(res, 'deliveries:write'));
       const job = pathAddress(req, 'job');
       const file = await readUpload(req, deps.deliveryMaxBytes);
       // busboy içerik tipini `tip/alt-tip` olarak ayrıştırır, geçersizini `application/octet-stream` yapar.
       const contentType = file.mimeType;
       if (contentType.length > 120) throw badRequest('dosyanın içerik tipi 120 karakteri aşıyor');
       const receipt = await deps.deliveries.upload({
-        wallet: principal.wallet,
+        caller,
         job,
         content: file.content,
         contentType,
@@ -59,7 +61,7 @@ export function writeRoutes(deps: {
       const principal = requireActor(res, 'agents:write');
       const { agentId } = parse(CardQuery, req.query, 'sorgu');
       const hosting = await deps.cards.put({
-        wallet: principal.wallet,
+        caller: callerOf(res, principal),
         agentRecord: pathAddress(req, 'agentRecord'),
         agentId: agentId ?? null,
         card: req.body,
@@ -82,9 +84,9 @@ export function writeRoutes(deps: {
     '/v1/policies/:policy/meta',
     writeLimit,
     route(async (req, res) => {
-      const { wallet } = requireSession(res);
+      const caller = callerOf(res, requireSession(res));
       const policy = pathAddress(req, 'policy');
-      await deps.policyMeta.put({ wallet, policy, meta: req.body });
+      await deps.policyMeta.put({ caller, policy, meta: req.body });
       sendOk(res, await deps.read.getPolicy(policy));
     }),
   );

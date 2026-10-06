@@ -1,8 +1,10 @@
 // Travel Rule uçları (BE-23): kayıt yazma ve okuma, okuma izni ve erişim kaydı. Kişisel veriye dokunan uçlar
-// yalnızca cüzdan oturumuyla çağrılır (API anahtarı kabul edilmez); kaynak üzerindeki yetki servistedir.
+// yalnızca cüzdan oturumuyla çağrılır (API anahtarı kabul edilmez); kaynak üzerindeki yetki servistedir. Kurum bir
+// smart account'un vault'uyla açıldıysa üye `X-Square-Smart-Account` başlığını verir (caller.ts).
 import { Address, PageQuerySchema } from '@squaresdk/solana-types';
 import { Router, type Request, type RequestHandler, type Response } from 'express';
 import { requireSession } from '../auth/middleware.js';
+import { callerOf } from '../caller.js';
 import { parse, requestIdOf, route, sendOk, sendPage } from '../http.js';
 import type { TravelRuleActor, TravelRuleService } from '../travel-rule/service.js';
 
@@ -10,7 +12,7 @@ const pathAddress = (req: Request, name: string) => parse(Address, req.params[na
 const AccessQuery = PageQuerySchema.strict();
 
 const actorOf = (res: Response): TravelRuleActor => ({
-  wallet: requireSession(res).wallet,
+  ...callerOf(res, requireSession(res)),
   requestId: requestIdOf(res),
 });
 

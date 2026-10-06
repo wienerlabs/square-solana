@@ -106,7 +106,8 @@ export function createArbitrationService(deps: {
           const [dispute, votes, evidence] = await Promise.all([
             read.getDispute(row.job),
             votesOf(row.job),
-            deps.evidence.list({ wallet, job: row.job }),
+            // Arbitrator cüzdanıyla girer (parties.ts); smart account başlığı arbitrator kuyruğunda kullanılmaz.
+            deps.evidence.list({ caller: { wallet, smartAccount: null }, job: row.job }),
           ]);
           const voted = hasVoted(
             { approvalMask: row.approvalMask, arbitratorSetVersion: Number(row.arbitratorSetVersion) },

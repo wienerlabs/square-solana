@@ -38,6 +38,7 @@ export const createApiClient: CreateApiClient = (config: ApiClientConfig): Squar
     accept: 'application/json',
     ...(config.auth?.session ? { authorization: `Bearer ${config.auth.session}` } : {}),
     ...(config.auth?.apiKey ? { 'x-api-key': config.auth.apiKey } : {}),
+    ...(config.auth?.smartAccount ? { 'x-square-smart-account': config.auth.smartAccount } : {}),
     ...extra,
   });
 

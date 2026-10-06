@@ -5,14 +5,15 @@
 import { createHash } from 'node:crypto';
 import type { DisputeEvidenceModel as EvidenceRow, PrismaClient } from '@squaresdk/solana-db';
 import { DisputeEvidenceSchema, type DisputeEvidence } from '@squaresdk/solana-types';
+import type { Caller } from '../caller.js';
 import { conflict, forbidden, notFound } from '../http.js';
 import type { EvidenceStore } from '../storage.js';
 import type { JobParties, Parties } from './parties.js';
 
 export interface EvidenceService {
-  upload(params: { wallet: string; job: string; content: Buffer; contentType: string }): Promise<DisputeEvidence>;
-  list(params: { wallet: string; job: string }): Promise<DisputeEvidence[]>;
-  content(params: { wallet: string; job: string; id: string }): Promise<{ contentType: string; content: Buffer }>;
+  upload(params: { caller: Caller; job: string; content: Buffer; contentType: string }): Promise<DisputeEvidence>;
+  list(params: { caller: Caller; job: string }): Promise<DisputeEvidence[]>;
+  content(params: { caller: Caller; job: string; id: string }): Promise<{ contentType: string; content: Buffer }>;
 }
 
 /** Kurumun dispute açmadan önce de yükleyebildiği durumlar (`raise_dispute` teslim edilmiş işte açılır). */
@@ -59,17 +60,17 @@ export function createEvidenceService(deps: {
     return dispute?.reasonHash ?? null;
   }
 
-  async function reader(wallet: string, job: string) {
+  async function reader(caller: Caller, job: string) {
     const row = await jobOf(job);
-    const role = await parties.roleOf(wallet, row);
+    const role = await parties.roleOf(caller, row);
     if (!role) throw forbidden('kanıtı yalnızca kurum, agent cüzdanı / sahibi ve aktif arbitrator’lar okur');
     return row;
   }
 
   return {
-    async upload({ wallet, job, content, contentType }) {
+    async upload({ caller, job, content, contentType }) {
       const row = await jobOf(job);
-      const role = await parties.roleOf(wallet, row);
+      const role = await parties.roleOf(caller, row);
       if (!role) throw forbidden('kanıtı yalnızca kurum, agent cüzdanı / sahibi ve aktif arbitrator’lar yükler');
       const allowed = role === 'institution' ? INSTITUTION_STATUSES : DISPUTE_STATUSES;
       if (!allowed.has(row.status)) {
@@ -91,7 +92,7 @@ export function createEvidenceService(deps: {
         byteSize: BigInt(content.length),
         storageKey,
         role,
-        uploadedBy: wallet,
+        uploadedBy: caller.wallet,
       };
       // Eşzamanlı aynı yükleme: ilk yazılan kayıt kalır.
       const created = await db.disputeEvidence.upsert({
@@ -102,8 +103,8 @@ export function createEvidenceService(deps: {
       return evidenceView(created, await reasonHashOf(job));
     },
 
-    async list({ wallet, job }) {
-      await reader(wallet, job);
+    async list({ caller, job }) {
+      await reader(caller, job);
       const [rows, reasonHash] = await Promise.all([
         db.disputeEvidence.findMany({ where: { job }, orderBy: [{ createdAt: 'asc' }, { id: 'asc' }] }),
         reasonHashOf(job),
@@ -111,8 +112,8 @@ export function createEvidenceService(deps: {
       return rows.map((row) => evidenceView(row, reasonHash));
     },
 
-    async content({ wallet, job, id }) {
-      await reader(wallet, job);
+    async content({ caller, job, id }) {
+      await reader(caller, job);
       const row = UUID.test(id) ? await db.disputeEvidence.findFirst({ where: { id, job } }) : null;
       if (!row) throw notFound('kanıt bulunamadı');
       const content = await store.get(row.storageKey);
