@@ -563,7 +563,7 @@
     "properties": {
       "challenger": {
         "$ref": "#/Address",
-        "description": "Institution (`raise_dispute`) or agent wallet (`escalate_missing_proof`, DRAFT)."
+        "description": "Institution (`raise_dispute`) or agent wallet (`escalate_missing_proof`)."
       },
       "bond": {
         "$ref": "#/U64",
@@ -579,7 +579,7 @@
       "deadline": {
         "type": "integer",
         "format": "int64",
-        "description": "DRAFT (M5): `raised_at + dispute_timeout_secs`; `lapse_dispute` allowed after it."
+        "description": "`raised_at + dispute_timeout_secs`; votes before it, `lapse_dispute` at or after it."
       },
       "decidedAt": {
         "type": "integer",
@@ -592,7 +592,8 @@
         "description": "When `execute_resolution` or `lapse_dispute` closed the dispute."
       },
       "lapsed": {
-        "type": "boolean"
+        "type": "boolean",
+        "description": "Set by `lapse_dispute`; the institution cannot raise a second dispute, the agent may escalate again after `proof_timeout_secs`."
       },
       "approvalMask": {
         "type": "integer",
@@ -609,7 +610,7 @@
         "type": "integer",
         "minimum": 0,
         "maximum": 4294967295,
-        "description": "`config.arbitrator_set_version` when the dispute was raised."
+        "description": "`config.arbitrator_set_version` the tally is counted against; a newer set restarts the tally."
       },
       "resolution": {
         "$ref": "#/DisputeResolution"
@@ -757,12 +758,12 @@
       "proofTimeoutSecs": {
         "type": "integer",
         "format": "int64",
-        "description": "DRAFT (M5, BC-24): `escalate_missing_proof` allowed after `challenge_end + proof_timeout_secs`."
+        "description": "`escalate_missing_proof` allowed after `challenge_end + proof_timeout_secs` (>= 0)."
       },
       "disputeTimeoutSecs": {
         "type": "integer",
         "format": "int64",
-        "description": "DRAFT (M5, BC-33): `dispute.deadline = raised_at + dispute_timeout_secs`."
+        "description": "`dispute.deadline = raised_at + dispute_timeout_secs` (> 0)."
       },
       "travelRuleThreshold": {
         "$ref": "#/U64",
@@ -4047,7 +4048,7 @@
   },
   "EscalateMissingProofCall": {
     "type": "object",
-    "description": "DRAFT (M5, BC-24/BC-33): the agent's recourse when a policy job has no bound release proof `proof_timeout_secs` after `challenge_end`: opens a dispute without bond.",
+    "description": "The agent's recourse when a policy job's release cannot settle: `proof_timeout_secs` after `challenge_end` (or after a lapsed dispute closed) with no bound proof, a temporary refusal or a proof evaluated on another UTC day, it opens a dispute without bond.",
     "required": [
       "program",
       "instruction",
@@ -4219,7 +4220,7 @@
   },
   "LapseDisputeCall": {
     "type": "object",
-    "description": "DRAFT (M5, BC-33): permissionless after `dispute.deadline` without a decision. Returns the bond and drops the dispute: the job goes back to `Delivered` and settles through `finalize_payment`.",
+    "description": "Permissionless at or after `dispute.deadline` without a decision. Returns the bond and drops the dispute: the job goes back to `Delivered` and settles through `finalize_payment`.",
     "required": [
       "program",
       "instruction",
@@ -4440,7 +4441,7 @@
   },
   "UpdateArbitratorsCall": {
     "type": "object",
-    "description": "Replaces the arbitrator set (N <= 7, 2 <= M <= N) and bumps `arbitrator_set_version`. DRAFT (M5, BC-32): rule for disputes that are active while the set changes.",
+    "description": "Replaces the arbitrator set (N <= 7, 2 <= M <= N) and bumps `arbitrator_set_version`. An active dispute keeps its deadline; its next vote restarts the tally with the new set.",
     "required": [
       "program",
       "instruction",
@@ -4475,7 +4476,7 @@
   },
   "UpdateParamsCall": {
     "type": "object",
-    "description": "Updates challenge bounds, bond, keeper fee and the M5 draft parameters.",
+    "description": "Updates challenge bounds, bond, keeper fee, proof and dispute timeouts and the Travel Rule threshold.",
     "required": [
       "program",
       "instruction",

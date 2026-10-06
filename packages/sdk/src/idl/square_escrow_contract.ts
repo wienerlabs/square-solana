@@ -635,8 +635,9 @@ export type SquareEscrowContract = {
     {
       "name": "escalateMissingProof",
       "docs": [
-        "DRAFT (M5, BC-24/BC-33): the agent's recourse when a policy job has no bound release proof",
-        "`proof_timeout_secs` after `challenge_end`: opens a dispute without bond."
+        "The agent's recourse when a policy job's release cannot settle: `proof_timeout_secs` after",
+        "`challenge_end` (or after a lapsed dispute closed) with no bound proof, a temporary refusal or",
+        "a proof evaluated on another UTC day, it opens a dispute without bond."
       ],
       "discriminator": [
         79,
@@ -1681,8 +1682,8 @@ export type SquareEscrowContract = {
     {
       "name": "lapseDispute",
       "docs": [
-        "DRAFT (M5, BC-33): permissionless after `dispute.deadline` without a decision. Returns the bond",
-        "and drops the dispute: the job goes back to `Delivered` and settles through `finalize_payment`."
+        "Permissionless at or after `dispute.deadline` without a decision. Returns the bond and drops",
+        "the dispute: the job goes back to `Delivered` and settles through `finalize_payment`."
       ],
       "discriminator": [
         252,
@@ -2229,8 +2230,8 @@ export type SquareEscrowContract = {
     {
       "name": "updateArbitrators",
       "docs": [
-        "Replaces the arbitrator set (N <= 7, 2 <= M <= N) and bumps `arbitrator_set_version`.",
-        "DRAFT (M5, BC-32): rule for disputes that are active while the set changes."
+        "Replaces the arbitrator set (N <= 7, 2 <= M <= N) and bumps `arbitrator_set_version`. An",
+        "active dispute keeps its deadline; its next vote restarts the tally with the new set."
       ],
       "discriminator": [
         105,
@@ -2286,7 +2287,8 @@ export type SquareEscrowContract = {
     {
       "name": "updateParams",
       "docs": [
-        "Updates challenge bounds, bond, keeper fee and the M5 draft parameters."
+        "Updates challenge bounds, bond, keeper fee, proof and dispute timeouts and the Travel Rule",
+        "threshold."
       ],
       "discriminator": [
         108,
@@ -2946,6 +2948,11 @@ export type SquareEscrowContract = {
       "code": 6047,
       "name": "travelRuleCommitmentRequired",
       "msg": "Travel Rule commitment required above the threshold"
+    },
+    {
+      "code": 6048,
+      "name": "invalidDisputeTimeout",
+      "msg": "Dispute timeout must be positive and proof timeout must not be negative"
     }
   ],
   "types": [
@@ -3191,7 +3198,7 @@ export type SquareEscrowContract = {
           {
             "name": "challenger",
             "docs": [
-              "Institution (`raise_dispute`) or agent wallet (`escalate_missing_proof`, DRAFT)."
+              "Institution (`raise_dispute`) or agent wallet (`escalate_missing_proof`)."
             ],
             "type": "pubkey"
           },
@@ -3218,7 +3225,7 @@ export type SquareEscrowContract = {
           {
             "name": "deadline",
             "docs": [
-              "DRAFT (M5): `raised_at + dispute_timeout_secs`; `lapse_dispute` allowed after it."
+              "`raised_at + dispute_timeout_secs`; votes before it, `lapse_dispute` at or after it."
             ],
             "type": "i64"
           },
@@ -3238,6 +3245,10 @@ export type SquareEscrowContract = {
           },
           {
             "name": "lapsed",
+            "docs": [
+              "Set by `lapse_dispute`; the institution cannot raise a second dispute, the agent may escalate",
+              "again after `proof_timeout_secs`."
+            ],
             "type": "bool"
           },
           {
@@ -3254,7 +3265,7 @@ export type SquareEscrowContract = {
           {
             "name": "arbitratorSetVersion",
             "docs": [
-              "`config.arbitrator_set_version` when the dispute was raised."
+              "`config.arbitrator_set_version` the tally is counted against; a newer set restarts the tally."
             ],
             "type": "u32"
           },
@@ -3551,14 +3562,14 @@ export type SquareEscrowContract = {
           {
             "name": "proofTimeoutSecs",
             "docs": [
-              "DRAFT (M5, BC-24): `escalate_missing_proof` allowed after `challenge_end + proof_timeout_secs`."
+              "`escalate_missing_proof` allowed after `challenge_end + proof_timeout_secs` (>= 0)."
             ],
             "type": "i64"
           },
           {
             "name": "disputeTimeoutSecs",
             "docs": [
-              "DRAFT (M5, BC-33): `dispute.deadline = raised_at + dispute_timeout_secs`."
+              "`dispute.deadline = raised_at + dispute_timeout_secs` (> 0)."
             ],
             "type": "i64"
           },
