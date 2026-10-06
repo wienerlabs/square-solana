@@ -126,6 +126,9 @@ importers:
       '@squaresdk/solana-config':
         specifier: workspace:*
         version: link:../../packages/config
+      '@squaresdk/solana-keeper':
+        specifier: workspace:*
+        version: link:../keeper
       '@testcontainers/postgresql':
         specifier: ^12.2.0
         version: 12.2.0

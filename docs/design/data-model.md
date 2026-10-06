@@ -41,7 +41,7 @@ Veritabanında **asla** tutulmayanlar:
 | `agents` | registry `AgentRecord` | `creator` + `agent_id` (tekil), `owner`, `wallet`, `status` | `listAgents`, `getAgent` |
 | `screenings` | registry `ScreeningRecord` | `wallet` (tekil), `status`, `expires_at` | `getScreening` |
 | `jobs` | escrow `Job` | `status`, `institution`, `agent_record`, `agent_wallet`, `policy`, `challenge_end` | `listJobs`, `getJob` |
-| `disputes` | escrow `Job.dispute` izdüşümü | `job_status`, `raised_at`, `institution`, `agent_record` | `listDisputes`, `getDispute` |
+| `disputes` | escrow `Job.dispute` izdüşümü; oy sayımı (`approval_mask`, `approval_count`, `arbitrator_set_version`), `decided_at`, `closed_at` (BE-22) | `job_status` + `raised_at`, `job_status` + `deadline` (lapse crank'i), `institution`, `agent_record` | `listDisputes`, `getDispute`, arbitrator kuyruğu |
 | `claims` | escrow `ClaimListing` | `job` (tekil), `status`, `seller`, `buyer` | `listClaims`, `getClaim`, `JobView.claim` |
 | `agent_reputations` | escrow `AgentReputation` | `agent_record` (tekil), `jobs_completed` | `AgentView.reputation` |
 | `validation_records` | escrow `ValidationRecord` | `job` (tekil), `agent_record` | `JobView.validation` |
@@ -66,8 +66,12 @@ Notlar:
 | `policy_metas` | Politikanın herkese açık adı, açıklaması, etiketleri | API (`putPolicyMeta`) | BE-18 |
 | `agent_cards` | Barındırılan ya da indirilen agent card: ham baytlar, SHA-256, ayrıştırılmış JSON, yetenekler, zincirdeki hash ile eşleşme | API (`putAgentCard`), indexer | BE-18, BE-09 |
 | `deliveries` | Teslimat içeriğinin nesne deposundaki konumu ve `submit_work`'e giden hash / URI | API (`uploadDelivery`) | BE-18 |
-| `keeper_actions` | Keeper günlüğü (`KeeperAction`) | keeper | BE-15 |
+| `keeper_actions` | Keeper günlüğü (`KeeperAction`); finalize ve lapse kayıtları `action`'la ayrılır | keeper | BE-15, BE-22 |
 | `screening_decisions` | Screener'ın denetim kaydı: her tarama kararı. Satırda cüzdan, tetikleyici (`request` / `renewal`) ve sonuç bulunur: `recorded`, `sourceError` ya da `txFailed`. Ayrıca kaynak başına sonuçlar, kanıt belgesi ve onun SHA-256'sı olan `source_hash`, tx imzası ve slot, zincirden okunan `screened_at` / `expires_at`, çağıranın anahtar parmak izi. Sonuca göre dolu alanlar CHECK kısıtıyla zorunlu. Zincirdeki kaydın aynası `screenings`'tir; TTL yenilemesi ikisinden aday bulur | screener | BE-16 |
+| `dispute_evidence` | Dispute kanıtının özel nesne deposundaki konumu, SHA-256'sı (`reason_hash`), yükleyen ve rolü (`institution`, `agent`, `arbitrator`); `(job, content_hash)` tekil | API (`uploadDisputeEvidence`) | BE-22 |
+| `arbitration_webhooks` | Arbitrator'ın webhook ucu, olay türleri ve secret box'la şifreli Standard Webhooks sırrı; `(wallet, url)` tekil | API | BE-22 |
+| `notification_outbox` | Bildirim outbox'ı: uç, olay anahtarı (`(webhook_id, event_key)` tekil), gövde, durum (`pending` / `delivered` / `failed`), deneme sayısı, sonraki deneme ve kiralama; abonelik silinince silinir | API | BE-22 |
+| `notification_cursors` | Bildirim kuyruğuna alınmış son `chain_events.id` | API | BE-22 |
 | `users`, `auth_challenges`, `sessions`, `api_keys` | Cüzdan Ed25519 oturumu ve API anahtarları | API | BE-18 |
 | `mpp_payments` | İmzası doğrulanmış Stripe webhook'undan gelen fiat ödemesi; makbuzun Poseidon commitment'ı ve MPP authority imzası | MPP rayı | BE-25 |
 | `cctp_transfers` | Job'a bağlanan burn (kaynak domain + burn tx'i, tekil), kurum ve beklenen mint alıcısı; attestation'dan sonra mesaj, nonce (V2, 32 bayt), tutar ve ücret; Solana'da receive ve fund imzaları; relayer'ın denemesi ve bir sonraki bakışı ([cctp-funding.md](cctp-funding.md#relayer-be-26)) | API (kayıt), keeper'daki CCTP relayer'ı (güncelleme) | BE-26 |

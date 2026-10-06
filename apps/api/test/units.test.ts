@@ -1,4 +1,5 @@
-// Yapılandırma, Squads multisig çözümleyicisi ve OpenAPI yükleyicisi.
+// Yapılandırma, Squads multisig çözümleyicisi, OpenAPI yükleyicisi, Travel Rule zarf şifrelemesi ve bakımı,
+// periyodik iş döngüsü.
 import { randomBytes } from 'node:crypto';
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -8,6 +9,7 @@ import { createLogger } from '@squaresdk/solana-observability';
 import { Keypair, PublicKey } from '@solana/web3.js';
 import { describe, expect, it } from 'vitest';
 import { loadConfig } from '../src/config.js';
+import { startLoop } from '../src/loop.js';
 import { loadOpenApi } from '../src/openapi.js';
 import { PERMISSION_INITIATE, SQUADS_PROGRAM_ID, multisigMembers } from '../src/squads.js';
 import { open, rewrap, seal } from '../src/travel-rule/crypto.js';
@@ -38,6 +40,20 @@ const ENV = {
   API_DELIVERY_S3_FORCE_PATH_STYLE: 'false',
   API_DELIVERY_PUBLIC_BASE_URL: 'https://files.square.example/deliveries/',
   API_DELIVERY_MAX_BYTES: '10485760',
+  API_EVIDENCE_S3_BUCKET: 'evidence',
+  API_EVIDENCE_MAX_BYTES: '5242880',
+  API_ARBITRATOR_CACHE_SECONDS: '30',
+  // Anahtar çalışma anında üretilir (repoda sır yok).
+  API_WEBHOOK_SECRET_KEYS: `k1:${randomBytes(32).toString('base64')},k2:${randomBytes(32).toString('base64')}`,
+  API_WEBHOOK_SECRET_ACTIVE_KEY_ID: 'k2',
+  API_NOTIFY_INTERVAL_MS: '5000',
+  API_NOTIFY_BATCH_SIZE: '100',
+  API_NOTIFY_TIMEOUT_MS: '5000',
+  API_NOTIFY_MAX_ATTEMPTS: '8',
+  API_NOTIFY_BACKOFF_BASE_SECONDS: '30',
+  API_NOTIFY_BACKOFF_MAX_SECONDS: '3600',
+  API_NOTIFY_DEADLINE_WARNING_SECONDS: '43200',
+  API_NOTIFY_ALLOW_INSECURE: 'false',
   API_LOOKUP_TABLE: '',
   API_COMPUTE_UNIT_PRICE: '1000',
   API_PROVER_URL: 'http://prover.internal:8080',
@@ -95,6 +111,31 @@ describe('yapılandırma', () => {
     );
     expect(() => loadConfig({ ...ENV, API_AUTH_DOMAIN: 'https://app' })).toThrow(/alan adı/);
     expect(() => loadConfig({ ...ENV, API_DELIVERY_S3_FORCE_PATH_STYLE: 'yes' })).toThrow(/FORCE_PATH_STYLE/);
+  });
+
+  it('uyuşmazlık araçları: kanıt kovası, anahtar halkası ve bildirim ayarları', () => {
+    const config = loadConfig(ENV);
+    expect(config).toMatchObject({
+      evidence: { bucket: 'evidence', maxBytes: 5_242_880 },
+      arbitratorCacheSeconds: 30,
+      webhookSecrets: { activeKeyId: 'k2' },
+      notify: { batchSize: 100, maxAttempts: 8, backoff: { baseSeconds: 30, maxSeconds: 3_600 }, allowInsecure: false },
+    });
+    expect(Object.keys(config.webhookSecrets.keys)).toEqual(['k1', 'k2']);
+    expect(() => loadConfig({ ...ENV, API_EVIDENCE_S3_BUCKET: 'deliveries' })).toThrow(/kanıt kovası/);
+    expect(() => loadConfig({ ...ENV, API_WEBHOOK_SECRET_ACTIVE_KEY_ID: 'k3' })).toThrow(
+      /etkin anahtar halkada yok: k3/,
+    );
+    const leaked = randomBytes(16).toString('base64');
+    let message = '';
+    try {
+      loadConfig({ ...ENV, API_WEBHOOK_SECRET_KEYS: `k1:${leaked}` });
+    } catch (error) {
+      message = (error as Error).message;
+    }
+    expect(message).toMatch(/API_WEBHOOK_SECRET_KEYS \/ API_WEBHOOK_SECRET_ACTIVE_KEY_ID: k1: anahtar 32 bayt/);
+    expect(message).not.toContain(leaked);
+    expect(() => loadConfig({ ...ENV, API_NOTIFY_BACKOFF_MAX_SECONDS: '10' })).toThrow(/küçük olamaz/);
   });
 });
 
@@ -232,5 +273,26 @@ describe('Travel Rule bakımı', () => {
     expect(() =>
       startTravelRuleMaintenance({ intervalMs: 0, log, onError: () => {}, run: async () => results[2] as never }),
     ).toThrow();
+  });
+});
+
+describe('döngü', () => {
+  it('koşular üst üste binmez; hata döngüyü durdurmaz (bildirim outbox turu)', async () => {
+    let runs = 0;
+    const errors: unknown[] = [];
+    const stop = startLoop({
+      intervalMs: 5,
+      immediate: true,
+      run: async () => {
+        runs += 1;
+        if (runs === 2) throw new Error('rpc down');
+      },
+      onError: (error) => errors.push(error),
+    });
+    while (runs < 3) await new Promise((resolve) => setTimeout(resolve, 5));
+    await stop();
+    expect(runs).toBeGreaterThan(2);
+    expect(errors).toHaveLength(1);
+    expect(() => startLoop({ intervalMs: 0, immediate: false, run: async () => {}, onError: () => {} })).toThrow();
   });
 });

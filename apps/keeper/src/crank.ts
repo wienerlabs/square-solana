@@ -14,8 +14,9 @@ import type { SquareClient } from '@squaresdk/solana-sdk';
 import { createAssociatedTokenAccountIdempotentInstruction } from '@solana/spl-token';
 import { PublicKey, TransactionMessage, VersionedTransaction, type Connection, type Keypair } from '@solana/web3.js';
 import { classifyFailure, nextAttemptAt, precheck, profitable, type Economics, type Outcome } from './decide.js';
-import type { Journal } from './journal.js';
+import type { FinalizeJournal } from './journal.js';
 import type { KeeperMetrics } from './metrics.js';
+import { confirmSignature, recentPriorityFee } from './send.js';
 import { keeperTokenAccount, type StateReader } from './state.js';
 
 export interface RoundResult {
@@ -37,7 +38,7 @@ export interface CrankDeps {
   readonly client: SquareClient;
   readonly connection: Connection;
   readonly reader: StateReader;
-  readonly journal: Journal;
+  readonly journal: FinalizeJournal;
   readonly keeper: Keypair;
   readonly economics: Economics & { readonly priorityFeePercentile: number; readonly maxComputeUnitPrice: bigint };
   readonly backoff: { readonly baseSeconds: number; readonly maxSeconds: number };
@@ -51,13 +52,8 @@ export interface CrankDeps {
   readonly clock?: () => number;
 }
 
-/** Yüzdelik (en yakın sıra yöntemi); boş listede 0. */
-export function percentile(values: readonly bigint[], p: number): bigint {
-  if (values.length === 0) return 0n;
-  const sorted = [...values].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
-  const rank = Math.min(sorted.length - 1, Math.max(0, Math.ceil((p / 100) * sorted.length) - 1));
-  return sorted[rank]!;
-}
+// Yüzdelik priority fee hesabı ortak modüldedir (lapse crank'i de kullanır).
+export { percentile } from './send.js';
 
 export function createCrank(deps: CrankDeps): Crank {
   const { client, connection, reader, journal, keeper, metrics, log } = deps;
@@ -87,7 +83,7 @@ export function createCrank(deps: CrankDeps): Crank {
     const next = nextAttemptAt(now, attempt, deps.backoff);
     const kind = outcome.kind === 'skip' ? 'skipped' : 'failed';
     await journal.write({ job, outcome: kind, reason, nextAttemptAt: next }, now);
-    metrics.actions.inc({ outcome: kind, reason });
+    metrics.actions.inc({ action: 'finalizePayment', outcome: kind, reason });
     if (kind === 'failed') deps.onError();
     log.info(`finalize_${kind}`, { job, reason, attempt, nextAttemptAt: next.toISOString(), ...detail });
   }
@@ -122,31 +118,10 @@ export function createCrank(deps: CrankDeps): Crank {
     return address;
   }
 
-  /**
-   * Gönderilen tx'in onayı: imza durumu yoklanır; blockhash'in son geçerli blok yüksekliği aşılırsa tx düşmüştür.
-   * Dönen değer tx'in hatası (başarılıysa null).
-   */
-  async function confirm(signature: string, lastValidBlockHeight: number): Promise<unknown> {
-    for (;;) {
-      const [status] = (await connection.getSignatureStatuses([signature])).value;
-      if (status && (status.confirmationStatus === 'confirmed' || status.confirmationStatus === 'finalized')) {
-        return status.err;
-      }
-      if ((await connection.getBlockHeight('confirmed')) > lastValidBlockHeight) {
-        throw new Error(`tx onaylanmadan blockhash'in süresi doldu: ${signature}`);
-      }
-      await new Promise((resolve) => setTimeout(resolve, deps.confirmPollMs));
-    }
-  }
+  const confirm = (signature: string, lastValidBlockHeight: number) =>
+    confirmSignature(connection, signature, lastValidBlockHeight, deps.confirmPollMs);
 
-  async function priorityFee(writable: readonly PublicKey[]): Promise<bigint> {
-    const recent = await connection.getRecentPrioritizationFees({ lockedWritableAccounts: [...writable] });
-    const fee = percentile(
-      recent.map((entry) => BigInt(entry.prioritizationFee)),
-      deps.economics.priorityFeePercentile,
-    );
-    return fee > deps.economics.maxComputeUnitPrice ? deps.economics.maxComputeUnitPrice : fee;
-  }
+  const priorityFee = (writable: readonly PublicKey[]) => recentPriorityFee(connection, writable, deps.economics);
 
   /** Bir aday: true ise onaylandı. */
   async function finalize(job: PublicKey, keeperFeeBps: number, now: Date): Promise<boolean> {
@@ -191,7 +166,7 @@ export function createCrank(deps: CrankDeps): Crank {
     // Onay kaydı gönderimden sonradır (günlük zamana göre sıralanır).
     const afterSubmit = () => new Date(Math.max(clock(), submittedAt.getTime() + 1));
     await journal.write({ job: address, outcome: 'submitted', reason: null, signature }, submittedAt);
-    metrics.actions.inc({ outcome: 'submitted', reason: 'none' });
+    metrics.actions.inc({ action: 'finalizePayment', outcome: 'submitted', reason: 'none' });
     let err: unknown;
     try {
       err = await confirm(signature, built.lastValidBlockHeight);
@@ -208,7 +183,7 @@ export function createCrank(deps: CrankDeps): Crank {
       { job: address, outcome: 'confirmed', reason: null, signature, keeperFee: check.fee },
       afterSubmit(),
     );
-    metrics.actions.inc({ outcome: 'confirmed', reason: 'none' });
+    metrics.actions.inc({ action: 'finalizePayment', outcome: 'confirmed', reason: 'none' });
     metrics.feesEarned.inc(Number(check.fee));
     metrics.finalizeDelay.observe(
       { gate: state.facts.job.policy === null ? 'none' : 'proof' },

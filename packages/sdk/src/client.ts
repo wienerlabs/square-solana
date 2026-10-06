@@ -148,6 +148,18 @@ export interface SquareFlow {
   ): Promise<BuiltTx>;
   /** Kesinleşmiş dispute kararını uygular: kasayı ve bond'u karara göre dağıtır (izinsiz). */
   executeResolution(params: { caller: PublicKey; job: PublicKey }, options: BuildOptions): Promise<BuiltTx>;
+  /**
+   * Permissionless: son tarihi geçmiş dispute'u düşürür (ADR 0016). Bond kuruma döner; kurumun token hesabı
+   * yoksa aynı tx'te açılır, ödeyici `options.feePayer`.
+   */
+  lapseDispute(params: { caller: PublicKey; job: PublicKey }, options: BuildOptions): Promise<BuiltTx>;
+  /** Agent'ın ispatsız bekleme başvurusu: policy'li işte bond'suz dispute (ADR 0016). */
+  escalateMissingProof(params: { agent: PublicKey; job: PublicKey }, options: BuildOptions): Promise<BuiltTx>;
+  /** Admin: arbitrator seti (N ≤ 7) ve eşik (2 ≤ M ≤ N); set sürümü artar. */
+  updateArbitrators(
+    params: { admin: PublicKey; arbitrators: readonly PublicKey[]; threshold: number },
+    options: BuildOptions,
+  ): Promise<BuiltTx>;
   /** Job'u iptal eder; fonlanmışsa tutar kuruma döner (kurum). */
   cancelJob(
     params: { institution: PublicKey; job: PublicKey; institutionTokenAccount: PublicKey },

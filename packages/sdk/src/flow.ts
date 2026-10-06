@@ -375,6 +375,51 @@ export function createFlow(deps: FlowDeps): SquareFlow {
       return deps.buildTx([...prepend, ix], options);
     },
 
+    async lapseDispute(params, options) {
+      const account = await job(params.job);
+      const program = await tokenProgram(account.mint);
+      // Bond kuruma döner; kurumun token hesabı yoksa aynı tx'te açılır (ödeyici fee payer).
+      const institution = ata(account.institution, account.mint, program, options.feePayer);
+      const ix = await deps.escrow.methods
+        .lapseDispute()
+        .accountsStrict({
+          caller: params.caller,
+          config: pda.escrowConfig()[0],
+          job: params.job,
+          bondVault: account.dispute.bond.isZero() ? null : pda.bondVault(params.job)[0],
+          institutionTokenAccount: institution.address,
+          mint: account.mint,
+          rentPayer: account.rentPayer,
+          tokenProgram: program,
+        })
+        .instruction();
+      return deps.buildTx([institution.create, ix], options);
+    },
+
+    async escalateMissingProof(params, options) {
+      const ix = await deps.escrow.methods
+        .escalateMissingProof()
+        .accountsStrict({
+          agent: params.agent,
+          config: pda.escrowConfig()[0],
+          job: params.job,
+          releaseProof: pda.releaseProof(params.job)[0],
+        })
+        .instruction();
+      return deps.buildTx([ix], options);
+    },
+
+    async updateArbitrators(params, options) {
+      if (!Number.isInteger(params.threshold) || params.threshold < 0 || params.threshold > 255) {
+        throw new Error(`threshold u8 aralığı dışında: ${params.threshold}`);
+      }
+      const ix = await deps.escrow.methods
+        .updateArbitrators([...params.arbitrators], params.threshold)
+        .accountsStrict({ admin: params.admin, config: pda.escrowConfig()[0] })
+        .instruction();
+      return deps.buildTx([ix], options);
+    },
+
     async cancelJob(params, options) {
       const account = await job(params.job);
       const ix = await deps.escrow.methods

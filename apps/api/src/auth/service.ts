@@ -32,6 +32,7 @@ const SCOPE_TO_DB: Readonly<Record<ApiKeyScope, DbScope>> = {
   'deliveries:write': 'deliveriesWrite',
   'agents:write': 'agentsWrite',
   prove: 'prove',
+  'disputes:write': 'disputesWrite',
 };
 const SCOPE_FROM_DB = Object.fromEntries(Object.entries(SCOPE_TO_DB).map(([wire, db]) => [db, wire])) as Readonly<
   Record<DbScope, ApiKeyScope>

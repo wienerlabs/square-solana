@@ -1,15 +1,18 @@
-// Keeper günlüğü (`keeper_actions`; API `GET /v1/keeper/actions`) ve aday seçimi. Adaylar indexer'ın job
-// aynasından gelir: `Delivered`, challenge penceresi bitmiş, hesabı açık. Bekletilen job (son kaydı
-// `nextAttemptAt` taşıyan) zamanı gelene kadar seçilmez; ancak beklediği şey indexlendiyse beklemeden yeniden
-// denenir: ispat bekleyen job'a ispat (`release_proofs`), screening bekleyen job'a payee'nin kaydı
-// (`screenings`) son denemeden sonra yazıldıysa. Böylece `ProofRequired` sürekli denenmez ama ispat gelince
-// gecikmeden ödenir.
-//
-// Birikim (`backlog`): finalize edilebilir durumda bekleyen job'lar; keeper gecikmesinin ölçüsü. Challenge
+// Keeper günlüğü (`keeper_actions`; API `GET /v1/keeper/actions`) ve aday seçimi. Her crank'in kayıtları
+// talimatıyla (`action`) ayrılır; bir crank'in bekletmesi diğerini etkilemez.
+// - Finalize: adaylar indexer'ın job aynasından gelir: `Delivered`, challenge penceresi bitmiş, hesabı açık.
+//   Bekletilen job (son kaydı `nextAttemptAt` taşıyan) zamanı gelene kadar seçilmez; ancak beklediği şey
+//   indexlendiyse beklemeden yeniden denenir: ispat bekleyen job'a ispat (`release_proofs`), screening bekleyen
+//   job'a payee'nin kaydı (`screenings`) son denemeden sonra yazıldıysa. Böylece `ProofRequired` sürekli
+//   denenmez ama ispat gelince gecikmeden ödenir.
+// - Lapse (BE-22): adaylar dispute aynasından gelir: açık (`disputed`), son tarihi geçmiş, job hesabı açık; son
+//   tarihi en eski önce. Son kaydı `nextAttemptAt` taşıyan dispute o zamana kadar seçilmez (onaylanan lapse de
+//   bekleme taşır: ayna güncellenene kadar aynı işe yeniden gönderilmez).
+// Birikim (`backlog`, yalnızca finalize): finalize edilebilir durumda bekleyen job'lar; keeper gecikmesinin ölçüsü. Challenge
 // penceresi bitmiş, açık ve teslim edilmiş job, bir sebeple bekletilmiyorsa birikimdedir. İspat, screening ya
 // da kârlılık beklemesi keeper'ın gecikmesi sayılmaz; ancak beklenen kayıt indexlendiyse job o andan itibaren
 // yeniden birikimdedir. Onaylanmış finalize indexer aynayı güncelleyene kadar birikime girmez.
-import type { KeeperOutcome, KeeperReason, PrismaClient } from '@squaresdk/solana-db';
+import type { KeeperActionKind, KeeperOutcome, KeeperReason, PrismaClient } from '@squaresdk/solana-db';
 
 export interface Candidate {
   readonly job: string;
@@ -33,20 +36,56 @@ export interface Backlog {
 }
 
 export interface Journal {
-  /** Bu turda değerlendirilecek job'lar, challenge'ı en erken biten önce. */
+  /** Bu turda değerlendirilecek job'lar (finalize: challenge'ı en erken biten önce). */
   candidates(now: Date, limit: number): Promise<Candidate[]>;
-  /** Finalize edilebilir durumda bekleyen job'lar. */
-  backlog(now: Date): Promise<Backlog>;
-  /** Job'un son kayıtlarından aynı sebeple ardışık bekletme ya da hata sayısı. */
+  /** Job'un bu talimattaki son kayıtlarından aynı sebeple ardışık bekletme ya da hata sayısı. */
   consecutive(job: string, reason: KeeperReason): Promise<number>;
   write(entry: JournalEntry, at: Date): Promise<void>;
+}
+
+/** Finalize crank'inin günlüğü: birikimi de ölçer. */
+export interface FinalizeJournal extends Journal {
+  /** Finalize edilebilir durumda bekleyen job'lar. */
+  backlog(now: Date): Promise<Backlog>;
 }
 
 /** Ardışık sayımda bakılan en fazla kayıt (geri çekilme üst sınıra bundan önce ulaşır). */
 const STREAK_WINDOW = 64;
 
-export function createJournal(db: PrismaClient): Journal {
+/** Bir talimatın günlüğe yazımı ve ardışık sayımı. */
+function actionLog(db: PrismaClient, action: KeeperActionKind): Omit<Journal, 'candidates'> {
   return {
+    async consecutive(job, reason) {
+      const recent = await db.keeperAction.findMany({
+        where: { job, action },
+        orderBy: [{ at: 'desc' }, { id: 'desc' }],
+        take: STREAK_WINDOW,
+        select: { reason: true },
+      });
+      const streak = recent.findIndex((entry) => entry.reason !== reason);
+      return streak === -1 ? recent.length : streak;
+    },
+
+    async write(entry, at) {
+      await db.keeperAction.create({
+        data: {
+          job: entry.job,
+          action,
+          outcome: entry.outcome,
+          reason: entry.reason,
+          signature: entry.signature ?? null,
+          keeperFee: entry.keeperFee === undefined || entry.keeperFee === null ? null : entry.keeperFee.toString(),
+          at,
+          nextAttemptAt: entry.nextAttemptAt ?? null,
+        },
+      });
+    },
+  };
+}
+
+export function createJournal(db: PrismaClient): FinalizeJournal {
+  return {
+    ...actionLog(db, 'finalizePayment'),
     async candidates(now, limit) {
       const seconds = BigInt(Math.floor(now.getTime() / 1000));
       const rows = await db.$queryRaw<{ job: string; reason: KeeperReason | null }[]>`
@@ -54,7 +93,7 @@ export function createJournal(db: PrismaClient): Journal {
         FROM jobs j
         LEFT JOIN LATERAL (
           SELECT k.reason, k.next_attempt_at, k.at FROM keeper_actions k
-          WHERE k.job = j.address ORDER BY k.at DESC, k.id DESC LIMIT 1
+          WHERE k.job = j.address AND k.action = 'finalizePayment' ORDER BY k.at DESC, k.id DESC LIMIT 1
         ) last ON true
         WHERE j.status = 'delivered' AND j.challenge_end <= ${seconds} AND j.closed_slot IS NULL
           AND (
@@ -79,7 +118,7 @@ export function createJournal(db: PrismaClient): Journal {
           FROM jobs j
           LEFT JOIN LATERAL (
             SELECT k.outcome, k.reason, k.at FROM keeper_actions k
-            WHERE k.job = j.address ORDER BY k.at DESC, k.id DESC LIMIT 1
+            WHERE k.job = j.address AND k.action = 'finalizePayment' ORDER BY k.at DESC, k.id DESC LIMIT 1
           ) last ON true
           LEFT JOIN LATERAL (
             SELECT max(woken.at) AS at FROM (
@@ -99,31 +138,28 @@ export function createJournal(db: PrismaClient): Journal {
         ) due`;
       return { due: row?.due ?? 0, oldestReadyAt: row?.oldest ?? null };
     },
+  };
+}
 
-    async consecutive(job, reason) {
-      const recent = await db.keeperAction.findMany({
-        where: { job },
-        orderBy: [{ at: 'desc' }, { id: 'desc' }],
-        take: STREAK_WINDOW,
-        select: { reason: true },
-      });
-      const streak = recent.findIndex((entry) => entry.reason !== reason);
-      return streak === -1 ? recent.length : streak;
-    },
-
-    async write(entry, at) {
-      await db.keeperAction.create({
-        data: {
-          job: entry.job,
-          action: 'finalizePayment',
-          outcome: entry.outcome,
-          reason: entry.reason,
-          signature: entry.signature ?? null,
-          keeperFee: entry.keeperFee === undefined || entry.keeperFee === null ? null : entry.keeperFee.toString(),
-          at,
-          nextAttemptAt: entry.nextAttemptAt ?? null,
-        },
-      });
+/** Lapse crank'inin günlüğü: son tarihi geçmiş açık dispute'lar (BE-22). */
+export function createLapseJournal(db: PrismaClient): Journal {
+  return {
+    ...actionLog(db, 'lapseDispute'),
+    async candidates(now, limit) {
+      const seconds = BigInt(Math.floor(now.getTime() / 1000));
+      const rows = await db.$queryRaw<{ job: string; reason: KeeperReason | null }[]>`
+        SELECT d.job AS job, last.reason::text AS reason
+        FROM disputes d
+        JOIN jobs j ON j.address = d.job AND j.closed_slot IS NULL
+        LEFT JOIN LATERAL (
+          SELECT k.reason, k.next_attempt_at FROM keeper_actions k
+          WHERE k.job = d.job AND k.action = 'lapseDispute' ORDER BY k.at DESC, k.id DESC LIMIT 1
+        ) last ON true
+        WHERE d.job_status = 'disputed' AND d.deadline <= ${seconds}
+          AND (last.next_attempt_at IS NULL OR last.next_attempt_at <= ${now})
+        ORDER BY d.deadline ASC, d.job ASC
+        LIMIT ${limit}`;
+      return rows.map((row) => ({ job: row.job, lastReason: row.reason }));
     },
   };
 }

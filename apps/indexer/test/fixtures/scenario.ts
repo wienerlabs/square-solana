@@ -81,7 +81,13 @@ export async function buildScenario(world: World): Promise<Scenario> {
   const jobBase = { institution, agentRecord: agent, agentWallet, policy };
   const dispute = world.sample('escrow', 'disputeInfo', {
     raisedAt: new BN(1_790_000_500),
+    deadline: new BN(1_790_259_700),
+    decidedAt: new BN(0),
+    closedAt: new BN(0),
     lapsed: false,
+    approvalMask: 0b101,
+    approvalCount: 2,
+    arbitratorSetVersion: 3,
     resolution: status('pending'),
   });
   await world.put(

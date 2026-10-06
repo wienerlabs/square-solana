@@ -27,7 +27,14 @@ export type SessionRequest = z.infer<typeof SessionRequestSchema>;
 export const SessionSchema = z.object({ token: z.string().min(1), wallet: Address, expiresAt: I64 });
 export type Session = z.infer<typeof SessionSchema>;
 
-export const ApiKeyScopeSchema = z.enum(['read', 'tx:prepare', 'deliveries:write', 'agents:write', 'prove']);
+export const ApiKeyScopeSchema = z.enum([
+  'read',
+  'tx:prepare',
+  'deliveries:write',
+  'agents:write',
+  'prove',
+  'disputes:write',
+]);
 export type ApiKeyScope = z.infer<typeof ApiKeyScopeSchema>;
 
 export const ApiKeySchema = z.object({
