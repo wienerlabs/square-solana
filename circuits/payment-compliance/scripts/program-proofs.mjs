@@ -7,6 +7,8 @@
 //
 //   node scripts/program-proofs.mjs           iki fikstürü yazar (önce `npm run build`)
 //   node scripts/program-proofs.mjs --squads  yalnızca Squads fikstürünü yazar (BC-35)
+//   node scripts/program-proofs.mjs --missing yalnızca fikstürde olmayan senaryoları üretip ekler; mevcut
+//                                             ispatlar (ve Squads fikstürü) olduğu gibi kalır
 //   node scripts/program-proofs.mjs --check   fikstürlerdeki her ispatı doğrulama anahtarıyla ve yeniden
 //                                             hesaplanan sinyallerle doğrular; uymazsa 1 ile çıkar
 //
@@ -81,6 +83,12 @@ function scenarios() {
       ['job_b', 'b', {}],
       // B'nin release'inden sonra A: sayaç B'nin neti kadar ilerledi.
       ['after_job_b', 'a', { dailySpentBefore: net('b') }],
+      // Dispute kararları (BC-32): agent tarafına keeper ücreti kesilmeden tam tutar (FavorAgent) ve
+      // kısmi tutar (Split, 10 USDC); escrow `execute_resolution`'da bu netleri bekler.
+      ['dispute_favor_agent', 'a', { netAmount: AMOUNTS.a }],
+      ['dispute_split', 'a', { netAmount: 10n * USDC }],
+      // FavorAgent'ın tam tutarı işlem başı tavanı (100 USDC) aşar: kalıcı ret, iade.
+      ['dispute_refused_per_tx', 'c', { netAmount: AMOUNTS.c }],
     ].map(([name, spec, overrides]) => ({
       name,
       spec,
@@ -234,11 +242,17 @@ async function policyRecord() {
   };
 }
 
-async function write() {
+async function write({ missingOnly = false } = {}) {
   const vk = JSON.parse(fs.readFileSync(VK, 'utf8'));
   const { list } = scenarios();
+  const existing = missingOnly ? JSON.parse(fs.readFileSync(OUT, 'utf8')).scenarios : [];
   const records = [];
   for (const scenario of list) {
+    const kept = existing.find((s) => s.name === scenario.name);
+    if (kept) {
+      records.push(kept);
+      continue;
+    }
     const { proof, publicSignals } = await snarkjs.groth16.fullProve(await input(scenario.overrides), WASM, ZKEY);
     if (!(await snarkjs.groth16.verify(vk, publicSignals, proof))) throw new Error(`${scenario.name}: ispat doğrulanmadı`);
     records.push(await scenarioRecord(scenario, proof, publicSignals));
@@ -259,7 +273,7 @@ async function write() {
   fs.mkdirSync(path.dirname(OUT), { recursive: true });
   fs.writeFileSync(OUT, `${JSON.stringify(fixture, null, 2)}\n`);
   process.stdout.write(`wrote ${path.relative(REPO, OUT)}\n`);
-  await writeSquads(vk);
+  if (!missingOnly) await writeSquads(vk);
 }
 
 const fromHex = (text) => Array.from(Buffer.from(text, 'hex'));
@@ -320,7 +334,7 @@ async function check() {
 try {
   if (process.argv.includes('--check')) await check();
   else if (process.argv.includes('--squads')) await writeSquads(JSON.parse(fs.readFileSync(VK, 'utf8')));
-  else await write();
+  else await write({ missingOnly: process.argv.includes('--missing') });
 } catch (error) {
   process.stderr.write(`error: ${error.message}\n`);
   process.exitCode = 1;

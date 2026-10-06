@@ -12,9 +12,9 @@ use square_common::seeds::{
 use crate::errors::EscrowError;
 use crate::linked;
 use crate::release_gate::{self, Gate};
+use crate::settlement;
 use crate::state::{
-    AgentReputation, ClaimListing, ClaimStatus, EscrowConfig, Job, JobStatus, ValidationOutcome,
-    ValidationRecord,
+    AgentReputation, EscrowConfig, Job, JobStatus, ValidationOutcome, ValidationRecord,
 };
 use crate::{Finalized, ReleaseRefused, ReleaseVerified, ReputationRecorded, ValidationRecorded};
 
@@ -116,30 +116,6 @@ pub struct FinalizePayment<'info> {
 pub fn keeper_fee(amount: u64, keeper_fee_bps: u16) -> Result<u64> {
     let fee = u128::from(amount) * u128::from(keeper_fee_bps) / u128::from(BPS_DENOMINATOR);
     u64::try_from(fee).map_err(|_| error!(EscrowError::MathOverflow))
-}
-
-/// `["claim", job]` listelemesi; hesap yoksa (alacak listelenmemiş) `None`.
-fn read_listing(info: &AccountInfo, job: &Pubkey) -> Result<Option<ClaimListing>> {
-    if info.data_is_empty() {
-        return Ok(None);
-    }
-    let listing = ClaimListing::try_deserialize(&mut &info.try_borrow_data()?[..])
-        .map_err(|_| error!(EscrowError::ClaimListingMismatch))?;
-    require_keys_eq!(listing.job, *job, EscrowError::ClaimListingMismatch);
-    Ok(Some(listing))
-}
-
-/// Settlement'ta listeleme: ödemede `Settled` (satılmışsa alıcıya ödendi, satılmamışsa satışa kapandı),
-/// iadede `Defaulted` (alıcıya ödenmez).
-fn settle_listing(info: &AccountInfo, listing: ClaimListing, paid: bool) -> Result<()> {
-    let status = if paid {
-        ClaimStatus::Settled
-    } else {
-        ClaimStatus::Defaulted
-    };
-    let settled = ClaimListing { status, ..listing };
-    let mut data = info.try_borrow_mut_data()?;
-    settled.try_serialize(&mut &mut data[..])
 }
 
 /// Job PDA'sının imzasıyla vault'tan `amount` aktarır (0 ise aktarım yapılmaz).
@@ -261,14 +237,8 @@ pub fn handler(ctx: Context<FinalizePayment>) -> Result<()> {
 
     let fee = keeper_fee(job.amount, ctx.accounts.config.params.keeper_fee_bps)?;
     let net = job.amount - fee;
-    let listing = read_listing(&ctx.accounts.claim_listing, &job_key)?;
-    let sold = listing
-        .as_ref()
-        .is_some_and(|l| matches!(l.status, ClaimStatus::Bought));
-    let payee = match &listing {
-        Some(l) if sold => l.buyer,
-        _ => job.agent_wallet,
-    };
+    let listing = settlement::read_listing(&ctx.accounts.claim_listing, &job_key)?;
+    let (payee, sold) = settlement::payee(&job, listing.as_ref());
     let facts = ReleaseFacts {
         payee,
         net_amount: net,
@@ -305,7 +275,7 @@ pub fn handler(ctx: Context<FinalizePayment>) -> Result<()> {
     }
     close_vault(accounts, &job)?;
     if let Some(listing) = listing {
-        settle_listing(&ctx.accounts.claim_listing, listing, paid)?;
+        settlement::settle_listing(&ctx.accounts.claim_listing, listing, paid)?;
     }
 
     let keeper = ctx.accounts.keeper.key();

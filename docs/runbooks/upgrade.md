@@ -154,7 +154,15 @@ solana program set-buffer-authority <buffer> --new-buffer-authority <vault>
 ```
 
 Ardından Squads'ta "Upgrade program" işlemi açılır (program, buffer, spill hesabı). İki üye onaylar, işlem
-yürütülür. Sonra:
+yürütülür. Betikle:
+
+```bash
+node scripts/deploy/upgrade-program.mjs --network <ağ> --program <program> --buffer <buffer> \
+  --spill <adres> --member <keypair> --member <keypair>
+```
+
+Betik buffer'ın ve programın authority'sinin vault olduğunu denetler, loader'ın `Upgrade` talimatını vault işlemi
+olarak açar, iki üyeyle onaylar ve yürütür (yarıda kalan işlemi sürdürür). Sonra:
 
 ```bash
 solana program show <program id>                                  # Last Deployed In Slot güncel

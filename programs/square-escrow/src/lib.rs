@@ -1,10 +1,14 @@
 //! Square escrow programı (program arayüzü §6, §10.4). Covenant'ın escrow'undan geçmişiyle taşındı (BC-04)
 //! ve sözleşmeye göre yeniden yazılıyor. BC-22: config, iş yaşam döngüsü ve agent bağlama. BC-23, BC-24,
 //! BC-26: permissionless finalize, keeper ücreti, ispat kapısı, itibar ve validation kaydı. BC-25: alacak
-//! piyasası ve alıcı uygunluğu. BC-34: Travel Rule commitment'ı.
+//! piyasası ve alıcı uygunluğu. BC-34: Travel Rule commitment'ı. BC-32: M-of-N arbitration. BC-33:
+//! dispute zaman aşımı ve ispatsız bekleme başvurusu (ADR 0016).
 //!
 //!   Open (-(commit_travel_rule)) -(fund_job)-> Funded -(accept_job)-> Accepted -(submit_work)-> Delivered
 //!   Delivered -(finalize_payment)-> Released | Refunded
+//!   Delivered -(raise_dispute | escalate_missing_proof)-> Disputed -(resolve_dispute × M)-> Resolved
+//!   Resolved -(execute_resolution)-> Released | Refunded
+//!   Disputed (deadline sonrası) -(lapse_dispute)-> Delivered
 //!   Open | Funded | Accepted (deadline sonrası) -(cancel_job)-> Cancelled
 //!
 //!   Alacak (Delivered iş): -(list_claim)-> Listed -(buy_claim)-> Bought
@@ -12,15 +16,16 @@
 //!
 //! İş bir registry `AgentRecord`'una ve opsiyonel bir policy'ye bağlanır; policy'nin commitment'ı, günlük
 //! tavanı ve sürümü job'a kopyalanır. Diğer programların hesapları CPI'sız okunur (`linked`,
-//! `release_gate`); tek CPI verifier'ın `record_release`'idir. Dispute (BC-32, BC-33) kendi
-//! issue'larında eklenir.
+//! `release_gate`); tek CPI verifier'ın `record_release`'idir.
 use anchor_lang::prelude::*;
 
 pub mod config_rules;
+pub mod dispute;
 pub mod errors;
 pub mod instructions;
 pub mod linked;
 pub mod release_gate;
+pub mod settlement;
 pub mod state;
 
 use instructions::*;
@@ -102,6 +107,20 @@ pub mod square_escrow {
         instructions::create_job::handler(ctx, spec_hash, amount, deadline, challenge_period)
     }
 
+    /// The agent's recourse when a policy job's release cannot settle: `proof_timeout_secs` after
+    /// `challenge_end` (or after a lapsed dispute closed) with no bound proof, a temporary refusal or
+    /// a proof evaluated on another UTC day, it opens a dispute without bond.
+    pub fn escalate_missing_proof(ctx: Context<EscalateMissingProof>) -> Result<()> {
+        instructions::escalate_missing_proof::handler(ctx)
+    }
+
+    /// Permissionless: pays out a `Resolved` dispute. The agent-side amount goes through the same
+    /// payee resolution and proof gate as `finalize_payment` (no keeper fee); the bond is slashed to
+    /// the agent side (FavorAgent) or returned to the institution. Closes the vaults.
+    pub fn execute_resolution(ctx: Context<ExecuteResolution>) -> Result<()> {
+        instructions::execute_resolution::handler(ctx)
+    }
+
     /// Flow steps 6-8, permissionless crank. After `challenge_end` with no dispute:
     /// - no policy: pay the payee (claim buyer if sold, else agent wallet) `amount - keeper fee`;
     /// - policy: read `ReleaseProof` ["release_proof", job] owned by square_verifier. Missing ->
@@ -143,9 +162,34 @@ pub mod square_escrow {
         )
     }
 
+    /// Permissionless at or after `dispute.deadline` without a decision. Returns the bond and drops
+    /// the dispute: the job goes back to `Delivered` and settles through `finalize_payment`.
+    pub fn lapse_dispute(ctx: Context<LapseDispute>) -> Result<()> {
+        instructions::lapse_dispute::handler(ctx)
+    }
+
     /// The agent lists its receivable on a delivered job below face value.
     pub fn list_claim(ctx: Context<ListClaim>, price: u64) -> Result<()> {
         instructions::list_claim::handler(ctx, price)
+    }
+
+    /// The institution disputes a delivery inside the challenge window with a bond
+    /// `>= max(amount * min_bond_bps / 10_000, min_bond_absolute)`. One dispute per job.
+    pub fn raise_dispute(
+        ctx: Context<RaiseDispute>,
+        reason_hash: [u8; 32],
+        bond: u64,
+    ) -> Result<()> {
+        instructions::raise_dispute::handler(ctx, reason_hash, bond)
+    }
+
+    /// One arbitrator vote. The first vote sets the pending resolution, later votes must match it;
+    /// reaching the threshold moves the job to `Resolved` (`DisputeDecided`). No funds move here.
+    pub fn resolve_dispute(
+        ctx: Context<ResolveDispute>,
+        resolution: DisputeResolution,
+    ) -> Result<()> {
+        instructions::resolve_dispute::handler(ctx, resolution)
     }
 
     /// Flow step 4: delivery; the challenge window opens (`challenge_end = now + challenge_period`).
@@ -163,7 +207,18 @@ pub mod square_escrow {
         instructions::sync_agent_wallet::handler(ctx)
     }
 
-    /// Updates challenge bounds, bond, keeper fee and the M5 draft parameters.
+    /// Replaces the arbitrator set (N <= 7, 2 <= M <= N) and bumps `arbitrator_set_version`. An
+    /// active dispute keeps its deadline; its next vote restarts the tally with the new set.
+    pub fn update_arbitrators(
+        ctx: Context<UpdateConfig>,
+        arbitrators: Vec<Pubkey>,
+        threshold: u8,
+    ) -> Result<()> {
+        instructions::update_arbitrators::handler(ctx, arbitrators, threshold)
+    }
+
+    /// Updates challenge bounds, bond, keeper fee, proof and dispute timeouts and the Travel Rule
+    /// threshold.
     pub fn update_params(ctx: Context<UpdateConfig>, params: EscrowParams) -> Result<()> {
         instructions::update_params::handler(ctx, params)
     }
