@@ -28,7 +28,7 @@ function finalized(signature: string): FinalizedTransaction {
 const PROGRAMS = Object.keys(PROGRAM_IDS) as SquareProgramName[];
 
 describe('event çözümü', () => {
-  it("sözleşmedeki 40 event'in her biri çözülüyor ve şemaya uyan payload veriyor", () => {
+  it("sözleşmedeki 41 event'in her biri çözülüyor ve şemaya uyan payload veriyor", () => {
     let total = 0;
     for (const program of PROGRAMS) {
       const anchor = world.programs[program];
@@ -49,7 +49,7 @@ describe('event çözümü', () => {
       });
       total += decoded.events.length;
     }
-    expect(total).toBe(40);
+    expect(total).toBe(41);
   });
 
   it('CPI event üst talimatına sayılır; kırpılmış log bildirilir', () => {

@@ -40,6 +40,8 @@ export interface JobOptions {
   screening?: 'clear' | 'flagged' | 'none';
   challengeEnd?: number;
   status?: string;
+  /** Varsayılan escrow; fiat iş `finalize_fiat_payment` ile kapanır (ADR 0024). */
+  rail?: 'escrow' | 'fiat';
 }
 
 export class World {
@@ -236,6 +238,7 @@ export class World {
       status: { [status]: {} },
       challengeEnd: new BN(challengeEnd),
       policy,
+      rail: { [options.rail ?? 'escrow']: {} },
     });
     await this.put('escrow', 'job', address, value);
     if (options.sold) {
@@ -279,6 +282,7 @@ export class World {
         createdAt: BigInt(account.createdAt as number),
         deadline: BigInt(account.deadline as number),
         challengeEnd: BigInt(challengeEnd),
+        rail: options.rail ?? 'escrow',
         account: account as object,
         slot: 1n,
         indexedAt: new Date(NOW * 1000 - 120_000),

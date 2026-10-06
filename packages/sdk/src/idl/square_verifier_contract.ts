@@ -427,7 +427,8 @@ export type SquareVerifierContract = {
     {
       "name": "updateMppAuthority",
       "docs": [
-        "DRAFT (M6, BC-37): rotates the MPP attestation authority (replaces Aperture's compile-time key)."
+        "The config admin (Squads vault) rotates the MPP attestation key without a program upgrade. A",
+        "zero key disables the fiat rail: no attestation can verify."
       ],
       "discriminator": [
         74,
@@ -442,6 +443,9 @@ export type SquareVerifierContract = {
       "accounts": [
         {
           "name": "admin",
+          "docs": [
+            "`config.admin` (the Squads vault on deployed clusters)."
+          ],
           "signer": true,
           "relations": [
             "config"
@@ -486,8 +490,14 @@ export type SquareVerifierContract = {
     {
       "name": "verifyMppPaymentProof",
       "docs": [
-        "DRAFT (M6, BC-37): Stripe MPP path — checks the compliance-api ed25519 attestation from the",
-        "preceding Ed25519 precompile instruction and records the payment proof."
+        "Fiat rail (ADR 0024): binds a Stripe (MPP) payment to a delivered fiat job. The instruction",
+        "right before it must be the Ed25519 precompile verifying `config.mpp_authority`'s signature on",
+        "`\"square/mpp-attestation/v1\" || job || stripe_receipt_hash || amount (u64 LE)`, `amount` being",
+        "the job amount. The Groth16 proof is checked against the same 13 signals as",
+        "`set_compliance_proof` with `refusal_code` 0, `net_amount` = job amount, payee = agent wallet",
+        "and the non-zero `stripe_receipt_hash` (public signal 12). Writes a `Compliant` `ReleaseProof`",
+        "that `finalize_fiat_payment` consumes. Arguments: `stripe_receipt_hash` is the Poseidon",
+        "commitment of the Stripe receipt; `proof_timestamp` is public signal 9 (Unix seconds)."
       ],
       "discriminator": [
         91,
@@ -502,11 +512,17 @@ export type SquareVerifierContract = {
       "accounts": [
         {
           "name": "payer",
+          "docs": [
+            "Pays rent and fees; separate from the role signer (fee payer / sponsored transactions)."
+          ],
           "writable": true,
           "signer": true
         },
         {
           "name": "authority",
+          "docs": [
+            "The institution's current authority (key, or its Squads vault once bound)."
+          ],
           "signer": true
         },
         {
@@ -543,6 +559,12 @@ export type SquareVerifierContract = {
           "name": "policy"
         },
         {
+          "name": "job",
+          "docs": [
+            "`job.policy == policy`; supplies the policy snapshot, amount, mint and payee (agent wallet)."
+          ]
+        },
+        {
           "name": "operatorState",
           "writable": true,
           "pda": {
@@ -574,7 +596,40 @@ export type SquareVerifierContract = {
           }
         },
         {
-          "name": "instructionsSysvar",
+          "name": "releaseProof",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  101,
+                  108,
+                  101,
+                  97,
+                  115,
+                  101,
+                  95,
+                  112,
+                  114,
+                  111,
+                  111,
+                  102
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "job"
+              }
+            ]
+          }
+        },
+        {
+          "name": "instructions",
+          "docs": [
+            "precompile verifying the MPP authority's attestation."
+          ],
           "address": "Sysvar1nstructions1111111111111111111111111"
         },
         {
@@ -611,18 +666,17 @@ export type SquareVerifierContract = {
           }
         },
         {
-          "name": "publicInputs",
+          "name": "stripeReceiptHash",
           "type": {
             "array": [
-              {
-                "array": [
-                  "u8",
-                  32
-                ]
-              },
-              10
+              "u8",
+              32
             ]
           }
+        },
+        {
+          "name": "proofTimestamp",
+          "type": "i64"
         }
       ]
     }
@@ -777,6 +831,11 @@ export type SquareVerifierContract = {
       "code": 6010,
       "name": "invalidMppAttestation",
       "msg": "MPP attestation missing or signed by an unexpected key"
+    },
+    {
+      "code": 6011,
+      "name": "railMismatch",
+      "msg": "Instruction does not apply to the job's settlement rail"
     }
   ],
   "types": [
@@ -827,11 +886,15 @@ export type SquareVerifierContract = {
     {
       "name": "mppPaymentVerified",
       "docs": [
-        "DRAFT (M6)."
+        "A Stripe (MPP) payment bound to a fiat job by `verify_mpp_payment_proof` (ADR 0024)."
       ],
       "type": {
         "kind": "struct",
         "fields": [
+          {
+            "name": "job",
+            "type": "pubkey"
+          },
           {
             "name": "institution",
             "type": "pubkey"
@@ -1042,7 +1105,8 @@ export type SquareVerifierContract = {
           {
             "name": "mppAuthority",
             "docs": [
-              "DRAFT (M6): ed25519 key of the compliance-api MPP attestations."
+              "Ed25519 key whose attestations bind Stripe (MPP) payments to fiat jobs; rotated by the admin",
+              "with `update_mpp_authority` (ADR 0024)."
             ],
             "type": "pubkey"
           },

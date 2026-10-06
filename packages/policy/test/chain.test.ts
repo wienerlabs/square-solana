@@ -1,11 +1,11 @@
 // Zincirden witness, set_compliance_proof tx'i, uzak prover ve ispat tazeleme izleyicisi.
 import { BN, type BorshInstructionCoder } from '@anchor-lang/core';
-import { ComputeBudgetProgram, Keypair } from '@solana/web3.js';
-import { TX_COMPUTE_UNIT_LIMITS, type BuiltTx } from '@squaresdk/solana-sdk';
+import { ComputeBudgetProgram, Ed25519Program, Keypair } from '@solana/web3.js';
+import { mppAttestationMessage, TX_COMPUTE_UNIT_LIMITS, type BuiltTx } from '@squaresdk/solana-sdk';
 import type { ProveResponse } from '@squaresdk/solana-types';
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { createRemoteProver, type Prover } from '../src/prover.js';
-import { buildSetComplianceProofTx } from '../src/tx.js';
+import { buildSetComplianceProofTx, buildVerifyMppPaymentProofTx } from '../src/tx.js';
 import { watchJobProof } from '../src/watch.js';
 import { dayStart } from '../src/release.js';
 import { buildReleaseWitness, type ReleaseWitness } from '../src/witness.js';
@@ -148,6 +148,90 @@ describe('buildSetComplianceProofTx', () => {
         { feePayer },
       ),
     ).rejects.toThrow(/u16/);
+  });
+});
+
+describe('fiat iş (BC-37, ADR 0024)', () => {
+  const FIAT_AMOUNT = 30_000_000n;
+  // Stripe makbuzunun Poseidon commitment'ı yerine test değeri: sıfırdan farklı bir alan elemanı.
+  const RECEIPT = 0x062426892f0128f3ebafebd760832d8d50bd69034e2cec2ca7089303a0574e34n;
+  const fiatWitness = (stripeReceiptHash?: bigint) =>
+    buildReleaseWitness({
+      client: state.client,
+      job: world.job,
+      policy: okPolicy,
+      salts,
+      paymentCategory: 'research',
+      now: TIMESTAMP,
+      ...(stripeReceiptHash === undefined ? {} : { stripeReceiptHash }),
+    });
+
+  beforeEach(async () => {
+    await state.job({ rail: { fiat: {} }, amount: new BN(FIAT_AMOUNT.toString()) });
+  });
+
+  it('net tutarın tamamı, payee agent (alacak satılmış görünse de), makbuz commitment sinyal 12', async () => {
+    await state.claim('bought', Keypair.generate().publicKey);
+    const w = await fiatWitness(RECEIPT);
+    expect(w.netAmount).toBe(FIAT_AMOUNT);
+    expect(w.payee.equals(world.agentWallet)).toBe(true);
+    expect(w.inputs.stripe_receipt_hash_in).toBe(RECEIPT.toString());
+    await expect(fiatWitness()).rejects.toThrow(/stripeReceiptHash/);
+    await expect(fiatWitness(0n)).rejects.toThrow(/stripeReceiptHash/);
+    await state.job();
+    await expect(fiatWitness(RECEIPT)).rejects.toThrow(/escrow işinin/);
+  });
+
+  it('verify_mpp_payment_proof: attestation hemen önceki talimat, ispat ve makbuz argüman, hesaplar PDA', async () => {
+    const mpp = Keypair.generate();
+    await state.verifierConfig(mpp.publicKey);
+    const proof = await localProver.prove(await fiatWitness(RECEIPT));
+    expect(await verify(proof)).toBe(true);
+    const receipt = Buffer.from(RECEIPT.toString(16).padStart(64, '0'), 'hex');
+    const message = mppAttestationMessage({ job: world.job, stripeReceiptHash: receipt, amount: FIAT_AMOUNT });
+    const signed = Ed25519Program.createInstructionWithPrivateKey({ privateKey: mpp.secretKey, message });
+    const attestationSignature = signed.data.subarray(48, 112);
+    const params = {
+      authority,
+      institution: world.institution,
+      policy: policyAccount,
+      job: world.job,
+      proof,
+      attestationSignature,
+    };
+    const tx = await buildVerifyMppPaymentProofTx(state.client, params, { feePayer });
+    const { name, args, accounts, computeUnitLimit } = decodeComplianceTx(tx);
+    expect(name).toBe('verifyMppPaymentProof');
+    expect(computeUnitLimit).toBe(TX_COMPUTE_UNIT_LIMITS.verifyMppPaymentProof);
+    expect(Buffer.from(args.stripeReceiptHash as number[])).toEqual(receipt);
+    expect((args.proofTimestamp as BN).toNumber()).toBe(TIMESTAMP);
+    const pda = state.client.pda;
+    expect(accounts).toMatchObject({
+      payer: feePayer.toBase58(),
+      authority: authority.toBase58(),
+      job: world.job.toBase58(),
+      operatorState: pda.operatorState(world.institution)[0].toBase58(),
+      releaseProof: pda.releaseProof(world.job)[0].toBase58(),
+      instructions: 'Sysvar1nstructions1111111111111111111111111',
+    });
+    // Precompile talimatı verifier talimatından hemen önce ve imzalanan mesajı taşır.
+    const message0 = tx.transaction.message;
+    const keys = message0.staticAccountKeys;
+    const programs = message0.compiledInstructions.map((ix) => keys[ix.programIdIndex]!);
+    const at = programs.findIndex((p) => p.equals(state.client.verifier.program.programId));
+    expect(programs[at - 1]!.equals(Ed25519Program.programId)).toBe(true);
+    expect(Buffer.from(message0.compiledInstructions[at - 1]!.data)).toEqual(Buffer.from(signed.data));
+
+    const refused = { ...proof, publicInputs: ['0'.repeat(63) + '1', ...proof.publicInputs.slice(1)] };
+    await expect(
+      buildVerifyMppPaymentProofTx(state.client, { ...params, proof: refused }, { feePayer }),
+    ).rejects.toThrow(/uyumlu/);
+    const noReceipt = { ...proof, publicInputs: [...proof.publicInputs.slice(0, 12), '0'.repeat(64)] };
+    await expect(
+      buildVerifyMppPaymentProofTx(state.client, { ...params, proof: noReceipt }, { feePayer }),
+    ).rejects.toThrow(/sinyal 12/);
+    await state.job();
+    await expect(buildVerifyMppPaymentProofTx(state.client, params, { feePayer })).rejects.toThrow(/fiat rayında/);
   });
 });
 

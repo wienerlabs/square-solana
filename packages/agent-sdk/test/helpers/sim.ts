@@ -123,6 +123,7 @@ export class SimChain {
       deadline: new BN(fields.deadline),
       workHash: new Array(32).fill(0),
       deliveryUri: '',
+      rail: { escrow: {} },
       policy: null,
       dispute: { ...(sample.dispute as object), bond: new BN(0) },
     };

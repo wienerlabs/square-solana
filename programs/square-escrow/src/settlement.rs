@@ -1,6 +1,6 @@
 //! Settlement yardımcıları: job PDA'sının imzasıyla vault'tan aktarım ve vault kapanışı, alacak
-//! listelemesinin okunması ve kapanması. `finalize_payment`, `execute_resolution` ve `lapse_dispute`
-//! aynı kuralları kullanır.
+//! listelemesinin okunması ve kapanması, release'in itibar ve validation kaydı. `finalize_payment`,
+//! `finalize_fiat_payment`, `execute_resolution` ve `lapse_dispute` aynı kuralları kullanır.
 
 use anchor_lang::prelude::*;
 use anchor_spl::token_interface::{
@@ -9,7 +9,11 @@ use anchor_spl::token_interface::{
 use square_common::seeds::JOB_SEED;
 
 use crate::errors::EscrowError;
-use crate::state::{ClaimListing, ClaimStatus, Job};
+use crate::release_gate::Gate;
+use crate::state::{
+    AgentReputation, ClaimListing, ClaimStatus, Job, JobStatus, ValidationOutcome, ValidationRecord,
+};
+use crate::{ReputationRecorded, ValidationRecorded};
 
 /// Job PDA'sının imza seed'leri; vault ve bond vault'unun token yetkilisi job'dur.
 pub struct JobSigner {
@@ -117,4 +121,86 @@ pub fn settle_listing(info: &AccountInfo, listing: ClaimListing, paid: bool) -> 
     let settled = ClaimListing { status, ..listing };
     let mut data = info.try_borrow_mut_data()?;
     settled.try_serialize(&mut &mut data[..])
+}
+
+/// Release'in yazdığı hesaplar: itibar (`init_if_needed`), validation kaydı (`init`) ve job.
+pub struct Outcome<'a, 'info> {
+    pub reputation: &'a mut Account<'info, AgentReputation>,
+    pub validation_record: &'a mut Account<'info, ValidationRecord>,
+    pub job_account: &'a mut Account<'info, Job>,
+    /// (reputation, validation_record) bump'ları.
+    pub bumps: (u8, u8),
+}
+
+/// İtibar (her zaman `AgentRecord`'a, alacak satılmış olsa da; ADR 0013), validation kaydı ve job'un
+/// son durumu (`Released` ya da `Refunded`).
+pub fn record_outcome(
+    outcome: Outcome,
+    job: &Job,
+    job_key: Pubkey,
+    gate: Gate,
+    net: u64,
+    now: i64,
+) -> Result<()> {
+    let Outcome {
+        reputation,
+        validation_record,
+        job_account,
+        bumps: (reputation_bump, validation_bump),
+    } = outcome;
+    let paid = gate.pays_agent_side();
+    if reputation.agent_record == Pubkey::default() {
+        reputation.agent_record = job.agent_record;
+        reputation.bump = reputation_bump;
+        reputation.first_job_at = now;
+    }
+    if paid {
+        reputation.jobs_completed = reputation
+            .jobs_completed
+            .checked_add(1)
+            .ok_or(EscrowError::MathOverflow)?;
+        reputation.total_earned = reputation
+            .total_earned
+            .checked_add(net)
+            .ok_or(EscrowError::MathOverflow)?;
+    }
+    reputation.last_job_at = now;
+    emit!(ReputationRecorded {
+        agent_record: job.agent_record,
+        job: job_key,
+        jobs_completed: reputation.jobs_completed,
+        jobs_failed: reputation.jobs_failed,
+        jobs_disputed: reputation.jobs_disputed,
+        total_earned: reputation.total_earned,
+    });
+
+    let (outcome, refusal_code) = match gate {
+        Gate::NoGate => (ValidationOutcome::NoGate, 0),
+        Gate::Verified { .. } => (ValidationOutcome::Verified, 0),
+        Gate::Refused { refusal_code, .. } => (ValidationOutcome::Refused, refusal_code),
+    };
+    validation_record.set_inner(ValidationRecord {
+        job: job_key,
+        agent_record: job.agent_record,
+        outcome,
+        refusal_code,
+        recorded_at: now,
+        bump: validation_bump,
+        policy: job.policy,
+        release_proof: gate.release_proof(),
+    });
+    emit!(ValidationRecorded {
+        job: job_key,
+        agent_record: job.agent_record,
+        outcome,
+        refusal_code,
+    });
+
+    job_account.status = if paid {
+        JobStatus::Released
+    } else {
+        JobStatus::Refunded
+    };
+    job_account.settled_at = now;
+    Ok(())
 }

@@ -82,6 +82,13 @@ stateDiagram-v2
   ([ADR 0016](decisions/0016-dispute-m-of-n-zaman-asimi-ve-ispatsiz-bekleme.md)).
 - **Zincir dışı araçlar:** Kanıt saklama (`reason_hash`), arbitrator kuyruğu, oy tx'i ve bildirimler API'dedir
   ([apps/api](../apps/api/README.md#uyuşmazlık)).
+- **Fiat rayı** ([ADR 0024](decisions/0024-stripe-mpp-fiat-rayi.md)):
+  - Kurum işi `create_fiat_job` ile açar; işin kasası yoktur ve iş her zaman bir politikaya bağlıdır.
+  - Agent işi `Open`'ken kabul eder ve teslim eder. Kurum Stripe ile öder.
+  - MPP authority'nin Ed25519 attestation'ı ve politika ispatı `verify_mpp_payment_proof` ile işe bağlanır.
+  - `finalize_fiat_payment` işi `Released` yapar. İtibar, `ValidationRecord` ve günlük sayaç escrow
+    yolundaki gibi yazılır; token hareket etmez, keeper ücreti yoktur.
+  - Fiat işte dispute, alacak ve Travel Rule yoktur. İptal `cancel_fiat_job` iledir.
 
 ## Event'ler
 
@@ -95,7 +102,7 @@ Event'lerin tek kaynağı IDL'lerdir. Yayım ve sürüm kuralları [event şemas
 | `square_registry` | `AgentRegistered`, `AgentUpdated`, `AgentStatusChanged`, `AgentOwnershipTransferred`, `AgentDeregistered`, `ScreeningRecorded`, `RegistryConfigUpdated` |
 | `square_policy` | `InstitutionCreated`, `InstitutionMultisigSet`, `PolicyCommitted`, `PolicyUpdated`, `PolicyDeactivated`, `BuyerRootCommitted` |
 | `square_verifier` | `ComplianceProofSet`, `ReleaseRecorded`, `MppPaymentVerified`, `VerifierConfigUpdated` |
-| `square_escrow` | `JobCreated`, `TravelRuleCommitted`, `JobFunded`, `JobAccepted`, `WorkSubmitted`, `JobAgentWalletSynced`, `ClaimListed`, `ClaimBought`, `ClaimCancelled`, `ReleaseVerified`, `ReleaseRefused`, `Finalized`, `ReputationRecorded`, `ValidationRecorded`, `DisputeRaised`, `DisputeVote`, `DisputeDecided`, `DisputeResolved`, `DisputeLapsed`, `MissingProofEscalated`, `JobCancelled`, `ArbitratorsUpdated`, `EscrowConfigUpdated` |
+| `square_escrow` | `JobCreated`, `FiatJobCreated`, `TravelRuleCommitted`, `JobFunded`, `JobAccepted`, `WorkSubmitted`, `JobAgentWalletSynced`, `ClaimListed`, `ClaimBought`, `ClaimCancelled`, `ReleaseVerified`, `ReleaseRefused`, `Finalized`, `ReputationRecorded`, `ValidationRecorded`, `DisputeRaised`, `DisputeVote`, `DisputeDecided`, `DisputeResolved`, `DisputeLapsed`, `MissingProofEscalated`, `JobCancelled`, `ArbitratorsUpdated`, `EscrowConfigUpdated` |
 
 Bir job'un geçmişi escrow event'leriyle ve verifier'ın ispat event'leriyle izlenir. Web'in denetim görünümü
 ve API'nin `listEvents({ job })`'u bunları sırayla gösterir.

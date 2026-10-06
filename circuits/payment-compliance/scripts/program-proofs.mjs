@@ -23,6 +23,7 @@ import {
   buildInput,
   evaluate,
   findPda,
+  getPoseidon,
   keyFromLabel,
   policyCommitment,
   sha256,
@@ -52,15 +53,29 @@ const SPECS = Object.freeze({
   a: 'job spec: market research report',
   b: 'job spec: data cleaning',
   c: 'job spec: field survey',
+  // Fiat rayı (BC-37): Stripe ile ödenen iş.
+  d: 'job spec: fiat market research',
 });
 const POLICY_ID = 'policy: research procurement';
 
 // Escrow tarafı: iş tutarları ve keeper ücreti. İspattaki net, escrow'un release'te ödeyeceği
 // `amount − amount × keeper_fee_bps / 10 000`'dir (program arayüzü §6).
 const KEEPER_FEE_BPS = 50n;
-const AMOUNTS = Object.freeze({ a: 25n * USDC, b: 40n * USDC, c: 150n * USDC });
+const AMOUNTS = Object.freeze({ a: 25n * USDC, b: 40n * USDC, c: 150n * USDC, d: 30n * USDC });
 const net = (spec) => AMOUNTS[spec] - (AMOUNTS[spec] * KEEPER_FEE_BPS) / 10_000n;
 const HOUR = 3600;
+
+// MPP yolu (BC-37): makbuz commitment'ı bir BN254 alan elemanıdır. Fikstürünki etiketten türetilir
+// (`Poseidon(sha256(etiket)'in iki 128 bitlik yarısı)`); program yalnızca ispattaki ve attestation'daki
+// değerin aynı ve sıfırdan farklı olmasına bakar.
+const STRIPE_RECEIPT_LABEL = 'square-solana/bc-37/stripe receipt';
+async function stripeReceiptHash() {
+  const poseidon = await getPoseidon();
+  const digest = sha256(STRIPE_RECEIPT_LABEL);
+  const halves = [digest.subarray(0, 16), digest.subarray(16)].map((half) => BigInt(`0x${half.toString('hex')}`));
+  return BigInt(poseidon.F.toString(poseidon(halves)));
+}
+const STRIPE_RECEIPT_HASH = await stripeReceiptHash();
 
 function scenarios() {
   const w = world();
@@ -89,6 +104,8 @@ function scenarios() {
       ['dispute_split', 'a', { netAmount: 10n * USDC }],
       // FavorAgent'ın tam tutarı işlem başı tavanı (100 USDC) aşar: kalıcı ret, iade.
       ['dispute_refused_per_tx', 'c', { netAmount: AMOUNTS.c }],
+      // Fiat rayı (BC-37): Stripe ödemesi işin tamamıdır (keeper ücreti yok), makbuz commitment'ı sinyal 12.
+      ['mpp_fiat', 'd', { netAmount: AMOUNTS.d, stripeReceiptHash: STRIPE_RECEIPT_HASH }],
     ].map(([name, spec, overrides]) => ({
       name,
       spec,
@@ -227,6 +244,9 @@ async function scenarioRecord({ name, spec, overrides }, proof, publicSignals) {
     daily_spent_before: signals.daily_spent_before,
     timestamp: Number(signals.current_unix_timestamp),
     policy_commitment: hex(fieldBytes(signals.policy_commitment)),
+    ...(BigInt(signals.stripe_receipt_hash) === 0n
+      ? {}
+      : { stripe_receipt_hash: hex(fieldBytes(signals.stripe_receipt_hash)) }),
     proof_a: hex(encoded.proofA),
     proof_b: hex(encoded.proofB),
     proof_c: hex(encoded.proofC),

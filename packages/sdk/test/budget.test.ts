@@ -29,9 +29,12 @@ describe('compute unit profili', () => {
         'acceptJob',
         'buyClaim',
         'cancelClaim',
+        'cancelFiatJob',
         'cancelJob',
         'commitTravelRule',
+        'createFiatJob',
         'createJob',
+        'finalizeFiatPayment',
         'finalizePayment',
         'fundJob',
         'initInstitution',
@@ -44,6 +47,7 @@ describe('compute unit profili', () => {
         'submitWork',
         'syncAgentWallet',
         'updatePolicy',
+        'verifyMppPaymentProof',
       ].sort(),
     );
     for (const limit of Object.values(TX_COMPUTE_UNIT_LIMITS)) {

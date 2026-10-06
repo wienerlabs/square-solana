@@ -276,4 +276,30 @@ Hesap düzeni değişmedi. Upgrade'den sonra config ve üç `Funded` job yeni ko
 | İmzalar | Oluşturma `2692LDVB…`; öneri `3fgWzDTD…`; onaylar `5BH5KDpJ…`, `21kCPyhn…`; yürütme `5o9LpXK7UK3Je3e9tS7Rojbv4t7hEyXTW372ZT9peFozmdcKhGLdCtiou99XQRXyu2DtxWmuLCLQ5KdD3QdWZV1C` |
 | Son deploy slot'u | 508076228 → 508189090 |
 
+### Verifier ve escrow v0.7.0: Stripe MPP fiat rayı (BC-37), 2026-10-07
+
+Program sözleşmesi v0.7.0 ([ADR 0024](../decisions/0024-stripe-mpp-fiat-rayi.md)):
+- verifier'a `verify_mpp_payment_proof` ve `update_mpp_authority` eklendi;
+- escrow'a fiat iş (`create_fiat_job`, `cancel_fiat_job`, `finalize_fiat_payment`) ve `Job.rail` eklendi.
+
+`Job.rail` hesabın sonuna eklendi. Upgrade'den sonra config'ler ve 15 job yeni IDL'le okundu: 6 `Released`,
+3 `Refunded`, 3 `Delivered`, 3 `Funded`. Hepsinin rayı `Escrow`.
+
+`VerifierConfig.mpp_authority` değişmedi (`CPwxS6VA…`). Rotasyon program upgrade'i gerektirmez:
+`scripts/deploy/rotate-mpp-authority.mjs` ([runbook](../runbooks/upgrade.md) §7).
+
+| | Verifier | Escrow |
+|---|---|---|
+| Kaynak | `feat/bc-37-mpp-fiat`, commit `0dcb71e` | aynı |
+| Build | `solana-verify build`, imaj `solanafoundation/solana-verifiable-build:4.1.2` ([Deploy](#deploy-bc-30-2026-10-06)'taki digest), `--library-name square_verifier` | `--library-name square_escrow` |
+| Executable hash (buffer ve zincir) | `d7ec6985f645ad7eb57faf98d8c559bb5f9e0602e22d464e8389405a47faab52` | `10ede5234f421c2dcb109cb4a04466b82db36d6b5999ef44d4bbcdc5c8825e16` |
+| Buffer | `7SCDKESj4fxWAX5YttSsoouy2dbuUhRRuSdoW2Pw2dan` | `DkykjNMr9pyw53CTwvMR9FP4i7XUegad6baq3rjqEb27` |
+| Squads işlemi | 5 | 6 |
+| Oluşturma / öneri | `4NpLHRKg…` / `4T1SAE6c…` | `4ueBc5bC…` / `4myYXdB9…` |
+| Onaylar (muhammedakinci, mehmethayirli) | `3DimM3Qe…`, `615DFZPC…` | `3Hn6KVJk…`, `HJez1y7H…` |
+| Yürütme | `2kMs1EhVWCnLGuqFb2Ki2GLPqYiz9BzqLDhvxjBRKiUwyn6dB5mt1Tapon1w1jfqjfo5yXBS9p9PY8911BU6HwQ4` | `27a6zHtvrRccZncCeZvPcVSdGCAM1f5AQda1Uu1zXVgq5HDQUc4ydFhCCZEUn4X48X8UqdzevmPqb1rMsscxfXEP` |
+| Son deploy slot'u | 508076174 → 508252508 | 508189090 → 508253095 |
+
+Buffer'lar `upgrade-program.mjs` ile yazıldı; authority'leri vault'a verildi, rent'leri deployer'a döndü (spill).
+
 Sonraki yükseltmeler runbook'un 6. adımıyla yapılır ve buraya eklenir.

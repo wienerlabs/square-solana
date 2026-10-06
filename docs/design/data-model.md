@@ -40,7 +40,7 @@ Veritabanında **asla** tutulmayanlar:
 | `policies` | policy `Policy` | `institution`, `policy_id`, `version`, `active` | `listPolicies`, `getPolicy` |
 | `agents` | registry `AgentRecord` | `creator` + `agent_id` (tekil), `owner`, `wallet`, `status` | `listAgents`, `getAgent` |
 | `screenings` | registry `ScreeningRecord` | `wallet` (tekil), `status`, `expires_at` | `getScreening` |
-| `jobs` | escrow `Job` | `status`, `institution`, `agent_record`, `agent_wallet`, `policy`, `challenge_end` | `listJobs`, `getJob` |
+| `jobs` | escrow `Job` | `status`, `institution`, `agent_record`, `agent_wallet`, `policy`, `challenge_end`, `rail` (fiat iş keeper'ın finalize crank'ine girmez, ADR 0024) | `listJobs`, `getJob` |
 | `disputes` | escrow `Job.dispute` izdüşümü; oy sayımı (`approval_mask`, `approval_count`, `arbitrator_set_version`), `decided_at`, `closed_at` (BE-22) | `job_status` + `raised_at`, `job_status` + `deadline` (lapse crank'i), `institution`, `agent_record` | `listDisputes`, `getDispute`, arbitrator kuyruğu |
 | `claims` | escrow `ClaimListing` | `job` (tekil), `status`, `seller`, `buyer` | `listClaims`, `getClaim`, `JobView.claim` |
 | `agent_reputations` | escrow `AgentReputation` | `agent_record` (tekil), `jobs_completed` | `AgentView.reputation` |

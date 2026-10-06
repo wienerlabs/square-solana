@@ -30,7 +30,7 @@ Solana adresi 32 bayttır ve tek bir BN254 alan elemanına sığmaz. Adresler ik
 | 8 | `daily_spent_before` | kurumun o UTC günündeki harcaması | `OperatorState.daily_spent` (gün dönümü uygulanmış, §7) |
 | 9 | `current_unix_timestamp` | ispatın değerlendirildiği an (saniye) | ispattan; `Clock::unix_timestamp` ± tolerans içinde olmalı |
 | 10, 11 | `job_high`, `job_low` | ispatın ait olduğu escrow `Job` hesabı | `job` hesabının adresi |
-| 12 | `stripe_receipt_hash` | MPP makbuz commitment'ı | release yolunda sabit 0; MPP yolunda (BC-37) argüman |
+| 12 | `stripe_receipt_hash` | MPP makbuz commitment'ı | release yolunda sabit 0; MPP yolunda (BC-37) argüman, MPP authority'nin attestation'ıyla bağlı (ADR 0024) |
 
 Verifier bu sinyallerin hiçbirini ispatı yapanın beyanına bırakmamalıdır. `net_amount`, `current_unix_timestamp` ve `refusal_code` dışındakilerin hepsi zincirde zaten bilinen değerlerdir. Bağlanmamış bir sinyal ispatı yapanın seçtiği bir sinyaldir. `test/tamper.test.mjs`, 13 sinyalden herhangi biri değişince gerçek bir ispatın doğrulamasının düştüğünü gösterir.
 
@@ -138,7 +138,7 @@ Her iki yolda da:
 | `ReleaseProof.refusal_code` | "devreyle BC-19'da tanımlanır" | §3'teki bit maskesi |
 | `verify_mpp_payment_proof` | 10 sinyal | aynı 13 sinyal; `stripe_receipt_hash` ≠ 0 |
 
-Program sözleşmesi v0.2.0'da (BE-10) `set_compliance_proof` için **yol A** uygulandı: argümanlar `proof_a/b/c`, `refusal_code: u16`, `net_amount: u64`, `proof_timestamp: i64`. `verify_mpp_payment_proof`'un geçişi BC-37'de.
+Program sözleşmesi v0.2.0'da (BE-10) `set_compliance_proof` için **yol A** uygulandı: argümanlar `proof_a/b/c`, `refusal_code: u16`, `net_amount: u64`, `proof_timestamp: i64`. `verify_mpp_payment_proof` v0.7.0'da (BC-37, [ADR 0024](../decisions/0024-stripe-mpp-fiat-rayi.md)) aynı yola geçti: argümanlar `proof_a/b/c`, `stripe_receipt_hash: [u8; 32]`, `proof_timestamp: i64`. `refusal_code` 0, `net_amount` fiat işin tutarı, payee `Job.agent_wallet`; makbuz commitment'ı MPP authority'nin attestation'ındaki değerle aynı olmalıdır.
 
 ## 7. Gizlilik
 
