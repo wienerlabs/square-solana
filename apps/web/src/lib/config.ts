@@ -12,6 +12,7 @@ export const ENV_VARS = {
   rpcUrl: 'SQUARE_SOLANA_RPC_URL',
   proverUrl: 'SQUARE_PROVER_URL',
   apiUrl: 'SQUARE_API_URL',
+  lookupTable: 'SQUARE_LOOKUP_TABLE',
 } as const;
 
 export const PROGRAMS = ['registry', 'policy', 'verifier', 'escrow'] as const;
@@ -31,6 +32,8 @@ export interface WebConfig {
   rpcUrl: string;
   /** Yapılandırılmış program kimlikleri. Şimdilik isteğe bağlı: tanımlı olmayan program "yapılandırılmamış" görünür. */
   programIds: Partial<Record<ProgramName, string>>;
+  /** İsteğe bağlı: Square address lookup table'ı (BC-28; servislerde `API_LOOKUP_TABLE`); ağ sayfası durumunu gösterir. */
+  lookupTable?: string;
   /** İsteğe bağlı: release ispatını üreten prover servisinin kök adresi (`apps/prover`, FE-09). */
   proverUrl?: string;
   /** İsteğe bağlı: Square API'nin kök adresi (`apps/api`, BE-18); indexer'dan okunan veriler ve keeper günlüğü. */
@@ -66,11 +69,20 @@ export function parseWebConfig(env: Readonly<Record<string, string | undefined>>
     if (isAddress(value)) programIds[program] = value;
     else errors.push(`${variable} is not a Solana address`);
   }
+  const lookupTable = env[ENV_VARS.lookupTable]?.trim() || undefined;
+  if (lookupTable && !isAddress(lookupTable)) errors.push(`${ENV_VARS.lookupTable} is not a Solana address`);
 
   if (errors.length > 0 || !isCluster(cluster)) return { ok: false, errors };
   return {
     ok: true,
-    config: { cluster, rpcUrl, programIds, ...(proverUrl && { proverUrl }), ...(apiUrl && { apiUrl }) },
+    config: {
+      cluster,
+      rpcUrl,
+      programIds,
+      ...(lookupTable && { lookupTable }),
+      ...(proverUrl && { proverUrl }),
+      ...(apiUrl && { apiUrl }),
+    },
   };
 }
 

@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { RoleDashboard } from '@/components/dashboard/role-dashboard';
 import { NetworkStatus } from '@/components/network-status';
 import { RolePicker } from '@/components/role-picker';
 import { WalletPanel } from '@/components/wallet-panel';
@@ -15,6 +16,9 @@ export default function AppPage() {
       </div>
       <div className="mt-6">
         <RolePicker />
+      </div>
+      <div className="mt-6">
+        <RoleDashboard />
       </div>
     </main>
   );

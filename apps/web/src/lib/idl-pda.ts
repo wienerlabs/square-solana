@@ -23,6 +23,14 @@ const find = (programId: PublicKey, seeds: Uint8Array[]) => PublicKey.findProgra
 export const escrowConfigAddress = (escrowProgramId: PublicKey) =>
   find(escrowProgramId, [seed('escrow', 'CONFIG_SEED')]);
 
+/** square_registry `RegistryConfig`: `["registry_config"]`. */
+export const registryConfigAddress = (registryProgramId: PublicKey) =>
+  find(registryProgramId, [seed('registry', 'REGISTRY_CONFIG_SEED')]);
+
+/** square_verifier `VerifierConfig`: `["verifier_config"]`. */
+export const verifierConfigAddress = (verifierProgramId: PublicKey) =>
+  find(verifierProgramId, [seed('verifier', 'VERIFIER_CONFIG_SEED')]);
+
 /** square_policy `Institution`: `["institution", owner_key]`. */
 export const institutionAddress = (policyProgramId: PublicKey, owner: PublicKey) =>
   find(policyProgramId, [seed('policy', 'INSTITUTION_SEED'), owner.toBytes()]);

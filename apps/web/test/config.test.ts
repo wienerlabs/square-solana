@@ -75,6 +75,22 @@ describe('program ids', () => {
   });
 });
 
+describe('lookup table', () => {
+  // Gerçek adres: Square'in devnet ALT'ı (docs/deploy/devnet.md).
+  const ALT = '3cjUqPz9ECuym9w8trGRVUadGbj24Z7BvYALvEfmCCoG';
+
+  it('is optional and read from SQUARE_LOOKUP_TABLE', () => {
+    const result = parseWebConfig({ ...valid, SQUARE_LOOKUP_TABLE: ` ${ALT} ` });
+    expect(result.ok && result.config.lookupTable).toBe(ALT);
+    expect(parseWebConfig({ ...valid, SQUARE_LOOKUP_TABLE: '' })).toEqual(parseWebConfig(valid));
+  });
+
+  it('rejects a value that is not a Solana address', () => {
+    const result = parseWebConfig({ ...valid, SQUARE_LOOKUP_TABLE: 'alt' });
+    expect(result.ok === false && result.errors).toEqual(['SQUARE_LOOKUP_TABLE is not a Solana address']);
+  });
+});
+
 describe('prover', () => {
   it('is optional and follows the RPC rules', () => {
     expect(parseWebConfig({ ...valid, SQUARE_PROVER_URL: ' https://prover.example.org ' })).toEqual({

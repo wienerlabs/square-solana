@@ -5,7 +5,8 @@ Square'in web uygulaması: Next.js 16 (App Router), React 19, Tailwind CSS 4 ve 
 | Rota | İçerik |
 |---|---|
 | `/` | Landing: değer önerisi, 8 adımlı akış, programlar ve ağ (canlı); bütün butonlar uygulamaya gider |
-| `/app` | Uygulama: bağlı cüzdanın adresi, SOL ve USDC bakiyesi, ağın canlı durumu ve doğrulaması, rol seçimi |
+| `/app` | Uygulama: bağlı cüzdanın adresi, SOL ve USDC bakiyesi, ağın canlı durumu ve doğrulaması, rol seçimi; seçilen rolün paneli: kurumun işleri, politikaları ve günlük tavan kullanımı, agent'ın işleri, kazancı ve itibarı, alıcının alacakları (FE-11) |
+| `/app/network` | Ağ durumu: programların deploy durumu ve upgrade authority'si, config hesapları sözleşmedeki alanlarıyla, keeper ücreti, Square ALT'ı, API'nin hazırlığı (FE-11) |
 | `/app/policy` | Kurumun harcama politikası: sır, kural editörü, alıcı listesi, zincire gidecek değerler (FE-04) |
 | `/app/agent` | Agent kaydı: kimlik, DID ve kayıt adresi tx'ten önce, kartın indirilip doğrulanması, `register_agent` (FE-05) |
 | `/app/did` | did:aip çözümü: kayıt zincirden, kart kendi adresinden; DID belgesi ve meta verisi. `?did=` ile paylaşılır (FE-05) |
@@ -29,6 +30,7 @@ Değerler ortamdan gelir ve kök layout'ta **istek anında, sunucuda** okunur (`
 | `SQUARE_PROVER_URL` | İsteğe bağlı: release ispatını üreten prover servisinin kök adresi ([`apps/prover`](../prover/README.md)); `https` (yalnızca `localnet` için `http`). Tanımlı değilse kurum iş sayfasında ispat üretemez, ispatın durumu yine görünür. Prover'ın `CORS_ORIGINS`'i web'in adresini içermeli |
 | `SQUARE_API_URL` | İsteğe bağlı: Square API'nin kök adresi ([`apps/api`](../api/README.md)); `https` (yalnızca `localnet` için `http`). Keeper günlüğü buradan okunur, cüzdan oturumu buradan açılır, teslim dosyası buraya yüklenir; tanımlı değilse sayfa bunu söyler. API'nin `CORS_ORIGINS`'i web'in adresini, `API_AUTH_DOMAIN`'i web'in host'unu (`location.host`, ör. `app.example.com`) içermeli |
 | `SQUARE_PROGRAM_ID_{REGISTRY,POLICY,VERIFIER,ESCROW}` | İsteğe bağlı: programların o cluster'daki adresi (db ile aynı adlar; IDL'deki adres kullanılmaz). Tanımlı olan program landing'de adresi ve zincirdeki deploy durumuyla, tanımlı olmayan "Not configured" olarak görünür. USDC bakiyesi escrow'un config'inden okunduğu için `ESCROW` gerekir. Geçersiz bir değer yapılandırma hatasıdır |
+| `SQUARE_LOOKUP_TABLE` | İsteğe bağlı: Square address lookup table'ı (BC-28; servislerde `API_LOOKUP_TABLE`, devnet'teki [kayıt](../../docs/deploy/devnet.md#square-alt)). Ağ sayfası tablonun durumunu ve içeriğinin SDK'nın beklediği adreslerle aynı olup olmadığını gösterir; tanımlı değilse bunu söyler. Geçersiz bir değer yapılandırma hatasıdır |
 
 RPC adresi istemci bileşenine (`ConnectionProvider`) gider, yani tarayıcıya iner: ekranda yalnızca host gösterilse de sayfa yükünde görünür. İçinde API anahtarı olan bir RPC kullanılacaksa ya alan adıyla kısıtlanmış (domain allowlist'li) bir anahtar ya da anahtarı sunucuda tutan bir vekil gerekir.
 
@@ -169,6 +171,28 @@ Politikaya bağlı işte escrow, kurumun bağladığı release ispatına (`Relea
 | Job | Zincirden: durum, tutar, kurum, agent (profile bağlantı), açılış ve settlement zamanı; politika adresi, sürümü ve commitment'ı (hash). Politikanın kuralları zincirde yoktur, sayfada da yoktur: tarayıcıdaki politika taslağı (FE-04) okunmaz |
 | İspat kararı | Politikasız işte "no proof gate". Politikalı işte zincirdeki `ReleaseProof`: karar (uyumlu ya da ret ve ret kodunun sebepleri), ispat zamanı, payee, net, release'in kullanıp kullanmadığı; settlement'ta validation kaydı (`ValidationRecord`). Job'a bağlanan bütün ispatlar (verifier `ComplianceProofSet`), kararlarıyla ve işlemleriyle |
 | Event'ler | `SQUARE_API_URL` tanımlıysa indexer'dan (`listEvents({ job })`, eskiden yeniye, en fazla 1.000): escrow event'leri ve verifier'ın ispat bağlama ve release kayıtları, tam geçmiş. Tanımlı değilse RPC'nin job'a dokunan son 50 işlemindeki escrow event'leri; sayfa bunu söyler. Her event'in zamanı, slot'u, imzası ve Solana Explorer bağlantısı (localnet'te uygulamanın RPC'siyle) |
+
+## Paneller (FE-11)
+
+`/app`'te rol seçiminin altında, seçilen rolün paneli; rol seçilmemişse ya da cüzdan bağlı değilse panel yoktur. Panel yalnızca seçildiğinde yüklenir (Anchor'a bağlı). `SQUARE_API_URL` ve `SQUARE_PROGRAM_ID_ESCROW` gerekir; ağ doğrulanmadan ne zincir ne API okunur. Listeler indexer'dan (API), en fazla 1.000 kayıt; fazlası varsa panel kaçının okunduğunu söyler. "Refresh" yeniden okur.
+
+| Panel | İçerik |
+|---|---|
+| Kurum | Kurum hesabı (`Institution`, zincirden): ad, politika sayısı, varsa Squads vault'u. İşler (`listJobs({ institution })`; vault varsa onun açtıkları da): kasada kilitli tutar, ödenen, fonlanmamış, iade edilen ya da iptal edilen; durum süzgeçli liste. Günlük tavan: verifier'ın kurum sayacı (`OperatorState`, zincirden) zincir saatinin UTC gününe göre (`dailySpentAt`, ADR 0012), her etkin politikanın herkese açık tavanına (`daily_ceiling`) karşı; kalan ve sıfırlanma anı. Politikalar (`listPolicies`): API'deki adı, sürüm, durum, tavan, commitment |
+| Agent | Cüzdanın sahibi olduğu agent kayıtları (`listAgents({ owner })`); başka ağın ya da escrow'un registry'si dışındaki kayıtlar gösterilmez, sayısı yazılır. Kazanç: ödenen (itibarın `total_earned`'i; satılmış alacakların neti dahil, onu alıcı aldı, ADR 0013), satılan alacakların fiyatı (satışta agent cüzdanına geçti), release'i bekleyen satılmamış işlerin bugünkü keeper ücretiyle neti. İtibar: tamamlanan, başarısız, uyuşmazlıklı, ilk ve son settlement. İşler, alacağın durumuyla |
+| Alıcı | Cüzdanın aldığı alacaklar (`listClaims({ buyer })`): release'i bekleyenlerin bugünkü keeper ücretiyle neti, ödenenler, temerrüde düşenler (iş kuruma iade edildi); fiyat, yüz değer, iskonto, alım zamanı |
+
+## Ağ sayfası (FE-11)
+
+`/app/network`, cüzdan gerekmez. Hepsi zincirden okunur, ağ doğrulanmadan okunmaz; indexer gerekmez.
+
+| Parça | Davranış |
+|---|---|
+| Programlar | Her program için BPF upgradeable loader'ın hesapları: upgrade authority (yoksa ya da sıfır adresse "Immutable"), son deploy'un slot'u, program data adresi; deploy edilmemiş, program olmayan ya da başka loader'ın programı olan hesap sebebiyle |
+| Config'ler | `RegistryConfig`, `VerifierConfig`, `EscrowConfig`: alanlar JSON IDL'den (program sözleşmesi, BC-44) adı, sırası ve açıklamasıyla, sözleşmedeki gibi snake_case. `*_bps` yüzdeyle, `*_secs` ve `*_period` süreyle, tutarlar USDC ve taban birimiyle; `arbitrators`'ın yalnızca etkin yuvaları (`arbitrator_count`). Program alanları (`*_program`) yapılandırmadaki program kimlikleriyle karşılaştırılır; upgrade authority olan adresler belirtilir. square_policy'nin config'i yoktur |
+| Keeper ücreti | `EscrowParams.keeper_fee_bps` ve sözleşmedeki açıklaması |
+| ALT | `SQUARE_LOOKUP_TABLE`: authority (dondurulmuş mu), etkin mi, son genişletme slot'u, girdiler. Program kimliklerinin dördü de tanımlıysa içerik SDK'nın beklediği adreslerle (`squareLookupTableAddresses`, escrow config'inin settlement mint'iyle) karşılaştırılır; her girdinin ne olduğu yazılır, eksik ve fazla adresler listelenir |
+| Square API | `SQUARE_API_URL` tanımlıysa `/ready`: durum, sürüm ve bağımlılıkların (veritabanı, RPC, depo) denetimi |
 
 ## Tasarım sistemi
 
