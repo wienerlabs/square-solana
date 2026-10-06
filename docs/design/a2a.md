@@ -158,7 +158,7 @@ Devam mesajında (`message.taskId` dolu) `contextId` görevinkiyle aynı olmalı
 
 ## 10. Açık noktalar
 
-1. **Agent kartı (BE-19):** Repodaki `AgentCardSchema`'da A2A v1.0'ın `supportedInterfaces` alanı yok; dış istemciler uç noktayı bu alandan okur. Kartın v1.0'a hizalanması BE-19'da (`createAgent`, `/.well-known/agent-card.json`).
+1. **Agent kartı (BE-19, kapandı):** `AgentCardSchema`'ya A2A v1.0'ın `supportedInterfaces` alanı eklendi (sözleşme v0.19.1); dış istemciler uç noktayı bu alandan okur. `@squaresdk/solana-agent-sdk`'nın `createAgent`'ı kartı `/.well-known/agent-card.json`'da sunar ve `@a2a-js/sdk` istemcisi kartı okuyup işi gönderebilir (`packages/agent-sdk/test/agent.test.ts`).
 2. **Birden fazla sunucu örneği:** Sıralı yazım ve olay veriyolu süreç içidir. Aynı agent birden fazla örnekle çalışacaksa olaylar örnekler arasında dağıtılmalı (ör. Postgres `LISTEN/NOTIFY`); depo düzeyinde iyimser sürüm ve kısmi tekil indeks bu durumda da tutarlılığı korur.
 3. **Cüzdan imzalı kimlik ve hız sınırı (BE-13):** API anahtarı yerine çağıranın cüzdan imzası ve istek hız sınırı; `Authenticator` arayüzü değişmez.
 4. **Uzun bekleme:** Akışsız `SendMessage` en fazla `blockingTimeoutMs` bekler; daha uzun işler için istemci `returnImmediately` ile açıp akışa abone olur.

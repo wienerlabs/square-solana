@@ -1,6 +1,6 @@
 # Program arayüz sözleşmesi
 
-**Sözleşme sürümü:** v0.5.1 (taslak) · **Issue:** BC-44 (#101), BC-47 (#119), BE-10 (#42), BC-17 (#25), BC-15 (#24), BC-21 (#29), BC-34 (#71), BC-09 (#9), BC-36 (#77) · **IDL'ler:** [`idl/`](../../idl/)
+**Sözleşme sürümü:** v0.6.0 (taslak) · **Issue:** BC-44 (#101), BC-47 (#119), BE-10 (#42), BC-17 (#25), BC-15 (#24), BC-21 (#29), BC-34 (#71), BC-09 (#9), BC-36 (#77), BC-32 (#69), BC-33 (#70) · **IDL'ler:** [`idl/`](../../idl/)
 
 Bu doküman Square'in dört Solana programının (`square_registry`, `square_policy`, `square_verifier`, `square_escrow`) dış arayüzünü sabitler: instruction adları ve argümanları, hesap sırası ve imzacılar, account düzenleri, PDA seed'leri, event'ler ve hata kodları. Backend (BE-35 API/SDK sözleşmesi, servisler) ve frontend (FE-24 veri katmanı) bu sözleşmeye göre geliştirir. Gerçek programlar `programs/` altında taşındıkça ve değiştikçe bu arayüze uyar; uyum BC-13 ile CI'da denetlenir.
 
@@ -36,13 +36,13 @@ Bir program gerçek uygulamasına kavuştuğunda, o programın `anchor build` il
 | Rol | Kim | Ne imzalar |
 |---|---|---|
 | `institution` | Kurumun anahtarı; `set_institution_multisig` sonrasında **yalnızca** bağlı Squads v4 vault PDA'sı | policy: `set_institution_multisig`, `set_policy`, `update_policy`, `set_buyer_root`, `deactivate_policy`; verifier: `set_compliance_proof`; escrow: `create_job`, `commit_travel_rule`, `fund_job`, `raise_dispute`, `cancel_job` |
-| `agent` | `Job.agent_wallet` (kayıttaki `AgentRecord.wallet`'ın job'a kopyası) | `accept_job`, `submit_work`, `list_claim`, `escalate_missing_proof` (taslak) |
+| `agent` | `Job.agent_wallet` (kayıttaki `AgentRecord.wallet`'ın job'a kopyası) | `accept_job`, `submit_work`, `list_claim`, `escalate_missing_proof` |
 | agent `owner` | `AgentRecord.owner` (kaydı yöneten anahtar, Squads vault olabilir) | `register_agent`, `update_agent`, `set_agent_status`, `transfer_agent_ownership`, `deregister_agent`, escrow `sync_agent_wallet` |
 | `seller` | Alacağı listeleyen agent cüzdanı | `cancel_claim` |
 | `buyer` | Kurumun onaylı alıcı listesindeki, screening'i temiz adres | `buy_claim` |
 | `arbitrator` | `EscrowConfig.arbitrators[..arbitrator_count]` | `resolve_dispute` (M-of-N oy) |
 | `keeper` | Herkes (permissionless) | `finalize_payment`; `keeper_fee_bps` kadar ücret alır |
-| permissionless çağıran | Herkes | `execute_resolution`, `lapse_dispute` (taslak) |
+| permissionless çağıran | Herkes | `execute_resolution`, `lapse_dispute` |
 | `screener_authority` | `RegistryConfig.screener_authority` (screener servisi, BE-16) | `record_screening` |
 | `admin` | Program upgrade authority'si (Squads vault, BC-09); `init_*` bunu `program_data` ile doğrular | `init_*` ve `update_*` config instruction'ları |
 | `payer` | Rent ve ücret ödeyen (sponsor fee payer olabilir) | Hesap açan instruction'lar; rol imzacısından ayrıdır (BC-22, BC-35) |
@@ -65,9 +65,9 @@ Bir program gerçek uygulamasına kavuştuğunda, o programın `anchor build` il
 | 5 | Agent / alıcı | `list_claim(price)`, `buy_claim(price, leaf_salt, merkle_proof)`, `cancel_claim` | escrow | `Policy.buyer_root`, alıcı `ScreeningRecord` |
 | 7 | Kurumun yazılımı | `set_compliance_proof(proof_a, proof_b, proof_c, public_inputs)` → `ReleaseProof` | verifier | `Institution`, `Policy`, `Job`, `ClaimListing` |
 | 6 + 8 | Keeper | `finalize_payment`: keeper ücreti, proof gate, ödeme, itibar, validation kaydı, `record_release` CPI | escrow → verifier | `ReleaseProof`, `OperatorState`, payee `ScreeningRecord` |
-| — | Kurum / arbitrator / herkes | `raise_dispute` → `resolve_dispute` oyları (M) → `execute_resolution`; taslak: `escalate_missing_proof`, `lapse_dispute` | escrow | `ReleaseProof` (agent tarafına ödeme varsa) |
+| — | Kurum / arbitrator / herkes | `raise_dispute` / `escalate_missing_proof` → `resolve_dispute` oyları (M) → `execute_resolution`; karar çıkmazsa `lapse_dispute` | escrow | `ReleaseProof` (agent tarafına ödeme varsa) |
 
-Policy'li işlerde 7. adım, 6. adımdaki finalize'dan **önce** gelir (Arc modeli): kurum ispatı release'den önce job'a bağlar, keeper ispattan habersizdir. İspat yoksa `finalize_payment` `ProofRequired` ile reddedilir ve escrow bekler. Agent'ın bu durumdaki başvuru yolu taslak `escalate_missing_proof`'tur (§7).
+Policy'li işlerde 7. adım, 6. adımdaki finalize'dan **önce** gelir (Arc modeli): kurum ispatı release'den önce job'a bağlar, keeper ispattan habersizdir. İspat yoksa `finalize_payment` `ProofRequired` ile reddedilir ve escrow bekler. Agent'ın bu durumdaki başvuru yolu `escalate_missing_proof`'tur ([ADR 0016](../decisions/0016-dispute-m-of-n-zaman-asimi-ve-ispatsiz-bekleme.md)).
 
 ## 4. Programlar arası erişim
 
@@ -86,9 +86,9 @@ Policy'li işlerde 7. adım, 6. adımdaki finalize'dan **önce** gelir (Arc mode
 | escrow `finalize_payment`, `execute_resolution` | `OperatorState` (verifier) | `["operator_state", release_proof.institution]` | `daily_spent == release_proof.daily_spent_before` (tazelik); CPI ile yazılır | — |
 | escrow `finalize_payment`, `execute_resolution` | `VerifierConfig` (verifier) | `["verifier_config"]` | CPI'a geçirilir | ✓ |
 | escrow `finalize_payment`, `execute_resolution` | payee `ScreeningRecord` (registry) | `["screening", payee]` | temiz ve taze; değilse ödeme bekler | — (payee claim'e bağlı) |
-| escrow `escalate_missing_proof` (taslak) | `ReleaseProof` (verifier) | `["release_proof", job]` | hesap yok veya bu job'a bağlı değil | ✓ |
+| escrow `escalate_missing_proof` | `ReleaseProof` (verifier) | `["release_proof", job]` | owner; hesap yoksa, ret geçiciyse ya da ispat başka bir UTC gününde değerlendirildiyse başvuru açılır | ✓ |
 | verifier `set_compliance_proof` | `Institution`, `Policy` (policy) | yukarıdaki gibi | owner; imzacı kurumun güncel yetkilisi; `policy.institution == institution` | — |
-| verifier `set_compliance_proof` | `Job` (escrow) | `["job", institution_wallet, spec_hash]` | owner; durum Delivered/Disputed; `job.policy == policy`; ispat `job.policy_commitment` ve `policy_daily_ceiling`'e karşı doğrulanır | — |
+| verifier `set_compliance_proof` | `Job` (escrow) | `["job", institution_wallet, spec_hash]` | owner; durum Delivered/Disputed/Resolved; `job.policy == policy`; ispat `job.policy_commitment` ve `policy_daily_ceiling`'e karşı doğrulanır | — |
 | verifier `set_compliance_proof` | `ClaimListing` (escrow) | `["claim", job]` | yoksa payee agent; `Bought` ise payee alıcı | ✓ |
 
 **Kontrollerin paylaşımı:** Verifier ispatı job'un policy snapshot'ına karşı doğrular; payee ve mint'i `Job` / `ClaimListing`'den bağlar. Net tutarı ise doğrulamaz, ispattaki değeri kaydeder. Escrow release anında net tutarı kendi config'iyle (`amount − keeper fee`, dispute'ta agent tarafı tutarı) hesaplar ve ispattaki payee, tutar, mint ve günlük sayaçla karşılaştırır. Herhangi biri farklıysa `StaleReleaseProof` döner ve kurum ispatı yeniden bağlar.
@@ -147,11 +147,11 @@ stateDiagram-v2
   Accepted --> Delivered: submit_work
   Delivered --> Released: finalize_payment (gate yok / Compliant)
   Delivered --> Refunded: finalize_payment (Refused)
-  Delivered --> Disputed: raise_dispute / escalate_missing_proof (taslak)
+  Delivered --> Disputed: raise_dispute / escalate_missing_proof
   Disputed --> Resolved: resolve_dispute (M oy)
   Resolved --> Released: execute_resolution (FavorAgent / Split)
   Resolved --> Refunded: execute_resolution (FavorInstitution)
-  Disputed --> Delivered: lapse_dispute (taslak)
+  Disputed --> Delivered: lapse_dispute (deadline sonrası)
   Open --> Cancelled: cancel_job
   Funded --> Cancelled: cancel_job
   Accepted --> Cancelled: cancel_job (deadline sonrası)
@@ -169,9 +169,9 @@ Aşağıdakiler sözleşmede **taslak** olarak yer alır; ayrıntılar ilgili is
 
 | Konu | Sözleşmedeki yüzey | Kesinleşeceği issue |
 |---|---|---|
-| M-of-N arbitration | `update_arbitrators(arbitrators: Vec<Pubkey>, threshold)`; N ≤ 7, 2 ≤ M ≤ N; `arbitrator_set_version` ve dispute'taki snapshot'ı; `ArbitratorsUpdated`, `DisputeVote`, `DisputeDecided` | BC-32 |
-| Dispute timeout | `EscrowParams.dispute_timeout_secs`, `DisputeInfo.deadline`, permissionless `lapse_dispute`: bond iade edilir, dispute düşer, iş `Delivered`'a döner ve normal finalize yolundan çözülür; `DisputeLapsed`, `DisputeNotExpired` | BC-33 |
-| İspatsız bekleme | `EscrowParams.proof_timeout_secs`, `escalate_missing_proof`: policy'li işte `challenge_end + proof_timeout_secs` sonrasında bağlı ispat yoksa agent bond'suz dispute açar; `MissingProofEscalated`, `ProofTimeoutNotReached` | BC-24, BC-33 |
+| M-of-N arbitration | `update_arbitrators(arbitrators: Vec<Pubkey>, threshold)`; N ≤ 7, 2 ≤ M ≤ N; `arbitrator_set_version` ve dispute'taki snapshot'ı; `ArbitratorsUpdated`, `DisputeVote`, `DisputeDecided` | BC-32: v0.6.0'da kesinleşti ([ADR 0016](../decisions/0016-dispute-m-of-n-zaman-asimi-ve-ispatsiz-bekleme.md)); set değişince sonraki oy sayımı yeni setle baştan başlar |
+| Dispute timeout | `EscrowParams.dispute_timeout_secs` (> 0), `DisputeInfo.deadline`, permissionless `lapse_dispute`: bond iade edilir, dispute düşer, iş `Delivered`'a döner ve normal finalize yolundan çözülür; `DisputeLapsed`, `DisputeNotExpired`, `InvalidDisputeTimeout` | BC-33: v0.6.0'da kesinleşti (ADR 0016) |
+| İspatsız bekleme | `EscrowParams.proof_timeout_secs` (>= 0), `escalate_missing_proof`: policy'li işte `challenge_end + proof_timeout_secs` (lapse'tan sonra kapanıştan) sonra, bugün işi kapatabilecek bir ispat yoksa agent bond'suz dispute açar; `MissingProofEscalated`, `ProofTimeoutNotReached` | BC-33: v0.6.0'da kesinleşti (ADR 0016) |
 | Travel Rule | `EscrowParams.travel_rule_threshold` (0 = kapalı), `commit_travel_rule(commitment)`, `Job.travel_rule_commitment`, `TravelRuleCommitted`, `TravelRuleCommitmentRequired` | BC-34: v0.4.2'de kesinleşti ([ADR 0015](../decisions/0015-travel-rule-commitment-ve-esik.md)) |
 | CCTP fonlama | Ayrı instruction yok: CCTP `receive_message` USDC'yi kurumun token hesabına mint eder, aynı tx'te `fund_job` çalışır | BC-36: v0.5.1'de kesinleşti ([cctp-funding.md](cctp-funding.md)) |
 | Stripe MPP | `verify_mpp_payment_proof` (Ed25519 precompile + Sysvar Instructions), `update_mpp_authority`, `VerifierConfig.mpp_authority`, `MppPaymentVerified` | BC-37 |
@@ -197,11 +197,11 @@ Aşağıdakiler sözleşmede **taslak** olarak yer alır; ayrıntılar ilgili is
 Sözleşme bu konularda bir varsayımla yazıldı. Varsayım, ilgili issue'nun ADR'ında doğrulanmalı ya da değiştirilmelidir:
 
 1. **Ret semantiği (BC-24):** Arc modeline göre `Refused` ispat net tutarı kuruma iade eder. İspat job'un policy snapshot'ına bağlı olduğu için kurum teslimattan sonra policy'yi değiştirerek ret üretemez. Ancak günlük tavan aşımı gibi **geçici** ret sebepleri (kurumun başka ödemelerle sayacı doldurması dahil) iadeye yol açar. Hangi `refusal_code`'ların iade, hangilerinin bekleme anlamına geldiği ADR'da belirlenmeli.
-2. **İspatın hiç bağlanmaması (BC-24, BC-33):** Taslak `escalate_missing_proof` agent'a dispute yolu açar. Dispute lapse olursa iş yeniden `Delivered`'a döner ve aynı durum sürebilir; arbitrator kararı (FavorAgent) da policy'li işte ispat ister. Kurumun ispatı vermeyerek ödemeyi süresiz bekletmesine karşı kesin kural ADR'da belirlenmeli.
-3. **Dispute'ta ispatın kapsamı (BC-24):** İspat agent tarafına ödenen escrow tutarını kapsar (FavorAgent'ta `amount`, Split'te `agent_amount`, keeper ücreti yok). FavorAgent'ta agent tarafına kesilen bond bir cezadır ve gate'ten geçmez.
+2. **İspatın hiç bağlanmaması (BC-24, BC-33):** Taslak `escalate_missing_proof` agent'a dispute yolu açar. Dispute lapse olursa iş yeniden `Delivered`'a döner ve aynı durum sürebilir; arbitrator kararı (FavorAgent) da policy'li işte ispat ister. Kurumun ispatı vermeyerek ödemeyi süresiz bekletmesine karşı kesin kural ADR'da belirlenmeli. **Karar ([ADR 0016](../decisions/0016-dispute-m-of-n-zaman-asimi-ve-ispatsiz-bekleme.md)):** başvuru lapse'tan sonra tekrarlanabilir; ispat yoksa, ret geçiciyse ya da ispat başka bir UTC gününde değerlendirildiyse açılır. Aynı gün bayatlayan ispat ve kurumun hiç ispat bağlamadığı karar ADR'nin açık noktalarıdır. Agent tarafına ispatsız ödeme yoktur, arbitrator'lar FavorInstitution ya da Split ile çözebilir.
+3. **Dispute'ta ispatın kapsamı (BC-24):** İspat agent tarafına ödenen escrow tutarını kapsar (FavorAgent'ta `amount`, Split'te `agent_amount`, keeper ücreti yok). FavorAgent'ta agent tarafına kesilen bond bir cezadır ve gate'ten geçmez (ADR 0016'da kesinleşti; payee screening'i bond için de aranır). İspat karar sonrası (`Resolved`) bağlanır.
 4. **Günlük sayacın ilerlemesi (BC-21):** Sözleşme, sayacın escrow → verifier `record_release` CPI'ı ile ilerlediğini varsayar.
 5. **Payee screening başarısızlığı (BC-27):** Release'te payee kaydı temiz değilse ödeme bekler; iade yapılmaz.
-6. **Aktif dispute'ta arbitrator seti değişimi (BC-32):** Dispute, açıldığı andaki `arbitrator_set_version`'ı saklar; oylamanın hangi sete göre yapılacağı issue'da kesinleşir.
+6. **Aktif dispute'ta arbitrator seti değişimi (BC-32):** Dispute, açıldığı andaki `arbitrator_set_version`'ı saklar; oylamanın hangi sete göre yapılacağı issue'da kesinleşir. **Karar (ADR 0016):** oylar oy anındaki sete göre sayılır; sürüm eskiyse sonraki oy sayımı sıfırlar, son tarih değişmez.
 7. **Keeper ücreti üst sınırı (BC-23):** `InvalidKeeperFee` için en yüksek bps değeri belirlenmeli.
 8. **Aynı token hesabının birden çok rolde geçmesi (BC-23):** Örneğin keeper kurumun kendisiyse, `finalize_payment`'te aynı token hesabı iki kez yazılabilir olarak geçebilir. Anchor 1.2.0'da (BC-08) aynı yazılabilir hesabın iki kez geçmesi varsayılan olarak reddedilir (2040); izin verilecek hesaba `dup` kısıtı yazılmalı.
 9. **İşlem boyutu (BC-19, BC-21, BC-28):** v0.2.0'dan itibaren `set_compliance_proof` 13 public sinyalin 10'unu hesaplardan kendisi kurar ([release-circuit.md](release-circuit.md) §6, yol A); instruction verisi 8 + 256 + 2 + 8 + 8 = 282 bayttır. `verify_mpp_payment_proof` hâlâ 10 sinyali argüman olarak taşır ve Ed25519 instruction'ıyla birlikte sınırı aşar; 13 sinyale ve aynı yola geçişi BC-37'de. 8 adımın tx'lerinin ölçümü ve Square ALT'ı: [tx-budget.md](tx-budget.md) (BC-28); `set_compliance_proof` ALT'sız 868 bayttır.
@@ -395,7 +395,7 @@ IDL'den üretilmiştir; instruction'lar alfabetik sıradadır. "(w)" yazılabili
 | `ValidationRecorded` | `job: pubkey`, `agent_record: pubkey`, `outcome: ValidationOutcome`, `refusal_code: u16` |
 | `WorkSubmitted` | `job: pubkey`, `work_hash: [u8; 32]`, `delivery_uri: string`, `challenge_end: i64` |
 
-#### Hata kodları (48)
+#### Hata kodları (49)
 
 | Kod | Ad | Mesaj |
 |---|---|---|
@@ -447,6 +447,7 @@ IDL'den üretilmiştir; instruction'lar alfabetik sıradadır. "(w)" yazılabili
 | 6045 | `LinkedProgramMismatch` | Account owner does not match the linked program in the config |
 | 6046 | `ProofTimeoutNotReached` | Proof timeout has not passed yet |
 | 6047 | `TravelRuleCommitmentRequired` | Travel Rule commitment required above the threshold |
+| 6048 | `InvalidDisputeTimeout` | Dispute timeout must be positive and proof timeout must not be negative |
 
 ## 11. Sözleşme değişiklik kaydı
 
@@ -459,6 +460,7 @@ IDL'den üretilmiştir; instruction'lar alfabetik sıradadır. "(w)" yazılabili
 | v0.3.0 | `set_institution_multisig` multisig hesabını da alır (`squads_multisig`, salt okunur): program, hesabın Squads v4'e ait ve başlatılmış bir `Multisig` olduğunu doğrular; yanlış ya da var olmayan bir multisig bağlanıp kurum kilitlenemez. Hata 6004 `InvalidMultisigVault` → `InvalidSquadsMultisig` ("Account is not an initialized Squads v4 multisig"); kodlar ve sıraları değişmedi. Program ilk kez bu arayüzle yazıldı (BC-17); IDL'i `set_buyer_root` (BC-18) dışında sözleşmeyle aynı | BC-17 (#25) |
 | v0.4.0 | Registry'nin agent kuralları did:aip v2 Solana profili §4.2'yle hizalandı. `AgentIdInvalid` (6000) kimliğin alfabesini de kapsar: `[A-Za-z0-9_-]{1,32}`. Yeni hata 6007 `AgentCardHashInvalid`: kart hash'i tam olarak URI boşken sıfırdır (§4.2/4; dolu URI'nin hash'i kartın SHA-256'sıdır). `transfer_agent_ownership` `wallet`'ı yeni sahibe sıfırlar (§4.2/5), dokümanı buna göre. Mevcut kodlar ve sıraları değişmedi. Program ilk kez bu arayüzle yazıldı (BC-15); IDL'i `init_registry_config`, `update_registry_config`, `record_screening` ve `RegistryConfig` / `ScreeningRecord` (BC-27) dışında sözleşmeyle aynı | BC-15 (#24) |
 | v0.4.1 | Yalnızca doküman: `set_compliance_proof`'un `refusal_code`, `net_amount` ve `proof_timestamp` argümanlarındaki doküman satırları talimatın dokümanına taşındı. Rust fonksiyon argümanları doküman taşıyamadığı için Anchor argümana doküman üretemez; v0.2.0'da IDL'e elle yazılan bu satırları hiçbir program üretemiyordu. Argümanlar, tipleri ve sıraları değişmedi. Verifier ilk kez bu arayüzle yazıldı (BC-21); IDL'i `verify_mpp_payment_proof` ve `update_mpp_authority` (BC-37) dışında sözleşmeyle aynı | BC-21 (#29) |
+| v0.6.0 | Dispute yüzeyi taslaktan çıktı ([ADR 0016](../decisions/0016-dispute-m-of-n-zaman-asimi-ve-ispatsiz-bekleme.md)). Escrow: yeni hata 6048 `InvalidDisputeTimeout` (`update_params` / `init_config`: `dispute_timeout_secs > 0`, `proof_timeout_secs >= 0`), sona eklendi, mevcut kodlar ve sıraları değişmedi; `raise_dispute`, `resolve_dispute`, `execute_resolution`, `update_arbitrators`, `lapse_dispute`, `escalate_missing_proof` ve `DisputeInfo` / `EscrowParams` alanlarının dokümanları kesinleşen kurallara göre. Verifier: `set_compliance_proof` `Resolved` işe de ispat bağlar (IDL değişmedi). Talimatlar, hesap sıraları, argümanlar ve event'ler değişmedi. Escrow'un IDL'i sözleşmeyle aynı | BC-32 (#69), BC-33 (#70) |
 | v0.5.1 | Yalnızca doküman: CCTP fonlaması taslaktan çıktı ([cctp-funding.md](cctp-funding.md)). Escrow'a talimat eklenmedi: Circle'ın `receive_message`'ı ile `fund_job` aynı tx'te art arda çalışır, devnet'te Sepolia'dan gerçek bir burn'le denendi. Talimatlar, hesaplar ve kodlar değişmedi | BC-36 (#77) |
 | v0.5.0 | Square program kimlikleri (BC-09): IDL `address` alanları ve programların `declare_id!`'i kaynak programların kimliklerinden Square'in kendi kimliklerine geçti. Registry `AL5p4aTWrmBmWa4vxJFbBjQG7Xnx2juc15FJRGpwSsA9`, policy `63HKPj2L8a9DGeTa9Eh3NaZXthMrFUEgbs9Y28SNEc4`, verifier `8yLdDR5zoAzeEWzkNX19DKy4HfVYXb7VcU3wWStwTFPh`, escrow `6yBTEVbizMVCWAp4c3jx6Xdsay3CiUmrJmTswY7QRWaX`. PDA'lar program kimliğinden türediği için bütün PDA adresleri değişti; instruction, argüman, hesap, event ve hata kodları değişmedi. Registry artık did:aip v1 programının (`CgchXu…`) kimliğini taşımıyor | BC-09 (#9) |
 | v0.4.2 | Yalnızca doküman: Travel Rule yüzeyi taslaktan çıktı ([ADR 0015](../decisions/0015-travel-rule-commitment-ve-esik.md)). `commit_travel_rule` yalnızca `Open` işe bağlar ve `fund_job`'a kadar değiştirilebilir; `EscrowParams.travel_rule_threshold`, `Job.travel_rule_commitment` ve `TravelRuleCommitted` dokümanları buna göre. Alanlar, talimat, event ve kodlar değişmedi. Escrow'un IDL'i dispute talimatları (BC-32, BC-33) dışında sözleşmeyle aynı | BC-34 (#71) |

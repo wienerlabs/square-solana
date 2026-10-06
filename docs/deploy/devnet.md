@@ -160,8 +160,52 @@ Servislerin değerleri:
 | `SQUARE_CCTP_SOURCE_CHAIN_ID`, `SQUARE_CCTP_SOURCE_DOMAIN` (web, FE-19) | `11155111` (Sepolia), `0` |
 | `SQUARE_CCTP_TOKEN_MESSENGER`, `SQUARE_CCTP_USDC` (web) | `0x8FE6B999Dc680CcFDD5Bf7EB0974218be2542DAA`, `0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238` |
 
-## Sonraki yükseltme
+## Screener (BE-16)
 
-Kh0ra'nın #184'ü (dispute talimatları, BC-32 ve BC-33) hesap düzenini değiştirmiyor; yalnızca talimat ekliyor.
-Merge edilince runbook'un 6. adımıyla, buffer ve Squads "Upgrade program" işlemiyle yükseltilir. Bu kayda yeni
-hash'ler eklenir.
+Screener'ın uçtan uca koşusu, 2026-10-06 (`apps/screener/test/devnet.e2e.test.ts`). OFAC'ın canlı listesi indirildi:
+SHA-256 `b61f54ea…5e72`, 4 SOL adresi. Screener authority `48DGxja6…` deployer'dan 0.1 SOL aldı. Denetim kaydı
+testin kendi Postgres'iydi.
+
+| Adım | Cüzdan | Tx |
+|---|---|---|
+| Listedeki adres → `Flagged` (SDN uid 194570) | `42RLPACwZPx3vYYmxSueqsogfynBDqXK298EDsNoyoHi` | `4q9mdB83DVj5RqSvXgNJ1TykRTLpMCQTRoZLK5SjE3AYnH9evHR11TbaZ7m26gAKKRziXGyrmch48YFqDJnHtgmw` |
+| Listede olmayan yeni cüzdan → `Clear` | `H5GBLjvy3B6mKqo6jmHGoxuxs1Nm87CgnFMpSTLvur6x` | `44FvHdGAdSaH5gfwvfwE4MqiWph1cNLM6XtYGEPyfqYwgKMkmVG24PmsGY6dLuedy4fiZktFWiyWuQFuRrFMY2NG` |
+| Yenileme (`Flagged`, `expires_at` ileri) | `42RLPACw…` | `32M8xSmp75UtsncZzPJLGcy8YUzYi8TYJkHg33UGweo5qSsPZCNySMDw7iP4JcXLN7f7m3rGHM2ZQcNUznxMicdj` |
+| Yenileme (`Clear`, `expires_at` ileri) | `H5GBLjvy…` | `3jug8pk42psPLuGi3qEa7v4GxaEvmZzzhDv6gyVxZfdtypCaNtUFjPR8UJjzQBPyJSq2y1gBKG54tceEcpHK3B57` |
+
+Her kayıtta zincirdeki `source_hash` denetim kaydındakidir; `expires_at − screened_at` config'teki süredir (30 gün).
+
+## x402 (BE-24)
+
+Ücretli ucun uçtan uca koşusu, 2026-10-06 (`packages/x402/test/devnet.e2e.test.ts`).
+- **Ödeme:** Fiyat 0,01 USDC (Circle devnet USDC'si `4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU`).
+- **Taraflar:** Ödeyen BC-36'nın kurumu (`7xNWRmEb…`), alıcı BC-36'nın agent'ı (`C6iFdvJp…`), ücret ödeyen deployer.
+- **Hazırlık:** Alıcının USDC hesabı koşudan önce açıldı (`DZ4fUUgJvREe4W8dWy9ce1oJafBRmf4cDPE32yfAVaEpPsLDzRYmsEnYE3xyCxaAk5auiHQAzKf5XNp991puS2x`).
+- **Depolar:** Tekrar koruması ve idempotent yanıt testin Postgres'iydi.
+
+| Adım | Sonuç | Uzlaştırma tx'i |
+|---|---|---|
+| Ödeyen fetch: 402 → ödeme → 200 | Alıcının bakiyesi 10 000 arttı | `5CSPep7Qh4Nd7dFfMP9vvo96c1RFqumKEHuBfgaCNkYrgdm5KDxGixs17pwp6y9JdYqwSHFceGcYKo5es5wXUTRW` |
+| Aynı başlık yeniden (yanıt kayboldu) | 200, aynı gövde ve makbuz; bakiye değişmedi | — |
+| Kimliksiz aynı başlıkla eşzamanlı iki istek | Biri 200, diğeri 402 (`replay_rejected`) | `2MYysDru1hnH4jjvj7gdfL9135BKzhjoRqgSdg7ZmroHChXcPPcyvm9V8zCeizcxZedQJ4WBbspyxsHxg9Htr51W` |
+| Uzlaşmış başlık yeniden | 402: facilitator'ın simülasyonu işlenmiş işlemi reddetti | — |
+
+## Yükseltmeler
+
+### Escrow v0.6.0: dispute (BC-32, BC-33), 2026-10-06
+
+Program sözleşmesi v0.6.0. M-of-N arbitration, dispute zaman aşımı (`lapse_dispute`), ispatsız bekleme başvurusu
+(`escalate_missing_proof`) ([ADR 0016](../decisions/0016-dispute-m-of-n-zaman-asimi-ve-ispatsiz-bekleme.md)).
+Hesap düzeni değişmedi. Upgrade'den sonra config ve üç `Funded` job yeni kodla okundu.
+
+| | |
+|---|---|
+| Kaynak | `feat/bc-32-33-dispute`, commit `93633b6` (programın kaynağı merge'te değişmedi) |
+| Build | `solana-verify build`, imaj `solanafoundation/solana-verifiable-build:4.1.2` ([Deploy](#deploy-bc-30-2026-10-06)'taki digest), `--library-name square_escrow` |
+| Executable hash | `84825b9b5f5e1087fc1a8e993f161d61a0dcd6760f49b99afa9182242ef2d796`. Buffer ve zincirdeki program aynı hash'i veriyor (`solana-verify get-buffer-hash`, `get-program-hash`) |
+| Buffer | `AwH8mrwMFZ9ikUD5Ct4UrM2ZoebiuEvWZYGs6PDQYVvC`; yazan deployer, authority'si vault'a verildi; rent'i deployer'a döndü (spill) |
+| Squads | İşlem 4. `scripts/deploy/upgrade-program.mjs` iki üyeyle yürüttü (muhammedakinci, mehmethayirli) |
+| İmzalar | Oluşturma `2692LDVB…`; öneri `3fgWzDTD…`; onaylar `5BH5KDpJ…`, `21kCPyhn…`; yürütme `5o9LpXK7UK3Je3e9tS7Rojbv4t7hEyXTW372ZT9peFozmdcKhGLdCtiou99XQRXyu2DtxWmuLCLQ5KdD3QdWZV1C` |
+| Son deploy slot'u | 508076228 → 508189090 |
+
+Sonraki yükseltmeler runbook'un 6. adımıyla yapılır ve buraya eklenir.

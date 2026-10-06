@@ -26,7 +26,7 @@ pub struct SetComplianceProof<'info> {
     pub institution: UncheckedAccount<'info>,
     /// CHECK: square_policy `Policy` of the job; `policy.institution == institution`.
     pub policy: UncheckedAccount<'info>,
-    /// CHECK: square_escrow `Job` (owner = `config.escrow_program`); Delivered or Disputed,
+    /// CHECK: square_escrow `Job` (owner = `config.escrow_program`); Delivered, Disputed or Resolved,
     /// `job.policy == policy`; supplies the policy snapshot, mint and default payee.
     pub job: UncheckedAccount<'info>,
     /// CHECK: square_escrow `ClaimListing`; may be uninitialized. `Bought` makes the buyer the payee.

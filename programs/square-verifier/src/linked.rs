@@ -66,10 +66,12 @@ pub fn job(info: &AccountInfo, escrow_program: &Pubkey) -> Result<Job> {
     Ok(job)
 }
 
-/// İspat yalnızca teslim edilmiş ya da dispute'taki işe bağlanır (program arayüzü §4).
+/// İspat yalnızca teslim edilmiş, dispute'taki ya da dispute'u karara bağlanmış işe bağlanır (program
+/// arayüzü §4). Karar sonrası (`Resolved`) bağlanan ispat agent tarafının tutarını kapsar ve
+/// `execute_resolution`'da tazelik kuralından geçer (ADR 0016).
 pub fn require_bindable(job: &Job) -> Result<()> {
     match job.status {
-        JobStatus::Delivered | JobStatus::Disputed => Ok(()),
+        JobStatus::Delivered | JobStatus::Disputed | JobStatus::Resolved => Ok(()),
         _ => err!(VerifierError::InvalidJobState),
     }
 }

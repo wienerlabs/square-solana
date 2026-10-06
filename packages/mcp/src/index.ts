@@ -13,4 +13,4 @@ export {
 } from './chain.js';
 export { createSigning, type Signing, type TxOutcome } from './signing.js';
 export { toBaseUnits, fromBaseUnits } from './units.js';
-export * from './client/pool.js';
+export * from './client/index.js';

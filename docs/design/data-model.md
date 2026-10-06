@@ -67,6 +67,7 @@ Notlar:
 | `agent_cards` | Barındırılan ya da indirilen agent card: ham baytlar, SHA-256, ayrıştırılmış JSON, yetenekler, zincirdeki hash ile eşleşme | API (`putAgentCard`), indexer | BE-18, BE-09 |
 | `deliveries` | Teslimat içeriğinin nesne deposundaki konumu ve `submit_work`'e giden hash / URI | API (`uploadDelivery`) | BE-18 |
 | `keeper_actions` | Keeper günlüğü (`KeeperAction`) | keeper | BE-15 |
+| `screening_decisions` | Screener'ın denetim kaydı: her tarama kararı. Satırda cüzdan, tetikleyici (`request` / `renewal`) ve sonuç bulunur: `recorded`, `sourceError` ya da `txFailed`. Ayrıca kaynak başına sonuçlar, kanıt belgesi ve onun SHA-256'sı olan `source_hash`, tx imzası ve slot, zincirden okunan `screened_at` / `expires_at`, çağıranın anahtar parmak izi. Sonuca göre dolu alanlar CHECK kısıtıyla zorunlu. Zincirdeki kaydın aynası `screenings`'tir; TTL yenilemesi ikisinden aday bulur | screener | BE-16 |
 | `users`, `auth_challenges`, `sessions`, `api_keys` | Cüzdan Ed25519 oturumu ve API anahtarları | API | BE-18 |
 | `mpp_payments` | İmzası doğrulanmış Stripe webhook'undan gelen fiat ödemesi; makbuzun Poseidon commitment'ı ve MPP authority imzası | MPP rayı | BE-25 |
 | `cctp_transfers` | Job'a bağlanan burn (kaynak domain + burn tx'i, tekil), kurum ve beklenen mint alıcısı; attestation'dan sonra mesaj, nonce (V2, 32 bayt), tutar ve ücret; Solana'da receive ve fund imzaları; relayer'ın denemesi ve bir sonraki bakışı ([cctp-funding.md](cctp-funding.md#relayer-be-26)) | API (kayıt), keeper'daki CCTP relayer'ı (güncelleme) | BE-26 |
@@ -74,8 +75,8 @@ Notlar:
 | `travel_rule_grants` | Kaydı okuma izni: `(job, grantee)` tekil, amaç, veren, süre, geri alınma | API (`createTravelRuleGrant`) | BE-23 |
 | `travel_rule_accesses` | Erişim kaydı: kişisel veriye dokunan her işlem (`store`, `read`, `grant`, `revoke`, `purge`), yapan ve izin verilen cüzdan, istek kimliği; yalnızca eklenir | API | BE-23 |
 | `rate_limit_windows` | Hız sınırı sayacı: anahtar (ör. `api:<cüzdan>`), pencerenin başı, ağırlık toplamı | servisler (`@squaresdk/solana-hardening/prisma`) | BE-13 |
-| `idempotency_records` | `Idempotency-Key` kaydı: `(scope, key)` tekil, isteğin SHA-256'sı, durum (`in_progress` / `completed`), kaydedilen yanıtın durum kodu ve gövdesi | servisler | BE-13 |
-| `replay_guards` | Tek kullanımlık kimlikler: webhook teslimat kimliği, imzalı eylem nonce'u; `(scope, id)` tekil | servisler | BE-13 |
+| `idempotency_records` | `Idempotency-Key` kaydı ve x402 ödeme kimliğinin kayıtlı yanıtı (`x402-response:<ağ>` kapsamı): `(scope, key)` tekil, isteğin SHA-256'sı, durum (`in_progress` / `completed`), kaydedilen yanıtın durum kodu ve gövdesi | servisler | BE-13, BE-24 |
+| `replay_guards` | Tek kullanımlık kimlikler: webhook teslimat kimliği, imzalı eylem nonce'u, x402 ödeme yükü (`x402:<ağ>` kapsamı); `(scope, id)` tekil | servisler | BE-13, BE-24 |
 | `a2a_tasks` | A2A görevi: agent, çağıran, bağlı job ve spec hash'i (görevin A2A bağlamı job adresidir), görev durumu, durum mesajı, artefaktlar, iyimser `version`. `job_status` ve `job_slot` sunucunun zincirde son gördüğü değerlerdir, ayna veri değildir. `(agent_record, caller, create_message_id)` tekil; kısmi tekil indeks job başına tek terminal olmayan görev | agent'ın A2A sunucusu ([a2a.md](a2a.md) §7) | BE-17 |
 | `a2a_messages` | Görev geçmişi: istemci ve agent mesajları, ekleme sırasıyla; `pending` istemcinin devam mesajı agent'a iletilip işlenene kadar true. `(task_id, message_id)` tekil, görev silinince silinir | agent'ın A2A sunucusu | BE-17 |
 
