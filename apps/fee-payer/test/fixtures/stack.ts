@@ -106,14 +106,16 @@ export async function startStack(
     clock?: () => number;
     /** Paylaşılan veritabanı yerine başka bir adres (ör. ulaşılamayan veritabanı testi). */
     databaseUrl?: string;
-    /** Fixture yerine gerçek bir RPC (localnet testi). */
+    /** Fixture yerine gerçek bir RPC (localnet ve devnet testleri). */
     rpcUrl?: string;
+    /** Çalışma anında üretilen yerine bakiyesi olan bir sponsor (devnet testi). */
+    sponsor?: Keypair;
   } = {},
 ): Promise<Stack> {
   const db = createDatabaseClient({ connectionString: options.databaseUrl ?? inject('databaseUrl') });
   const rpc = new FixtureRpc();
   const rpcServer = await startRpc(rpc);
-  const sponsor = Keypair.generate();
+  const sponsor = options.sponsor ?? Keypair.generate();
   rpc.balances.set(sponsor.publicKey.toBase58(), SPONSOR_BALANCE);
   const rpcUrl = options.rpcUrl ?? rpcServer.url;
   const config = loadConfig(testEnv(sponsor, { FEE_PAYER_RPC_URLS: rpcUrl, ...options.env }));

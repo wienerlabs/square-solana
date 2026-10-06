@@ -144,6 +144,11 @@ değildir.
 - **Squads vault'u** (`@squaresdk/solana-sdk/squads`, `wrapInVault`): bir adım iki tx'tir. Öneri tx'i
   (`vault_transaction_create` + `proposal_create` + `proposal_approve`) iç mesajı argüman olarak taşır.
   Yürütme tx'i (`vault_transaction_execute`) iç mesajın hesaplarını kalan hesap olarak taşır; iç talimatın
-  profil sınırına Squads'ın yükü eklenir. Squads programı ölçüm ortamında olmadığından bu yük profilde yoktur:
-  yürütme tx'inin sınırı simülasyonla seçilmelidir. En büyük iç mesaj (`set_compliance_proof`) ALT'sız öneri
-  tx'ine sığar (apps/fee-payer `test/eight-steps.test.ts`).
+  profil sınırına Squads'ın yükü eklenir. Squads programı LiteSVM ölçüm ortamında olmadığından bu yük profilde
+  yoktur: yürütme tx'inin sınırı simülasyonla seçilmelidir.
+- **Devnet ölçümü** (2026-10-06, apps/fee-payer `test/squads-devnet.e2e.test.ts`, gerçek Squads v4):
+  - Öneri tx'leri 43 – 63 bin CU ve 689 – 1 162 bayttır.
+  - Yürütme tx'leri 28 – 68 bin CU'dur. Tek istisna `set_compliance_proof`'un yürütmesi: 207 547 CU, 758 bayt.
+  - En büyük tx `set_compliance_proof`'un önerisidir (1 162 bayt) ve ALT'sız sığar.
+  - Smart account açılışı (`multisig_create_v2`) 15 – 19 bin CU'dur.
+  - Sponsorlu `finalize_payment` 80 963 CU'dur.

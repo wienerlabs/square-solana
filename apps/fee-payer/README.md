@@ -124,13 +124,29 @@ SQUARE_LOCALNET=1 SQUARE_PROGRAMS_DIR=<repo>/target/deploy SQUARE_LOCALNET_RPC_P
   pnpm --filter @squaresdk/solana-fee-payer exec vitest run test/localnet.test.ts
 ```
 
-Testler: her ret dalı ayrı testli ([`test/policy.test.ts`](test/policy.test.ts)); 8 adımın her tx'i (SDK akışıyla
-üretilmiş, Squads vault imzacılı, öneri + yürütme) politikadan geçer ve sponsorlanır
-([`test/eight-steps.test.ts`](test/eight-steps.test.ts)); localnet'te SOL'süz kullanıcının `register_agent`'ı
-sponsorla zincire girer ve sponsordan SOL çeken tx gönderilmeden reddedilir
-([`test/localnet.test.ts`](test/localnet.test.ts)).
+Testler:
+- **Ret dalları:** Her biri ayrı testli ([`test/policy.test.ts`](test/policy.test.ts)).
+- **8 adımın tx'leri:** SDK akışıyla üretilir, Squads vault imzacılıdır (öneri + yürütme). Her biri politikadan
+  geçer ve sponsorlanır ([`test/eight-steps.test.ts`](test/eight-steps.test.ts), fixture RPC).
+- **Localnet:** SOL'süz kullanıcının `register_agent`'ı sponsorla zincire girer. Sponsordan SOL çeken tx
+  gönderilmeden reddedilir ([`test/localnet.test.ts`](test/localnet.test.ts)).
+- **Devnet:** [`test/squads-devnet.e2e.test.ts`](test/squads-devnet.e2e.test.ts) gerçek Squads v4 programıyla
+  çalışır ([deploy kaydı](../../docs/deploy/devnet.md#fee-payer-ve-squads-smart-account-be-27)).
+  - Üç smart account (kurum, agent, alıcı) sponsorla açılır.
+  - 8 adımın 22 tx'i servisten geçer. Vault'lar hiç SOL tutmaz.
+  - Release ispatı zincirden kurulan witness'la üretilen gerçek Groth16 ispatıdır.
+  - Ödeme alıcı vault'una gider.
 
-**Kalan:** Squads programı localnet'te yok (mainnet'ten kopyalanması gerçek ağ ister); vault akışının gerçek
-zincirde denemesi devnet / mainnet'te yapılacak. Squads talimatlarının compute unit profili ölçülmedi; vault
-yürütme tx'inin sınırı simülasyonla seçilmelidir. Railway dağıtımı ve sponsor anahtarının KMS'e taşınması ADR
-0019'nin açık noktalarındadır.
+```bash
+FEE_PAYER_E2E_SPONSOR=<SOL'ü olan sponsor keypair'i> FEE_PAYER_E2E_FUNDER=<devnet USDC'si olan keypair> \
+FEE_PAYER_E2E_SCREENER=<screener authority keypair'i> \
+  pnpm --filter @squaresdk/solana-fee-payer exec vitest run test/squads-devnet.e2e.test.ts
+```
+
+Funder ve screener yalnızca kurulumda kullanılır: vault'ların token hesapları, USDC ve screening kayıtları.
+
+**Keeper'ın rent'i:** `finalize_payment`'ın açtığı `AgentReputation` ve `ValidationRecord`'un rent'ini program keeper'a
+ödetir (`payer = keeper`). Keeper bunu keeper ücretiyle karşılar. Tx'in ücreti sponsorludur; devnet testi keeper'ın
+SOL'ünün yalnızca bu iki rent'e gittiğini denetler.
+
+**Kalan:** Railway dağıtımı ve sponsor anahtarının KMS'e taşınması ADR 0019'un açık noktalarındadır.

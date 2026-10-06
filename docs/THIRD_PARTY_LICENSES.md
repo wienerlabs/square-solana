@@ -118,7 +118,7 @@ pnpm license:write
 | `prisma` | npm | Apache-2.0 | runtime | `@squaresdk/solana-db` | ✓ |
 | `react` | npm | MIT | runtime | `@squaresdk/solana-web` | ✓ |
 | `react-dom` | npm | MIT | runtime | `@squaresdk/solana-web` | ✓ |
-| `snarkjs` | npm | GPL-3.0 | runtime | `@squaresdk/solana-policy`, `@squaresdk/solana-prover` | ⚠️ inceleme |
+| `snarkjs` | npm | GPL-3.0 | runtime | `@squaresdk/solana-fee-payer`, `@squaresdk/solana-policy`, `@squaresdk/solana-prover` | ⚠️ inceleme |
 | `stripe` | npm | MIT | runtime | `@squaresdk/solana-compliance-api` | ✓ |
 | `swagger-jsdoc` | npm | MIT | runtime | `@squaresdk/solana-compliance-api` | ✓ |
 | `swagger-ui-express` | npm | MIT | runtime | `@squaresdk/solana-compliance-api` | ✓ |

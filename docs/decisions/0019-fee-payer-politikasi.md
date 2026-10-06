@@ -124,6 +124,13 @@
   `src/ledger.ts`), metrikler. Her ret dalı ayrı testlidir. 8 adımın her tx'i (SDK akışı, Squads vault
   imzacılı, öneri + yürütme) politikadan geçer. Localnet'te (`SQUARE_LOCALNET=1`) SOL'süz kullanıcının
   `register_agent`'ı sponsorla zincire girer; ölçülen maliyet sponsorun bakiye farkına eşittir.
+- **Devnet'te gerçek Squads v4 ile 8 adım** (`test/squads-devnet.e2e.test.ts`,
+  [deploy kaydı](../deploy/devnet.md#fee-payer-ve-squads-smart-account-be-27)):
+  - Üç smart account sponsorla açıldı.
+  - 22 tx'in ücretini ve rent'ini sponsor ödedi; vault'lar hiç SOL tutmadı.
+  - CU ve boyut ölçümleri [tx-budget.md §8](../design/tx-budget.md#8-sponsorlu-tx-ve-squads-vaultu)'dedir.
+  - `finalize_payment`'ın açtığı iki kaydın rent'ini program keeper'a ödetir (`payer = keeper`). Keeper bunu
+    ücretiyle karşılar.
 - `@squaresdk/solana-sdk/squads`:
   - Vault ve multisig adresleri `square_common::squads` ile aynıdır; ortak vektörle denetlenir.
   - `createSmartAccountInstruction` (`multisig_create_v2`) ve `wrapInVault` resmi `@sqds/multisig` 2.1.4
@@ -134,9 +141,8 @@
 
 ## Açık noktalar
 
-- **Squads talimatlarının CU profili ölçülmedi:** Squads programı LiteSVM ortamında ve localnet'te yok. Vault
+- **Squads'ın LiteSVM profili:** Squads programı LiteSVM ortamında yok. Devnet ölçümü tx-budget §8'dedir; vault
   yürütmesinin sınırı simülasyonla seçilmelidir.
-- **Vault akışının gerçek zincirde denemesi:** Devnet / mainnet'te yapılacak.
 - **Anahtarı KMS ya da HSM'e taşıma:** İmza uzaktan yapılır, gizli anahtar süreçte durmaz. Railway dağıtımında
   karar verilecek.
 - **Kullanıcı başına farklı bütçeler:** Ör. kurum planına göre. Şimdilik tek bir kullanıcı bütçesi var.
