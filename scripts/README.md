@@ -12,7 +12,7 @@ smoke ([§9](../docs/analysis/square-solana-analysis.md#9-%C3%B6nerilen-monorepo
 | [`hooks/`](hooks/): `pnpm install`'da git kancalarını `.githooks/`'a bağlar (`install.mjs`) | [BC-13] |
 | [`deploy/`](deploy/): program kimliklerinin depoya uygulanması (`set-program-ids.mjs`; anahtar okumaz), Squads v4 multisig'inin kurulması ve doğrulanması (`squads-multisig.mjs`) ve [upgrade runbook'u](../docs/runbooks/upgrade.md) | [BC-09] |
 | Address Lookup Table, compute budget, priority fee | [BC-28] |
-| Devnet deploy + init (escrow config, screener authority, ALT) | [BC-30] |
+| [`deploy/`](deploy/): ağ yapılandırması (`networks/<ağ>.json`, `network-config.mjs`), config'lerin Squads vault'u adına kurulması (`init-configs.mjs`), Square ALT'ı (`create-lookup-table.mjs`), hız sınırına dayanıklı RPC bağlantısı (`rpc.mjs`); kayıt [`docs/deploy/devnet.md`](../docs/deploy/devnet.md) | [BC-30] |
 | Devnet uçtan uca smoke: 8 adım gerçek işlemlerle, tx / CU / ücret raporu | [BC-31] |
 
 Anahtarlar ve secret'lar repoya girmez (`.gitignore`: `*keypair*.json`, `.env*`); deploy

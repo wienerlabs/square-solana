@@ -108,6 +108,11 @@ solana program show <program id>        # Authority: <vault>, Executable
 solana-verify get-program-hash -u <rpc> <program id>   # build'in hash'iyle aynı
 ```
 
+Genel devnet RPC'si yoğun yazmada hız sınırına (429) takılır. `--use-rpc` verilmez: CLI buffer'ı doğrudan
+validator'lara (TPU) yazar, RPC'yi yalnızca onay için kullanır. Yarıda kalan deploy'un buffer'ı
+`solana program close --buffers` ile kapatılıp rent'i geri alınır. `--max-len` program boyutundan büyük
+verilirse yükseltmelere yer kalır (devnet: 1,5 katı).
+
 Verifiable build (BC-13) ile derlenmiş `.so` kullanılır. Böylece zincirdeki hash, depodaki commit'ten herkesin
 yeniden üretebileceği hash olur. Dört programın kimliği, deploy imzası, executable hash'i ve authority'si
 deploy kaydına yazılır.
@@ -124,6 +129,16 @@ Her `init_*` talimatı bir Squads vault işlemidir. Squads arayüzünde "Transac
 | `square_registry` | `init_registry_config(screener_authority, screening_ttl_secs)` | screener servisinin authority'si (BE-16), screening ömrü |
 | `square_verifier` | `init_verifier_config(escrow_program, policy_program, mpp_authority)` | escrow ve policy kimlikleri, MPP authority (BC-37) |
 | `square_escrow` | `init_config(settlement_mint, arbitrators, threshold, params, linked)` | USDC mint'i (devnet: Circle devnet USDC), arbitrator seti ve eşiği (program arayüzü §6), `EscrowParams` (challenge sınırları, bond, keeper ücreti ≤ 100 bps, `proof_timeout_secs ≥ 0`, `dispute_timeout_secs > 0`, Travel Rule eşiği), bağlı program kimlikleri |
+
+Değerler `scripts/deploy/networks/<ağ>.json`'dadır (anahtar değil, açık değerler; `network-config.mjs`
+programların kurallarıyla doğrular). Betik her config için vault işlemini ve önerisini açar, iki üyeyle
+onaylar ve yürütür. Kurulmuş config atlanır; yarıda kalan öneri kaldığı adımdan sürdürülür:
+
+```bash
+node scripts/deploy/init-configs.mjs --network <ağ> --member <üye keypair> --member <üye keypair>
+node scripts/deploy/init-configs.mjs --network <ağ> --show       # zincirdeki config'ler, JSON
+node scripts/deploy/create-lookup-table.mjs --network <ağ> --payer <keypair>   # Square ALT, kurulup dondurulur
+```
 
 Talimat verileri SDK'nın builder'larıyla (`createSquareClient(...).escrow.instructions.initConfig(...)`) üretilir.
 Squads'a girilecek talimatlar ve değerler PR'da ya da deploy kaydında, iki üyenin onayından önce yazılı olur.
