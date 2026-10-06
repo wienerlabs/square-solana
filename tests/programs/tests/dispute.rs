@@ -6,6 +6,7 @@
 
 mod escrow_world;
 
+use anchor_lang::error::ErrorCode as AnchorErrorCode;
 use anchor_lang::prelude::Pubkey;
 use escrow_world::*;
 use solana_signer::Signer;
@@ -261,10 +262,9 @@ fn m_of_n_arbitrators_decide_in_favor_of_the_agent() {
     // Bir karar bir kez ödenir.
     let again = w.h.funded(LAMPORTS);
     let settlement = w.settlement(&institution, &again.pubkey(), agent.wallet.pubkey());
-    assert!(
-        w.execute(&again, &job, settlement).is_err(),
-        "ikinci execute"
-    );
+    w.execute(&again, &job, settlement)
+        .expect_err("ikinci execute")
+        .assert_error(anchor_error(AnchorErrorCode::AccountNotInitialized));
 }
 
 #[test]
