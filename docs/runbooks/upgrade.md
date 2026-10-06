@@ -68,7 +68,14 @@ PR'dır; birleşmeden önce program kontrollerinin tamamı yeşil olmalıdır ([
 
 ## 3. Squads v4 multisig
 
-[Squads](https://app.squads.so) arayüzünden ya da Squads v4 SDK'sıyla, ağ başına bir multisig kurulur:
+[Squads](https://app.squads.so) arayüzünden ya da `scripts/deploy/squads-multisig.mjs` ile (Squads v4 SDK), ağ başına bir
+multisig kurulur:
+
+```bash
+node scripts/deploy/squads-multisig.mjs create --rpc <url> --creator <ücreti ödeyen keypair> \
+  --member <adres> --member <adres> --member <adres> --threshold 2 --time-lock 0
+node scripts/deploy/squads-multisig.mjs show --rpc <url> --multisig <adres>   # doğrulama, JSON
+```
 
 | Ayar | Değer |
 |---|---|
@@ -116,7 +123,7 @@ Her `init_*` talimatı bir Squads vault işlemidir. Squads arayüzünde "Transac
 |---|---|---|
 | `square_registry` | `init_registry_config(screener_authority, screening_ttl_secs)` | screener servisinin authority'si (BE-16), screening ömrü |
 | `square_verifier` | `init_verifier_config(escrow_program, policy_program, mpp_authority)` | escrow ve policy kimlikleri, MPP authority (BC-37) |
-| `square_escrow` | `init_config(settlement_mint, arbitrators, threshold, params, linked)` | USDC mint'i (devnet: Circle devnet USDC), arbitrator seti (2 ≤ M ≤ N ≤ 7, ADR 0016), `EscrowParams` (challenge sınırları, bond, keeper ücreti ≤ 100 bps, `proof_timeout_secs ≥ 0`, `dispute_timeout_secs > 0`, Travel Rule eşiği), bağlı program kimlikleri |
+| `square_escrow` | `init_config(settlement_mint, arbitrators, threshold, params, linked)` | USDC mint'i (devnet: Circle devnet USDC), arbitrator seti ve eşiği (program arayüzü §6), `EscrowParams` (challenge sınırları, bond, keeper ücreti ≤ 100 bps, `proof_timeout_secs ≥ 0`, `dispute_timeout_secs > 0`, Travel Rule eşiği), bağlı program kimlikleri |
 
 Talimat verileri SDK'nın builder'larıyla (`createSquareClient(...).escrow.instructions.initConfig(...)`) üretilir.
 Squads'a girilecek talimatlar ve değerler PR'da ya da deploy kaydında, iki üyenin onayından önce yazılı olur.

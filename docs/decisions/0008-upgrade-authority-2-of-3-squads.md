@@ -35,12 +35,14 @@ varsayımıdır.
   ([program arayüzü §2](../design/program-interface.md#2-roller)).
 - Durum (2026-10-03): uygulanmadı. Yeni program kimlikleri, devnet'te Squads v4 multisig'i,
   `docs/runbooks/upgrade.md` ve deploy anahtarlarının secret store'da tutulması BC-09'dadır (#9).
-- Durum (2026-10-06): [runbook](../runbooks/upgrade.md) ve kimlikleri depoya uygulayan
-  `scripts/deploy/set-program-ids.mjs` hazır. Anahtarların üretimi, devnet multisig'i ve deploy, anahtar
-  sahiplerinin yapacağı işlemlerdir; yapılmadı.
+- Durum (2026-10-06): [runbook](../runbooks/upgrade.md), kimlikleri depoya uygulayan
+  `scripts/deploy/set-program-ids.mjs` ve multisig'i kuran `scripts/deploy/squads-multisig.mjs` hazır. Square
+  program kimlikleri depoda (program sözleşmesi v0.5.0). Devnet'te 2-of-3 multisig kuruldu; adresi, vault'u ve
+  üyeleri [devnet kaydında](../deploy/devnet.md). Devnet'in üye anahtarları bu ağ için üretildi. Mainnet'in
+  üyeleri kendi anahtarlarıyla BC-42'de (#98) kurulur.
 - Mainnet'te authority devri dış audit'ten sonradır (M9; BC-42, #98).
 
 ## Açık noktalar
 
 - Vanity program kimlikleri §12'de karara bağlanmadı (§11, soru 7).
-- Üyelerin multisig'deki anahtar adresleri henüz kayıtlı değil (BC-09, #9).
+- Devnet üyelerinin adresleri [devnet kaydında](../deploy/devnet.md); mainnet üyelerinin adresleri BC-42'de (#98) kaydedilir.

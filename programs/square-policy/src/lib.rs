@@ -9,7 +9,7 @@ pub mod state;
 
 use instructions::*;
 
-declare_id!("FXD7ycSguBQw7o3DXqq4VUBHtdx5ZQpu9P2zb4KG4ZEU");
+declare_id!("63HKPj2L8a9DGeTa9Eh3NaZXthMrFUEgbs9Y28SNEc4");
 
 square_common::square_policy_events!();
 
