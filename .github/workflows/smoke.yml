@@ -1,0 +1,177 @@
+# Uçtan uca smoke (BC-31): 8 adım, ispat-ret ve ispat-yok varyantları gerçek işlemlerle; her tx'in imzası,
+# CU'su ve ücreti raporlanır (tests/smoke). Yalnızca elle tetiklenir, küme girişte seçilir:
+# - localnet: programlar derlenir, `smoke:localnet` geçici bir solana-test-validator açar, init ve smoke'u
+#   koşar. Anahtarlar koşu için üretilir; secret gerekmez.
+# - devnet: `devnet` environment'ında koşar (environment'ın onay kuralı işi kapıda tutar). Rol anahtarları
+#   environment secret'larından iş süresince runner'ın geçici dizinine yazılır ve iş sonunda silinir;
+#   küme yapılandırması (anahtar içermeyen JSON) `SMOKE_CONFIG` environment değişkenidir
+#   (tests/smoke/README.md).
+# Rapor iş özetine ve artefakta yazılır; depoya commit'lenmesi elle yapılır (docs/deploy/smoke-<küme>.md).
+# Araç sürümleri Anchor.toml [toolchain] ile aynıdır (scripts/ci/toolchain.mjs denetler); indirilen dosyalar
+# SHA-256 ile, action'lar commit SHA'sıyla sabitlenir.
+name: Smoke
+
+on:
+  workflow_dispatch:
+    inputs:
+      cluster:
+        description: 'Küme: localnet (geçici validator) ya da devnet (environment onayı ve secretlar)'
+        type: choice
+        options: [localnet, devnet]
+        default: localnet
+
+permissions:
+  contents: read
+
+concurrency:
+  group: smoke-${{ inputs.cluster }}
+  cancel-in-progress: false
+
+env:
+  AGAVE_VERSION: 4.1.2
+  AGAVE_SHA256: 5991d027a686eb419a709a479178b33eb83501e8a2bfbf599a81a286bfcbf770
+  ANCHOR_VERSION: 1.2.0
+  ANCHOR_SHA256: 0c9c41a3292c281cc6eadb78d6e1c8224d8324a34b0736a89d640fd314db05b7
+
+jobs:
+  localnet:
+    name: Localnet smoke (geçici validator)
+    if: inputs.cluster == 'localnet'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - name: Araç sürümleri Anchor.toml ile aynı
+        run: node scripts/ci/toolchain.mjs
+
+      - name: Rust toolchain
+        run: rustup toolchain install || rustup show
+
+      - name: Agave ve Anchor CLI
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP"
+          curl -sSfL -o agave.tar.bz2 \
+            "https://github.com/anza-xyz/agave/releases/download/v${AGAVE_VERSION}/solana-release-x86_64-unknown-linux-gnu.tar.bz2"
+          echo "${AGAVE_SHA256}  agave.tar.bz2" | sha256sum -c -
+          tar -xjf agave.tar.bz2
+          mkdir -p bin
+          curl -sSfL -o bin/anchor \
+            "https://github.com/solana-foundation/anchor/releases/download/v${ANCHOR_VERSION}/anchor-${ANCHOR_VERSION}-x86_64-unknown-linux-gnu"
+          echo "${ANCHOR_SHA256}  bin/anchor" | sha256sum -c -
+          chmod +x bin/anchor
+          echo "$RUNNER_TEMP/solana-release/bin" >> "$GITHUB_PATH"
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            ~/.cache/solana
+            target
+          key: smoke-${{ runner.os }}-${{ env.AGAVE_VERSION }}-${{ hashFiles('rust-toolchain.toml', 'Cargo.lock') }}
+          restore-keys: smoke-${{ runner.os }}-${{ env.AGAVE_VERSION }}-
+
+      - name: Programlar (anchor build)
+        run: anchor build
+
+      # circom 2.2.3 (sha256 doğrulanır); in-process prover build/payment_js/payment.wasm'ı kullanır.
+      - name: Release devresi
+        run: circuits/payment-compliance/scripts/ci-build.sh
+
+      - name: Derleme
+        run: pnpm turbo run build --filter @squaresdk/solana-smoke...
+
+      - name: Localnet smoke
+        run: pnpm --filter @squaresdk/solana-smoke smoke:localnet --ledger "$RUNNER_TEMP/ledger"
+
+      - name: Rapor
+        if: always()
+        run: |
+          if [ -f docs/deploy/smoke-localnet.md ]; then cat docs/deploy/smoke-localnet.md >> "$GITHUB_STEP_SUMMARY"; fi
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: smoke-localnet
+          path: docs/deploy/smoke-localnet.md
+          if-no-files-found: ignore
+
+  devnet:
+    name: Devnet smoke
+    if: inputs.cluster == 'devnet'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    environment: devnet
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - name: Release devresi
+        run: circuits/payment-compliance/scripts/ci-build.sh
+
+      - name: Derleme
+        run: pnpm turbo run build --filter @squaresdk/solana-smoke...
+
+      # Anahtarlar yalnızca bu işin geçici dizininde, sahibine okunur; yapılandırma anahtar içermez ve
+      # yolları kendi dizinine göre verir (keys/<rol>.json).
+      - name: Anahtarlar ve küme yapılandırması
+        env:
+          SMOKE_CONFIG_JSON: ${{ vars.SMOKE_CONFIG }}
+          PAYER: ${{ secrets.SMOKE_PAYER_KEYPAIR }}
+          SCREENER: ${{ secrets.SMOKE_SCREENER_KEYPAIR }}
+          INSTITUTION: ${{ secrets.SMOKE_INSTITUTION_KEYPAIR }}
+          AGENT: ${{ secrets.SMOKE_AGENT_KEYPAIR }}
+          BUYER: ${{ secrets.SMOKE_BUYER_KEYPAIR }}
+          KEEPER: ${{ secrets.SMOKE_KEEPER_KEYPAIR }}
+        run: |
+          set -euo pipefail
+          umask 077
+          dir="$RUNNER_TEMP/smoke"
+          mkdir -p "$dir/keys"
+          for role in payer screener institution agent buyer keeper; do
+            var="${role^^}"
+            if [ -z "${!var}" ]; then echo "secret eksik: SMOKE_${var}_KEYPAIR" >&2; exit 1; fi
+            printf '%s' "${!var}" > "$dir/keys/$role.json"
+          done
+          if [ -z "$SMOKE_CONFIG_JSON" ]; then echo "environment değişkeni eksik: SMOKE_CONFIG" >&2; exit 1; fi
+          printf '%s' "$SMOKE_CONFIG_JSON" > "$dir/devnet.json"
+
+      - name: Devnet smoke
+        env:
+          SMOKE_RPC_URL: ${{ secrets.SMOKE_RPC_URL }}
+        run: pnpm --filter @squaresdk/solana-smoke smoke --config "$RUNNER_TEMP/smoke/devnet.json"
+
+      - name: Anahtarları sil
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/smoke"
+
+      - name: Rapor
+        if: always()
+        run: |
+          if [ -f docs/deploy/smoke-devnet.md ]; then cat docs/deploy/smoke-devnet.md >> "$GITHUB_STEP_SUMMARY"; fi
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: smoke-devnet
+          path: docs/deploy/smoke-devnet.md
+          if-no-files-found: ignore

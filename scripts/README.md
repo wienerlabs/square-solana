@@ -1,7 +1,8 @@
 # scripts/
 
-Repo düzeyindeki operasyon script'leri: deploy, init, Address Lookup Table kurulumu ve devnet
-smoke ([§9](../docs/analysis/square-solana-analysis.md#9-%C3%B6nerilen-monorepo-yap%C4%B1s%C4%B1)).
+Repo düzeyindeki operasyon script'leri ([§9](../docs/analysis/square-solana-analysis.md#9-%C3%B6nerilen-monorepo-yap%C4%B1s%C4%B1)).
+Init, Address Lookup Table kurulumu ve smoke SDK'yı kullandığı için bir workspace paketidir:
+[`tests/smoke`](../tests/smoke/).
 
 | Konu | Issue |
 |---|---|
@@ -12,8 +13,8 @@ smoke ([§9](../docs/analysis/square-solana-analysis.md#9-%C3%B6nerilen-monorepo
 | [`hooks/`](hooks/): `pnpm install`'da git kancalarını `.githooks/`'a bağlar (`install.mjs`) | [BC-13] |
 | [`deploy/`](deploy/): program kimliklerinin depoya uygulanması (`set-program-ids.mjs`; anahtar okumaz) ve [upgrade runbook'u](../docs/runbooks/upgrade.md) | [BC-09] |
 | Address Lookup Table, compute budget, priority fee | [BC-28] |
-| Devnet deploy + init (escrow config, screener authority, ALT) | [BC-30] |
-| Devnet uçtan uca smoke: 8 adım gerçek işlemlerle, tx / CU / ücret raporu | [BC-31] |
+| Devnet deploy + init (escrow config, screener authority, ALT): [`tests/smoke`](../tests/smoke/) `init` komutu (Squads vault'unda talimatları Squads biçiminde yazar) ve [runbook](../docs/runbooks/upgrade.md) | [BC-30] |
+| Uçtan uca smoke: 8 adım ve iki varyant gerçek işlemlerle, tx / CU / ücret raporu: [`tests/smoke`](../tests/smoke/) `smoke` ve `smoke:localnet`; CI [`smoke.yml`](../.github/workflows/smoke.yml) | [BC-31] |
 
 Anahtarlar ve secret'lar repoya girmez (`.gitignore`: `*keypair*.json`, `.env*`); deploy
 keypair'leri secret store'da tutulur [BC-09].

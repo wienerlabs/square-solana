@@ -1,0 +1,41 @@
+{
+  "name": "@squaresdk/solana-smoke",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Küme kurulumu ve uçtan uca smoke: config'lerin init'i (Squads talimatları dahil), Square ALT'ı, kayıt satırları; 8 adım, ispat-ret ve ispat-yok varyantları gerçek işlemlerle, tx / CU / ücret raporu; localnet koşucusu (BC-30, BC-31)",
+  "license": "Apache-2.0",
+  "type": "module",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run --coverage",
+    "init": "node dist/cli.js init",
+    "smoke": "node dist/cli.js smoke",
+    "smoke:localnet": "node dist/localnet.js"
+  },
+  "dependencies": {
+    "@anchor-lang/core": "1.2.0",
+    "@noble/hashes": "^1.8.0",
+    "@solana/spl-token": "^0.4.15",
+    "@solana/web3.js": "^1.99.0",
+    "@squaresdk/solana-policy": "workspace:*",
+    "@squaresdk/solana-sdk": "workspace:*",
+    "@squaresdk/solana-types": "workspace:*",
+    "bn.js": "^5.2.5",
+    "snarkjs": "0.7.6",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@squaresdk/solana-config": "workspace:*",
+    "@types/bn.js": "^5.2.0",
+    "@types/node": "^24.0.0",
+    "@vitest/coverage-v8": "^5.0.3",
+    "vitest": "^5.0.3"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}

@@ -118,10 +118,18 @@ Her `init_*` talimatı bir Squads vault işlemidir. Squads arayüzünde "Transac
 | `square_verifier` | `init_verifier_config(escrow_program, policy_program, mpp_authority)` | escrow ve policy kimlikleri, MPP authority (BC-37) |
 | `square_escrow` | `init_config(settlement_mint, arbitrators, threshold, params, linked)` | USDC mint'i (devnet: Circle devnet USDC), arbitrator seti (2 ≤ M ≤ N ≤ 7, ADR 0016), `EscrowParams` (challenge sınırları, bond, keeper ücreti ≤ 100 bps, `proof_timeout_secs ≥ 0`, `dispute_timeout_secs > 0`, Travel Rule eşiği), bağlı program kimlikleri |
 
-Talimat verileri SDK'nın builder'larıyla (`createSquareClient(...).escrow.instructions.initConfig(...)`) üretilir.
-Squads'a girilecek talimatlar ve değerler PR'da ya da deploy kaydında, iki üyenin onayından önce yazılı olur.
-Kurulumdan sonra config hesapları okunur ve değerler kayda yazılır. Square ALT'ı (BC-28,
-[tx-budget.md](../design/tx-budget.md)) bu adımdan sonra kurulur.
+Talimat verileri SDK'nın builder'larıyla üretilir. [`tests/smoke`](../../tests/smoke/)'un `init` komutu
+bunu yapar: upgrade authority vault'sa talimatları göndermez, Squads'a girilecek biçimde (program, hesaplar ve
+imza / yazma bayrakları, base64 veri, okunur argümanlar) yazar. Squads'a girilecek talimatlar ve değerler PR'da
+ya da deploy kaydında, iki üyenin onayından önce yazılı olur. Kurulumdan sonra `init` yeniden koşulur: config
+hesapları okunur ve değerler kayıt satırları olarak yazılır. Square ALT'ı (BC-28,
+[tx-budget.md](../design/tx-budget.md)) aynı komutla bu adımdan sonra kurulur. Ardından uçtan uca smoke koşulur
+(BC-31, `smoke` komutu); rapor `docs/deploy/smoke-<ağ>.md`.
+
+```bash
+pnpm --filter @squaresdk/solana-smoke init  --config <ağ.json> --records <kayıt.md>
+pnpm --filter @squaresdk/solana-smoke smoke --config <ağ.json>
+```
 
 ## 6. Upgrade
 
