@@ -82,11 +82,18 @@ o talimat `emit_cpi!`'e geçer. Bu bir sözleşme değişikliğidir (MINOR) ve b
 - **Çözme:** `Program data:` satırının ilk 8 baytı discriminator'dır. Satır, log yığınında (invoke
   derinliği) o anda çalışan program bir Square programıysa o programa aittir. SDK'nın `decodeEvents`'i
   (BE-08) bu kuralla çözer.
-- **İndexer (BE-14):** Event'leri bu şemaya göre işler; tablolar [veri modelindedir](data-model.md).
-  Zincir kaynak-gerçektir ([veri modeli](data-model.md), §1). Event'ler
-  hangi hesabın değiştiğini bildirir, ayna tablolar hesap okumasıyla doğrulanır.
-- **Kırpılmış log:** `Log truncated` satırı görülen işlemin event'lerine güvenilmez. İndexer o işlemin
-  dokunduğu hesapları zincirden okuyarak uzlaştırır.
+- **Konum:** SDK'nın `decodeTransactionEvents`'i event'i yayımlayan programı, üst düzey talimatın tx'teki
+  sırasını (`instructionIndex`; CPI'lar üst talimatına sayılır) ve talimattaki sırasını (`eventIndex`)
+  verir. `(imza, instructionIndex, eventIndex)` event'in tekil anahtarıdır (`chain_events`).
+- **İndexer (BE-14, [`apps/indexer`](../../apps/indexer/)):** Event'leri bu şemaya göre işler; tablolar
+  [veri modelindedir](data-model.md). Zincir kaynak-gerçektir ([veri modeli](data-model.md), §1). Event'ler
+  hangi hesabın değiştiğini bildirir, ayna tablolar hesap okumasıyla doğrulanır: indexer tx'in yazılabilir
+  hesaplarının hepsini okur (değişen her hesap tx'te yazılabilirdir).
+- **Kırpılmış log:** `Log truncated` satırı görülen işlemin kesilen kısmının event'leri okunamaz;
+  `decodeTransactionEvents` bunu `truncated` ile bildirir. Okunabilen event'ler yazılır, ayna tablolar yine
+  yazılabilir hesapların okumasıyla güncellenir.
+- **Sözleşmede olmayan event:** Indexer o tx'i yazmaz ve durur (alarm). Yayımlanmış event değişmediği için
+  (§4) bu, indexer'ın IDL'inin programın gerisinde olduğunu gösterir.
 
 ## 6. Program issue'ları için kontrol listesi
 

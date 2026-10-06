@@ -81,6 +81,54 @@ describe('decodeEvents', () => {
   });
 });
 
+describe('decodeTransactionEvents', () => {
+  const escrow = programs.escrow;
+  const verifier = programs.verifier;
+  const escrowId = escrow.programId.toBase58();
+  const verifierId = verifier.programId.toBase58();
+  const budget = 'ComputeBudget111111111111111111111111111111';
+  const sampleEscrow = createSampler(escrow.idl);
+  const sampleVerifier = createSampler(verifier.idl);
+
+  it('event, program, üst düzey talimat ve talimattaki sırayla döner; CPI event üst talimatına sayılır', () => {
+    const logs = [
+      invoke(budget),
+      success(budget),
+      invoke(escrowId),
+      eventLine(escrow, 'jobFunded', sampleEscrow.struct('jobFunded')),
+      success(escrowId),
+      invoke(escrowId),
+      invoke(verifierId, 2),
+      eventLine(verifier, 'releaseRecorded', sampleVerifier.struct('releaseRecorded')),
+      success(verifierId),
+      eventLine(escrow, 'finalized', sampleEscrow.struct('finalized')),
+      success(escrowId),
+    ];
+    const { events, truncated } = client.decodeTransactionEvents(logs, context);
+    expect(truncated).toBe(false);
+    expect(events.map((e) => [e.program, e.name, e.instructionIndex, e.eventIndex])).toEqual([
+      ['escrow', 'jobFunded', 1, 0],
+      ['verifier', 'releaseRecorded', 2, 0],
+      ['escrow', 'finalized', 2, 1],
+    ]);
+    expect(events.every((e) => e.signature === 'sig' && e.slot === 77)).toBe(true);
+    expect(client.decodeEvents(logs, context)).toEqual(
+      events.map(({ name, data, signature, slot }) => ({ name, data, signature, slot })),
+    );
+  });
+
+  it("kırpılmış logda okunabilen event'ler döner ve kırpılma bildirilir", () => {
+    const logs = [invoke(escrowId), eventLine(escrow, 'jobFunded', sampleEscrow.struct('jobFunded')), 'Log truncated'];
+    const { events, truncated } = client.decodeTransactionEvents(logs, context);
+    expect(truncated).toBe(true);
+    expect(events.map((e) => e.name)).toEqual(['jobFunded']);
+  });
+
+  it('kapanmamış çağrının içinde yeni üst düzey talimat tutarsızdır', () => {
+    expect(() => client.decodeTransactionEvents([invoke(escrowId), invoke(budget)], context)).toThrow(/yığın/);
+  });
+});
+
 describe('mapError', () => {
   const failed = (id: string, code: number) => `Program ${id} failed: custom program error: 0x${code.toString(16)}`;
 

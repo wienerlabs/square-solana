@@ -5,7 +5,7 @@ import { Program, type Idl, type Provider } from '@anchor-lang/core';
 import type { Commitment, Connection, PublicKey, TransactionInstruction, VersionedTransaction } from '@solana/web3.js';
 import type { ProgramErrorRef } from '@squaresdk/solana-types';
 import { mapProgramError } from './errors.js';
-import { decodeEventLogs } from './events.js';
+import { decodeEventLogs, decodeTransactionLogs, type TransactionEvents } from './events.js';
 import { createFlow } from './flow.js';
 import { createPda, type SquarePda } from './pda.js';
 import { SQUARE_IDLS, type SquareIdls, type SquareProgramIds, type SquareProgramName } from './programs.js';
@@ -137,6 +137,11 @@ export interface SquareClient {
   buildTx(instructions: readonly TransactionInstruction[], options: BuildOptions): Promise<BuiltTx>;
   /** Tx loglarından Anchor event'lerini çözer. */
   decodeEvents(logs: readonly string[], context: { signature: string; slot: number }): DecodedEvent[];
+  /**
+   * Tx loglarından event'leri tx içindeki konumlarıyla (program, üst düzey talimat, talimattaki sıra) çözer;
+   * log kırpılmışsa bildirir (indexer, BE-14).
+   */
+  decodeTransactionEvents(logs: readonly string[], context: { signature: string; slot: number }): TransactionEvents;
   /** Hata (simülasyon / gönderim) → (program, kod, ad); program hatası değilse null. */
   mapError(error: unknown): ProgramErrorRef | null;
 }
@@ -206,6 +211,7 @@ export const createSquareClient: CreateSquareClient = (config) => {
     flow: createFlow({ connection: config.connection, programIds: config.programIds, pda, ...programs, buildTx }),
     buildTx,
     decodeEvents: (logs, context) => decodeEventLogs(sources, logs, context),
+    decodeTransactionEvents: (logs, context) => decodeTransactionLogs(sources, logs, context),
     mapError: (error) => mapProgramError(sources, error),
   };
 };

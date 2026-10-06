@@ -10,4 +10,4 @@ export * from './events.js';
 export * from './operations.js';
 
 /** BE-35 API / SDK sözleşme sürümü (docs/design/api-sdk-contract.md değişiklik kaydı). */
-export const API_CONTRACT_VERSION = '0.11.0';
+export const API_CONTRACT_VERSION = '0.12.0';

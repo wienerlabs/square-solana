@@ -26,7 +26,7 @@ test('SQUARE_IDLS, idl/ dosyalarıyla aynı', () => {
   }
 });
 
-test('SDK çalışma zamanı dışa aktarımları beklenen yüzeyle aynı (BE-35 + BE-08 + BC-28 + BC-34)', () => {
+test('SDK çalışma zamanı dışa aktarımları beklenen yüzeyle aynı (BE-35 + BE-08 + BC-28 + BC-34 + BE-14)', () => {
   assert.deepEqual(Object.keys(sdk).sort(), [
     'API_OPERATIONS',
     'MAX_COMPUTE_UNIT_LIMIT',
@@ -40,6 +40,7 @@ test('SDK çalışma zamanı dışa aktarımları beklenen yüzeyle aynı (BE-35
     'createSquareClient',
     'specHashing',
     'squareLookupTableAddresses',
+    'toIdlJson',
     'travelRule',
     'withComputeProfile',
     'workHash',
