@@ -35,6 +35,7 @@ const setup: EscrowSetup = {
   minChallengePeriod: 60n,
   maxChallengePeriod: 604_800n,
   travelRuleThreshold: 1_000_000_000n,
+  keeperFeeBps: 50,
 };
 
 const openJob = (commitment = new Uint8Array(32)): TravelRuleJob => ({
