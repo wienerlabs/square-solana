@@ -9,7 +9,6 @@
 //
 //   node scripts/deploy/cctp-fund-job.mjs --network devnet --source sepolia --burn-tx <0x…> \
 //     --institution <keypair> --agent <keypair> --screener <keypair> [--job <adres>]
-import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import {
@@ -29,11 +28,10 @@ import {
   VersionedTransaction,
 } from '@solana/web3.js';
 import { loadNetwork } from './network-config.mjs';
+import { OFAC_SDN_URL, fetchSdn, screen } from './sanctions.mjs';
 import { connectionFor } from './rpc.mjs';
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
-/** OFAC'ın SDN listesi (XML; dijital para adresleri `Digital Currency Address - …` kimlikleri olarak). */
-const OFAC_SDN_URL = 'https://www.treasury.gov/ofac/downloads/sdn.xml';
 /** Agent'ın bu koşudaki kaydı: kimliği ve rent / ücret için en az SOL'ü. */
 const AGENT_ID = 'bc36-cctp-devnet';
 const AGENT_MIN_LAMPORTS = 0.05 * LAMPORTS_PER_SOL;
@@ -102,21 +100,6 @@ async function waitForAttestation(network, source, transactionHash) {
     if (Date.now() > deadline) throw new Error(`attestation gelmedi: ${transactionHash}`);
     await new Promise((resolve) => setTimeout(resolve, ATTESTATION_POLL_MS));
   }
-}
-
-/** Cüzdanlar OFAC SDN listesine karşı: listede adresi geçen cüzdan temiz kaydedilmez. */
-async function screenAgainstSdn(wallets) {
-  const response = await fetch(OFAC_SDN_URL);
-  if (!response.ok) throw new Error(`OFAC SDN listesi ${response.status}`);
-  const bytes = Buffer.from(await response.arrayBuffer());
-  const text = bytes.toString('utf8');
-  const listed = wallets.filter((wallet) => text.includes(wallet.toBase58()));
-  if (listed.length > 0) throw new Error(`OFAC SDN listesinde: ${listed.map((key) => key.toBase58()).join(', ')}`);
-  return {
-    sourceHash: createHash('sha256').update(bytes).digest(),
-    publishDate: /<Publish_Date>([^<]+)<\/Publish_Date>/.exec(text)?.[1] ?? null,
-    recordCount: Number(/<Record_Count>(\d+)<\/Record_Count>/.exec(text)?.[1] ?? Number.NaN),
-  };
 }
 
 async function main() {
@@ -194,7 +177,12 @@ async function main() {
     }),
   );
   if (fresh.includes(false)) {
-    const sdn = await screenAgainstSdn(wallets);
+    const sdn = await fetchSdn();
+    const { flagged } = screen(
+      sdn,
+      wallets.map((wallet) => wallet.toBase58()),
+    );
+    if (flagged.length > 0) throw new Error(`OFAC SDN listesinde: ${flagged.join(', ')}`);
     result.screening = {
       list: OFAC_SDN_URL,
       publishDate: sdn.publishDate,

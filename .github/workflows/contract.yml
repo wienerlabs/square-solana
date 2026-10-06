@@ -28,5 +28,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: IDL → zod / OpenAPI şemaları ve SDK tipleri güncel
         run: pnpm contract:check
-      - name: OpenAPI lint
+      - name: OpenAPI lint (API referansının bütünlüğü dahil)
         run: pnpm openapi:lint
+      - name: SDK referansı eksiksiz (BE-31)
+        run: pnpm docs:check

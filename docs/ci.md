@@ -13,7 +13,7 @@ PR sayfasında görünen ad, iş akışındaki işin adıdır.
 | İş akışı | Kontrol (PR'daki ad) | Ne zaman | Ne denetler |
 |---|---|---|---|
 | `packages` | Kapsam, ad kuralı ve lint · Derleme, tip kontrolü ve testler · Paket kurulum smoke'u · Prisma migration kontrolü · `ci-ok` | her PR, main | TS paketleri ve servisler: ad kuralı, ESLint + Prettier, `scripts/ci` testleri, derleme / tip / test (PR'da etkilenen paketler), paket kurulumu, migration kuralları (BE-03) |
-| `contract` | `api-sdk-contract` | her PR, main | IDL'den türetilen dosyalar (`packages/types`, SDK IDL kopyaları, `docs/api/schemas`) `idl/` ile güncel: `pnpm contract:check` (BE-35) |
+| `contract` | `api-sdk-contract` | her PR, main | IDL'den türetilen dosyalar (`packages/types`, SDK IDL kopyaları, `docs/api/schemas`) `idl/` ile güncel: `pnpm contract:check` (BE-35); OpenAPI lint ve API referansının bütünlüğü (`pnpm openapi:lint`); SDK referansının bütünlüğü (`pnpm docs:check`, BE-31) |
 | `License` | Lisans envanteri | her PR, main | Bağımlılık lisansları ve `docs/THIRD_PARTY_LICENSES.md` güncel (BC-02) |
 | `Security` | Sır taraması (gitleaks) | her PR, main, haftalık | Bütün git geçmişinde sır; kuralların testleri (BC-13) |
 | `Programs` | SBF derleme ve program testleri | programları, crate'leri, IDL'leri, Rust araç dosyalarını, SDK'nın işlem profilini (`packages/sdk/src/tx-profile.json`) ya da bu iş akışının betiklerini değiştiren PR, main | Araç sürümleri, `cargo fmt`, `anchor build`, program IDL'lerinin sözleşmeyle uyumu, `cargo clippy`, birim testleri, `anchor test` (LiteSVM; işlem bütçesi dahil, BC-28) (BC-12, BC-13) |
@@ -108,8 +108,8 @@ birleştirilmiş hâlinde şu kontroller yerelde yeşil olmalı ve PR'a yazılma
   `cargo clippy`, gitleaks.
 - Program iş akışının adımları: `toolchain.mjs`, `rust-lint.mjs`, `idl-conformance.mjs`,
   `cargo test --workspace --locked` ve program testleri.
-- `pnpm turbo run test`, `pnpm lint`, `pnpm license:check`, `pnpm contract:check`,
-  `node --test "scripts/**/*.test.mjs"`, `pnpm secrets:scan`.
+- `pnpm turbo run test`, `pnpm lint`, `pnpm license:check`, `pnpm contract:check`, `pnpm openapi:lint`,
+  `pnpm docs:check`, `node --test "scripts/**/*.test.mjs"`, `pnpm secrets:scan`.
 - Devreye dokunan PR'da `program-proofs.mjs --check`.
 
 Actions açılınca bu dönemde main'e giren commit'lerin iş akışları main'de bir kez koşturulur.
@@ -127,6 +127,7 @@ node scripts/ci/rust-lint.mjs           # cargo fmt --check + clippy (kapsam: pr
 anchor build && node scripts/ci/idl-conformance.mjs   # program IDL'leri ↔ idl/
 anchor test --validator legacy --skip-build            # program testleri (LiteSVM)
 pnpm contract:check                     # IDL'den türetilen dosyalar
+pnpm docs:check                         # SDK referansı eksiksiz (docs/README.md)
 pnpm secrets:scan                       # gitleaks, bütün geçmiş
 node scripts/ci/monitoring.mjs          # izleme kuralları ve pano ↔ servis metrikleri (docs/slo.md)
 node --test "scripts/ci/*.test.mjs"     # CI betiklerinin testleri

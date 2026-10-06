@@ -10,6 +10,7 @@ import { CCTP_SOLANA_DOMAIN } from './cctp.js';
 
 /** `minFinalityThreshold`: 1000 hızlı (Fast Transfer, ücretli), 2000 standart (kaynak zincirin kesinliği). */
 export const CCTP_FINALITY = Object.freeze({ fast: 1000, standard: 2000 });
+/** Kesinlik adı: `fast` ya da `standard`. */
 export type CctpFinality = keyof typeof CCTP_FINALITY;
 
 /** `TokenMessengerV2.depositForBurn` (CCTP V2, EVM). */
@@ -62,7 +63,9 @@ export const CCTP_ERC20_ABI = [
   },
 ] as const;
 
+/** EVM adresi (0x'li, 20 bayt). */
 export type EvmAddress = `0x${string}`;
+/** 32 baytlık değer, 0x'li hex. */
 export type Bytes32Hex = `0x${string}`;
 
 const EVM_ADDRESS = /^0x[0-9a-fA-F]{40}$/;
@@ -96,14 +99,19 @@ export function cctpMaxFee(amount: bigint, feeBps: number): bigint {
 
 /** Servisin ücret tablosu (`/v2/burn/USDC/fees/{kaynak}/{hedef}`): kesinlik eşiği başına baz puan. */
 export interface CctpFeeQuote {
+  /** Kesinlik eşiği (1000, 2000). */
   readonly finalityThreshold: number;
+  /** En düşük ücret, baz puan. */
   readonly minimumFee: number;
 }
 
+/** Circle'ın attestation servisine istek seçenekleri. */
 export interface CctpServiceOptions {
   /** Circle'ın attestation servisi, ör. `https://iris-api-sandbox.circle.com` (sonda `/` olmadan). */
   readonly api: string;
+  /** Burn'ün yapıldığı zincirin Circle domain'i. */
   readonly sourceDomain: number;
+  /** İstekleri gönderen fetch; verilmezse global `fetch`. */
   readonly fetch?: typeof fetch;
 }
 
@@ -132,12 +140,17 @@ export async function fetchCctpFees(options: CctpServiceOptions): Promise<CctpFe
 
 /** viem / wagmi `writeContract` biçiminde çağrı tarifi. */
 export interface EvmCall<Abi, Name extends string, Args extends readonly unknown[]> {
+  /** Çağrılan sözleşme. */
   readonly address: EvmAddress;
+  /** Sözleşmenin ABI'si. */
   readonly abi: Abi;
+  /** Fonksiyon adı. */
   readonly functionName: Name;
+  /** Argümanlar, ABI sırasıyla. */
   readonly args: Args;
 }
 
+/** `depositForBurn` çağrı tarifi ve seçilen `maxFee`. */
 export type CctpBurnCall = EvmCall<
   typeof CCTP_TOKEN_MESSENGER_ABI,
   'depositForBurn',
@@ -198,12 +211,15 @@ export const cctpApproveCall = (params: {
 
 /** Servisin imzaladığı mesaj. `message` attestation'lı kopyadır (nonce ve alınan ücret dolu). */
 export interface CctpAttestedMessage {
+  /** `MessageV2` baytları (attestation'lı kopya). */
   readonly message: Uint8Array;
+  /** Attester imzaları. */
   readonly attestation: Uint8Array;
   /** Circle'ın atadığı nonce (0x'li hex). */
   readonly eventNonce: string;
 }
 
+/** Attestation servisine bir bakışın sonucu. */
 export type CctpAttestationLookup =
   /** Servis bu hash'i henüz görmedi (ya da hiç görmeyecek: yanlış domain, yanlış hash). */
   | { readonly state: 'notFound' }

@@ -1,0 +1,61 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "name": "Square",
+  "entryPointStrategy": "packages",
+  "entryPoints": [
+    "packages/sdk",
+    "packages/types",
+    "packages/identity",
+    "packages/policy",
+    "packages/a2a",
+    "packages/agent-sdk",
+    "packages/mcp",
+    "packages/cctp"
+  ],
+  "packageOptions": {
+    "entryPoints": ["src/index.ts"],
+    "validation": {
+      "notExported": false
+    }
+  },
+  "readme": "docs/README.md",
+  "projectDocuments": [
+    "docs/protocol.md",
+    "docs/runbooks/*.md",
+    "docs/deploy/*.md",
+    "docs/design/*.md",
+    "docs/did-aip/*.md",
+    "docs/decisions/*.md",
+    "docs/slo.md",
+    "docs/ci.md",
+    "docs/licensing.md"
+  ],
+  "out": "dist/docs",
+  "includeVersion": false,
+  "excludePrivate": true,
+  "logLevel": "Warn",
+  "highlightLanguages": [
+    "bash",
+    "console",
+    "css",
+    "html",
+    "javascript",
+    "json",
+    "jsonc",
+    "json5",
+    "rust",
+    "toml",
+    "tsx",
+    "typescript",
+    "yaml",
+    "sql",
+    "mermaid",
+    "diff"
+  ],
+  "ignoredHighlightLanguages": ["abnf"],
+  "validation": {
+    "notExported": false,
+    "invalidLink": true,
+    "notDocumented": false
+  }
+}
