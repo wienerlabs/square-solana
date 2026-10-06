@@ -231,6 +231,7 @@ export async function createHostedAgent(config: HostedConfig, deps: HostedDeps):
         price: BigInt(capability.price),
       })),
       handler: (request: JobRequest) => runtime(request.capability.id).run(request),
+      admit: ({ capability }) => runtime(capability.id).room(),
       signer: deps.agentSigner,
       connection: deps.connection,
       programIds,

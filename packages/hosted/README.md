@@ -199,7 +199,7 @@ capability'nin kendi çalıştırma bağlamı vardır.
 | MCP bağlantıları | Capability başına ayrı `McpClientPool`; havuzda yalnızca allowlist'teki sunucular |
 | Zaman | `timeoutMs`: bütün çalıştırma (Claude + tool'lar); `AbortSignal` tool çağrılarına iner. Kuyrukta bekleme sayılmaz |
 | İstek ve token | `maxTurns`, yanıt başına `maxTokens`, bütün isteklerin toplamı `maxTotalTokens` |
-| Eşzamanlılık | `maxConcurrency` çalıştırma; fazlası `maxQueue`'ya kadar bekler, kuyruk doluysa iş hemen düşer |
+| Eşzamanlılık | `maxConcurrency` çalıştırma; fazlası `maxQueue`'ya kadar bekler. Sınır `accept_job`'dan önce denetlenir (agent-sdk `admit`): yer yoksa görev reddedilir, kabul edilmiş bir iş yer bekler ve düşmez |
 | İptal | Kuyrukta iptal edilen iş slot almadan çıkar; kapatma kuyruğu reddeder |
 | Hata | Çalıştırmanın istisnası yalnızca kendi görevini `FAILED` yapar; diğer capability'ler, A2A sunucusu ve duty'ler sürer |
 | Gözlem | `stats()`: capability başına `active`, `queued`, `completed`, `failed`, `rejected`, `deniedToolCalls` |

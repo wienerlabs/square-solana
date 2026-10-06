@@ -89,7 +89,7 @@ describe('CapabilityRuntime', () => {
     expect(item.stats()).toMatchObject({ failed: 1, active: 0 });
   });
 
-  it('eşzamanlılık sınırı ve kuyruk: fazlası bekler, kuyruk doluysa hemen düşer', async () => {
+  it('eşzamanlılık sınırı ve kuyruk: fazlası bekler, kuyruk doluysa yeni iş kabulden önce reddedilir', async () => {
     const gate = deferred();
     let concurrent = 0;
     let peak = 0;
@@ -110,11 +110,20 @@ describe('CapabilityRuntime', () => {
     ];
     await new Promise((resolve) => setTimeout(resolve, 20));
     expect(item.stats()).toMatchObject({ active: 2, queued: 1 });
-    await expect(item.run(request({ input: '4' }))).rejects.toBeInstanceOf(CapabilityBusyError);
+    expect(item.room()).toMatch(/eşzamanlılık sınırı \(2\) ve kuyruk \(1\) dolu/);
+    const admitted = item.run(request({ input: '4' }));
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(item.stats()).toMatchObject({ active: 2, queued: 2 });
     gate.resolve();
-    expect((await Promise.all(runs)).map((r) => r.content)).toEqual(['tamam', 'tamam', 'tamam']);
+    expect((await Promise.all([...runs, admitted])).map((r) => r.content)).toEqual([
+      'tamam',
+      'tamam',
+      'tamam',
+      'tamam',
+    ]);
     expect(peak).toBe(2);
-    expect(item.stats()).toMatchObject({ active: 0, queued: 0, completed: 3, rejected: 1 });
+    expect(item.room()).toBeNull();
+    expect(item.stats()).toMatchObject({ active: 0, queued: 0, completed: 4, rejected: 1 });
   });
 
   it('kuyrukta iptal edilen iş slot almadan düşer; kapatma kuyruğu reddeder', async () => {
