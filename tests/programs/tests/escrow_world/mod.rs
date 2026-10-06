@@ -35,10 +35,13 @@ pub const POLICY_ID: [u8; 32] = [7; 32];
 const LAMPORTS: u64 = 1_000_000_000;
 
 mod claims;
+mod disputes;
 mod parties;
 // Alacak yardımcılarını kullanmayan test binary'leri de bu modülü içerir.
 #[allow(unused_imports)]
 pub use claims::*;
+#[allow(unused_imports)]
+pub use disputes::*;
 
 pub fn params() -> EscrowParams {
     EscrowParams {
@@ -172,6 +175,8 @@ pub struct World {
     pub screener: Keypair,
     pub mint_authority: Keypair,
     pub usdc: Pubkey,
+    /// Escrow config'inin arbitrator'ları (config kurulmadan önce boş).
+    pub panel: Panel,
 }
 
 impl World {
@@ -224,6 +229,7 @@ impl World {
             screener,
             mint_authority,
             usdc,
+            panel: Panel::new(0, 0),
         }
     }
 
@@ -233,20 +239,22 @@ impl World {
     }
 
     /// Escrow config'ini kurar (3 arbitrator, M = 2, [`params`]).
-    pub fn configured(mut w: Self) -> Self {
+    pub fn configured(w: Self) -> Self {
+        Self::configured_with(w, Panel::new(3, 2))
+    }
+
+    /// Escrow config'ini `panel` ile kurar ([`params`]).
+    pub fn configured_with(mut w: Self, panel: Panel) -> Self {
         let ix = w.init_config_ix(
             &w.admin.pubkey(),
             w.usdc,
-            vec![
-                Pubkey::new_unique(),
-                Pubkey::new_unique(),
-                Pubkey::new_unique(),
-            ],
-            2,
+            panel.keys(),
+            panel.threshold,
             params(),
         );
         let admin = w.admin.insecure_clone();
         w.h.send(&[ix], &[&admin]).expect("init_config");
+        w.panel = panel;
         w
     }
 

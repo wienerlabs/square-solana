@@ -102,9 +102,11 @@ pub enum EscrowError {
     InvalidKeeperFee,
     #[msg("Account owner does not match the linked program in the config")]
     LinkedProgramMismatch,
-    // ---- drafts (M5) ----
+    // ---- M5: proof timeout, Travel Rule, dispute timeout ----
     #[msg("Proof timeout has not passed yet")]
     ProofTimeoutNotReached,
     #[msg("Travel Rule commitment required above the threshold")]
     TravelRuleCommitmentRequired,
+    #[msg("Dispute timeout must be positive and proof timeout must not be negative")]
+    InvalidDisputeTimeout,
 }

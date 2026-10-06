@@ -103,23 +103,25 @@ pub enum JobStatus {
     AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq, Debug, Default, InitSpace,
 )]
 pub struct DisputeInfo {
-    /// Institution (`raise_dispute`) or agent wallet (`escalate_missing_proof`, DRAFT).
+    /// Institution (`raise_dispute`) or agent wallet (`escalate_missing_proof`).
     pub challenger: Pubkey,
     /// 0 for an escalation without bond.
     pub bond: u64,
     pub reason_hash: [u8; 32],
     pub raised_at: i64,
-    /// DRAFT (M5): `raised_at + dispute_timeout_secs`; `lapse_dispute` allowed after it.
+    /// `raised_at + dispute_timeout_secs`; votes before it, `lapse_dispute` at or after it.
     pub deadline: i64,
     /// When the threshold was reached.
     pub decided_at: i64,
     /// When `execute_resolution` or `lapse_dispute` closed the dispute.
     pub closed_at: i64,
+    /// Set by `lapse_dispute`; the institution cannot raise a second dispute, the agent may escalate
+    /// again after `proof_timeout_secs`.
     pub lapsed: bool,
     /// Bit i = `config.arbitrators[i]` voted for `resolution`.
     pub approval_mask: u8,
     pub approval_count: u8,
-    /// `config.arbitrator_set_version` when the dispute was raised.
+    /// `config.arbitrator_set_version` the tally is counted against; a newer set restarts the tally.
     pub arbitrator_set_version: u32,
     pub resolution: DisputeResolution,
 }
@@ -218,9 +220,9 @@ pub struct EscrowParams {
     pub min_bond_absolute: u64,
     /// Share of the escrowed amount paid to the `finalize_payment` caller (BC-23).
     pub keeper_fee_bps: u16,
-    /// DRAFT (M5, BC-24): `escalate_missing_proof` allowed after `challenge_end + proof_timeout_secs`.
+    /// `escalate_missing_proof` allowed after `challenge_end + proof_timeout_secs` (>= 0).
     pub proof_timeout_secs: i64,
-    /// DRAFT (M5, BC-33): `dispute.deadline = raised_at + dispute_timeout_secs`.
+    /// `dispute.deadline = raised_at + dispute_timeout_secs` (> 0).
     pub dispute_timeout_secs: i64,
     /// Jobs at or above this amount need a Travel Rule commitment before `fund_job`; 0 = disabled.
     pub travel_rule_threshold: u64,
