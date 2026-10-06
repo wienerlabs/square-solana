@@ -9,6 +9,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./squads": {
+      "types": "./dist/squads.d.ts",
+      "import": "./dist/squads.js"
     }
   },
   "files": [
@@ -28,6 +32,7 @@
     "@noble/hashes": "^1.8.0",
     "@solana/spl-token": "^0.4.15",
     "@solana/web3.js": "^1.99.0",
+    "@sqds/multisig": "2.1.4",
     "@squaresdk/solana-types": "workspace:*",
     "bn.js": "^5.2.5"
   },

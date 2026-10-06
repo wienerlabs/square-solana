@@ -134,3 +134,16 @@ değildir.
   `handle_receive_unfinalized_message`'a gider; hesapları aynıdır, mint + fonlama 204 372 CU, 1 094 bayt
   ([deploy kaydı](../deploy/devnet.md#cctp-relayer-be-26)). Kurumun USDC hesabı yoksa aynı tx'te açılır
   (`createAssociatedTokenAccountIdempotent`).
+
+## 8. Sponsorlu tx ve Squads vault'u
+
+- **Fee payer** (`apps/fee-payer`, [ADR 0019](../decisions/0019-fee-payer-politikasi.md)): sponsorlu tx'in
+  compute unit fiyatı ve sınırı servisin tavanlarıyla sınırlıdır. Sınır verilmeyen tx'te talimat başına
+  200 bin sayılır; profilin sınırını taşıyan `flow.*` tx'leri bu yüzden tavana takılmaz. ALT'lı tx'lerin
+  hesapları servis tarafında zincirden çözülür.
+- **Squads vault'u** (`@squaresdk/solana-sdk/squads`, `wrapInVault`): bir adım iki tx'tir. Öneri tx'i
+  (`vault_transaction_create` + `proposal_create` + `proposal_approve`) iç mesajı argüman olarak taşır.
+  Yürütme tx'i (`vault_transaction_execute`) iç mesajın hesaplarını kalan hesap olarak taşır; iç talimatın
+  profil sınırına Squads'ın yükü eklenir. Squads programı ölçüm ortamında olmadığından bu yük profilde yoktur:
+  yürütme tx'inin sınırı simülasyonla seçilmelidir. En büyük iç mesaj (`set_compliance_proof`) ALT'sız öneri
+  tx'ine sığar (apps/fee-payer `test/eight-steps.test.ts`).
