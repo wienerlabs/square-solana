@@ -246,8 +246,22 @@ SQUARE_LOCALNET=1 SQUARE_PROGRAMS_DIR=<repo>/target/deploy SQUARE_LOCALNET_RPC_P
   SQUARE_LOCALNET_ARGS="--faucet-port 9900" pnpm --filter @squaresdk/solana-api exec vitest run test/localnet.e2e.test.ts
 ```
 
-Agave 4.1.2 ve `anchor build` çıktısı gerekir; senaryo yaklaşık iki dakika sürer. Devnet'te deneme yapılmadı
-(devnet dağıtımı BC-30).
+Agave 4.1.2 ve `anchor build` çıktısı gerekir; senaryo yaklaşık iki dakika sürer.
+
+**Devnet uçtan uca (BE-22):** `test/devnet.e2e.test.ts` yalnızca ortamla çalışır; anahtarlar repoda tutulmaz.
+- **Ne kullanır:** Devnet'teki programlar ve escrow config'i. Indexer gerçek süreç olarak devnet'i indexler.
+- **Senaryo:** kanıt → `raise_dispute` → kuyruk → iki arbitrator'ın API'den aldığı oy tx'leri → üçüncü oyun reddi →
+  `execute_resolution`.
+- **Lapse:** Devnet'te dispute son tarihi 7 gündür; lapse senaryosu localnet testindedir.
+
+```bash
+pnpm turbo build --filter @squaresdk/solana-api... --filter @squaresdk/solana-indexer
+DISPUTE_E2E_INSTITUTION=<kurum keypair'i> DISPUTE_E2E_AGENT=<agent cüzdanı keypair'i> \
+DISPUTE_E2E_AGENT_RECORD=<agent kaydı> DISPUTE_E2E_ARBITRATORS=<üç arbitrator keypair'i, virgülle> \
+  pnpm --filter @squaresdk/solana-api exec vitest run test/devnet.e2e.test.ts
+```
+
+Koşu kaydı: [deploy kaydı](../../docs/deploy/devnet.md#uyuşmazlık-be-22).
 
 ## Kaynak
 

@@ -678,6 +678,7 @@ paths:
         - name: id
           in: path
           required: true
+          description: Kanıtın kimliği (`listDisputeEvidence`'taki `id`).
           schema: { type: string, minLength: 1 }
       responses:
         '200':
@@ -824,6 +825,7 @@ paths:
         - name: id
           in: path
           required: true
+          description: Aboneliğin kimliği (`listArbitrationWebhooks`'taki `id`).
           schema: { type: string, minLength: 1 }
       responses:
         '204':
@@ -1323,14 +1325,17 @@ webhooks:
         - name: webhook-id
           in: header
           required: true
+          description: Teslimat kimliği; yeniden denemelerde aynı kalır.
           schema: { type: string }
         - name: webhook-timestamp
           in: header
           required: true
+          description: İmzanın anı, Unix saniyesi.
           schema: { type: string, pattern: '^[0-9]+$' }
         - name: webhook-signature
           in: header
           required: true
+          description: 'İmza: `v1,<base64>` = HMAC-SHA256(sır, `id.zaman.gövde`).'
           schema: { type: string }
       requestBody:
         required: true

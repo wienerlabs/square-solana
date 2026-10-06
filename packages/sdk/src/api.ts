@@ -121,16 +121,21 @@ export interface SquareApi {
   listDisputes(query?: PageParams & { jobStatus?: JobStatus }): Promise<ApiEnvelope<DisputeView[]>>;
   /** `GET /v1/disputes/{job}`: job'un dispute'u. */
   getDispute(job: Address): Promise<ApiEnvelope<DisputeView>>;
-  /** Dispute kanıtı; dönen `reasonHash` kurumun `raise_dispute` argümanıdır. */
+  /** `POST /v1/jobs/{job}/dispute/evidence`: dispute kanıtı; dönen `reasonHash` kurumun `raise_dispute` argümanıdır. */
   uploadDisputeEvidence(job: Address, file: Blob): Promise<ApiEnvelope<DisputeEvidence>>;
+  /** `GET /v1/disputes/{job}/evidence`: job'un kanıtları; okuyan yalnızca taraflardır (kurum, agent, arbitrator). */
   listDisputeEvidence(job: Address): Promise<ApiEnvelope<DisputeEvidence[]>>;
-  /** Kanıtın baytları (zarfsız); içerik tipi `Blob.type`'tadır. */
+  /** `GET /v1/disputes/{job}/evidence/{id}`: kanıtın baytları (zarfsız); içerik tipi `Blob.type`'tadır. */
   getDisputeEvidenceContent(job: Address, id: string): Promise<Blob>;
-  /** Arbitrator oyu için imzasız `resolve_dispute` tx'i (ön denetimli). */
+  /** `POST /v1/disputes/{job}/votes`: arbitrator oyu için imzasız `resolve_dispute` tx'i (ön denetimli). */
   prepareDisputeVote(job: Address, body: DisputeVoteRequest): Promise<ApiEnvelope<UnsignedTx>>;
+  /** `GET /v1/arbitration/queue`: aktif arbitrator'ın açık dispute'ları, son tarihi en yakın önce. */
   getArbitrationQueue(query?: PageParams): Promise<ApiEnvelope<ArbitrationQueueItem[]>>;
+  /** `GET /v1/arbitration/webhooks`: arbitrator'ın bildirim abonelikleri. */
   listArbitrationWebhooks(): Promise<ApiEnvelope<ArbitrationWebhook[]>>;
+  /** `POST /v1/arbitration/webhooks`: bildirim aboneliği; imza sırrı (`whsec_…`) yalnızca bu yanıtta döner. */
   createArbitrationWebhook(body: ArbitrationWebhookCreate): Promise<ApiEnvelope<ArbitrationWebhookCreated>>;
+  /** `DELETE /v1/arbitration/webhooks/{id}`: aboneliği ve bekleyen teslimatlarını siler. */
   deleteArbitrationWebhook(id: string): Promise<void>;
   /** `GET /v1/screening/{wallet}`: cüzdanın screening kaydı. */
   getScreening(wallet: Address): Promise<ApiEnvelope<ScreeningView>>;

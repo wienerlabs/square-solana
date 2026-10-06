@@ -218,6 +218,29 @@ Uçtan uca koşu, 2026-10-06 (`apps/fee-payer/test/squads-devnet.e2e.test.ts`).
 
 CU ve boyut ölçümleri: [tx-budget.md §8](../design/tx-budget.md#8-sponsorlu-tx-ve-squads-vaultu).
 
+## Uyuşmazlık (BE-22)
+
+Uçtan uca koşu, 2026-10-06 (`apps/api/test/devnet.e2e.test.ts`).
+- **Taraflar:** Kurum ve agent BC-36'nınkiler (`7xNWRmEb…`, kayıt `52gxSYGG…`). Arbitrator'lar escrow config'indeki
+  üç üye cüzdanıdır, eşik 2.
+- **Indexer:** Gerçek süreç olarak devnet'i indexledi (testin Postgres'i). API kanıtı, kuyruğu ve oy tx'lerini bu
+  aynadan sundu.
+- **İş ve bond:** İş 1 USDC; bond config'in en azı, 1 USDC.
+
+| Adım | Tx |
+|---|---|
+| `create_job` | `5J2A3o4DwwSeAHr98M4JJPjYMp5hsy3hqmiy8bha62f4QtwYQemiLXYLQyuS7WZG486tCvFFJzkBSm5vQqWTiFo4` |
+| `fund_job` | `2bSTXGBGXDYbBvFvmJvutSrNDdNf1s35rq27nL3Spm9y9rMLBSfERTz17gw5kaNEvYt24Jkw1fM1PSFVePQ3268S` |
+| `accept_job` | `QJY9p1uu9VDZDiqsFt1Rx7AKFzwqzdLbVRjD1PoNC74dwhkJ3c9Rp3kZv9YMedvU6L57uBwz6Ng3D7ioHSEHPEK` |
+| `submit_work` | `LoKZZ3dcY4LtMtTAFJQCpqPeyj38JG8uaZLe9V3D7DtB6RdZfT8Vantu6f2NHZUXdREXKqmHijeRydmzArrofv8` |
+| Kanıt (`POST /v1/jobs/{job}/dispute/evidence`) → `raise_dispute` (reasonHash = kanıtın SHA-256'sı) | `3Y4tcWkLiakoHawqfP41hzand3bDoFTvSMMeFjTckYkTXj8fqP9hFVfopG2kKdxFtwnViKd98AYaMgZrFBSdJfWP` |
+| Oy 1 (`DPF8Myr3…`, API'nin hazırladığı `resolve_dispute`) | `1WyxdLTvZZxi6cxREccwQdoySPuRNiPVJ3VW6YwDgSF6NgRiQSm7rwhDoY4jEud37jqssn6iJxvxus1E9fMvDY` |
+| Oy 2 (`EZggdp7B…`); karar `FavorAgent`. Üçüncü oy API'de 409 | `5cD3kPHB4x2gj3ntFp4W4RgD8XuSvdJ6j3x25eA7McuC11MYNEs3mLhNFovUATrfHJ3tH5KxZguFfr1742o9saMA` |
+| `execute_resolution`: 1 USDC iş + 1 USDC bond agent'a | `4gsD7uozs5TPaYtCG53rwB62X6D4DEh9ceZfEt9rmr13gzWDTquCfeFpy1MxhEbM36vTnNxxyHxv3W8GQVDss34Z` |
+
+Lapse (dispute son tarihi devnet'te 7 gün) localnet testinde gerçek keeper süreciyle gösterilir
+(`apps/api/test/localnet.e2e.test.ts`).
+
 ## Yükseltmeler
 
 ### Escrow v0.6.0: dispute (BC-32, BC-33), 2026-10-06
