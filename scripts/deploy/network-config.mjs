@@ -25,6 +25,9 @@ const integer = (value, path, min, max) => {
   if (parsed < min || parsed > max) fail(path, `${min} … ${max} aralığında olmalı`);
   return parsed;
 };
+const evmAddress = (value, path) =>
+  /^0x[0-9a-fA-F]{40}$/.test(value ?? '') ? value : fail(path, '0x ile 20 baytlık EVM adresi bekleniyor');
+const https = (value, path) => (/^https:\/\//.test(value ?? '') ? value : fail(path, 'https adresi bekleniyor'));
 const small = (value, path, min, max) =>
   Number.isInteger(value) && value >= min && value <= max ? value : fail(path, `${min} … ${max} arası tamsayı`);
 
@@ -63,6 +66,8 @@ export function validateNetwork(config) {
     cluster,
     rpc: config.rpc,
     squads: { multisig: address(config.squads?.multisig, 'squads.multisig') },
+    // Square ALT'ı (`create-lookup-table.mjs`); kurulmadıysa yok.
+    lookupTable: config.lookupTable === undefined ? null : address(config.lookupTable, 'lookupTable'),
     registry: {
       screenerAuthority: address(config.registry?.screenerAuthority, 'registry.screenerAuthority'),
       screeningTtlSecs: small(
@@ -88,6 +93,37 @@ export function validateNetwork(config) {
         travelRuleThreshold: integer(params.travelRuleThreshold, 'escrow.params.travelRuleThreshold', 0n, U64_MAX),
       },
     },
+    cctp: validateCctp(config.cctp),
+  };
+}
+
+/**
+ * CCTP V2 (BC-36): Circle'ın Solana programları, attestation servisi ve kaynak EVM zincirleri. Bölüm
+ * yoksa null; CCTP fonlaması o ağda kurulmamıştır.
+ */
+function validateCctp(cctp) {
+  if (cctp === undefined) return null;
+  const sources = Object.entries(cctp.sources ?? {});
+  if (sources.length === 0) fail('cctp.sources', 'en az bir kaynak zincir gerekli');
+  return {
+    attestationApi: https(cctp.attestationApi, 'cctp.attestationApi'),
+    messageTransmitter: address(cctp.messageTransmitter, 'cctp.messageTransmitter'),
+    tokenMessengerMinter: address(cctp.tokenMessengerMinter, 'cctp.tokenMessengerMinter'),
+    sources: Object.fromEntries(
+      sources.map(([name, source]) => [
+        name,
+        {
+          domain: small(source.domain, `cctp.sources.${name}.domain`, 0, 2 ** 32 - 1),
+          chainId: small(source.chainId, `cctp.sources.${name}.chainId`, 1, Number.MAX_SAFE_INTEGER),
+          rpc: https(source.rpc, `cctp.sources.${name}.rpc`),
+          tokenMessenger: evmAddress(source.tokenMessenger, `cctp.sources.${name}.tokenMessenger`),
+          usdc: evmAddress(source.usdc, `cctp.sources.${name}.usdc`),
+          // `create-lookup-table.mjs --cctp <kaynak>` kurar; kurulmadıysa yok.
+          lookupTable:
+            source.lookupTable === undefined ? null : address(source.lookupTable, `cctp.sources.${name}.lookupTable`),
+        },
+      ]),
+    ),
   };
 }
 

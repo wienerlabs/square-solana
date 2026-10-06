@@ -27,6 +27,13 @@ export class TestChain {
     );
   }
 
+  /** Kayıtlı tablo (tx'in adres anahtarlarını çözmek için). */
+  lookupTable(key: PublicKey): AddressLookupTableAccount {
+    const table = this.tables.get(key.toBase58());
+    if (!table) throw new Error(`tablo yok: ${key.toBase58()}`);
+    return table;
+  }
+
   connection(): Connection {
     const { accounts, tables, blockhash, lastValidBlockHeight } = this;
     return {
