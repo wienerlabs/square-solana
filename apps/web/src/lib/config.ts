@@ -33,7 +33,7 @@ export interface WebConfig {
   programIds: Partial<Record<ProgramName, string>>;
   /** İsteğe bağlı: release ispatını üreten prover servisinin kök adresi (`apps/prover`, FE-09). */
   proverUrl?: string;
-  /** İsteğe bağlı: Square API'nin kök adresi (`apps/api`, BE-18); indexer'dan okunan veriler ve keeper günlüğü. */
+  /** İsteğe bağlı: Square API'nin kök adresi (`apps/api`, BE-18); keeper günlüğü (FE-10), dispute kanıtı ve arbitrator konsolu (FE-17). */
   apiUrl?: string;
 }
 
