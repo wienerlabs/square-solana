@@ -279,7 +279,7 @@ kararı: [ADR 0023](../../docs/decisions/0023-x402-ucretli-uc-nokta-tanimlari.md
 - **Eşik 1'den büyükse:** Adım öneriden sonra durur ve sayfa öneriyi söyler ("Proposed as smart account transaction
   #N"). Diğer üyeler hesap sayfasından onaylar, yürütme yetkili bir üye yürütür.
 - **API:** Rol adına giden istekler `X-Square-Smart-Account: <multisig>` başlığını taşır
-  ([apps/api](../api/README.md#kimlik), API sözleşmesi v0.23.0). Kapsananlar: teslimat yükleme, kart barındırma,
+  ([apps/api](../api/README.md#kimlik), API sözleşmesi v0.24.0). Kapsananlar: teslimat yükleme, kart barındırma,
   Travel Rule ve dispute kanıtı. API cüzdanın multisig'te `Initiate` yetkili üye olduğunu zincirden okur.
 - **Sayfalar:** Politika, agent kaydı, iş açma ve fonlama, iş detayı (kabul, teslim, ispat, alacak, uyuşmazlık) ve
   paneller rolün adresiyle çalışır. Sayfanın üstündeki not hangi adres adına gidildiğini ve ücretin kimde olduğunu
