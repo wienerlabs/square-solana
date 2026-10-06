@@ -21,7 +21,12 @@ export interface SponsoredEntry {
 }
 
 export type Reservation =
-  | { readonly ok: true; readonly userSpent: bigint; readonly userLimit: bigint }
+  | {
+      readonly ok: true;
+      readonly userSpent: bigint;
+      readonly userLimit: bigint;
+      readonly replayed: 'signed' | 'submitted' | null;
+    }
   | {
       readonly ok: false;
       readonly scope: 'user' | 'global';
@@ -79,6 +84,19 @@ export function createLedger(deps: {
       return db.$transaction(async (tx) => {
         await tx.$executeRaw`SELECT pg_advisory_xact_lock(${LOCK_KEY})`;
         const since = dayStart(clock());
+        const existing = await tx.sponsoredTx.findUnique({
+          where: { signature: entry.signature },
+          select: { wallet: true, status: true },
+        });
+        if (existing && existing.status !== 'failed') {
+          const owner = await spent(tx, since, existing.wallet);
+          return {
+            ok: true,
+            userSpent: owner.lamports,
+            userLimit: deps.userDailyLamports,
+            replayed: existing.status,
+          } as const;
+        }
         const user = await spent(tx, since, entry.wallet);
         if (user.lamports + cost > deps.userDailyLamports) {
           return { ok: false, scope: 'user', spent: user.lamports, limit: deps.userDailyLamports } as const;
@@ -87,22 +105,28 @@ export function createLedger(deps: {
         if (total.lamports + cost > deps.globalDailyLamports) {
           return { ok: false, scope: 'global', spent: total.lamports, limit: deps.globalDailyLamports } as const;
         }
-        await tx.sponsoredTx.create({
-          data: {
-            signature: entry.signature,
-            wallet: entry.wallet,
-            apiKeyId: entry.apiKeyId,
-            status: 'signed',
-            feeLamports: entry.feeLamports.toString(),
-            rentLamports: entry.rentLamports.toString(),
-            computeUnits: entry.computeUnits,
-            computeUnitLimit: entry.computeUnitLimit,
-            computeUnitPrice: entry.computeUnitPrice.toString(),
-            instructions: [...entry.instructions],
-            createdAt: new Date(clock()),
-          },
-        });
-        return { ok: true, userSpent: user.lamports + cost, userLimit: deps.userDailyLamports } as const;
+        const row = {
+          wallet: entry.wallet,
+          apiKeyId: entry.apiKeyId,
+          status: 'signed' as const,
+          error: null,
+          feeLamports: entry.feeLamports.toString(),
+          rentLamports: entry.rentLamports.toString(),
+          computeUnits: entry.computeUnits,
+          computeUnitLimit: entry.computeUnitLimit,
+          computeUnitPrice: entry.computeUnitPrice.toString(),
+          instructions: [...entry.instructions],
+          createdAt: new Date(clock()),
+        };
+        await (existing
+          ? tx.sponsoredTx.update({ where: { signature: entry.signature }, data: row })
+          : tx.sponsoredTx.create({ data: { signature: entry.signature, ...row } }));
+        return {
+          ok: true,
+          userSpent: user.lamports + cost,
+          userLimit: deps.userDailyLamports,
+          replayed: null,
+        } as const;
       });
     },
 

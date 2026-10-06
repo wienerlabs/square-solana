@@ -1,11 +1,12 @@
 // `POST /v1/sponsor` ve yan uçlar: kimlik, imza ve gönderim, maliyet ölçümü, kalıcı bütçe ve hız sınırı,
 // metrikler, health ve alarmlar. Servis gerçek Postgres ve fixture RPC ile.
 import { ed25519 } from '@noble/curves/ed25519.js';
+import { createAssociatedTokenAccountIdempotentInstruction } from '@solana/spl-token';
 import { ComputeBudgetProgram, Keypair, VersionedTransaction } from '@solana/web3.js';
 import bs58 from 'bs58';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { PROGRAM_IDS, SPONSOR_BALANCE, startStack, truncate, type Stack } from './fixtures/stack.js';
-import { encode, signed, squareIx, v0 } from './fixtures/tx.js';
+import { encode, key, signed, squareIx, v0 } from './fixtures/tx.js';
 
 let stack: Stack;
 const user = Keypair.generate();
@@ -151,6 +152,37 @@ describe('imza ve gönderim', () => {
     const row = await stack.db.sponsoredTx.findFirstOrThrow();
     expect(row.status).toBe('submitted');
     expect((await metric('square_fee_payer_requests_total')).join('\n')).toMatch(/outcome="submitted"[^\n]* 1/);
+  });
+
+  it('sponsorun açtığı ATA’nın rent’i simülasyon göstermese de bütçeye sayılır', async () => {
+    const token = await stack.session(user.publicKey);
+    const ataRent = (165 + 128) * 3480 * 2;
+    const tx = v0(stack.sponsor.publicKey, [
+      createAssociatedTokenAccountIdempotentInstruction(stack.sponsor.publicKey, key(), user.publicKey, key()),
+      squareIx('registry', 'register_agent', { payer: stack.sponsor.publicKey, owner: user.publicKey }),
+    ]);
+    const response = await sponsor(token, { transaction: encode(tx) });
+    expect(response.status).toBe(200);
+    expect(response.body.data).toMatchObject({ rentLamports: String(ataRent) });
+    const row = await stack.db.sponsoredTx.findFirstOrThrow();
+    expect(row.rentLamports.toFixed()).toBe(String(ataRent));
+    stack.rpc.simulations.push({ err: null, logs: [], unitsConsumed: 1_000, rent: ataRent + 1_000 });
+    const larger = await sponsor(token, { transaction: encode(registerAgent(Keypair.generate().publicKey)) });
+    expect(larger.body.data).toMatchObject({ rentLamports: String(ataRent + 1_000) });
+  });
+
+  it('aynı tx ikinci kez gelince ilk kayıt döner: ikinci ücret yok, ikinci gönderim yok', async () => {
+    const token = await stack.session(user.publicKey);
+    const tx = encode(signed(registerAgent(), user));
+    const first = await sponsor(token, { transaction: tx, submit: true });
+    expect(first.status).toBe(200);
+    const again = await sponsor(token, { transaction: tx, submit: true });
+    expect(again.status).toBe(200);
+    expect(again.body.data).toMatchObject({ signature: first.body.data!['signature'], submitted: true });
+    expect(stack.rpc.sent).toHaveLength(1);
+    expect(await stack.db.sponsoredTx.count()).toBe(1);
+    const usage = await stack.request<Record<string, unknown>>('GET', '/v1/sponsor/usage', { headers: bearer(token) });
+    expect(usage.body.data).toMatchObject({ transactions: 1 });
   });
 
   it('gönderim RPC’de reddedilirse 503, kayıt başarısız ve bütçeye sayılmaz', async () => {
