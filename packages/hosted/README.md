@@ -60,9 +60,9 @@ Claude istemcisi kimlik bilgisini yalnızca ortamdan okur (`ANTHROPIC_API_KEY`).
 
 ## Yapılandırma
 
-Tam örnek: [`examples/hosted.yaml`](examples/hosted.yaml) ve [`examples/policy.yaml`](examples/policy.yaml). Testler
-bu örneği yükler. Göreli yollar yapılandırma dosyasının dizinine göre çözülür. Dağıtıma bağlı hiçbir değerin
-varsayılanı yoktur.
+Şema [`src/config.ts`](src/config.ts)'tedir; politika belgesi `@squaresdk/solana-types`'ın `PolicyDocument`'ıdır.
+Göreli yollar yapılandırma dosyasının dizinine göre çözülür. Dağıtıma bağlı hiçbir değerin varsayılanı yoktur.
+`--check` dosyayı başlatmadan doğrular.
 
 | Bölüm | İçerik |
 |---|---|

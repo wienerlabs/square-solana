@@ -3,7 +3,6 @@
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { Keypair } from '@solana/web3.js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { stringify } from 'yaml';
@@ -56,19 +55,6 @@ const delegation = {
 };
 
 describe('geçerli yapılandırma', () => {
-  it("README'deki örnek yapılandırma ve politika geçerli", async () => {
-    const loaded = await loadHostedConfig(fileURLToPath(new URL('../examples/hosted.yaml', import.meta.url)));
-    expect(loaded.config.capabilities.map((c) => c.id)).toEqual(['research.brief', 'research.translate']);
-    expect(loaded.policy!.allowedCategories).toEqual(['research', 'translation']);
-    expect(requiredEnv(loaded.config)).toEqual([
-      'DATABASE_URL',
-      'PROVER_API_KEY',
-      'SEARCH_MCP_TOKEN',
-      'SQUARE_API_KEY',
-      'TRANSLATOR_A2A_KEY',
-    ]);
-  });
-
   it('YAML dosyası yüklenir; varsayılanlar dolar, yollar dosyanın dizinine göre mutlak olur', async () => {
     writeFileSync(join(dir, 'policy.yaml'), stringify(policyDocument(mint)));
     const config = rawConfig({
