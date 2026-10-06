@@ -41,8 +41,12 @@ Sunucu özel anahtar tutmaz.
 1. Yazma tool'u API'nin `POST /v1/tx` ucundan imzasız v0 tx'i alır (hesap çözümü, compute unit sınırı ve
    simülasyon sunucuda; düşecek tx `simulation_failed` + `programError` ile döner).
 2. Tool tx'i base64 olarak ve çözülmüş özetiyle döner: fee payer, zorunlu imzacılar ve imza durumları, talimatların
-   programları (`square_escrow`, `compute_budget`), `lastValidBlockHeight`. Özet, API'nin döndürdüğü tx'in istenen
-   fee payer'ı ve yapılandırılmış escrow programını içerdiğini de denetler.
+   programları (`square_escrow`, `compute_budget`), `lastValidBlockHeight`. API'nin döndürdüğü tx dönmeden önce
+   denetlenir: fee payer istenen cüzdandır; talimatlar yalnızca compute budget (`set_compute_unit_limit`,
+   `set_compute_unit_price`, her biri en fazla bir kez) ve yapılandırılmış escrow programının tek talimatıdır;
+   o talimatın verisi istenen çağrının yerelde kodlanmış hâliyle bayt bayt aynıdır; tool'un verdiği hesaplar
+   IDL'deki yerlerindedir; fiyat istendiyse tx'teki fiyat odur. Uymayan tx reddedilir (`prepared transaction
+   rejected`): ele geçirilmiş bir API ya da araya giren biri talimat ekleyemez, tutarı ya da hesabı değiştiremez.
 3. Kullanıcı tx'i kendi cüzdanında imzalar; imzalı tx `square_submit_signed_transaction`'a verilir.
 4. Gönderimden önce her zorunlu imzacının imzası mesaj baytlarına karşı Ed25519 ile doğrulanır. Eksik ya da
    geçersiz imzalı tx RPC'ye **hiç gönderilmez** (`not_fully_signed`, imzacı başına durumla).
@@ -50,7 +54,10 @@ Sunucu özel anahtar tutmaz.
 **Yerel imzalayıcı (isteğe bağlı, varsayılan kapalı).** `SQUARE_SIGNER_KEYPAIR` bir keypair dosyasını
 (solana-keygen biçimi) gösterirse yazma tool'larına `sign: true` verilebilir: tx bu anahtarla imzalanır ve aynı
 doğrulamadan geçip gönderilir; cüzdan girdisi verilmezse varsayılanı bu anahtarın adresidir. Başka bir imzacı da
-gerekiyorsa kısmen imzalı tx döner, gönderilmez.
+gerekiyorsa kısmen imzalı tx döner, gönderilmez. Fiyat (`computeUnitPrice`) verilmezse yerel imza, API'nin koyduğu
+fiyat compute unit başına 1 000 000 mikro-lamport'u (`LOCAL_SIGNING_MAX_COMPUTE_UNIT_PRICE`) aşıyorsa reddedilir;
+daha yüksek bir priority fee açıkça verilir. Para taşıyan yazma tool'ları `destructiveHint: true` ile işaretlidir:
+istemci onay isteyebilir.
 
 > **Uyarı:** yerel imzalayıcı, bağlı agent'ın (ve onu yönlendiren her girdinin, ör. prompt injection) o anahtarla
 > fon taşıyan tx imzalatabilmesi demektir. Yalnızca ayrı, sınırlı bakiyeli bir anahtarla ve güvendiğiniz bir agent

@@ -1,22 +1,27 @@
 // Test fixture: anahtarlar çalışma anında üretilir; API görünümleri sözleşmedeki şemalarla (packages/types)
 // doğrulanarak kurulur, böylece sahte API gerçek API'nin biçiminden sapamaz.
+import { Program, type Idl } from '@anchor-lang/core';
 import {
   ComputeBudgetProgram,
+  Connection,
   Keypair,
   PublicKey,
   TransactionInstruction,
   TransactionMessage,
   VersionedTransaction,
 } from '@solana/web3.js';
+import { SQUARE_IDLS } from '@squaresdk/solana-sdk';
 import {
   AgentViewSchema,
   DisputeViewSchema,
   JobViewSchema,
   type AgentView,
   type DisputeView,
+  type InstructionCall,
   type JobStatus,
   type JobView,
 } from '@squaresdk/solana-types';
+import { encodeCall } from '../../src/transactions.js';
 
 export const address = () => Keypair.generate().publicKey.toBase58();
 export const hex32 = (byte: number) => Buffer.alloc(32, byte).toString('hex');
@@ -191,3 +196,49 @@ export function unsignedTx(options: {
 }
 
 export const toBase64 = (tx: VersionedTransaction) => Buffer.from(tx.serialize()).toString('base64');
+
+export const escrowProgram = (programId: PublicKey = ESCROW_PROGRAM): Program<Idl> =>
+  new Program(
+    { ...(SQUARE_IDLS.escrow as unknown as Idl), address: programId.toBase58() },
+    {
+      connection: new Connection('http://127.0.0.1:9'),
+    },
+  );
+
+interface IdlAccountFlags {
+  name: string;
+  signer?: boolean;
+  writable?: boolean;
+}
+
+export function preparedTx(options: {
+  program: Program<Idl>;
+  call: InstructionCall;
+  accounts: Readonly<Record<string, string>>;
+  feePayer: PublicKey;
+  blockhash?: string;
+  extra?: TransactionInstruction[];
+}): VersionedTransaction {
+  const { program, call } = options;
+  const encoded = encodeCall(program, call);
+  const idl = (program.idl.instructions as unknown as { name: string; accounts: IdlAccountFlags[] }[]).find(
+    (candidate) => candidate.name === call.instruction,
+  )!;
+  const ix = new TransactionInstruction({
+    programId: program.programId,
+    keys: idl.accounts.map((account) => ({
+      pubkey: options.accounts[account.name]
+        ? new PublicKey(options.accounts[account.name]!)
+        : Keypair.generate().publicKey,
+      isSigner: account.signer ?? false,
+      isWritable: account.writable ?? false,
+    })),
+    data: encoded.data,
+  });
+  const message = new TransactionMessage({
+    payerKey: options.feePayer,
+    recentBlockhash: options.blockhash ?? BLOCKHASH,
+    instructions: [ComputeBudgetProgram.setComputeUnitLimit({ units: 100_000 }), ix, ...(options.extra ?? [])],
+  }).compileToV0Message();
+  return new VersionedTransaction(message);
+}

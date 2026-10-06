@@ -18,11 +18,13 @@ import {
   knownPrograms,
   submitSigned,
   summarize,
+  verifyPrepared,
+  LOCAL_SIGNING_MAX_COMPUTE_UNIT_PRICE,
   type LocalSigner,
 } from '../transactions.js';
 import { ToolInputError, guarded, type ToolContext } from './result.js';
 
-const WRITE = { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true } as const;
+const WRITE = { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true } as const;
 
 const common = {
   feePayer: Address.optional().describe('Fee payer wallet (default: the acting wallet).'),
@@ -70,9 +72,13 @@ async function prepare(
   if (summary.feePayer !== feePayer) {
     throw new Error(`prepared transaction has fee payer ${summary.feePayer}, expected ${feePayer}`);
   }
-  if (!summary.instructions.some((ix) => ix.program === 'square_escrow')) {
-    throw new Error('prepared transaction does not call the configured square_escrow program');
-  }
+  verifyPrepared(tx, {
+    programId: deps.chain.escrowProgramId,
+    call: deps.chain.encode(call),
+    accounts,
+    computeUnitPrice: options.computeUnitPrice === undefined ? null : BigInt(options.computeUnitPrice),
+    maxComputeUnitPrice: options.sign ? LOCAL_SIGNING_MAX_COMPUTE_UNIT_PRICE : null,
+  });
   const prepared = {
     instruction: call.instruction,
     transaction: unsigned.transaction,

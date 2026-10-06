@@ -1,6 +1,6 @@
 // Yazma tool'ları ve imza akışı: tool'lar imzasız tx döner; gönderim yalnızca tam ve geçerli imzalı tx'le olur.
 import { getAssociatedTokenAddressSync } from '@solana/spl-token';
-import { Keypair, PublicKey } from '@solana/web3.js';
+import { ComputeBudgetProgram, Keypair, PublicKey, SystemProgram } from '@solana/web3.js';
 import { specHashing } from '@squaresdk/solana-sdk';
 import { afterEach, describe, expect, it } from 'vitest';
 import { decodeTransaction, LocalSigner } from '../src/transactions.js';
@@ -225,7 +225,36 @@ describe('square_open_job', () => {
     h.api.prepare = prepared(Keypair.generate().publicKey);
     expect((await h.call('square_open_job', openArgs(institution))).body.message).toMatch(/fee payer/);
     h.api.prepare = prepared(new PublicKey(institution), Keypair.generate().publicKey);
-    expect((await h.call('square_open_job', openArgs(institution))).body.message).toMatch(/square_escrow/);
+    expect((await h.call('square_open_job', openArgs(institution))).body.message).toMatch(/another program/);
+  });
+
+  it('API’nin değiştirdiği ya da eklediği talimat reddedilir; yerel imzalayıcı imzalamaz', async () => {
+    const keypair = Keypair.generate();
+    h = await connect({ signer: LocalSigner.fromKeypair(keypair) });
+    const institution = keypair.publicKey.toBase58();
+    const honest = h.api.prepare;
+    h.api.inject = [
+      SystemProgram.transfer({ fromPubkey: keypair.publicKey, toPubkey: Keypair.generate().publicKey, lamports: 1 }),
+    ];
+    const appended = await h.call('square_open_job', { ...openArgs(institution), sign: true });
+    expect(appended.body.message).toMatch(/instruction for another program/);
+    h.api.inject = [];
+    h.api.prepare = (request) =>
+      honest({ ...request, call: { ...request.call, args: { ...request.call.args, amount: '999999999' } as never } });
+    const changed = await h.call('square_open_job', { ...openArgs(institution), sign: true });
+    expect(changed.body.message).toMatch(/instruction data differs/);
+    h.api.prepare = (request) => honest({ ...request, accounts: { ...request.accounts, institution: address() } });
+    const swapped = await h.call('square_open_job', { ...openArgs(institution), sign: true });
+    expect(swapped.body.message).toMatch(/account institution differs|fee payer/);
+    h.api.prepare = honest;
+    h.api.inject = [ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 9_999_999 })];
+    const priced = await h.call('square_open_job', { ...openArgs(institution), computeUnitPrice: '5000', sign: true });
+    expect(priced.body.message).toMatch(/compute unit price differs/);
+    const ceiling = await h.call('square_open_job', { ...openArgs(institution), sign: true });
+    expect(ceiling.body.message).toMatch(/above the local signing ceiling/);
+    const unsigned = await h.call('square_open_job', openArgs(institution));
+    expect(unsigned.body).toMatchObject({ signed: false, submitted: null });
+    expect(h.chain.sent).toHaveLength(0);
   });
 });
 

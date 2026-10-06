@@ -4,7 +4,10 @@
 // İsteğe bağlı yerel imzalayıcı yalnızca açıkça verilen keypair dosyasıyla çalışır (config.ts).
 import { createPublicKey, verify } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
+import type { Idl, IdlType } from '@anchor-lang/core';
 import { ComputeBudgetProgram, Keypair, PublicKey, VersionedTransaction } from '@solana/web3.js';
+import { fromIdlJson } from '@squaresdk/solana-sdk';
+import type { InstructionCall } from '@squaresdk/solana-types';
 import type { SquareChain } from './chain.js';
 
 export class UnsignedTransactionError extends Error {
@@ -157,5 +160,95 @@ export class LocalSigner {
     }
     tx.sign([this.keypair]);
     return tx;
+  }
+}
+
+export interface EncodedCall {
+  readonly data: Buffer;
+  readonly accounts: readonly string[];
+}
+
+interface IdlIx {
+  name: string;
+  args: { name: string; type: IdlType }[];
+  accounts: { name: string }[];
+}
+
+export interface CallCoder {
+  readonly idl: Idl;
+  readonly coder: { readonly instruction: { encode(name: string, data: unknown): Buffer } };
+}
+
+export function encodeCall(program: CallCoder, call: InstructionCall): EncodedCall {
+  const ix = (program.idl.instructions as unknown as IdlIx[]).find((candidate) => candidate.name === call.instruction);
+  if (!ix) throw new Error(`${call.program} programında ${call.instruction} yok`);
+  const raw = call.args as Record<string, unknown>;
+  const args = Object.fromEntries(
+    ix.args.map((arg) => [arg.name, fromIdlJson(program.idl, arg.type, raw[arg.name], `call.args.${arg.name}`)]),
+  );
+  return { data: program.coder.instruction.encode(ix.name, args), accounts: ix.accounts.map((a) => a.name) };
+}
+
+export class PreparedTransactionError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'PreparedTransactionError';
+  }
+}
+
+const SET_COMPUTE_UNIT_LIMIT = 2;
+const SET_COMPUTE_UNIT_PRICE = 3;
+export const LOCAL_SIGNING_MAX_COMPUTE_UNIT_PRICE = 1_000_000n;
+
+export function verifyPrepared(
+  tx: VersionedTransaction,
+  expected: {
+    programId: PublicKey;
+    call: EncodedCall;
+    accounts: Readonly<Record<string, string>>;
+    computeUnitPrice: bigint | null;
+    maxComputeUnitPrice: bigint | null;
+  },
+): void {
+  const { message } = tx;
+  const keys = message.staticAccountKeys;
+  const fail = (reason: string): never => {
+    throw new PreparedTransactionError(`prepared transaction rejected: ${reason}`);
+  };
+  const budget = new Set<number>();
+  let target: { accountKeyIndexes: number[]; data: Uint8Array } | null = null;
+  for (const ix of message.compiledInstructions) {
+    const program = keys[ix.programIdIndex];
+    if (program?.equals(ComputeBudgetProgram.programId)) {
+      const tag = ix.data[0];
+      if ((tag !== SET_COMPUTE_UNIT_LIMIT && tag !== SET_COMPUTE_UNIT_PRICE) || budget.has(tag)) {
+        fail('unexpected or repeated compute budget instruction');
+      }
+      budget.add(tag!);
+      if (tag === SET_COMPUTE_UNIT_PRICE) {
+        const price = ix.data.length === 9 ? Buffer.from(ix.data).readBigUInt64LE(1) : null;
+        if (price === null) fail('malformed compute unit price');
+        if (expected.computeUnitPrice !== null && price !== expected.computeUnitPrice) {
+          fail('compute unit price differs from the request');
+        }
+        if (expected.computeUnitPrice === null && expected.maxComputeUnitPrice !== null) {
+          if (price! > expected.maxComputeUnitPrice) fail('compute unit price is above the local signing ceiling');
+        }
+      }
+      continue;
+    }
+    if (!program?.equals(expected.programId)) fail(`instruction for another program (${program?.toBase58() ?? '?'})`);
+    if (target) fail('more than one Square instruction');
+    target = ix;
+  }
+  if (!target) return fail('no Square instruction');
+  if (!Buffer.from(target.data).equals(expected.call.data)) fail('instruction data differs from the request');
+  for (const [name, value] of Object.entries(expected.accounts)) {
+    const position = expected.call.accounts.indexOf(name);
+    if (position < 0) fail(`unknown account ${name}`);
+    const index = target.accountKeyIndexes[position];
+    if (index === undefined || index >= keys.length || keys[index]!.toBase58() !== value) {
+      fail(`account ${name} differs from the request`);
+    }
   }
 }
