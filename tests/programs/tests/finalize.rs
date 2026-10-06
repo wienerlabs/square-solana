@@ -134,10 +134,9 @@ fn a_job_settles_once_and_only_when_delivered() {
     w.finalize(&keeper, &job, settlement).expect("ilk finalize");
     let other_keeper = w.h.funded(LAMPORTS);
     let settlement = w.settlement(&institution, &other_keeper.pubkey(), agent.wallet.pubkey());
-    assert!(
-        w.finalize(&other_keeper, &job, settlement).is_err(),
-        "ikinci finalize"
-    );
+    w.finalize(&other_keeper, &job, settlement)
+        .expect_err("ikinci finalize")
+        .assert_error(anchor_error(AnchorErrorCode::AccountNotInitialized));
     assert_eq!(w.balance(&settlement.keeper_token_account), Some(0));
     assert_eq!(w.balance(&settlement.payee_token_account), Some(NET));
 }
