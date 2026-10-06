@@ -315,6 +315,23 @@ export const HostedConfigSchema = z
         issue(['capabilities', i, 'delegation'], 'delegasyon açık ama delegation bölümü yok');
       }
     });
+    const keyFiles = [config.signers.agent, config.signers.institution].flatMap((signer) =>
+      signer?.type === 'keypair' ? [signer.keypairPath] : [],
+    );
+    for (const [name, server] of Object.entries(config.mcp?.servers ?? {})) {
+      if (server.type !== 'stdio') continue;
+      if (server.env && Object.hasOwn(server.env, 'SQUARE_SIGNER_KEYPAIR')) {
+        issue(
+          ['mcp', 'servers', name, 'env', 'SQUARE_SIGNER_KEYPAIR'],
+          'MCP sunucusuna imza anahtarı verilemez: imza delegasyon kapısının dışında atılırdı',
+        );
+      }
+      (server.args ?? []).forEach((arg, k) => {
+        if (keyFiles.some((file) => arg.includes(file))) {
+          issue(['mcp', 'servers', name, 'args', k], 'MCP sunucusuna agent ya da kurum keypair dosyası verilemez');
+        }
+      });
+    }
     const institution = config.signers.institution;
     if (config.delegation && !institution) {
       issue(['signers', 'institution'], 'delegasyon kurumun imzacısını ister');

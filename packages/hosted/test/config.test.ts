@@ -174,6 +174,25 @@ describe('geçersiz yapılandırma açılışta reddedilir', () => {
     expect(unknown).toContain('capabilities.0.tools.0.server: mcp.servers içinde yok yok');
   });
 
+  it('stdio MCP sunucusuna imza anahtarı ya da keypair dosyası verilemez', () => {
+    const base = rawConfig() as { mcp: { servers: Record<string, unknown> }; signers: Record<string, unknown> };
+    const stdio = (extra: Record<string, unknown>) =>
+      rawConfig({
+        mcp: {
+          ...base.mcp,
+          servers: { ...base.mcp.servers, square: { type: 'stdio', command: 'square-mcp', ...extra } },
+        },
+      });
+    expect(issues(stdio({ env: { SQUARE_SIGNER_KEYPAIR: { fromEnv: 'KEY_FILE' } } }))).toContain(
+      'mcp.servers.square.env.SQUARE_SIGNER_KEYPAIR: MCP sunucusuna imza anahtarı verilemez: imza delegasyon kapısının dışında atılırdı',
+    );
+    const agentKey = (base.signers.agent as { keypairPath: string }).keypairPath;
+    expect(issues(stdio({ args: ['--keypair', agentKey] }))).toContain(
+      'mcp.servers.square.args.1: MCP sunucusuna agent ya da kurum keypair dosyası verilemez',
+    );
+    expect(() => parseHostedConfig(stdio({ env: { SQUARE_API_URL: 'https://api.square.test' } }))).not.toThrow();
+  });
+
   it('sınırlar: sıfır, maxTokens > maxTotalTokens, çok tur', () => {
     const found = issues(
       rawConfig({
