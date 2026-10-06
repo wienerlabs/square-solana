@@ -14,6 +14,7 @@ Init, Address Lookup Table kurulumu ve smoke SDK'yı kullandığı için bir wor
 | [`deploy/`](deploy/): program kimliklerinin depoya uygulanması (`set-program-ids.mjs`; anahtar okumaz), Squads v4 multisig'inin kurulması ve doğrulanması (`squads-multisig.mjs`) ve [upgrade runbook'u](../docs/runbooks/upgrade.md) | [BC-09] |
 | Address Lookup Table, compute budget, priority fee | [BC-28] |
 | [`deploy/`](deploy/): ağ yapılandırması (`networks/<ağ>.json`, `network-config.mjs`), config'lerin Squads vault'u adına kurulması (`init-configs.mjs`), Square ALT'ı (`create-lookup-table.mjs`), hız sınırına dayanıklı RPC bağlantısı (`rpc.mjs`); kayıt [`docs/deploy/devnet.md`](../docs/deploy/devnet.md) | [BC-30] |
+| [`deploy/`](deploy/): CCTP V2 ile fonlama: kaynak EVM zincirinde burn (`cctp-burn.mjs`), attestation ve tek tx'te mint + `fund_job` devnet koşusu (`cctp-fund-job.mjs`), ortak yardımcılar (`cctp.mjs`), CCTP ALT'ı (`create-lookup-table.mjs --cctp`); [cctp-funding.md](../docs/design/cctp-funding.md) | [BC-36] |
 | Uçtan uca smoke: 8 adım ve iki varyant gerçek işlemlerle, tx / CU / ücret raporu: [`tests/smoke`](../tests/smoke/) `smoke` ve `smoke:localnet`; CI [`smoke.yml`](../.github/workflows/smoke.yml) | [BC-31] |
 
 Anahtarlar ve secret'lar repoya girmez (`.gitignore`: `*keypair*.json`, `.env*`); deploy
@@ -26,3 +27,4 @@ keypair'leri secret store'da tutulur [BC-09].
 [BC-28]: https://github.com/wienerlabs/square-solana/issues/36
 [BC-30]: https://github.com/wienerlabs/square-solana/issues/38
 [BC-31]: https://github.com/wienerlabs/square-solana/issues/43
+[BC-36]: https://github.com/wienerlabs/square-solana/issues/77

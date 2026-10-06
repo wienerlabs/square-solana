@@ -118,7 +118,19 @@ değildir.
   3. ALT'ın adresi tx'lere `BuildOptions.addressLookupTables` ile verilir.
 - **Paket sınırı:** `buildTx` pakete sığmayan tx'i kurarken reddeder ve ALT'ı önerir.
 
-## 7. Sponsorlu tx ve Squads vault'u
+## 7. CCTP ile fonlama (BC-36)
+
+`flow.receiveAndFundJob` Circle'ın `receive_message`'ını ve `fund_job`'u tek tx'te kurar
+([cctp-funding.md](cctp-funding.md)).
+
+- **Compute:** `receive_message` Circle'ın programıdır, LiteSVM ölçümüne (§2) girmez.
+  - **Ölçüm:** Devnet'te yalnızca `receive_message` içeren 18 işlem, 178 061 – 194 880 CU (2026-10-06).
+  - **Pay:** §5'in kuralıyla `CCTP_RECEIVE_COMPUTE_UNITS` = 390 000; tx'in sınırı `fundJob` + bu pay = 480 000.
+  - **Gerçek koşu:** 202 865 CU.
+- **Boyut:** Tx, Square ALT'ı ve kaynak zincirin CCTP ALT'ı (`cctpLookupTableAddresses`, 13 adres) ile 1 082
+  bayttır. Mesaj 376 bayt, attestation iki imzayla 130 bayttır. ALT'sız sığmaz.
+
+## 8. Sponsorlu tx ve Squads vault'u
 
 - **Fee payer** (`apps/fee-payer`, [ADR 0019](../decisions/0019-fee-payer-politikasi.md)): sponsorlu tx'in
   compute unit fiyatı ve sınırı servisin tavanlarıyla sınırlıdır. Sınır verilmeyen tx'te talimat başına

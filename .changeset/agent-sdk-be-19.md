@@ -3,7 +3,7 @@
 '@squaresdk/solana-types': patch
 ---
 
-Agent yazma kiti (BE-19, sözleşme v0.17.1).
+Agent yazma kiti (BE-19, sözleşme v0.18.1).
 
 `@squaresdk/solana-agent-sdk`: Square'e uyarlanmış yeniden yazım, geriye uyumsuz. ESM ve Apache-2.0 (kaynağın MIT
 bildirimi `LICENSE-MIT`). `createAgent` artık asenkron ve Express yerine `@squaresdk/solana-a2a`'nın A2A v1.0
@@ -21,4 +21,4 @@ altında `anthropicHandler` (`@anthropic-ai/sdk` isteğe bağlı peer, varsayıl
 `claude-haiku-4-5-20251001`, anahtar yalnızca ortamdan).
 
 `@squaresdk/solana-types`: `AgentCardSchema`'ya isteğe bağlı `supportedInterfaces` (A2A v1.0 `AgentInterface`,
-`AgentInterfaceSchema`); verilirse kartın `url`'i ile aynı bir girdi içermeli. `API_CONTRACT_VERSION` 0.17.1.
+`AgentInterfaceSchema`); verilirse kartın `url`'i ile aynı bir girdi içermeli. `API_CONTRACT_VERSION` 0.18.1.

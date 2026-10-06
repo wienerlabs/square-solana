@@ -110,6 +110,24 @@ kurulduktan sonra donduruldu: authority'si yoktur, değişmez. Servislerde `API_
 | `SQUARE_PROGRAM_ID_ESCROW` | `6yBTEVbizMVCWAp4c3jx6Xdsay3CiUmrJmTswY7QRWaX` |
 | `API_LOOKUP_TABLE` | `3cjUqPz9ECuym9w8trGRVUadGbj24Z7BvYALvEfmCCoG` |
 
+## CCTP ile fonlama (BC-36)
+
+Ethereum Sepolia'dan Solana devnet'e CCTP V2 ile 5 USDC: tasarım ve tx örnekleri
+[cctp-funding.md](../design/cctp-funding.md).
+
+| | |
+|---|---|
+| CCTP ALT (Sepolia) | `2Zg2NRhkLqdFHq3SZcxqHmZkTTLXmKx4yeZNbfSqPbUY`. `create-lookup-table.mjs --cctp sepolia` kurdu ve dondurdu (kurulum `3w8gzZM8…`, dondurma `4RBBrn5S…`) |
+| Kullanılmayan ikinci tablo | `D4znhujirRMcecDhB3AvjbHGChZ54RYMrmW7EJKpoizJ`. Aynı adreslerle önceki bir denemede kuruldu; o denemenin çıktısı kaydedilmedi. Dondurulduğu için kapatılamaz; kullanılmaz |
+| Kurum (test) | `7xNWRmEbp5aQFQuL1vAnJAW3iZn6NXA3CisMSAmnXoi4`; USDC hesabı (mint alıcısı) `4p2faFwmZTjkXua3wdHVrviqaLH3tuR3JdFcK82zXLeU` |
+| Agent (test) | `C6iFdvJpk2bbFKTseNGhgdKuPZjWpV762b5wuW7AX1z4`, kayıt `52gxSYGG9vWeMmLLXST5fXddNdMToiZe1xzF1vKNr18V` (`bc36-cctp-devnet`, kartsız) |
+| Screening | İki cüzdan OFAC SDN listesine karşı tarandı (yayın 10/05/2026, 19 363 kayıt), listede değiller. Screener authority temiz kaydetti; kaynak hash'i listenin SHA-256'sı `b61f54ea…5e72`. Kurum `221Mcokb…`, agent `c1UHunmN…` |
+| Sepolia burn | `0x579e67589ff91e49ce72c499f01414a7c15d9f7dd6399d541f6bd988223c6911` (5 USDC, standart kesinlik, ücret 0) |
+| Attestation nonce | `0xab4ef092ac8246464a4c1e2750038a96b4b5b1d2655a5198dc7e6548b3bec063` |
+| `create_job` | `4UnXtueHmZFGi4Ac9dKHYq4juvP7fEL3sWZNEUceefDKrC8neMdiP32NjTNcxHzWtcehDSkSkDvP9LusLVqvRH6S` |
+| `receive_message` + `fund_job` | `2qfMga78K7aTAx9ichvTyiMTeUEr3DzzJZNVB5nyNqpX5qe5q3nNeq5XQHyMdVEXooy6NfjYmZ13o1cmV3xg7rq2` (1 082 bayt, 202 865 CU) |
+| Job | `DYog8N8bftM5cAY2xop7BzLjMmZqgW9wTAJek4LXbfGC`, `Funded`; vault `5HfGjn6fbSJoKo1oJnksH8Q2igtW8uf7cwsPdQGxwY3S`'de 5 000 000 |
+
 ## Sonraki yükseltme
 
 Kh0ra'nın #184'ü (dispute talimatları, BC-32 ve BC-33) hesap düzenini değiştirmiyor; yalnızca talimat ekliyor.
