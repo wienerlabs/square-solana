@@ -22,6 +22,8 @@ on:
       - 'scripts/ci/idl-conformance.mjs'
       - 'scripts/ci/rust-lint.mjs'
       - 'scripts/ci/toolchain.mjs'
+      - 'scripts/ci/program-coverage.mjs'
+      - 'scripts/ci/cu-report.mjs'
       - '.github/workflows/programs.yml'
       - '.github/workflows/verifiable-build.yml'
   push:
@@ -42,6 +44,8 @@ on:
       - 'scripts/ci/idl-conformance.mjs'
       - 'scripts/ci/rust-lint.mjs'
       - 'scripts/ci/toolchain.mjs'
+      - 'scripts/ci/program-coverage.mjs'
+      - 'scripts/ci/cu-report.mjs'
       - '.github/workflows/programs.yml'
       - '.github/workflows/verifiable-build.yml'
 
@@ -140,4 +144,13 @@ jobs:
       # `anchor test`, Anchor.toml'daki test betiğini (tests/programs, LiteSVM) yerel bir
       # solana-test-validator'la çalıştırır; programlar az önce derlendi.
       - name: Program testleri (anchor test)
-        run: anchor test --validator legacy --skip-build
+        run: |
+          set -o pipefail
+          anchor test --validator legacy --skip-build 2>&1 | tee "$RUNNER_TEMP/program-tests.log"
+
+      # BC-29: talimat, ret dalı ve hata kodu kapsamı; escrow'da her oran en az %80 olmalı.
+      - name: Program test kapsamı
+        run: node scripts/ci/program-coverage.mjs
+
+      - name: Compute unit raporu
+        run: node scripts/ci/cu-report.mjs "$RUNNER_TEMP/program-tests.log"
