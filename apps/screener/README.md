@@ -155,10 +155,24 @@ gerekir). Testlerin dayanakları:
 - **OFAC:** commit'lenmiş sentetik fikstür (`test/fixtures/sdn.xml`); gerçek liste repoda değildir.
 - **Chainalysis:** sahte `fetch`.
 
+Uçtan uca devnet koşusu (`test/devnet.e2e.test.ts`) yalnızca ortamla çalışır; anahtar repoda tutulmaz:
+
+```bash
+SCREENER_E2E_AUTHORITY=<screener authority keypair'i> \
+pnpm --filter @squaresdk/solana-screener exec vitest run test/devnet.e2e.test.ts
+```
+
+Koşu OFAC'ın canlı listesini indirir:
+- Listedeki bir SOL adresini tarar ve zincire `Flagged` yazar.
+- Yeni bir cüzdanı `Clear` yazar.
+- Yenilemenin saatini süre dolumuna yaklaştırır ve iki kaydın yenilendiğini zincirden okur.
+
+Ağ ve programlar `scripts/deploy/networks/devnet.json`'dandır
+([deploy kaydı](../../docs/deploy/devnet.md#screener-be-16)).
+
 ## Kalanlar
 
-- **Gerçek ağda deneme:** devnet'te gerçek registry programıyla deneme ve fonlamanın gerçek reddi
-  (`ScreeningFlagged` / `ScreeningExpired`) BE-36'dadır (localnet).
-- **Gerçek uçlara karşı smoke testi:** OFAC'ın canlı `SDN.XML` ucuna ve Chainalysis API'sine karşı
-  smoke testi dağıtımda yapılır. Chainalysis için kayıtla alınan bir API anahtarı gerekir.
+- **Fonlamanın gerçek reddi:** `ScreeningFlagged` / `ScreeningExpired` BE-36'dadır (localnet).
+- **Chainalysis:** Canlı API'ye karşı smoke testi kayıtla alınan bir API anahtarı ister. Anahtar yokken servis
+  yalnızca OFAC listesiyle tarar.
 - **Dağıtım:** Railway servisi ve secret tanımı dağıtım işidir.
