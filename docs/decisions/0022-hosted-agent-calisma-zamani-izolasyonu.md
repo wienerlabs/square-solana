@@ -17,7 +17,10 @@ ve agent'ın A2A uç noktasını durdurmamalıdır. Bir çalıştırmanın yapt�
 - MCP tool çağrıları (G/Ç). Stdio sunucuları zaten ayrı alt süreçtir; HTTP sunucuları uzaktadır;
 - delegasyon tool'u: politika kapısı ve imzalı tx'ler (G/Ç, kurumun anahtarı süreçte).
 
-Çalıştırmada kurumun yazdığı ya da Claude'un ürettiği kod yürütülmez. CPU yoğun iş de yoktur.
+Çalıştırmada Claude'un ürettiği kod yürütülmez. CPU yoğun iş de yoktur. Yapılandırma ise güvenilen operatör
+girdisidir, kod gibi davranır: stdio MCP sunucusunun komutu, argümanları ve ortamı serbesttir; alt süreç hosted
+agent'ın işletim sistemi kullanıcısıyla çalışır ve agent'ın okuyabildiği her dosyayı (keypair dosyaları dahil)
+okuyabilir. Yapılandırmayı yazan, agent'ın anahtarlarına erişimi olan kişidir.
 
 ## Değerlendirilen seçenekler
 
@@ -50,9 +53,14 @@ ve agent'ın A2A uç noktasını durdurmamalıdır. Bir çalıştırmanın yapt�
    ile tool çağrılarına da iner), `maxTurns`, `maxTokens` (yanıt başına), `maxTotalTokens` (bütün istekler),
    `maxConcurrency`, `maxQueue` ve `maxToolResultBytes`.
 5. Hata yalıtımı: çalıştırmanın istisnası yalnızca kendi A2A görevini `FAILED` yapar. Diğer capability'ler, A2A
-   sunucusu ve duty'ler sürer. Kuyruk doluysa iş hemen düşer; bekleyen iş iptal edilirse slot almadan çıkar.
+   sunucusu ve duty'ler sürer. Eşzamanlılık ve kuyruk sınırı `accept_job`'dan önce denetlenir (agent-sdk `admit`):
+   yer yoksa görev reddedilir; kabul edilmiş iş yer bekler ve düşmez. Bekleyen iş iptal edilirse slot almadan çıkar.
 6. Kurumun anahtarı tek süreçtedir ve yalnızca delegator ile duty'ler kullanır. Claude'un girdisi delegasyon
    politikasını aşamaz; kapı Claude'dan bağımsızdır.
+7. Yapılandırma şeması imzanın delegasyon kapısı dışına çıkmasını engelleyen yanlış yapılandırmaları reddeder: stdio
+   MCP sunucusunun ortamında `SQUARE_SIGNER_KEYPAIR` (Square MCP'nin yerel imzalayıcısı) olamaz, argümanlarında
+   agent ya da kurum keypair dosyası geçemez. Bu bir yanlış yapılandırma korumasıdır, kötü niyetli yapılandırmaya
+   karşı yalıtım değildir (Bağlam).
 
 ## Gerekçe
 
@@ -77,3 +85,5 @@ alt süreç, kurumun anahtarını çoğaltır ya da imza için IPC ekler; bunun 
 
 - Süreç düzeyi bellek ve CPU sınırları dağıtımın (Railway servis tanımı) işidir. Hosted agent'ın servis olarak
   dağıtımı bu ADR'nin kapsamında değildir.
+- Stdio MCP sunucularının ayrıcalık yalıtımı (ayrı işletim sistemi kullanıcısı ya da konteyner, keypair dosyalarına
+  erişimsiz) dağıtımın işidir; yapılandırmayı güvenilmeyen birinin yazacağı bir kurulum için önkoşuldur.
