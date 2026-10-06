@@ -1,6 +1,6 @@
 # Runbook: program kimlikleri, Squads upgrade authority ve upgrade
 
-**Issue:** BC-09 (#9), BC-30 (#38) · **Kararlar:** [ADR 0004](../decisions/0004-gecmisli-tasima-ve-yeni-program-idleri.md)
+**Issue:** BC-09 (#9), BC-30 (#38), BC-37 (#78) · **Kararlar:** [ADR 0004](../decisions/0004-gecmisli-tasima-ve-yeni-program-idleri.md)
 (yeni program kimlikleri), [ADR 0008](../decisions/0008-upgrade-authority-2-of-3-squads.md) (2-of-3 Squads)
 
 Dört Square programının (`square_policy`, `square_verifier`, `square_registry`, `square_escrow`) kimliklerinin
@@ -185,11 +185,31 @@ Kontrol listesi:
   1.0.0'a kadar düzen değişikliği MINOR sürümdür.
 - **Kayıt:** Deploy kaydına sürüm, commit, hash, Squads işlem adresi ve imzalar yazılır.
 
-## 7. Olağan dışı durumlar
+## 7. MPP authority rotasyonu
+
+Fiat rayının attestation anahtarı (`VerifierConfig.mpp_authority`, [ADR 0024](../decisions/0024-stripe-mpp-fiat-rayi.md))
+config'tedir; değiştirmek için program upgrade'i gerekmez. Config'in admin'i vault'tur, `update_mpp_authority` bir
+vault işlemidir:
+
+```bash
+solana-keygen new --no-bip39-passphrase --silent -o <depo dışı>/mpp-authority-<tarih>.json   # yeni anahtar
+node scripts/deploy/rotate-mpp-authority.mjs --network <ağ> --mpp-authority <yeni adres> \
+  --member <keypair> --member <keypair>
+```
+
+Betik config'in admin'inin vault, yeni anahtarın sıfırdan ve mevcut anahtardan farklı olduğunu denetler, işlemi
+iki üyeyle onaylayıp yürütür ve verifier'ın son deploy slot'unun değişmediğini doğrular. Sonra:
+
+- MPP authority servisi (BE-25) yeni anahtarla imzalar. Eski anahtarla imzalanmış attestation'lar artık bağlanmaz;
+  bağlanmamış ödemelerin attestation'ı yeni anahtarla yeniden imzalanır.
+- `scripts/deploy/networks/<ağ>.json`'daki `verifier.mppAuthority` ve deploy kaydı güncellenir.
+
+## 8. Olağan dışı durumlar
 
 | Durum | Yapılacak |
 |---|---|
 | Bir üyenin anahtarı kayboldu | Kalan iki üye Squads'ta üye değişikliği (config transaction) yapar; eşik 2 korunur |
 | Bir üyenin anahtarı ele geçirildi | Aynı gün üye değiştirilir; bekleyen işlemler iptal edilir |
 | Buffer yanlış yüklendi | `solana program close <buffer>` (buffer authority vault ise Squads işlemiyle) |
+| MPP authority anahtarı sızdı | Aynı gün §7 ile döndürülür; yeni anahtar hazır değilse sıfır anahtarla (`update_mpp_authority`) fiat rayı kapatılır |
 | Program keypair'i sızdı | Deploy edilmiş program için etkisi yoktur (upgrade authority vault'tadır); henüz deploy edilmemişse kimlik yeniden üretilir (adım 1–2) |

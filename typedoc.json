@@ -21,6 +21,7 @@
   "readme": "docs/README.md",
   "projectDocuments": [
     "docs/protocol.md",
+    "docs/cli.md",
     "docs/runbooks/*.md",
     "docs/deploy/*.md",
     "docs/design/*.md",

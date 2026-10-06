@@ -1,5 +1,5 @@
 {
-  "description": "BC-28 işlem profili. computeUnitLimits: her tx türünün compute unit sınırı; tests/programs/tests/tx_budget.rs'in 60 ölçümünün en yükseğinin iki katı, 10 bine yukarı yuvarlanmış. Ölçülen her değer sınırın (1 - headroom) katını aşmamalıdır. lookupTable: Square address lookup table'ının girdileri. Yöntem ve tablo: docs/design/tx-budget.md.",
+  "description": "BC-28 işlem profili. computeUnitLimits: her tx türünün compute unit sınırı; tests/programs/tests/tx_budget.rs'in 60 ölçümünün en yükseğinin en az iki katı, 10 bine yukarı yuvarlanmış. Ölçülen her değer sınırın (1 - headroom) katını aşmamalıdır. lookupTable: Square address lookup table'ının girdileri. Yöntem ve tablo: docs/design/tx-budget.md.",
   "headroom": 0.25,
   "lookupTable": [
     "program:registry",
@@ -18,22 +18,26 @@
   ],
   "computeUnitLimits": {
     "initInstitution": 50000,
-    "setPolicy": 40000,
+    "setPolicy": 60000,
     "updatePolicy": 20000,
     "setBuyerRoot": 20000,
     "registerAgent": 40000,
-    "recordScreening": 40000,
+    "recordScreening": 60000,
     "createJob": 100000,
     "commitTravelRule": 20000,
-    "fundJob": 90000,
+    "fundJob": 120000,
     "acceptJob": 20000,
     "submitWork": 20000,
     "listClaim": 50000,
-    "buyClaim": 110000,
+    "buyClaim": 120000,
     "cancelClaim": 10000,
-    "setComplianceProof": 360000,
-    "finalizePayment": 200000,
+    "setComplianceProof": 390000,
+    "finalizePayment": 220000,
     "cancelJob": 40000,
-    "syncAgentWallet": 20000
+    "syncAgentWallet": 20000,
+    "createFiatJob": 70000,
+    "cancelFiatJob": 20000,
+    "verifyMppPaymentProof": 360000,
+    "finalizeFiatPayment": 120000
   }
 }

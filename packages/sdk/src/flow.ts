@@ -2,7 +2,9 @@
 // `SquarePda`'dan, payee / mint / rent ödeyicisi zincirdeki job ve alacak kaydından, token programı
 // mint hesabının sahibinden. Token hesabı gereken alıcı tarafların ATA'sı aynı tx'te idempotent
 // olarak açılır. Program adresleri yapılandırmadan gelir (BC-09). Çağıran compute unit sınırı vermezse
-// tx türünün profil sınırı eklenir (BC-28); dispute talimatlarının profili BC-32 / BC-33'te.
+// tx türünün profil sınırı eklenir (BC-28); dispute talimatlarının profili BC-32 / BC-33'te. Fiat rayının
+// (BC-37, ADR 0024) iş açılışı, iptali ve kapanışı da buradadır; MPP ispatının bağlanması
+// `@squaresdk/solana-policy`'de.
 import type { Program } from '@anchor-lang/core';
 import {
   createAssociatedTokenAccountIdempotentInstruction,
@@ -200,6 +202,64 @@ export function createFlow(deps: FlowDeps): SquareFlow {
         })
         .instruction();
       return { ...(await deps.buildTx([ix], withComputeProfile(options, 'createJob'))), job: address, specHash };
+    },
+
+    async createFiatJob(params, options) {
+      const specHash = specHashing.specHash(params.spec);
+      const address = pda.job(params.institution, specHash)[0];
+      const policy = await deps.policy.account.policy.fetchNullable(params.policy);
+      if (!policy) throw new Error(`politika bulunamadı: ${params.policy.toBase58()}`);
+      const record = await deps.registry.account.agentRecord.fetchNullable(params.agentRecord);
+      if (!record) throw new Error(`agent kaydı bulunamadı: ${params.agentRecord.toBase58()}`);
+      const ix = await deps.escrow.methods
+        .createFiatJob(Array.from(specHash), u64(params.amount, 'amount'), i64(params.deadline, 'deadline'))
+        .accountsStrict({
+          payer: options.feePayer,
+          institution: params.institution,
+          config: pda.escrowConfig()[0],
+          agentRecord: params.agentRecord,
+          policy: params.policy,
+          policyInstitution: policy.institution,
+          institutionScreening: pda.screeningRecord(params.institution)[0],
+          agentScreening: pda.screeningRecord(record.wallet)[0],
+          job: address,
+          systemProgram: SystemProgram.programId,
+        })
+        .instruction();
+      return { ...(await deps.buildTx([ix], withComputeProfile(options, 'createFiatJob'))), job: address, specHash };
+    },
+
+    async cancelFiatJob(params, options) {
+      const ix = await deps.escrow.methods
+        .cancelFiatJob()
+        .accountsStrict({ institution: params.institution, job: params.job })
+        .instruction();
+      return deps.buildTx([ix], withComputeProfile(options, 'cancelFiatJob'));
+    },
+
+    async finalizeFiatPayment(params, options) {
+      const account = await job(params.job);
+      const gate = await releaseGate(params.job, account);
+      if (!gate.releaseProof || !gate.operatorState || !gate.verifierConfig || !gate.verifierProgram) {
+        throw new Error(`fiat iş bir politikaya bağlı değil: ${params.job.toBase58()}`);
+      }
+      const ix = await deps.escrow.methods
+        .finalizeFiatPayment()
+        .accountsStrict({
+          payer: params.payer,
+          config: pda.escrowConfig()[0],
+          job: params.job,
+          releaseProof: gate.releaseProof,
+          operatorState: gate.operatorState,
+          verifierConfig: gate.verifierConfig,
+          verifierProgram: gate.verifierProgram,
+          escrowAuthority: pda.escrowAuthority()[0],
+          agentReputation: pda.agentReputation(account.agentRecord)[0],
+          validationRecord: pda.validationRecord(params.job)[0],
+          systemProgram: SystemProgram.programId,
+        })
+        .instruction();
+      return deps.buildTx([ix], withComputeProfile(options, 'finalizeFiatPayment'));
     },
 
     async commitTravelRule(params, options) {

@@ -26,7 +26,7 @@ test('SQUARE_IDLS, idl/ dosyalarıyla aynı', () => {
   }
 });
 
-test('SDK çalışma zamanı dışa aktarımları beklenen yüzeyle aynı (BE-35 + BE-08 + BC-28 + BC-34 + BE-14 + BE-18 + BC-36)', () => {
+test('SDK çalışma zamanı dışa aktarımları beklenen yüzeyle aynı (BE-35 + BE-08 + BC-28 + BC-34 + BE-14 + BE-18 + BC-36 + BC-37)', () => {
   assert.deepEqual(Object.keys(sdk).sort(), [
     'API_OPERATIONS',
     'ApiClientError',
@@ -37,6 +37,8 @@ test('SDK çalışma zamanı dışa aktarımları beklenen yüzeyle aynı (BE-35
     'CCTP_TOKEN_MESSENGER_ABI',
     'IdlJsonError',
     'MAX_COMPUTE_UNIT_LIMIT',
+    'MPP_ATTESTATION_DOMAIN',
+    'MPP_ATTESTATION_MESSAGE_LENGTH',
     'PACKET_DATA_SIZE',
     'RECEIVE_MESSAGE_DISCRIMINATOR',
     'SQUARE_IDLS',
@@ -62,6 +64,8 @@ test('SDK çalışma zamanı dışa aktarımları beklenen yüzeyle aynı (BE-35
     'fetchCctpFees',
     'fromIdlJson',
     'isCctpNonceUsed',
+    'mppAttestationInstruction',
+    'mppAttestationMessage',
     'receiveMessageInstruction',
     'specHashing',
     'squareLookupTableAddresses',

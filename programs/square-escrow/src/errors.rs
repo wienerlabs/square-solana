@@ -109,4 +109,7 @@ pub enum EscrowError {
     TravelRuleCommitmentRequired,
     #[msg("Dispute timeout must be positive and proof timeout must not be negative")]
     InvalidDisputeTimeout,
+    // ---- M6: Stripe MPP fiat rail ----
+    #[msg("Instruction does not apply to the job's settlement rail")]
+    RailMismatch,
 }

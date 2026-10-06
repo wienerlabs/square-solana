@@ -110,6 +110,7 @@ export function localnetConfig(params: {
       agent: 'agent.json',
       buyer: 'buyer.json',
       keeper: 'keeper.json',
+      mppAuthority: 'mppAuthority.json',
     },
     init: {
       registry: { screenerAuthority: params.screener.toBase58(), screeningTtlSecs: 86_400 },
@@ -177,11 +178,13 @@ async function main(): Promise<void> {
   const artifacts = loadCircuitArtifacts();
   const keysDir = mkdtempSync(join(tmpdir(), 'square-smoke-keys-'));
   const key = Object.fromEntries(
-    ['admin', 'payer', 'screener', 'institution', 'agent', 'buyer', 'keeper', 'mintAuthority'].map((role) => {
-      const keypair = Keypair.generate();
-      writeFileSync(join(keysDir, `${role}.json`), JSON.stringify(Array.from(keypair.secretKey)), { mode: 0o600 });
-      return [role, keypair];
-    }),
+    ['admin', 'payer', 'screener', 'institution', 'agent', 'buyer', 'keeper', 'mintAuthority', 'mppAuthority'].map(
+      (role) => {
+        const keypair = Keypair.generate();
+        writeFileSync(join(keysDir, `${role}.json`), JSON.stringify(Array.from(keypair.secretKey)), { mode: 0o600 });
+        return [role, keypair];
+      },
+    ),
   ) as Record<string, Keypair>;
 
   const version = spawnSync('solana-test-validator', ['--version'], { encoding: 'utf8' });
@@ -233,7 +236,7 @@ async function main(): Promise<void> {
       mint,
       arbitrators,
       screener: key.screener!.publicKey,
-      mppAuthority: Keypair.generate().publicKey,
+      mppAuthority: key.mppAuthority!.publicKey,
     });
     for (const [role, amount] of [
       ['institution', BigInt(config.smoke.jobAmount) * 10n],

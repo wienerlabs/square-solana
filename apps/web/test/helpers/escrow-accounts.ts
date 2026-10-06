@@ -99,6 +99,7 @@ export async function encodeJob(fields: JobFields): Promise<Buffer> {
       resolution: d.resolution ?? { Pending: {} },
     },
     delivery_uri: 'https://deliveries.example.org/work',
+    rail: { Escrow: {} },
   });
 }
 

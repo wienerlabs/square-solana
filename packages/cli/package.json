@@ -1,0 +1,58 @@
+{
+  "name": "@squaresdk/solana-cli",
+  "version": "0.1.0",
+  "description": "Square komut satırı aracı (`squaresdk-solana`): 8 adım, dispute ve did:aip çözümü; JSON çıktı modu, küme ve keypair yapılandırması; BE-30",
+  "license": "Apache-2.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "bin": {
+    "squaresdk-solana": "dist/bin.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run --coverage"
+  },
+  "dependencies": {
+    "@noble/hashes": "^1.8.0",
+    "@solana/spl-token": "^0.4.15",
+    "@solana/web3.js": "^1.99.0",
+    "@squaresdk/solana-identity": "workspace:*",
+    "@squaresdk/solana-policy": "workspace:*",
+    "@squaresdk/solana-sdk": "workspace:*",
+    "@squaresdk/solana-types": "workspace:*",
+    "bn.js": "^5.2.5",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@anchor-lang/core": "1.2.0",
+    "@squaresdk/solana-config": "workspace:*",
+    "@types/bn.js": "^5.2.0",
+    "@types/node": "^24.0.0",
+    "@vitest/coverage-v8": "^5.0.3",
+    "vitest": "^5.0.3"
+  },
+  "keywords": [
+    "square",
+    "solana",
+    "cli",
+    "escrow",
+    "agent",
+    "did-aip"
+  ],
+  "engines": {
+    "node": ">=24"
+  }
+}
