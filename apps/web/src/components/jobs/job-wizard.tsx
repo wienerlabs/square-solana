@@ -669,9 +669,7 @@ export function JobWizard({ owner, escrowProgramId }: { owner: string; escrowPro
               balance={balance ? balance.amount : undefined}
               escrowProgramId={escrowProgramId}
               blocked={
-                screening?.state !== 'ready'
-                  ? 'The sanctions screenings are not read yet.'
-                  : (fundBlock ?? travelBlock)
+                screening?.state !== 'ready' ? 'The sanctions screenings are not read yet.' : (fundBlock ?? travelBlock)
               }
               onFunded={reread}
             />
