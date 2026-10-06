@@ -1,5 +1,5 @@
-// Indexer'ın eşik alarmları (`@squaresdk/solana-observability`): tarama durması, uzlaştırma sapması ve
-// işleme hataları. Eşikler ortamdandır (`INDEXER_ALERT_*`); bildirim log'a ve verilmişse webhook'a gider.
+// Indexer'ın eşik alarmları (`@squaresdk/solana-observability`): tarama durması, senkron gecikmesi,
+// uzlaştırma sapması ve işleme hataları. Eşikler ortamdandır (`INDEXER_ALERT_*`); bildirim log'a ve verilmişse webhook'a gider.
 import type { AlarmRule, EventWindow } from '@squaresdk/solana-observability';
 import type { AlertThresholds } from './config.js';
 
@@ -8,6 +8,8 @@ export function indexerAlarmRules(params: {
   lastPollAt: () => number | null;
   /** Servisin açıldığı zaman (ms): hiç tarama olmadıysa durma süresi buradan sayılır. */
   startedAt: number;
+  /** Son taramadaki senkron gecikmesi (slot); hiç tarama olmadıysa null. */
+  syncLag: () => number | null;
   lastDrift: () => number | null;
   errors: EventWindow;
   thresholds: AlertThresholds;
@@ -22,6 +24,14 @@ export function indexerAlarmRules(params: {
       severity: 'critical',
       read: () => (clock() - (params.lastPollAt() ?? params.startedAt)) / 1000,
       above: thresholds.stallSeconds,
+      forSeconds: 0,
+    },
+    {
+      name: 'indexer_lagging',
+      description: `Indexer kesinleşmiş zincir ucunun ${thresholds.lagSlots} slot'tan fazla gerisinde: okunamayan tx'te bekliyor`,
+      severity: 'warning',
+      read: () => params.syncLag() ?? 0,
+      above: thresholds.lagSlots,
       forSeconds: 0,
     },
     {

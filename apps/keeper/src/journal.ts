@@ -4,6 +4,11 @@
 // denenir: ispat bekleyen job'a ispat (`release_proofs`), screening bekleyen job'a payee'nin kaydı
 // (`screenings`) son denemeden sonra yazıldıysa. Böylece `ProofRequired` sürekli denenmez ama ispat gelince
 // gecikmeden ödenir.
+//
+// Birikim (`backlog`): finalize edilebilir durumda bekleyen job'lar; keeper gecikmesinin ölçüsü. Challenge
+// penceresi bitmiş, açık ve teslim edilmiş job, bir sebeple bekletilmiyorsa birikimdedir. İspat, screening ya
+// da kârlılık beklemesi keeper'ın gecikmesi sayılmaz; ancak beklenen kayıt indexlendiyse job o andan itibaren
+// yeniden birikimdedir. Onaylanmış finalize indexer aynayı güncelleyene kadar birikime girmez.
 import type { KeeperOutcome, KeeperReason, PrismaClient } from '@squaresdk/solana-db';
 
 export interface Candidate {
@@ -21,9 +26,17 @@ export interface JournalEntry {
   readonly nextAttemptAt?: Date | null;
 }
 
+export interface Backlog {
+  readonly due: number;
+  /** En eski birikim kaydının finalize edilebilir olduğu an; birikim boşsa null. */
+  readonly oldestReadyAt: Date | null;
+}
+
 export interface Journal {
   /** Bu turda değerlendirilecek job'lar, challenge'ı en erken biten önce. */
   candidates(now: Date, limit: number): Promise<Candidate[]>;
+  /** Finalize edilebilir durumda bekleyen job'lar. */
+  backlog(now: Date): Promise<Backlog>;
   /** Job'un son kayıtlarından aynı sebeple ardışık bekletme ya da hata sayısı. */
   consecutive(job: string, reason: KeeperReason): Promise<number>;
   write(entry: JournalEntry, at: Date): Promise<void>;
@@ -56,6 +69,35 @@ export function createJournal(db: PrismaClient): Journal {
         ORDER BY j.challenge_end ASC, j.address ASC
         LIMIT ${limit}`;
       return rows.map((row) => ({ job: row.job, lastReason: row.reason }));
+    },
+
+    async backlog(now) {
+      const seconds = BigInt(Math.floor(now.getTime() / 1000));
+      const [row] = await db.$queryRaw<{ due: number; oldest: Date | null }[]>`
+        SELECT count(*)::int AS due, min(ready_at) AS oldest FROM (
+          SELECT GREATEST(to_timestamp(j.challenge_end::double precision), wake.at) AS ready_at
+          FROM jobs j
+          LEFT JOIN LATERAL (
+            SELECT k.outcome, k.reason, k.at FROM keeper_actions k
+            WHERE k.job = j.address ORDER BY k.at DESC, k.id DESC LIMIT 1
+          ) last ON true
+          LEFT JOIN LATERAL (
+            SELECT max(woken.at) AS at FROM (
+              SELECT r.indexed_at AS at FROM release_proofs r
+              WHERE last.reason IN ('proofRequired', 'staleProof') AND r.job = j.address AND r.indexed_at > last.at
+              UNION ALL
+              SELECT s.indexed_at AS at FROM screenings s
+              WHERE last.reason = 'screeningPending' AND s.indexed_at > last.at AND (s.wallet = j.agent_wallet
+                OR s.wallet IN (SELECT c.buyer FROM claims c WHERE c.job = j.address AND c.buyer IS NOT NULL))
+            ) woken
+          ) wake ON true
+          WHERE j.status = 'delivered' AND j.challenge_end <= ${seconds} AND j.closed_slot IS NULL
+            AND (last.outcome IS NULL OR last.outcome <> 'confirmed')
+            AND (last.reason IS NULL
+              OR last.reason NOT IN ('proofRequired', 'staleProof', 'screeningPending', 'unprofitable')
+              OR wake.at IS NOT NULL)
+        ) due`;
+      return { due: row?.due ?? 0, oldestReadyAt: row?.oldest ?? null };
     },
 
     async consecutive(job, reason) {

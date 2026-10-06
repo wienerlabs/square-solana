@@ -11,6 +11,7 @@ Proje belgeleri. Mevcut olanlar bağlantılı; diğerleri ilgili issue ile eklen
 | [`api/`](api/) | [OpenAPI 3.1 spec](api/openapi.yaml) (28 operasyon); [`schemas/idl.json`](api/schemas/idl.json) IDL'den üretilen JSON Schema'lar, elle düzenlenmez | [BE-35] |
 | [`provenance/`](provenance/) | taşınan dizinlerin kaynak repo, commit ve yöntem kayıtları (issue başına bir dosya) | [BC-04], [BC-05], [BC-06], [BC-07], [BE-02] |
 | [`ci.md`](ci.md) | CI kontrolleri, program durum listesi, sır taraması, verifiable build ve merge kuralı | [BE-03], [BC-12], [BC-13] |
+| [`slo.md`](slo.md) | SLO'lar, hata bütçesi ve burn-rate politikası; panolar ve alarm kuralları [`infra/monitoring/`](../infra/monitoring/)'da | [BE-33] |
 | [`licensing.md`](licensing.md) | lisans politikası: proje lisansı, taşınan kodun bildirimleri, bağımlılık lisansları | [BC-02] |
 | [`THIRD_PARTY_LICENSES.md`](THIRD_PARTY_LICENSES.md) | üçüncü taraf lisans envanteri (üretilir) | [BC-02] |
 | `legal/relicensing/` | Covenant LGPL kodu için yazılı yeniden lisanslama onayları | [BC-03] |
@@ -36,4 +37,5 @@ Proje belgeleri. Mevcut olanlar bağlantılı; diğerleri ilgili issue ile eklen
 [BE-02]: https://github.com/wienerlabs/square-solana/issues/16
 [BE-06]: https://github.com/wienerlabs/square-solana/issues/20
 [BE-35]: https://github.com/wienerlabs/square-solana/issues/102
+[BE-33]: https://github.com/wienerlabs/square-solana/issues/95
 [BE-03]: https://github.com/wienerlabs/square-solana/issues/17

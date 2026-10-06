@@ -1,0 +1,236 @@
+# Square SLO kuralları (BE-33). Tanımlar ve hedefler: docs/slo.md. Kayıt kuralları her SLO'nun hata oranını
+# dört pencerede hesaplar; alarmlar SRE Workbook'un çok pencereli burn-rate yöntemidir: 1 saatte 30 günlük
+# bütçenin %2'si (14.4x, uzun ve kısa pencere birlikte) sayfa, 6 saatte %5'i (6x) bilet. Eşik hedeflerle
+# birlikte değişir: burn × (1 − hedef). Zaman tabanlı SLO'lar (senkron, birikim, canlılık) eşik ve süreyle
+# alarmdır. Doğrulama: node --test scripts/ci/monitoring.test.mjs (PromQL sözdizimi ve metrik adları).
+groups:
+  - name: square-slo-recording
+    interval: 30s
+    rules:
+      - record: slo:indexer_freshness:error_ratio_rate5m
+        expr: '1 - (sum(rate(indexer_ingest_delay_seconds_bucket{le="60"}[5m])) / sum(rate(indexer_ingest_delay_seconds_count[5m])))'
+      - record: slo:indexer_freshness:error_ratio_rate30m
+        expr: '1 - (sum(rate(indexer_ingest_delay_seconds_bucket{le="60"}[30m])) / sum(rate(indexer_ingest_delay_seconds_count[30m])))'
+      - record: slo:indexer_freshness:error_ratio_rate1h
+        expr: '1 - (sum(rate(indexer_ingest_delay_seconds_bucket{le="60"}[1h])) / sum(rate(indexer_ingest_delay_seconds_count[1h])))'
+      - record: slo:indexer_freshness:error_ratio_rate6h
+        expr: '1 - (sum(rate(indexer_ingest_delay_seconds_bucket{le="60"}[6h])) / sum(rate(indexer_ingest_delay_seconds_count[6h])))'
+      - record: slo:keeper_finalize:error_ratio_rate5m
+        expr: '1 - (sum(rate(keeper_finalize_delay_seconds_bucket{gate="none",le="600"}[5m])) / sum(rate(keeper_finalize_delay_seconds_count{gate="none"}[5m])))'
+      - record: slo:keeper_finalize:error_ratio_rate30m
+        expr: '1 - (sum(rate(keeper_finalize_delay_seconds_bucket{gate="none",le="600"}[30m])) / sum(rate(keeper_finalize_delay_seconds_count{gate="none"}[30m])))'
+      - record: slo:keeper_finalize:error_ratio_rate1h
+        expr: '1 - (sum(rate(keeper_finalize_delay_seconds_bucket{gate="none",le="600"}[1h])) / sum(rate(keeper_finalize_delay_seconds_count{gate="none"}[1h])))'
+      - record: slo:keeper_finalize:error_ratio_rate6h
+        expr: '1 - (sum(rate(keeper_finalize_delay_seconds_bucket{gate="none",le="600"}[6h])) / sum(rate(keeper_finalize_delay_seconds_count{gate="none"}[6h])))'
+      - record: slo:prover_availability:error_ratio_rate5m
+        expr: 'sum(rate(prover_proofs_total{result=~"capacity|error"}[5m])) / sum(rate(prover_proofs_total[5m]))'
+      - record: slo:prover_availability:error_ratio_rate30m
+        expr: 'sum(rate(prover_proofs_total{result=~"capacity|error"}[30m])) / sum(rate(prover_proofs_total[30m]))'
+      - record: slo:prover_availability:error_ratio_rate1h
+        expr: 'sum(rate(prover_proofs_total{result=~"capacity|error"}[1h])) / sum(rate(prover_proofs_total[1h]))'
+      - record: slo:prover_availability:error_ratio_rate6h
+        expr: 'sum(rate(prover_proofs_total{result=~"capacity|error"}[6h])) / sum(rate(prover_proofs_total[6h]))'
+      - record: slo:prover_latency:error_ratio_rate5m
+        expr: '1 - (sum(rate(prover_proving_seconds_bucket{le="5"}[5m])) / sum(rate(prover_proving_seconds_count[5m])))'
+      - record: slo:prover_latency:error_ratio_rate30m
+        expr: '1 - (sum(rate(prover_proving_seconds_bucket{le="5"}[30m])) / sum(rate(prover_proving_seconds_count[30m])))'
+      - record: slo:prover_latency:error_ratio_rate1h
+        expr: '1 - (sum(rate(prover_proving_seconds_bucket{le="5"}[1h])) / sum(rate(prover_proving_seconds_count[1h])))'
+      - record: slo:prover_latency:error_ratio_rate6h
+        expr: '1 - (sum(rate(prover_proving_seconds_bucket{le="5"}[6h])) / sum(rate(prover_proving_seconds_count[6h])))'
+      - record: slo:api_availability:error_ratio_rate5m
+        expr: 'sum(rate(http_requests_total{service="@squaresdk/solana-api",status=~"5.."}[5m])) / sum(rate(http_requests_total{service="@squaresdk/solana-api"}[5m]))'
+      - record: slo:api_availability:error_ratio_rate30m
+        expr: 'sum(rate(http_requests_total{service="@squaresdk/solana-api",status=~"5.."}[30m])) / sum(rate(http_requests_total{service="@squaresdk/solana-api"}[30m]))'
+      - record: slo:api_availability:error_ratio_rate1h
+        expr: 'sum(rate(http_requests_total{service="@squaresdk/solana-api",status=~"5.."}[1h])) / sum(rate(http_requests_total{service="@squaresdk/solana-api"}[1h]))'
+      - record: slo:api_availability:error_ratio_rate6h
+        expr: 'sum(rate(http_requests_total{service="@squaresdk/solana-api",status=~"5.."}[6h])) / sum(rate(http_requests_total{service="@squaresdk/solana-api"}[6h]))'
+      - record: slo:api_latency:error_ratio_rate5m
+        expr: '1 - (sum(rate(http_request_duration_seconds_bucket{service="@squaresdk/solana-api",le="1"}[5m])) / sum(rate(http_request_duration_seconds_count{service="@squaresdk/solana-api"}[5m])))'
+      - record: slo:api_latency:error_ratio_rate30m
+        expr: '1 - (sum(rate(http_request_duration_seconds_bucket{service="@squaresdk/solana-api",le="1"}[30m])) / sum(rate(http_request_duration_seconds_count{service="@squaresdk/solana-api"}[30m])))'
+      - record: slo:api_latency:error_ratio_rate1h
+        expr: '1 - (sum(rate(http_request_duration_seconds_bucket{service="@squaresdk/solana-api",le="1"}[1h])) / sum(rate(http_request_duration_seconds_count{service="@squaresdk/solana-api"}[1h])))'
+      - record: slo:api_latency:error_ratio_rate6h
+        expr: '1 - (sum(rate(http_request_duration_seconds_bucket{service="@squaresdk/solana-api",le="1"}[6h])) / sum(rate(http_request_duration_seconds_count{service="@squaresdk/solana-api"}[6h])))'
+  - name: square-slo-burn-rate
+    rules:
+      - alert: SLOBurnRate_indexer_freshness_page
+        expr: slo:indexer_freshness:error_ratio_rate1h > 0.144 and slo:indexer_freshness:error_ratio_rate5m > 0.144
+        for: 2m
+        labels:
+          severity: critical
+          slo: indexer_freshness
+        annotations:
+          summary: 'indexer_freshness: hata bütçesi 14.4x hızla tükeniyor (1h ve 5m)'
+          description: "Canlı tx'lerin 60 s içinde indexlenmeyen payı; hedef %99.0. Bkz. docs/slo.md."
+      - alert: SLOBurnRate_indexer_freshness_ticket
+        expr: slo:indexer_freshness:error_ratio_rate6h > 0.06 and slo:indexer_freshness:error_ratio_rate30m > 0.06
+        for: 15m
+        labels:
+          severity: warning
+          slo: indexer_freshness
+        annotations:
+          summary: 'indexer_freshness: hata bütçesi 6x hızla tükeniyor (6h ve 30m)'
+          description: "Canlı tx'lerin 60 s içinde indexlenmeyen payı; hedef %99.0. Bkz. docs/slo.md."
+      - alert: SLOBurnRate_keeper_finalize_page
+        expr: slo:keeper_finalize:error_ratio_rate1h > 0.144 and slo:keeper_finalize:error_ratio_rate5m > 0.144
+        for: 2m
+        labels:
+          severity: critical
+          slo: keeper_finalize
+        annotations:
+          summary: 'keeper_finalize: hata bütçesi 14.4x hızla tükeniyor (1h ve 5m)'
+          description: 'Politikasız işlerde challenge bitişinden 600 s içinde onaylanmayan finalize payı; hedef %99.0. Bkz. docs/slo.md.'
+      - alert: SLOBurnRate_keeper_finalize_ticket
+        expr: slo:keeper_finalize:error_ratio_rate6h > 0.06 and slo:keeper_finalize:error_ratio_rate30m > 0.06
+        for: 15m
+        labels:
+          severity: warning
+          slo: keeper_finalize
+        annotations:
+          summary: 'keeper_finalize: hata bütçesi 6x hızla tükeniyor (6h ve 30m)'
+          description: 'Politikasız işlerde challenge bitişinden 600 s içinde onaylanmayan finalize payı; hedef %99.0. Bkz. docs/slo.md.'
+      - alert: SLOBurnRate_prover_availability_page
+        expr: slo:prover_availability:error_ratio_rate1h > 0.144 and slo:prover_availability:error_ratio_rate5m > 0.144
+        for: 2m
+        labels:
+          severity: critical
+          slo: prover_availability
+        annotations:
+          summary: 'prover_availability: hata bütçesi 14.4x hızla tükeniyor (1h ve 5m)'
+          description: 'Kapasite ya da iç hata yüzünden üretilemeyen ispat isteklerinin payı; hedef %99.0. Bkz. docs/slo.md.'
+      - alert: SLOBurnRate_prover_availability_ticket
+        expr: slo:prover_availability:error_ratio_rate6h > 0.06 and slo:prover_availability:error_ratio_rate30m > 0.06
+        for: 15m
+        labels:
+          severity: warning
+          slo: prover_availability
+        annotations:
+          summary: 'prover_availability: hata bütçesi 6x hızla tükeniyor (6h ve 30m)'
+          description: 'Kapasite ya da iç hata yüzünden üretilemeyen ispat isteklerinin payı; hedef %99.0. Bkz. docs/slo.md.'
+      - alert: SLOBurnRate_prover_latency_page
+        expr: slo:prover_latency:error_ratio_rate1h > 0.72 and slo:prover_latency:error_ratio_rate5m > 0.72
+        for: 2m
+        labels:
+          severity: critical
+          slo: prover_latency
+        annotations:
+          summary: 'prover_latency: hata bütçesi 14.4x hızla tükeniyor (1h ve 5m)'
+          description: "5 s'den uzun süren başarılı ispatların payı; hedef %95.0. Bkz. docs/slo.md."
+      - alert: SLOBurnRate_prover_latency_ticket
+        expr: slo:prover_latency:error_ratio_rate6h > 0.3 and slo:prover_latency:error_ratio_rate30m > 0.3
+        for: 15m
+        labels:
+          severity: warning
+          slo: prover_latency
+        annotations:
+          summary: 'prover_latency: hata bütçesi 6x hızla tükeniyor (6h ve 30m)'
+          description: "5 s'den uzun süren başarılı ispatların payı; hedef %95.0. Bkz. docs/slo.md."
+      - alert: SLOBurnRate_api_availability_page
+        expr: slo:api_availability:error_ratio_rate1h > 0.072 and slo:api_availability:error_ratio_rate5m > 0.072
+        for: 2m
+        labels:
+          severity: critical
+          slo: api_availability
+        annotations:
+          summary: 'api_availability: hata bütçesi 14.4x hızla tükeniyor (1h ve 5m)'
+          description: "API'nin 5xx yanıt payı; hedef %99.5. Bkz. docs/slo.md."
+      - alert: SLOBurnRate_api_availability_ticket
+        expr: slo:api_availability:error_ratio_rate6h > 0.03 and slo:api_availability:error_ratio_rate30m > 0.03
+        for: 15m
+        labels:
+          severity: warning
+          slo: api_availability
+        annotations:
+          summary: 'api_availability: hata bütçesi 6x hızla tükeniyor (6h ve 30m)'
+          description: "API'nin 5xx yanıt payı; hedef %99.5. Bkz. docs/slo.md."
+      - alert: SLOBurnRate_api_latency_page
+        expr: slo:api_latency:error_ratio_rate1h > 0.144 and slo:api_latency:error_ratio_rate5m > 0.144
+        for: 2m
+        labels:
+          severity: critical
+          slo: api_latency
+        annotations:
+          summary: 'api_latency: hata bütçesi 14.4x hızla tükeniyor (1h ve 5m)'
+          description: "API'de 1 s'den uzun süren isteklerin payı; hedef %99.0. Bkz. docs/slo.md."
+      - alert: SLOBurnRate_api_latency_ticket
+        expr: slo:api_latency:error_ratio_rate6h > 0.06 and slo:api_latency:error_ratio_rate30m > 0.06
+        for: 15m
+        labels:
+          severity: warning
+          slo: api_latency
+        annotations:
+          summary: 'api_latency: hata bütçesi 6x hızla tükeniyor (6h ve 30m)'
+          description: "API'de 1 s'den uzun süren isteklerin payı; hedef %99.0. Bkz. docs/slo.md."
+  - name: square-slo-thresholds
+    rules:
+      - alert: IndexerLagging
+        expr: 'max(indexer_sync_lag_slots) > 150'
+        for: 10m
+        labels:
+          severity: warning
+          slo: indexer_sync
+        annotations:
+          summary: "Indexer kesinleşmiş ucun 150 slot'tan (~60 s) fazla gerisinde"
+          description: 'Bkz. docs/slo.md.'
+      - alert: IndexerStalled
+        expr: 'time() - max(indexer_last_poll_timestamp_seconds) > 300'
+        labels:
+          severity: critical
+          slo: indexer_sync
+        annotations:
+          summary: 'Indexer 5 dakikadır başarılı tarama yapmadı'
+          description: 'Bkz. docs/slo.md.'
+      - alert: IndexerMetricsAbsent
+        expr: 'absent_over_time(indexer_last_poll_timestamp_seconds[10m])'
+        labels:
+          severity: critical
+          slo: indexer_sync
+        annotations:
+          summary: 'Indexer metrikleri 10 dakikadır okunamıyor'
+          description: 'Bkz. docs/slo.md.'
+      - alert: KeeperBacklog
+        expr: 'max(keeper_oldest_due_seconds) > 600'
+        for: 5m
+        labels:
+          severity: critical
+          slo: keeper_backlog
+        annotations:
+          summary: 'Finalize edilebilir bir job 10 dakikadan uzun süredir bekliyor'
+          description: 'Bkz. docs/slo.md.'
+      - alert: KeeperStalled
+        expr: 'time() - max(keeper_last_round_timestamp_seconds) > 300'
+        labels:
+          severity: critical
+          slo: keeper_backlog
+        annotations:
+          summary: 'Keeper 5 dakikadır başarılı tur yapmadı'
+          description: 'Bkz. docs/slo.md.'
+      - alert: KeeperMetricsAbsent
+        expr: 'absent_over_time(keeper_last_round_timestamp_seconds[10m])'
+        labels:
+          severity: critical
+          slo: keeper_backlog
+        annotations:
+          summary: 'Keeper metrikleri 10 dakikadır okunamıyor'
+          description: 'Bkz. docs/slo.md.'
+      - alert: ProverQueueBacklog
+        expr: 'max(prover_queued_requests) > 0'
+        for: 10m
+        labels:
+          severity: warning
+          slo: prover_availability
+        annotations:
+          summary: 'Prover kuyruğu 10 dakikadır boşalmıyor: kapasite talebi karşılamıyor'
+          description: 'Bkz. docs/slo.md.'
+      - alert: ServiceAlarmFiring
+        expr: 'max by (service, alarm) (square_alarm_firing) == 1'
+        labels:
+          severity: warning
+          slo: service_alarm
+        annotations:
+          summary: 'Servisin kendi eşik alarmı çalıyor'
+          description: 'Bkz. docs/slo.md.'
