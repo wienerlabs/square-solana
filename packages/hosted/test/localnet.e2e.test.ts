@@ -5,6 +5,8 @@
 // `create_job` + `fund_job` gönderir; politika tavanını aşan delegasyon tx'siz reddedilir. Yalnızca SQUARE_LOCALNET=1
 // ile koşar; programlar `anchor build` çıktısıdır (`SQUARE_DEPLOY_DIR`, varsayılan repo kökündeki target/deploy).
 // Teslimat Square API'sinin sözleşmesindeki uca gider; API'nin kendisi burada çalıştırılmaz (sahte fetch).
+// HOSTED_E2E_REAL_CLAUDE=1 (ve ANTHROPIC_API_KEY) ile MCP tool'lu capability gerçek Claude API'siyle koşar; delegasyon
+// senaryosu belirli tool çağrılarına dayandığı için sahte istemcide kalır ve bu modda koşmaz.
 import { spawn, type ChildProcess } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -35,6 +37,10 @@ import { fakeClaude, lastToolResults, text, toolUse } from './helpers/claude.js'
 import { LIMITS, policyDocument, rawConfig } from './helpers/config.js';
 
 const ENABLED = process.env.SQUARE_LOCALNET === '1';
+const REAL_CLAUDE = process.env.HOSTED_E2E_REAL_CLAUDE === '1';
+/** Gerçek Claude'a capability talimatı: sonucu tool'dan alır, sabit biçimde döner. */
+const WORD_COUNT_INSTRUCTIONS =
+  "Count the words of the user's text with the word_count tool. Reply with exactly `kelime sayısı: <count>` and nothing else.";
 const REPO_ROOT = fileURLToPath(new URL('../../..', import.meta.url));
 const DEPLOY_DIR = process.env.SQUARE_DEPLOY_DIR ?? join(REPO_ROOT, 'target', 'deploy');
 const RPC_PORT = Number(process.env.SQUARE_LOCALNET_RPC_PORT ?? 18_899);
@@ -287,7 +293,11 @@ describe.skipIf(!ENABLED)('localnet: yapılandırmadan hosted agent → teslim; 
             reconnect: { maxAttempts: 2, backoffMs: 50, maxBackoffMs: 200 },
           },
           capabilities: [
-            { ...base.capabilities[0], tools: [{ server: 'tools', allow: ['word_count'] }] },
+            {
+              ...base.capabilities[0],
+              tools: [{ server: 'tools', allow: ['word_count'] }],
+              ...(REAL_CLAUDE && { instructions: WORD_COUNT_INSTRUCTIONS }),
+            },
             {
               id: 'research.delegate',
               name: 'Delegasyon',
@@ -346,7 +356,7 @@ describe.skipIf(!ENABLED)('localnet: yapılandırmadan hosted agent → teslim; 
     const started = await runFromConfig(
       { config: join(dir, 'hosted.yaml'), check: false },
       { SQUARE_API_KEY: 'sqk_test', DATABASE_URL: db!.url, TOOLS_MCP_CALL_LOG: join(dir, 'calls.log') },
-      { anthropic: fake.client, extra: { api: api.client() } },
+      REAL_CLAUDE ? { extra: { api: api.client() } } : { anthropic: fake.client, extra: { api: api.client() } },
     );
     hosted = started.hosted!;
     const url = `http://127.0.0.1:${(hosted.server!.address() as AddressInfo).port}`;
@@ -417,6 +427,8 @@ describe.skipIf(!ENABLED)('localnet: yapılandırmadan hosted agent → teslim; 
         .split('\n')
         .map((l) => JSON.parse(l).tool),
     ).toEqual(['word_count']);
+
+    if (REAL_CLAUDE) return;
 
     // 2) Delegasyon: izinli tutar gerçek create_job + fund_job; işlem başı tavanı (5) aşan tx'siz reddedilir.
     const institutionAta = await getOrCreateAssociatedTokenAccount(connection, admin, mint, institution.publicKey);

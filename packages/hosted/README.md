@@ -235,13 +235,19 @@ benzetim zinciri verir.
 ```bash
 pnpm --filter @squaresdk/solana-hosted test           # Docker gerekir (Postgres görev deposu)
 SQUARE_LOCALNET=1 pnpm --filter @squaresdk/solana-hosted test:localnet
+# MCP tool'lu capability gerçek Claude API'siyle (anahtar ortamdan):
+ANTHROPIC_API_KEY=<anahtar> HOSTED_E2E_REAL_CLAUDE=1 SQUARE_LOCALNET=1 pnpm --filter @squaresdk/solana-hosted test:localnet
 ```
 
-Gerçek Claude API'si hiçbir testte çağrılmaz. Messages istemcisi enjekte edilir (`test/helpers/claude.ts`).
+Birim ve kabul testlerinde Messages istemcisi enjekte edilir (`test/helpers/claude.ts`). Gerçek Claude API'si yalnızca
+`HOSTED_E2E_REAL_CLAUDE=1` ile localnet testinde çağrılır.
+- **Bu modda:** Claude, işi MCP sunucusundaki `word_count` tool'uyla yürütür. Sonuç gerçek programlarla teslim edilir.
+- **Delegasyon:** Senaryo belirli tool çağrılarına dayandığı için sahte istemcide kalır.
+- **Koşu:** 2026-10-06'da `claude-opus-5-5` ile koşturuldu ve geçti.
 
 | Test | Kapsam |
 |---|---|
-| `test/config.test.ts` | Şema: örnek dosyalar, JSON / YAML, yol çözümü; geçersiz yapılandırma ve politikanın reddi; ortam |
+| `test/config.test.ts` | Şema: JSON / YAML, yol çözümü; geçersiz yapılandırma ve politikanın reddi; ortam |
 | `test/claude.test.ts` | Tool döngüsü (tool sonucu, paralel çağrı, `pause_turn`); allowlist dışı adın reddi; tur ve token sınırları, ret, kesik yanıt; MCP tool dönüşümü (bellek içi MCP sunucusu) |
 | `test/runtime.test.ts` | İzolasyon: allowlist, zaman sınırı, eşzamanlılık ve kuyruk, iptal, kapatma, bir capability çökerken diğerinin sürmesi |
 | `test/guard.test.ts` | Politika kuralları: sınır değerler, günlük tavanlar, mint, payee, kategori, zaman penceresi, çoklu ihlal |
@@ -268,8 +274,6 @@ talimatları IDL ile çözer ve şu talimatları programların durum kurallarıy
 
 ## Kalan
 
-- **Gerçek Claude API'si:** Testlerde çağrılmadı (anahtar yok). Döngü Messages API'sinin tool use sözleşmesine
-  göredir, istemci enjekte edilir.
 - **Teslimat yükleme:** Square API'sinin sözleşmesindeki uca gider. Testlerde API (`apps/api`) çalıştırılmaz; sahte
   fetch kullanılır.
 - **İspat bağlama:** Gerçek prover ve devre artefaktlarıyla uçtan uca denenmedi. Testte izleyici enjekte edilir;
