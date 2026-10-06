@@ -36,6 +36,7 @@ const ENV = {
   KEEPER_MAX_COMPUTE_UNIT_PRICE: '100000',
   KEEPER_ALERT_MIN_BALANCE_LAMPORTS: '100000000',
   KEEPER_ALERT_STALL_SECONDS: '300',
+  KEEPER_ALERT_DUE_SECONDS: '600',
   KEEPER_ALERT_ERRORS: '5',
   KEEPER_ALERT_ERROR_WINDOW_SECONDS: '600',
   LOG_LEVEL: 'info',
@@ -82,17 +83,19 @@ describe('yapılandırma', () => {
 });
 
 describe('alarmlar', () => {
-  it('düşük bakiye eksiği, durma süresi ve hatalar', () => {
+  it('düşük bakiye eksiği, durma süresi, birikim ve hatalar', () => {
     let now = 10_000;
     let balance: bigint | null = null;
     let round: number | null = null;
+    let oldestDue: number | null = null;
     const errors = createEventWindow({ windowSeconds: 60, clock: () => now });
     const rules = keeperAlarmRules({
       lastRoundAt: () => round,
       lastBalance: () => balance,
+      oldestDueSeconds: () => oldestDue,
       startedAt: 4_000,
       errors,
-      thresholds: { minBalanceLamports: 1_000n, stallSeconds: 300, errors: 5, errorWindowSeconds: 60 },
+      thresholds: { minBalanceLamports: 1_000n, stallSeconds: 300, dueSeconds: 600, errors: 5, errorWindowSeconds: 60 },
       clock: () => now,
     });
     const read = (name: string) => rules.find((rule) => rule.name === name)!.read();
@@ -104,6 +107,10 @@ describe('alarmlar', () => {
     expect(read('keeper_stalled')).toBe(6);
     round = 9_000;
     expect(read('keeper_stalled')).toBe(1);
+    expect(read('keeper_backlog')).toBe(0);
+    oldestDue = 900;
+    expect(read('keeper_backlog')).toBe(900);
+    expect(rules.find((rule) => rule.name === 'keeper_backlog')!.above).toBe(600);
     errors.record();
     expect(read('keeper_errors')).toBe(1);
     now += 1;

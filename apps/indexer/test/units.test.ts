@@ -19,6 +19,7 @@ const BASE_ENV = {
   INDEXER_SIGNATURE_PAGE_SIZE: '1000',
   INDEXER_RECONCILE_INTERVAL_SECONDS: '600',
   INDEXER_ALERT_STALL_SECONDS: '120',
+  INDEXER_ALERT_LAG_SLOTS: '150',
   INDEXER_ALERT_DRIFT: '0',
   INDEXER_ALERT_ERRORS: '5',
   INDEXER_ALERT_ERROR_WINDOW_SECONDS: '60',
@@ -114,30 +115,36 @@ describe('döngü', () => {
 });
 
 describe('alarm kuralları', () => {
-  it('durma süresi, sapma ve hata sayısı', () => {
+  it('durma süresi, senkron gecikmesi, sapma ve hata sayısı', () => {
     let now = 10_000;
     let lastPoll: number | null = null;
+    let lag: number | null = null;
     let drift: number | null = null;
     const errors = createEventWindow({ windowSeconds: 60, clock: () => now });
     const rules = indexerAlarmRules({
       lastPollAt: () => lastPoll,
       startedAt: 4_000,
+      syncLag: () => lag,
       lastDrift: () => drift,
       errors,
-      thresholds: { stallSeconds: 120, drift: 0, errors: 5, errorWindowSeconds: 60 },
+      thresholds: { stallSeconds: 120, lagSlots: 150, drift: 0, errors: 5, errorWindowSeconds: 60 },
       clock: () => now,
     });
     const value = (name: string) => rules.find((rule) => rule.name === name)!.read();
     expect(value('indexer_stalled')).toBe(6);
     lastPoll = 9_000;
     expect(value('indexer_stalled')).toBe(1);
+    expect(value('indexer_lagging')).toBe(0);
+    lag = 200;
+    expect(value('indexer_lagging')).toBe(200);
+    expect(rules.find((rule) => rule.name === 'indexer_lagging')!.above).toBe(150);
     expect(value('indexer_reconcile_drift')).toBe(0);
     drift = 3;
     expect(value('indexer_reconcile_drift')).toBe(3);
     errors.record();
     expect(value('indexer_errors')).toBe(1);
     now += 1;
-    expect(rules.map((rule) => rule.severity)).toEqual(['critical', 'warning', 'critical']);
+    expect(rules.map((rule) => rule.severity)).toEqual(['critical', 'warning', 'warning', 'critical']);
   });
 });
 

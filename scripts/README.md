@@ -7,7 +7,7 @@ Init, Address Lookup Table kurulumu ve smoke SDK'yı kullandığı için bir wor
 | Konu | Issue |
 |---|---|
 | [`license/`](license/): lisans envanteri, paketlerdeki `LICENSE` / `NOTICE` kopyaları ve CI kapısı (`pnpm license:check`, `pnpm license:write`) | [BC-02] |
-| [`ci/`](ci/): TS CI'ının yardımcıları: PR'da derleme ve test kapsamı (`turbo-scope.mjs`), paket kurulum smoke'u (`pack-smoke.mjs`), migration kuralları (`migrations-guard.mjs`); testleri `node --test "scripts/ci/*.test.mjs"` | [BE-03] |
+| [`ci/`](ci/): TS CI'ının yardımcıları: PR'da derleme ve test kapsamı (`turbo-scope.mjs`), paket kurulum smoke'u (`pack-smoke.mjs`), migration kuralları (`migrations-guard.mjs`), izleme kuralları ve panosunun servis metrikleriyle uyumu (`monitoring.mjs`, BE-33); testleri `node --test "scripts/ci/*.test.mjs"` | [BE-03] |
 | [`ci/`](ci/): program CI'ı: programların sözleşmeye göre durumu (`programs.mjs`), program IDL'lerinin sözleşmeyle uyumu (`idl-conformance.mjs`), Rust biçim ve lint kapsamı (`rust-lint.mjs`), araç sürümlerinin `Anchor.toml` ile aynılığı (`toolchain.mjs`) ([docs/ci.md](../docs/ci.md)) | [BC-13] |
 | [`security/`](security/): gitleaks çalıştırıcısı (`gitleaks.mjs`: `staged` kancada, `history` CI'da ve `pnpm secrets:scan`'de), sabitlenen sürüm (`gitleaks.env`), Solana kurallarının testi (`gitleaks-rules.check.mjs`, gitleaks ister) | [BC-13] |
 | [`hooks/`](hooks/): `pnpm install`'da git kancalarını `.githooks/`'a bağlar (`install.mjs`) | [BC-13] |

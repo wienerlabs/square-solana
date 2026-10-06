@@ -109,11 +109,19 @@ Her karar `keeper_actions`'a yazılır; API bunu `GET /v1/keeper/actions` ile su
 - `keeper_fees_earned_total`
 - `keeper_balance_lamports`
 - `keeper_last_round_timestamp_seconds`
+- Gecikme ([SLO'lar](../../docs/slo.md)):
+  - `keeper_finalize_delay_seconds{gate}`: Challenge penceresinin bitişinden finalize'ın onayına geçen süre
+    (histogram). `gate="none"` politikasız iş, `gate="proof"` politikalı iş; ikincisine kurumun ispatı
+    bağlaması da girer.
+  - `keeper_due_jobs`, `keeper_oldest_due_seconds`: Tur başında finalize edilebilir durumda bekleyen job'lar ve
+    en eskisinin bekleme süresi. İspat, screening ya da kârlılık yüzünden bekletilen job sayılmaz. Beklenen
+    kayıt (ispat ya da screening) indexlenince job o andan itibaren yeniden sayılır.
 
 **Alarmlar:**
 - `keeper_low_balance`: Bakiye `KEEPER_ALERT_MIN_BALANCE_LAMPORTS`'un altında; işlem ücreti ve rent
   ödenemeyebilir.
 - `keeper_stalled`: İki crank'ten birinin son başarılı turu `KEEPER_ALERT_STALL_SECONDS` önce.
+- `keeper_backlog`: Finalize edilebilir bir job `KEEPER_ALERT_DUE_SECONDS`'tan uzun süredir bekliyor.
 - `keeper_errors`: Başarısız finalize / lapse ve tur hataları pencerede eşiğin üstünde.
 
 ## Testler

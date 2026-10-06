@@ -9,7 +9,7 @@ square_registry `record_screening`) yazar. Escrow bu kaydı okur:
 
 Kayıt `status == Clear` ve `expires_at > now` değilse işlem durur
 ([program arayüzü](../../docs/design/program-interface.md) §10.1, [ADR 0013](../../docs/decisions/0013-release-keeper-ucreti-iade-ve-itibar.md)).
-Kaynak ve sağlayıcı seçimi: [ADR 0017](../../docs/decisions/0017-sanctions-screening-kaynaklari-ve-saglayici.md).
+Kaynak ve sağlayıcı seçimi: [ADR 0020](../../docs/decisions/0020-sanctions-screening-kaynaklari-ve-saglayici.md).
 
 ## Akış
 

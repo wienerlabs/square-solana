@@ -108,6 +108,14 @@ describe('createApiClient', () => {
       [() => api.getScreening(job), 'GET', `/api/v1/screening/${job}`],
       [() => api.listEvents({ fromSlot: 5 }), 'GET', '/api/v1/events?fromSlot=5'],
       [() => api.listKeeperActions({ outcome: 'failed' }), 'GET', '/api/v1/keeper/actions?outcome=failed'],
+      [() => api.putTravelRule(job, { record: {} as never }), 'PUT', `/api/v1/jobs/${job}/travel-rule`],
+      [() => api.getTravelRule(job), 'GET', `/api/v1/jobs/${job}/travel-rule`],
+      [
+        () => api.createTravelRuleGrant(job, { grantee: job, purpose: 'karşı VASP', expiresAt: 1 }),
+        'POST',
+        `/api/v1/jobs/${job}/travel-rule/grants`,
+      ],
+      [() => api.listTravelRuleAccess(job, { page: 2 }), 'GET', `/api/v1/jobs/${job}/travel-rule/access?page=2`],
       [() => api.prepareTx({} as never), 'POST', '/api/v1/tx'],
       [() => api.prove({} as never), 'POST', '/api/v1/prove'],
       [() => api.getHealth(), 'GET', '/api/health'],
@@ -183,6 +191,8 @@ describe('createApiClient', () => {
     respond = () => ({ status: 204 });
     await expect(api.deleteApiKey('a/b')).resolves.toBeUndefined();
     expect(last().url).toBe('/api/v1/api-keys/a%2Fb');
+    await expect(api.deleteTravelRuleGrant(job, job)).resolves.toBeUndefined();
+    expect(last()).toMatchObject({ method: 'DELETE', url: `/api/v1/jobs/${job}/travel-rule/grants/${job}` });
     respond = () => ({ status: 502, body: '<html>bad gateway</html>' });
     await expect(api.getJob(job)).rejects.toBeInstanceOf(ApiClientError);
     await expect(api.deleteSession()).rejects.toThrow(/beklenmeyen yanıt \(502\)/);

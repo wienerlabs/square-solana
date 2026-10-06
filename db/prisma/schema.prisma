@@ -721,25 +721,75 @@ model CctpTransfer {
   @@map("cctp_transfers")
 }
 
-// ---------------------------------------------------------------- Travel Rule
+// ---------------------------------------------------------------- Travel Rule (BE-23, ADR 0017)
 
-/// Travel Rule verisi (BE-23). Yalnızca şifreli tutulur (zarf şifreleme: veri anahtarı KMS'te);
-/// zincirde yalnızca commitment vardır (`TravelRuleCommitted`). Düz metin sütunu yoktur.
+/// Job'un Travel Rule kaydı. Kayıt ve salt zarf şifrelemesiyle saklanır: kaydı şifreleyen veri anahtarı
+/// `key_id`'li ana anahtarla sarılıdır; düz metin sütunu yoktur. Zincirde yalnızca commitment vardır
+/// (`TravelRuleCommitted`). Saklama süresi dolunca şifreli alanlar silinir (`purged_at`); commitment ve özet kalır.
 model TravelRuleRecord {
-  id         String   @id @default(uuid()) @db.Uuid
-  job        String   @unique @db.VarChar(44)
-  /// Zincirdeki commitment.
-  commitment String   @db.Char(64)
-  ciphertext Bytes
-  /// Şifreleme algoritması (ör. AEAD adı) ve IV / nonce.
-  algorithm  String   @db.Text
-  iv         Bytes
-  /// Veri anahtarını saran KMS anahtarının kimliği ve sarılmış veri anahtarı.
-  kmsKeyId   String   @map("kms_key_id") @db.Text
-  wrappedKey Bytes    @map("wrapped_key")
-  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  id           String    @id @default(uuid()) @db.Uuid
+  job          String    @unique @db.VarChar(44)
+  /// `sha256("square/travel-rule/v1" ‖ job ‖ salt ‖ record_digest)`.
+  commitment   String    @db.Char(64)
+  /// Kaydın RFC 8785 kanonik JSON'unun SHA-256'sı.
+  recordDigest String    @map("record_digest") @db.Char(64)
+  /// Şifreli `{ record, salt }` ve GCM etiketi (son 16 bayt).
+  ciphertext   Bytes?
+  /// AEAD adı (`aes-256-gcm`).
+  algorithm    String?   @db.Text
+  /// `ciphertext`'in IV'si.
+  iv           Bytes?
+  /// Veri anahtarını saran ana anahtarın kimliği (`TRAVEL_RULE_KEYS`).
+  keyId        String?   @map("key_id") @db.VarChar(32)
+  /// Sarılmış veri anahtarı: IV (12) ‖ şifreli anahtar ‖ GCM etiketi (16).
+  wrappedKey   Bytes?    @map("wrapped_key")
+  storedBy     String    @map("stored_by") @db.VarChar(44)
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  /// Son yazma; saklama süresi buradan sayılır.
+  storedAt     DateTime  @map("stored_at") @db.Timestamptz(3)
+  retainUntil  DateTime  @map("retain_until") @db.Timestamptz(3)
+  purgedAt     DateTime? @map("purged_at") @db.Timestamptz(3)
 
+  @@index([retainUntil])
+  @@index([keyId])
   @@map("travel_rule_records")
+}
+
+/// Kaydı okuma izni (karşı VASP, denetçi).
+model TravelRuleGrant {
+  job       String    @db.VarChar(44)
+  grantee   String    @db.VarChar(44)
+  purpose   String    @db.VarChar(200)
+  grantedBy String    @map("granted_by") @db.VarChar(44)
+  grantedAt DateTime  @map("granted_at") @db.Timestamptz(3)
+  expiresAt DateTime  @map("expires_at") @db.Timestamptz(3)
+  revokedAt DateTime? @map("revoked_at") @db.Timestamptz(3)
+
+  @@id([job, grantee])
+  @@map("travel_rule_grants")
+}
+
+enum TravelRuleAccessAction {
+  store
+  read
+  grant
+  revoke
+  purge
+}
+
+/// Erişim kaydı: kişisel veriye dokunan her işlem (yalnızca eklenir).
+model TravelRuleAccess {
+  id        String                 @id @default(uuid()) @db.Uuid
+  job       String                 @db.VarChar(44)
+  action    TravelRuleAccessAction
+  /// İşlemi yapan cüzdan; saklama süresiyle silmede null.
+  actor     String?                @db.VarChar(44)
+  grantee   String?                @db.VarChar(44)
+  requestId String?                @map("request_id") @db.Uuid
+  at        DateTime               @db.Timestamptz(3)
+
+  @@index([job, at])
+  @@map("travel_rule_accesses")
 }
 
 // ---------------------------------------------------------------- servis korumaları (BE-13)

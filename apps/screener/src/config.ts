@@ -67,7 +67,7 @@ const EnvSchema = z.object({
   /** İndirilen listenin en büyük boyutu (bayt). */
   SCREENER_OFAC_MAX_BYTES: int(1),
 
-  /** Chainalysis sanctions API anahtarı (ADR 0017). Verilmezse yalnızca OFAC listesi taranır. */
+  /** Chainalysis sanctions API anahtarı (ADR 0020). Verilmezse yalnızca OFAC listesi taranır. */
   SCREENER_CHAINALYSIS_API_KEY: optional(nonEmpty),
   /** Yukarıdaki verilince zorunlu: */
   SCREENER_CHAINALYSIS_URL: optional(baseUrl(httpsUrl)),

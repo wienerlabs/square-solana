@@ -6,13 +6,15 @@
 //    `KEEPER_MIN_MARGIN_BPS` payla aşmıyorsa kârsızdır, günlüğe yazılır.
 // 4. İmzalı tx simüle edilir; escrow'un bekleme hataları bekletme sebebi olur (`classifyFailure`).
 // 5. Gönderilir (`submitted`), onaylanınca `confirmed` ve keeper ücreti günlüğe yazılır.
+// Tur başında birikim (finalize edilebilir durumda bekleyen job'lar) ölçülür; onaylanan finalize'ın challenge
+// bitişinden bu yana geçen süresi histograma yazılır.
 import type { KeeperReason } from '@squaresdk/solana-db';
 import type { Logger } from '@squaresdk/solana-observability';
 import type { SquareClient } from '@squaresdk/solana-sdk';
 import { createAssociatedTokenAccountIdempotentInstruction } from '@solana/spl-token';
 import { PublicKey, TransactionMessage, VersionedTransaction, type Connection, type Keypair } from '@solana/web3.js';
 import { classifyFailure, nextAttemptAt, precheck, profitable, type Economics, type Outcome } from './decide.js';
-import type { Journal } from './journal.js';
+import type { FinalizeJournal } from './journal.js';
 import type { KeeperMetrics } from './metrics.js';
 import { confirmSignature, recentPriorityFee } from './send.js';
 import { keeperTokenAccount, type StateReader } from './state.js';
@@ -28,13 +30,15 @@ export interface Crank {
   lastSuccessAt(): number | null;
   /** Son okunan keeper bakiyesi (lamport); hiç okunmadıysa null. */
   lastBalance(): bigint | null;
+  /** Son turda finalize edilebilir en eski job'un bekleme süresi (saniye); hiç tur olmadıysa null. */
+  oldestDueSeconds(): number | null;
 }
 
 export interface CrankDeps {
   readonly client: SquareClient;
   readonly connection: Connection;
   readonly reader: StateReader;
-  readonly journal: Journal;
+  readonly journal: FinalizeJournal;
   readonly keeper: Keypair;
   readonly economics: Economics & { readonly priorityFeePercentile: number; readonly maxComputeUnitPrice: bigint };
   readonly backoff: { readonly baseSeconds: number; readonly maxSeconds: number };
@@ -58,6 +62,7 @@ export function createCrank(deps: CrankDeps): Crank {
   const ensuredTokenAccounts = new Set<string>();
   let lastSuccess: number | null = null;
   let balance: bigint | null = null;
+  let oldestDue: number | null = null;
 
   const rent = async (size: number) => {
     const cached = rentBySize.get(size);
@@ -180,6 +185,10 @@ export function createCrank(deps: CrankDeps): Crank {
     );
     metrics.actions.inc({ action: 'finalizePayment', outcome: 'confirmed', reason: 'none' });
     metrics.feesEarned.inc(Number(check.fee));
+    metrics.finalizeDelay.observe(
+      { gate: state.facts.job.policy === null ? 'none' : 'proof' },
+      Math.max(0, clock() / 1000 - state.facts.job.challengeEnd),
+    );
     log.info('finalize_confirmed', { job: address, signature, keeperFee: check.fee.toString() });
     return true;
   }
@@ -190,6 +199,11 @@ export function createCrank(deps: CrankDeps): Crank {
       balance = BigInt(await connection.getBalance(keeper.publicKey, 'confirmed'));
       metrics.balance.set(Number(balance));
       const keeperFeeBps = await reader.keeperFeeBps();
+      const backlog = await journal.backlog(now);
+      oldestDue =
+        backlog.oldestReadyAt === null ? 0 : Math.max(0, (now.getTime() - backlog.oldestReadyAt.getTime()) / 1000);
+      metrics.dueJobs.set(backlog.due);
+      metrics.oldestDue.set(oldestDue);
       const candidates = await journal.candidates(now, deps.batchSize);
       let confirmed = 0;
       for (const candidate of candidates) {
@@ -208,5 +222,6 @@ export function createCrank(deps: CrankDeps): Crank {
     },
     lastSuccessAt: () => lastSuccess,
     lastBalance: () => balance,
+    oldestDueSeconds: () => oldestDue,
   };
 }

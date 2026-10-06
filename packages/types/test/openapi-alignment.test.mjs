@@ -53,6 +53,17 @@ const OBJECTS = {
   ArbitrationWebhookCreated: t.ArbitrationWebhookCreatedSchema,
   ArbitrationNotification: t.ArbitrationNotificationSchema,
   Health: t.HealthSchema,
+  TravelRuleAddress: t.TravelRuleAddressSchema,
+  TravelRuleNationalId: t.TravelRuleNationalIdSchema,
+  TravelRulePerson: t.TravelRulePersonSchema,
+  TravelRuleVasp: t.TravelRuleVaspSchema,
+  TravelRuleRecord: t.TravelRuleRecordSchema,
+  TravelRulePut: t.TravelRulePutSchema,
+  TravelRuleStatus: t.TravelRuleStatusSchema,
+  TravelRuleDisclosure: t.TravelRuleDisclosureSchema,
+  TravelRuleGrantCreate: t.TravelRuleGrantCreateSchema,
+  TravelRuleGrant: t.TravelRuleGrantSchema,
+  TravelRuleAccess: t.TravelRuleAccessSchema,
 };
 
 const ENUMS = {
@@ -63,6 +74,9 @@ const ENUMS = {
   KeeperReason: t.KeeperReasonSchema,
   DisputeEvidenceRole: t.DisputeEvidenceRoleSchema,
   ArbitrationEventType: t.ArbitrationEventTypeSchema,
+  TravelRuleIdentifierType: t.TravelRuleIdentifierTypeSchema,
+  TravelRulePersonKind: t.TravelRulePersonKindSchema,
+  TravelRuleAccessAction: t.TravelRuleAccessActionSchema,
 };
 
 const acceptsUndefined = (schema) => schema.safeParse(undefined).success;
