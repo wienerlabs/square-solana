@@ -16,7 +16,9 @@ Uygulama ve servisler (pnpm workspace). `package.json` adları `@squaresdk/solan
 | [`fee-payer/`](fee-payer/) | Sponsorlu işlem servisi: kullanıcının v0 tx'ini politikaya göre denetler (izinli program / talimat, sponsor anahtarının rolü, compute budget, ALT, Squads vault mesajları), simüle eder, kullanıcı başına hız sınırı ve günlük lamport bütçesiyle imzalar ya da gönderir; maliyet metrikleri ve `sponsored_txs` günlüğü ([ADR 0022](../docs/decisions/0022-fee-payer-politikasi.md)) | [BE-27] |
 | [`screener/`](screener/) | Sanctions screening: OFAC SDN listesi ve Chainalysis API ile tarama, screener authority anahtarıyla registry `record_screening` tx'i, TTL yenileme, denetim kaydı ve API ([ADR 0017](../docs/decisions/0017-sanctions-screening-kaynaklari-ve-saglayici.md)) | [BE-16] |
 
-Tüm servisler tek veritabanını ([`db/`](../db/)) kullanır.
+Tüm servisler tek veritabanını ([`db/`](../db/)) kullanır. Her servisin Railway tanımı `<servis>/railway.json`'dır
+(`node scripts/ci/railway.mjs` workspace bağımlılıklarından üretir); ortam değişkenleri, secret'lar ve ortamlar
+[`docs/environments.md`](../docs/environments.md)'de [BE-05].
 
 [BE-01]: https://github.com/wienerlabs/square-solana/issues/15
 [BE-02]: https://github.com/wienerlabs/square-solana/issues/16

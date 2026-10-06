@@ -10,6 +10,7 @@ Proje belgeleri. Mevcut olanlar bağlantılı; diğerleri ilgili issue ile eklen
 | [`design/`](design/) | [program arayüz sözleşmesi](design/program-interface.md), [API ve SDK sözleşmesi](design/api-sdk-contract.md), [veri modeli](design/data-model.md), [normatif event şeması](design/events.md), [işlem bütçesi](design/tx-budget.md) | [BC-44], [BE-35], [BE-04], [BC-16], [BC-28] |
 | [`api/`](api/) | [OpenAPI 3.1 spec](api/openapi.yaml) (28 operasyon); [`schemas/idl.json`](api/schemas/idl.json) IDL'den üretilen JSON Schema'lar, elle düzenlenmez | [BE-35] |
 | [`provenance/`](provenance/) | taşınan dizinlerin kaynak repo, commit ve yöntem kayıtları (issue başına bir dosya) | [BC-04], [BC-05], [BC-06], [BC-07], [BE-02] |
+| [`environments.md`](environments.md) | ortamlar (PR preview, staging, production), secret politikası ve servislerin ortam değişkeni envanteri (üretilir) | [BE-05] |
 | [`ci.md`](ci.md) | CI kontrolleri, program durum listesi, sır taraması, verifiable build ve merge kuralı | [BE-03], [BC-12], [BC-13] |
 | [`licensing.md`](licensing.md) | lisans politikası: proje lisansı, taşınan kodun bildirimleri, bağımlılık lisansları | [BC-02] |
 | [`THIRD_PARTY_LICENSES.md`](THIRD_PARTY_LICENSES.md) | üçüncü taraf lisans envanteri (üretilir) | [BC-02] |
@@ -38,3 +39,4 @@ Proje belgeleri. Mevcut olanlar bağlantılı; diğerleri ilgili issue ile eklen
 [BE-06]: https://github.com/wienerlabs/square-solana/issues/20
 [BE-35]: https://github.com/wienerlabs/square-solana/issues/102
 [BE-03]: https://github.com/wienerlabs/square-solana/issues/17
+[BE-05]: https://github.com/wienerlabs/square-solana/issues/19
