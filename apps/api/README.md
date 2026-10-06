@@ -199,7 +199,8 @@ dispute'u keeper'ın lapse crank'i düşürür ([apps/keeper](../keeper/README.m
     - `dispute.raised`, `dispute.escalated`, `dispute.vote` (oyu verene gitmez), `dispute.decided`: indexer'ın
       `chain_events`'inden.
     - `dispute.deadline`: son tarihe `API_NOTIFY_DEADLINE_WARNING_SECONDS` kala, oy vermemiş arbitrator'lara bir
-      kez.
+      kez. Bir tur en çok `API_NOTIFY_BATCH_SIZE` dispute için uyarı kuyruğa alır; kuyruğa girmiş uyarılar atlanır,
+      kalanlar sonraki turlarda son tarih sırasıyla alınır.
   - Outbox: olay uç başına bir kez kuyruğa girer (`notification_outbox`, `(uç, olay)` tekil). API süreci her
     `API_NOTIFY_INTERVAL_MS`'te kuyruğu işler.
     - Satır kiralanır; birden çok API örneği aynı satırı göndermez.
