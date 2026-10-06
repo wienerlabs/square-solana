@@ -76,7 +76,10 @@ export interface WebConfig {
   lookupTable?: string;
   /** İsteğe bağlı: release ispatını üreten prover servisinin kök adresi (`apps/prover`, FE-09). */
   proverUrl?: string;
-  /** İsteğe bağlı: Square API'nin kök adresi (`apps/api`, BE-18); indexer'dan okunan veriler ve keeper günlüğü. */
+  /**
+   * İsteğe bağlı: Square API'nin kök adresi (`apps/api`, BE-18; sondaki eğik çizgi olmadan); indexer'dan okunan
+   * veriler, keeper günlüğü ve geliştirici portalı (FE-22).
+   */
   apiUrl?: string;
   /** İsteğe bağlı: CCTP ile başka zincirden fonlama (FE-19); `apiUrl` de gerekir (kayıt ve kurumun tx'i). */
   cctp?: CctpSource;
@@ -107,7 +110,9 @@ export function parseWebConfig(
 
   const proverUrl = env[ENV_VARS.proverUrl]?.trim() || undefined;
   if (proverUrl) errors.push(...urlProblems(ENV_VARS.proverUrl, proverUrl, cluster));
-  const apiUrl = env[ENV_VARS.apiUrl]?.trim() || undefined;
+
+  // Sondaki eğik çizgi olmadan: yollar buna eklenir.
+  const apiUrl = env[ENV_VARS.apiUrl]?.trim().replace(/\/+$/, '') || undefined;
   if (apiUrl) errors.push(...urlProblems(ENV_VARS.apiUrl, apiUrl, cluster));
 
   const programIds: Partial<Record<ProgramName, string>> = {};

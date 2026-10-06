@@ -77,8 +77,11 @@ stateDiagram-v2
   `ValidationRecord` üretir.
 - **Dispute:** Bir job'da en fazla bir dispute açılır. Arbitrator'lar M-of-N oy verir; ödemeyi
   `execute_resolution` yapar.
-- **Dispute'un süresi:** Süresi dolan dispute ve ispatsız bekleme kh0ra'nın PR'ında (#184) gelir
-  (`lapse_dispute`, `escalate_missing_proof`; ADR 0016).
+- **Dispute'un süresi:** Son tarihi geçen dispute `lapse_dispute` ile düşer; keeper'ın lapse crank'i bunu
+  otomatik yapar. Policy'li işte kurum ispatı bağlamazsa agent `escalate_missing_proof` ile bond'suz dispute açar
+  ([ADR 0016](decisions/0016-dispute-m-of-n-zaman-asimi-ve-ispatsiz-bekleme.md)).
+- **Zincir dışı araçlar:** Kanıt saklama (`reason_hash`), arbitrator kuyruğu, oy tx'i ve bildirimler API'dedir
+  ([apps/api](../apps/api/README.md#uyuşmazlık)).
 
 ## Event'ler
 

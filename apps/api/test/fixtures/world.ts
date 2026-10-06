@@ -158,24 +158,32 @@ export class World {
     });
   }
 
-  /** Job: ayna satırı ve (PDA çözümü için) zincirdeki hesap. `disputed` ise dispute satırı da. */
+  /**
+   * Job: ayna satırı ve (PDA çözümü için) zincirdeki hesap. `disputed` ise dispute satırı da; `dispute` dispute
+   * alanlarını (Anchor biçimi), `status` job durumunu değiştirir.
+   */
   async job(params: {
     institution: string;
     agentRecord: string;
     agentWallet: string;
     disputed?: boolean;
-    status?: 'open' | 'funded' | 'accepted';
+    status?: string;
+    amount?: bigint;
+    dispute?: Record<string, unknown>;
   }) {
     const address = key();
-    const status = params.disputed ? 'disputed' : (params.status ?? 'accepted');
+    const status = (params.status ?? (params.disputed ? 'disputed' : 'accepted')) as 'disputed';
     const value = sample(this.programs.escrow.idl, 'job', {
       institution: new PublicKey(params.institution),
       agentRecord: new PublicKey(params.agentRecord),
       agentWallet: new PublicKey(params.agentWallet),
       status: { [status]: {} },
+      ...(params.amount === undefined ? {} : { amount: new BN(params.amount.toString()) }),
       dispute: sample(this.programs.escrow.idl, 'disputeInfo', {
         raisedAt: new BN(params.disputed ? 1_790_000_500 : 0),
         resolution: { pending: {} },
+        lapsed: false,
+        ...params.dispute,
       }),
     });
     const account = this.json('escrow', 'job', value);
@@ -205,14 +213,19 @@ export class World {
           job: address.toBase58(),
           institution: params.institution,
           agentRecord: params.agentRecord,
-          jobStatus: 'disputed',
+          jobStatus: status,
           challenger: dispute.challenger as string,
           bond: dispute.bond as string,
           reasonHash: dispute.reasonHash as string,
-          raisedAt: 1_790_000_500n,
+          raisedAt: BigInt(dispute.raisedAt as number),
           deadline: BigInt(dispute.deadline as number),
-          resolution: 'pending',
-          lapsed: false,
+          decidedAt: BigInt(dispute.decidedAt as number),
+          closedAt: BigInt(dispute.closedAt as number),
+          resolution: (dispute.resolution as { kind: 'pending' }).kind,
+          lapsed: dispute.lapsed as boolean,
+          approvalMask: dispute.approvalMask as number,
+          approvalCount: dispute.approvalCount as number,
+          arbitratorSetVersion: BigInt(dispute.arbitratorSetVersion as number),
           ...row,
         },
       });
@@ -266,6 +279,45 @@ export class World {
         job,
         payload: { program: 'escrow', name: 'JobFunded', data },
       },
+    });
+  }
+
+  /** Escrow event'i (`chain_events`); `data` Anchor biçimindedir. Satırın kimliği döner. */
+  async chainEvent(job: string, name: string, data: Record<string, unknown>, slot?: bigint): Promise<bigint> {
+    const type = name.charAt(0).toLowerCase() + name.slice(1);
+    const json = this.json('escrow', type, {
+      ...sample(this.programs.escrow.idl, type),
+      job: new PublicKey(job),
+      ...data,
+    });
+    const row = await this.db.chainEvent.create({
+      data: {
+        signature: Keypair.generate().publicKey.toBase58().repeat(2).slice(0, 88),
+        slot: slot ?? this.fresh().slot,
+        blockTime: 1_790_000_000n,
+        instructionIndex: 0,
+        eventIndex: 0,
+        program: 'escrow',
+        name,
+        job,
+        payload: { program: 'escrow', name, data: json },
+      },
+    });
+    return row.id;
+  }
+
+  /** Zincirdeki escrow config'i: aktif arbitrator seti, eşik ve set sürümü. */
+  async escrowConfig(arbitrators: readonly string[], threshold: number, version: number, pda: PublicKey) {
+    const value = sample(this.programs.escrow.idl, 'escrowConfig');
+    const slots = Array.from({ length: 7 }, (_, i) =>
+      arbitrators[i] ? new PublicKey(arbitrators[i]) : PublicKey.default,
+    );
+    await this.onChain('escrow', 'escrowConfig', pda, {
+      ...value,
+      arbitrators: slots,
+      arbitratorCount: arbitrators.length,
+      threshold,
+      arbitratorSetVersion: version,
     });
   }
 

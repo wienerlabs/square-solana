@@ -7,8 +7,8 @@ import { Counter, Gauge, Histogram, createServiceMetrics, type ServiceMetrics } 
 export const FINALIZE_DELAY_BUCKETS = [30, 60, 120, 300, 600, 900, 1800, 3600, 7200, 21_600, 86_400] as const;
 
 export interface KeeperMetrics extends ServiceMetrics {
-  /** Günlüğe yazılan kararlar: `outcome` (submitted, confirmed, skipped, failed) ve `reason`. */
-  readonly actions: Counter<'outcome' | 'reason'>;
+  /** Günlüğe yazılan kararlar: `action` (finalizePayment, lapseDispute), `outcome` ve `reason`. */
+  readonly actions: Counter<'action' | 'outcome' | 'reason'>;
   /** Onaylanan finalize'ların keeper ücreti toplamı (settlement mint'inin taban birimi). */
   readonly feesEarned: Counter;
   /** Keeper cüzdanının SOL bakiyesi (lamport). */
@@ -37,8 +37,8 @@ export function createMetrics(params: { service: string; version: string }): Kee
     ...base,
     actions: new Counter({
       name: 'keeper_actions_total',
-      help: 'Keeper kararları, sonuca ve sebebe göre',
-      labelNames: ['outcome', 'reason'],
+      help: 'Keeper kararları, talimata, sonuca ve sebebe göre',
+      labelNames: ['action', 'outcome', 'reason'],
       registers,
     }),
     feesEarned: new Counter({

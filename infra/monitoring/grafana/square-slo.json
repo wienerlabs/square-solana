@@ -702,8 +702,8 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum by (outcome, reason) (rate(keeper_actions_total[5m]))",
-          "legendFormat": "{{outcome}} {{reason}}"
+          "expr": "sum by (action, outcome, reason) (rate(keeper_actions_total[5m]))",
+          "legendFormat": "{{action}} {{outcome}} {{reason}}"
         },
         {
           "refId": "B",
