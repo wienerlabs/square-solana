@@ -1,6 +1,7 @@
 import dotenv from 'dotenv';
 import path from 'node:path';
 import { parseObservabilityEnv } from '@squaresdk/solana-observability';
+import { toSolanaNetwork } from '@squaresdk/solana-x402';
 import { z } from 'zod';
 
 dotenv.config({ path: path.resolve(process.cwd(), '.env') });
@@ -68,11 +69,28 @@ const EnvSchema = z
     SOLANA_RPC_URL: z.string().url(),
     VERIFIER_PROGRAM: base58Pubkey,
 
-    X402_NETWORK: z.enum(['solana', 'solana-devnet']),
+    /// CAIP-2 id or the v1 name (`solana`, `solana-devnet`); normalised to CAIP-2.
+    X402_NETWORK: nonEmpty.transform((value, ctx) => {
+      try {
+        return toSolanaNetwork(value);
+      } catch (error) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: (error as Error).message });
+        return z.NEVER;
+      }
+    }),
     X402_PAYMENT_MINT: base58Pubkey,
     X402_PUBLISHER_WALLET: base58Pubkey,
     /// Report price in the payment mint's base units.
     X402_REPORT_PRICE: intFromEnv(1),
+    /// Facilitator (ADR 0018). Unset: our own facilitator; X402_FEE_PAYER_KEYPAIR pays the transaction
+    /// fees and SOLANA_RPC_URL verifies and submits. Set: a remote x402 facilitator at this URL.
+    X402_FACILITATOR_URL: z.preprocess((v) => (v === '' ? undefined : v), z.string().url().optional()),
+    /// Bearer token for X402_FACILITATOR_URL.
+    X402_FACILITATOR_TOKEN: optionalSecret,
+    /// 64-byte Solana keypair (base58 or JSON array) of the fee payer; holds SOL only, never the payee.
+    X402_FEE_PAYER_KEYPAIR: optionalSecret,
+    /// Square's single Postgres (db/); x402 payment replay guards live in its `replay_guards` table.
+    DATABASE_URL: nonEmpty,
 
     /// Enables the unattested-payment watcher.
     HELIUS_API_KEY: optionalSecret,
@@ -96,6 +114,13 @@ const EnvSchema = z
         code: z.ZodIssueCode.custom,
         path: ['COMPLIANCE_METRICS_PORT'],
         message: 'must differ from COMPLIANCE_API_PORT',
+      });
+    }
+    if (!env.X402_FACILITATOR_URL && !env.X402_FEE_PAYER_KEYPAIR) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['X402_FEE_PAYER_KEYPAIR'],
+        message: 'required when X402_FACILITATOR_URL is not set (own facilitator, ADR 0018)',
       });
     }
     if (env.HELIUS_API_KEY && !env.HELIUS_API_URL) {
@@ -159,6 +184,10 @@ export const config = {
     paymentMint: env.X402_PAYMENT_MINT,
     publisherWallet: env.X402_PUBLISHER_WALLET,
     reportPrice: env.X402_REPORT_PRICE,
+    facilitator: env.X402_FACILITATOR_URL
+      ? ({ mode: 'remote', url: env.X402_FACILITATOR_URL, token: env.X402_FACILITATOR_TOKEN } as const)
+      : ({ mode: 'self', feePayerKeypair: env.X402_FEE_PAYER_KEYPAIR! } as const),
+    databaseUrl: env.DATABASE_URL,
   },
   helius:
     env.HELIUS_API_KEY && env.HELIUS_API_URL

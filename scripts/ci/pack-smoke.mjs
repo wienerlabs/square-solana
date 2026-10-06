@@ -25,6 +25,7 @@ export const PUBLISHABLE = [
   '@squaresdk/solana-a2a',
   '@squaresdk/solana-mcp',
   '@squaresdk/solana-agent-sdk',
+  '@squaresdk/solana-x402',
 ];
 
 export const EXCLUDED = {
