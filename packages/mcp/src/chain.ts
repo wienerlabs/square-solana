@@ -7,7 +7,8 @@ import { Program } from '@anchor-lang/core';
 import { TOKEN_2022_PROGRAM_ID, TOKEN_PROGRAM_ID, unpackMint } from '@solana/spl-token';
 import { Connection, PublicKey } from '@solana/web3.js';
 import { SQUARE_IDLS, type SquareEscrowContract } from '@squaresdk/solana-sdk';
-import type { JobStatus } from '@squaresdk/solana-types';
+import type { InstructionCall, JobStatus } from '@squaresdk/solana-types';
+import { encodeCall, type EncodedCall } from './transactions.js';
 
 export interface Settlement {
   mint: PublicKey;
@@ -35,6 +36,7 @@ export interface SquareChain {
   settlement(): Promise<Settlement>;
   jobAddress(institution: PublicKey, specHash: Uint8Array): PublicKey;
   job(address: PublicKey): Promise<ChainJob | null>;
+  encode(call: InstructionCall): EncodedCall;
   /** İmzalı tx'i gönderir (preflight açık); imza denetimi çağıranın işidir (`submitSigned`). */
   sendRaw(raw: Uint8Array): Promise<string>;
   /** `confirmed` ya da `finalized` olana, hata dönene ya da süre dolana kadar bekler. */
@@ -110,6 +112,8 @@ export function createChain(options: {
         travelRuleCommitted: account.travelRuleCommitment.some((byte) => byte !== 0),
       };
     },
+
+    encode: (call) => encodeCall(escrow, call),
 
     sendRaw: (raw) =>
       connection.sendRawTransaction(raw, { skipPreflight: false, preflightCommitment: 'confirmed', maxRetries: 3 }),

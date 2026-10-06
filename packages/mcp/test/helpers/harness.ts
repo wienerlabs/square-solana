@@ -10,9 +10,10 @@ import bs58 from 'bs58';
 import { createApi } from '../../src/api.js';
 import type { ChainJob, ConfirmationStatus, Settlement, SquareChain } from '../../src/chain.js';
 import { createSquareMcpServer } from '../../src/server.js';
-import type { LocalSigner } from '../../src/transactions.js';
+import { encodeCall, type LocalSigner } from '../../src/transactions.js';
+import type { InstructionCall } from '@squaresdk/solana-types';
 import { FakeApi } from './fake-api.js';
-import { ESCROW_PROGRAM } from './fixtures.js';
+import { ESCROW_PROGRAM, escrowProgram } from './fixtures.js';
 
 export class FakeChain implements SquareChain {
   readonly escrowProgramId = ESCROW_PROGRAM;
@@ -36,6 +37,12 @@ export class FakeChain implements SquareChain {
 
   async job(address: PublicKey) {
     return this.jobs.get(address.toBase58()) ?? null;
+  }
+
+  private readonly program = escrowProgram(ESCROW_PROGRAM);
+
+  encode(call: InstructionCall) {
+    return encodeCall(this.program, call);
   }
 
   async sendRaw(raw: Uint8Array) {

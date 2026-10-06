@@ -6,7 +6,7 @@ import { once } from 'node:events';
 import { createHash } from 'node:crypto';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { PublicKey } from '@solana/web3.js';
+import { PublicKey, type TransactionInstruction } from '@solana/web3.js';
 import type {
   AgentView,
   ApiError,
@@ -19,7 +19,7 @@ import type {
   TxRequest,
   UnsignedTx,
 } from '@squaresdk/solana-types';
-import { BLOCKHASH, ESCROW_PROGRAM, toBase64, unsignedTx } from './fixtures.js';
+import { BLOCKHASH, ESCROW_PROGRAM, escrowProgram, preparedTx, toBase64 } from './fixtures.js';
 
 type Handler = (request: TxRequest) => UnsignedTx | { status: number; error: Partial<ApiError> };
 
@@ -45,23 +45,25 @@ export class FakeApi {
   readonly uploads: { job: string; type: string; text: string }[] = [];
   /** Sonraki isteğe verilecek hata. */
   failNext: { status: number; error: Partial<ApiError> } | null = null;
+  /** Verilirse hazırlanan tx'e eklenir (ele geçirilmiş API testi). */
+  inject: TransactionInstruction[] = [];
   prepare: Handler = (request) => {
-    const signers = new Set<string>([request.feePayer]);
-    for (const name of ['institution', 'agent', 'payer']) {
-      const value = request.accounts[name];
-      if (value) signers.add(value);
-    }
-    const tx = unsignedTx({
+    const tx = preparedTx({
+      program: escrowProgram(this.escrowProgram),
+      call: request.call,
+      accounts: { payer: request.feePayer, ...request.accounts },
       feePayer: new PublicKey(request.feePayer),
-      signers: [...signers].map((key) => new PublicKey(key)),
-      programId: this.escrowProgram,
+      extra: this.inject,
     });
+    const signers = tx.message.staticAccountKeys
+      .slice(0, tx.message.header.numRequiredSignatures)
+      .map((key) => key.toBase58());
     return {
       transaction: toBase64(tx),
       blockhash: BLOCKHASH,
       lastValidBlockHeight: 5150,
       feePayer: request.feePayer,
-      signers: [...signers],
+      signers,
       addressLookupTables: [],
       computeUnitLimit: 100_000,
       simulatedUnits: 41_000,
