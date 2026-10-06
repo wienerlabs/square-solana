@@ -34,6 +34,7 @@ const publicKeyOf = (address: string): KeyObject =>
   });
 
 const NOW = 1_791_300_000;
+const clockSeconds = () => Math.floor(Date.now() / 1000);
 const meta = { requestId: 'test', page: null, limit: null, total: null };
 const json = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
@@ -63,7 +64,7 @@ export function fakeSquareApi(domain = globalThis.location?.host ?? 'app.square.
       const nonce = randomUUID().replaceAll('-', '');
       const message = `${domain} wants you to sign in with your Solana account:\n${wallet}\n\nSign in to Square.\n\nNonce: ${nonce}`;
       challenges.set(nonce, { wallet, message });
-      return ok({ nonce, message, expiresAt: NOW + 300 });
+      return ok({ nonce, message, expiresAt: clockSeconds() + 300 });
     }
     if (method === 'POST' && path === '/v1/auth/session') {
       const { wallet, nonce, signature } = body as { wallet: string; nonce: string; signature: string };
@@ -78,7 +79,7 @@ export function fakeSquareApi(domain = globalThis.location?.host ?? 'app.square.
       }
       const token = `sqs_${randomUUID()}`;
       sessions.set(token, wallet);
-      return ok({ token, wallet, expiresAt: NOW + 3_600 });
+      return ok({ token, wallet, expiresAt: clockSeconds() + 3_600 });
     }
     const token = /^Bearer (.+)$/.exec(headers.get('authorization') ?? '')?.[1] ?? '';
     if (!sessions.has(token)) return fail(401, 'unauthorized', 'oturum gerekli');
