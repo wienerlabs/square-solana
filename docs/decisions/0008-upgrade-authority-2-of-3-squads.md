@@ -35,6 +35,9 @@ varsayımıdır.
   ([program arayüzü §2](../design/program-interface.md#2-roller)).
 - Durum (2026-10-03): uygulanmadı. Yeni program kimlikleri, devnet'te Squads v4 multisig'i,
   `docs/runbooks/upgrade.md` ve deploy anahtarlarının secret store'da tutulması BC-09'dadır (#9).
+- Durum (2026-10-06): [runbook](../runbooks/upgrade.md) ve kimlikleri depoya uygulayan
+  `scripts/deploy/set-program-ids.mjs` hazır. Anahtarların üretimi, devnet multisig'i ve deploy, anahtar
+  sahiplerinin yapacağı işlemlerdir; yapılmadı.
 - Mainnet'te authority devri dış audit'ten sonradır (M9; BC-42, #98).
 
 ## Açık noktalar

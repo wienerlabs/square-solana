@@ -47,8 +47,8 @@ jobs:
         run: pnpm check:names
       - name: ESLint + Prettier
         run: pnpm lint
-      - name: CI betiklerinin testleri
-        run: node --test "scripts/ci/*.test.mjs"
+      - name: CI ve deploy betiklerinin testleri
+        run: node --test "scripts/ci/*.test.mjs" "scripts/deploy/*.test.mjs"
       - name: Her workspace paketi yayınlanabilir ya da gerekçeli dışlanmış
         run: node scripts/ci/pack-smoke.mjs --classify-only
       - name: Kapsam (PR'da etkilenen paketler, main'de hepsi)
