@@ -1,15 +1,17 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useId, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useId, useMemo, useState, type ReactNode } from 'react';
 import { useConnection } from '@solana/wallet-adapter-react';
 import { PublicKey } from '@solana/web3.js';
+import { useApiClient } from '@/components/api-client';
 import { useNetworkGuard, useSendTransaction } from '@/components/network-guard';
 import { Address } from '@/components/ui/address';
 import { Button } from '@/components/ui/button';
 import { CopyButton } from '@/components/ui/copy-button';
 import { StatusBadge, type Tone } from '@/components/ui/status-badge';
 import { TxConfirmation } from '@/components/ui/tx-confirmation';
+import { JobTravelRule } from './job-travel-rule';
 import { chainRefOf, hex } from '@/lib/agent-registration';
 import { institutionAddress, policyAddress } from '@/lib/idl-pda';
 import {
@@ -34,6 +36,7 @@ import { loadDrafts } from '@/lib/policy-local';
 import { TransactionBlockedError } from '@/lib/send-transaction';
 import { formatUnits, parseUnits, settlementAccount } from '@/lib/settlement';
 import { statusLabel } from '@/lib/status';
+import { isBound, travelRuleFundBlock, travelRuleRequired, type TravelRuleVerification } from '@/lib/travel-rule';
 import { useSettlementToken, useTokenBalance } from '@/lib/use-settlement';
 import { useSignatureStatus } from '@/lib/use-signature-status';
 
@@ -90,6 +93,17 @@ function Section({ id, title, children }: { id: string; title: string; children:
       <div className="mt-4 grid gap-5">{children}</div>
     </section>
   );
+}
+
+const NO_COMMITMENT = new Uint8Array(32);
+
+interface WizardJob {
+  status: string;
+  amount: bigint;
+  mint: PublicKey;
+  agentWallet: PublicKey;
+  /** `Job.travel_rule_commitment`; sıfır: bağlı değil. */
+  commitment: Uint8Array;
 }
 
 interface ActivePolicy {
@@ -195,7 +209,7 @@ export function JobWizard({ owner, escrowProgramId }: { owner: string; escrowPro
 
   const jobAddress = setup && spec.ok ? setup.client.pda.job(ownerKey, spec.hash)[0].toBase58() : null;
   const [refresh, setRefresh] = useState(0);
-  const [job, setJob] = useState<Load<{ status: string; amount: bigint; agentWallet: PublicKey } | null> | null>(null);
+  const [job, setJob] = useState<Load<WizardJob | null> | null>(null);
   useEffect(() => {
     if (!setup || !jobAddress) {
       setJob(null);
@@ -211,7 +225,9 @@ export function JobWizard({ owner, escrowProgramId }: { owner: string; escrowPro
           value: value && {
             status: Object.keys(value.status)[0]!,
             amount: BigInt(value.amount.toString()),
+            mint: value.mint,
             agentWallet: value.agentWallet,
+            commitment: Uint8Array.from(value.travelRuleCommitment),
           },
         }),
       (error: Error) => active && setJob({ state: 'error', message: error.message }),
@@ -249,8 +265,17 @@ export function JobWizard({ owner, escrowProgramId }: { owner: string; escrowPro
   const fundAmount = existingJob?.amount ?? amountValue;
   const insufficient =
     fundAmount !== null && balance !== null && (balance.amount === null || balance.amount < fundAmount);
-  const travelRule =
-    setup && fundAmount !== null && setup.travelRuleThreshold > 0n && fundAmount >= setup.travelRuleThreshold;
+  const travelRule = setup !== null && fundAmount !== null && travelRuleRequired(fundAmount, setup.travelRuleThreshold);
+
+  const apiClient = useApiClient();
+  const [travelVerification, setTravelVerification] = useState<TravelRuleVerification | null>(null);
+  const chainCommitment = existingJob?.commitment ?? NO_COMMITMENT;
+  const travelBlock = travelRuleFundBlock({
+    required: travelRule,
+    chainCommitment,
+    verification: travelVerification,
+  });
+  const onTravelRuleConfirmed = useCallback(() => setRefresh((n) => n + 1), []);
 
   const [busy, setBusy] = useState<'create' | 'fund' | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -280,7 +305,7 @@ export function JobWizard({ owner, escrowProgramId }: { owner: string; escrowPro
     screening?.state === 'ready' &&
     fundBlock === null &&
     !insufficient &&
-    !travelRule &&
+    travelBlock === null &&
     guard.canTransact &&
     !pending;
 
@@ -542,6 +567,28 @@ export function JobWizard({ owner, escrowProgramId }: { owner: string; escrowPro
         )}
       </Section>
 
+      {!existingJob && travelRule && (
+        <p className="rounded-card border border-border bg-surface p-6 text-sm text-muted">
+          This amount is at or above the Travel Rule threshold (
+          {formatUnits(setup.travelRuleThreshold, token?.decimals ?? 0)} USDC). Once the job is created, you enter the
+          originator and beneficiary here; the Square API stores the record encrypted and you bind its commitment before
+          funding.
+        </p>
+      )}
+      {existingJob && jobAddress && (travelRule || isBound(existingJob.commitment)) && (
+        <JobTravelRule
+          setup={setupLoad.value.setup}
+          jobAddress={jobAddress}
+          job={existingJob}
+          institution={ownerKey}
+          api={apiClient}
+          verification={travelVerification}
+          onVerification={setTravelVerification}
+          formatAmount={(base) => (token ? `${formatUnits(base, token.decimals)} USDC` : base.toString())}
+          onConfirmed={onTravelRuleConfirmed}
+        />
+      )}
+
       <Section id="job-fund" title="Create and fund">
         {screening?.state === 'loading' && <p className="text-sm text-muted">Reading the sanctions screenings…</p>}
         {screening?.state === 'error' && (
@@ -579,11 +626,7 @@ export function JobWizard({ owner, escrowProgramId }: { owner: string; escrowPro
             {insufficient && <span className="text-danger-text"> — not enough to fund this job.</span>}
           </p>
         )}
-        {travelRule && (
-          <p className="text-sm text-danger-text">
-            Jobs of this size need a Travel Rule commitment before funding, which this page cannot attach yet.
-          </p>
-        )}
+        {existingJob?.status === 'open' && travelBlock && <p className="text-sm text-danger-text">{travelBlock}</p>}
         <div className="flex flex-wrap items-center gap-3">
           <Button onClick={() => void run('create')} loading={busy === 'create'} disabled={!canCreate || busy !== null}>
             Create the job
@@ -601,8 +644,9 @@ export function JobWizard({ owner, escrowProgramId }: { owner: string; escrowPro
           )}
         </div>
         <p className="text-caption text-muted">
-          Two transactions signed by this wallet: create_job opens the job and its vault; fund_job moves the amount into
-          the vault once both wallets are screened clear.
+          Transactions signed by this wallet: create_job opens the job and its vault; above the Travel Rule threshold
+          commit_travel_rule binds the record&apos;s commitment; fund_job moves the amount into the vault once both
+          wallets are screened clear.
         </p>
         {error && <p className="text-sm text-danger-text">{error}</p>}
         {status && <TxConfirmation stage={status.stage} signature={signature ?? undefined} error={status.error} />}
