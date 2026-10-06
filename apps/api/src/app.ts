@@ -1,4 +1,4 @@
-// HTTP yüzeyi: sözleşmedeki 41 operasyon (docs/api/openapi.yaml), `GET /openapi.json`. Metrikler ayrı
+// HTTP yüzeyi: sözleşmedeki 48 operasyon (docs/api/openapi.yaml), `GET /openapi.json`. Metrikler ayrı
 // uygulamada (`createMetricsApp`), iç ağdaki portta. Hız sınırı paylaşılan Postgres sayacıyla
 // (`@squaresdk/solana-hardening`): okuma ve yazma uçları ayrı kurallarla, kimliği olan istekte cüzdan, olmayanda
 // istemci IP'si başına.
@@ -34,8 +34,10 @@ import { disputeRoutes } from './routes/disputes.js';
 import { readRoutes } from './routes/reads.js';
 import { travelRuleRoutes } from './routes/travel-rule.js';
 import { writeRoutes } from './routes/writes.js';
+import { x402Routes } from './routes/x402.js';
 import type { TravelRuleService } from './travel-rule/service.js';
 import type { TxBuilder } from './tx.js';
+import type { X402EndpointService } from './x402.js';
 
 export interface AppDeps {
   readonly db: PrismaClient;
@@ -46,6 +48,7 @@ export interface AppDeps {
   readonly policyMeta: PolicyMetaService;
   readonly tx: TxBuilder;
   readonly prover: ProverProxy;
+  readonly x402: X402EndpointService;
   readonly travelRule: TravelRuleService;
   readonly limiters: { readonly read: RateLimiter; readonly write: RateLimiter };
   readonly openapi: OpenApiDocument;
@@ -129,6 +132,7 @@ export function createApp(deps: AppDeps): express.Express {
   const readLimit = limit('read');
   const writeLimit = limit('write');
   app.use(authRoutes({ auth: deps.auth, readLimit, writeLimit }));
+  app.use(x402Routes({ x402: deps.x402, readLimit, writeLimit }));
   app.use(readRoutes({ db: deps.db, read: deps.read, readLimit }));
   app.use(travelRuleRoutes({ travelRule: deps.travelRule, readLimit, writeLimit }));
   app.use(

@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Square Solana API
-  version: 0.18.0
+  version: 0.20.0
   summary: Square HTTP API sözleşmesi (BE-35), uygulaması apps/api (BE-18).
   description: |
     Contract-first API sözleşmesi. Zincirdeki hesaplar, event'ler ve instruction argümanları
@@ -17,6 +17,10 @@ info:
 tags:
   - name: auth
     description: Cüzdan Ed25519 oturumu ve API anahtarları.
+  - name: x402
+    description: |
+      Geliştiricinin x402 ücretli uç nokta tanımları ve kullanımı (FE-22, ADR 0023). Ödemeyi geliştiricinin
+      sunucusu `@squaresdk/solana-x402` `paidRouteFromDefinition` ile ister ve uzlaştırılan ödemeyi bildirir.
   - name: jobs
     description: Job okuma uçları ve teslimat yükleme (adım 3–4, 6–8).
   - name: policies
@@ -171,6 +175,192 @@ paths:
           description: İptal edildi.
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+
+  /v1/x402/endpoints:
+    get:
+      tags: [x402]
+      operationId: listX402Endpoints
+      summary: Çağıranın cüzdanına ait ücretli uç nokta tanımlarını listeler.
+      security:
+        - session: []
+        - apiKey: []
+      description: Anahtarla gelen istek `x402:serve` kapsamı ister.
+      responses:
+        '200':
+          description: Tanımlar, yeniden eskiye.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessBase'
+                  - properties:
+                      data:
+                        type: array
+                        items: { $ref: '#/components/schemas/X402Endpoint' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+    post:
+      tags: [x402]
+      operationId: createX402Endpoint
+      summary: Ücretli uç nokta tanımı oluşturur.
+      description: Yol cüzdan başına tekildir; aynı yolda ikinci tanım 409 alır.
+      security:
+        - session: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/X402EndpointCreate' }
+      responses:
+        '201':
+          description: Oluşturulan tanım.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessBase'
+                  - properties:
+                      data: { $ref: '#/components/schemas/X402Endpoint' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+
+  /v1/x402/endpoints/{id}:
+    parameters:
+      - $ref: '#/components/parameters/X402EndpointPath'
+    get:
+      tags: [x402]
+      operationId: getX402Endpoint
+      summary: Tek ücretli uç nokta tanımı (geliştiricinin sunucusu bunu okuyarak ödeme ister).
+      description: Anahtarla gelen istek `x402:serve` kapsamı ister.
+      security:
+        - session: []
+        - apiKey: []
+      responses:
+        '200':
+          description: Tanım.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessBase'
+                  - properties:
+                      data: { $ref: '#/components/schemas/X402Endpoint' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+    patch:
+      tags: [x402]
+      operationId: updateX402Endpoint
+      summary: Tanımı kısmen günceller (ör. etkin / pasif, fiyat).
+      security:
+        - session: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/X402EndpointUpdate' }
+      responses:
+        '200':
+          description: Güncel tanım.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessBase'
+                  - properties:
+                      data: { $ref: '#/components/schemas/X402Endpoint' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+    delete:
+      tags: [x402]
+      operationId: deleteX402Endpoint
+      summary: Tanımı ve kullanım kaydını siler.
+      security:
+        - session: []
+      responses:
+        '204':
+          description: Silindi.
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+
+  /v1/x402/endpoints/{id}/usage:
+    get:
+      tags: [x402]
+      operationId: getX402EndpointUsage
+      summary: Kullanım - ödemeli çağrı sayısı, tahsil edilen tutar ve son ödemeler.
+      description: Anahtarla gelen istek `x402:serve` kapsamı ister.
+      security:
+        - session: []
+        - apiKey: []
+      parameters:
+        - $ref: '#/components/parameters/X402EndpointPath'
+      responses:
+        '200':
+          description: Kullanım özeti.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessBase'
+                  - properties:
+                      data: { $ref: '#/components/schemas/X402EndpointUsage' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+
+  /v1/x402/endpoints/{id}/payments:
+    post:
+      tags: [x402]
+      operationId: recordX402Payment
+      summary: Geliştiricinin sunucusunun uzlaştırdığı ödemeyi kaydeder.
+      description: |
+        Kayıt ödeme yükünün kimliğiyle (`fingerprint`) idempotenttir: aynı kimlik ikinci kez bildirilirse ilk kayıt
+        döner (200), yeni kayıt 201 alır. Ödemenin ağı, mint'i ve alıcısı tanımınkiyle aynı olmalıdır.
+        Anahtarla gelen istek `x402:serve` kapsamı ister.
+      security:
+        - session: []
+        - apiKey: []
+      parameters:
+        - $ref: '#/components/parameters/X402EndpointPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/X402PaymentReport' }
+      responses:
+        '200':
+          description: Bu ödeme daha önce kaydedilmiş; ilk kayıt.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessBase'
+                  - properties:
+                      data: { $ref: '#/components/schemas/X402Payment' }
+        '201':
+          description: Kaydedilen ödeme.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessBase'
+                  - properties:
+                      data: { $ref: '#/components/schemas/X402Payment' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
         '429': { $ref: '#/components/responses/RateLimited' }
 
   /v1/jobs:
@@ -1219,6 +1409,12 @@ components:
       required: true
       description: AgentRecord PDA adresi (did:aip v2 Solana tanımlayıcısının son parçası).
       schema: { $ref: './schemas/idl.json#/Address' }
+    X402EndpointPath:
+      name: id
+      in: path
+      required: true
+      description: Ücretli uç nokta tanımının kimliği.
+      schema: { type: string, minLength: 1 }
 
   responses:
     BadRequest:
@@ -1627,7 +1823,7 @@ components:
         expiresAt: { type: integer, format: int64 }
     ApiKeyScope:
       type: string
-      enum: [read, 'tx:prepare', 'deliveries:write', 'agents:write', prove, 'disputes:write']
+      enum: [read, 'tx:prepare', 'deliveries:write', 'agents:write', prove, 'disputes:write', 'x402:serve']
     ApiKey:
       type: object
       required: [id, label, prefix, scopes, createdAt, lastUsedAt]
@@ -1659,6 +1855,130 @@ components:
       properties:
         apiKey: { $ref: '#/components/schemas/ApiKey' }
         secret: { type: string, minLength: 32, description: Yalnızca bu yanıtta döner. }
+
+    # ------------------------------------------------------------ x402 ücretli uç noktalar
+    X402Network:
+      type: string
+      description: x402 v2 Solana ağı (CAIP-2) - mainnet, devnet, testnet.
+      enum:
+        - 'solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp'
+        - 'solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1'
+        - 'solana:4uhcVJyU9pJkvQyS88uRDiswHXSCkY3z'
+    X402Path:
+      type: string
+      maxLength: 200
+      pattern: "^/[A-Za-z0-9._~!$&'()*+,;=:@%/-]*$"
+      description: Geliştiricinin sunucusundaki route yolu; cüzdan başına tekil.
+    X402Endpoint:
+      type: object
+      required: [id, name, path, description, amount, mint, network, payTo, enabled, createdAt, updatedAt]
+      additionalProperties: false
+      properties:
+        id: { type: string, minLength: 1 }
+        name: { type: string, minLength: 1, maxLength: 80 }
+        path: { $ref: '#/components/schemas/X402Path' }
+        description: { type: [string, 'null'], maxLength: 500 }
+        amount:
+          allOf:
+            - $ref: './schemas/idl.json#/U64'
+          description: Çağrı başına fiyat, mint'in taban biriminde; sıfırdan büyük.
+        mint: { $ref: './schemas/idl.json#/Address' }
+        network: { $ref: '#/components/schemas/X402Network' }
+        payTo:
+          allOf:
+            - $ref: './schemas/idl.json#/Address'
+          description: Ödemeyi alan cüzdan (ATA'sı mint'e göre türetilir).
+        enabled: { type: boolean, description: Pasif uç nokta ödeme istemez ve çağrıyı geçirmez. }
+        createdAt: { type: integer, format: int64 }
+        updatedAt: { type: integer, format: int64 }
+    X402EndpointCreate:
+      type: object
+      required: [name, path, description, amount, mint, network, payTo, enabled]
+      additionalProperties: false
+      properties:
+        name: { type: string, minLength: 1, maxLength: 80 }
+        path: { $ref: '#/components/schemas/X402Path' }
+        description: { type: [string, 'null'], maxLength: 500 }
+        amount: { $ref: './schemas/idl.json#/U64' }
+        mint: { $ref: './schemas/idl.json#/Address' }
+        network: { $ref: '#/components/schemas/X402Network' }
+        payTo: { $ref: './schemas/idl.json#/Address' }
+        enabled: { type: boolean }
+    X402EndpointUpdate:
+      type: object
+      description: Kısmi güncelleme; verilmeyen alan değişmez.
+      minProperties: 1
+      additionalProperties: false
+      properties:
+        name: { type: string, minLength: 1, maxLength: 80 }
+        path: { $ref: '#/components/schemas/X402Path' }
+        description: { type: [string, 'null'], maxLength: 500 }
+        amount: { $ref: './schemas/idl.json#/U64' }
+        mint: { $ref: './schemas/idl.json#/Address' }
+        network: { $ref: '#/components/schemas/X402Network' }
+        payTo: { $ref: './schemas/idl.json#/Address' }
+        enabled: { type: boolean }
+    X402PaymentReport:
+      type: object
+      required: [fingerprint, transaction, network, asset, amount, payer, payTo, settledAt]
+      additionalProperties: false
+      properties:
+        fingerprint:
+          type: string
+          pattern: '^(svm|json):[0-9a-f]{64}$'
+          description: Ödeme yükünün tekrar koruması kimliği (`paymentFingerprint`); ağ başına tekil.
+        transaction:
+          type: string
+          pattern: '^[1-9A-HJ-NP-Za-km-z]{64,88}$'
+          description: Uzlaştırma makbuzunun (`PAYMENT-RESPONSE`) işlem imzası.
+        network: { $ref: '#/components/schemas/X402Network' }
+        asset: { $ref: './schemas/idl.json#/Address' }
+        amount: { $ref: './schemas/idl.json#/U64' }
+        payer: { $ref: './schemas/idl.json#/Address' }
+        payTo: { $ref: './schemas/idl.json#/Address' }
+        settledAt: { type: integer, format: int64 }
+    X402Payment:
+      type: object
+      required: [id, endpointId, fingerprint, transaction, network, asset, amount, payer, payTo, settledAt, reportedAt]
+      additionalProperties: false
+      properties:
+        id: { type: string, minLength: 1 }
+        endpointId: { type: string, minLength: 1 }
+        fingerprint: { type: string, pattern: '^(svm|json):[0-9a-f]{64}$' }
+        transaction: { type: string, pattern: '^[1-9A-HJ-NP-Za-km-z]{64,88}$' }
+        network: { $ref: '#/components/schemas/X402Network' }
+        asset: { $ref: './schemas/idl.json#/Address' }
+        amount: { $ref: './schemas/idl.json#/U64' }
+        payer: { $ref: './schemas/idl.json#/Address' }
+        payTo: { $ref: './schemas/idl.json#/Address' }
+        settledAt: { type: integer, format: int64 }
+        reportedAt: { type: integer, format: int64 }
+    X402UsageTotal:
+      type: object
+      required: [network, asset, amount, payments]
+      additionalProperties: false
+      properties:
+        network: { $ref: '#/components/schemas/X402Network' }
+        asset: { $ref: './schemas/idl.json#/Address' }
+        amount: { $ref: './schemas/idl.json#/U64' }
+        payments: { type: integer, minimum: 0 }
+    X402EndpointUsage:
+      type: object
+      required: [endpointId, payments, totals, lastPaidAt, recent]
+      additionalProperties: false
+      properties:
+        endpointId: { type: string, minLength: 1 }
+        payments: { type: integer, minimum: 0, description: Uzlaştırılmış (ödemeli) çağrı sayısı. }
+        totals:
+          type: array
+          description: Ağ ve mint başına tahsil edilen toplam.
+          items: { $ref: '#/components/schemas/X402UsageTotal' }
+        lastPaidAt: { type: [integer, 'null'], format: int64 }
+        recent:
+          type: array
+          description: Son ödemeler, yeniden eskiye.
+          maxItems: 20
+          items: { $ref: '#/components/schemas/X402Payment' }
 
     # ------------------------------------------------------------ tx, teslimat, prover
     TxRequest:

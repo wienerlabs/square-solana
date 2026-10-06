@@ -97,7 +97,7 @@ describe('servis uçları', () => {
     expect(await api.getReady()).toMatchObject({ status: 'degraded', checks: { rpc: 'fail' } });
   });
 
-  it('OpenAPI belgesi yayımlanıyor: sözleşmenin 33 operasyonu, sunucu adresi, dış referans yok', async () => {
+  it('OpenAPI belgesi yayımlanıyor: sözleşmenin 48 operasyonu, sunucu adresi, dış referans yok', async () => {
     const response = await fetch(`${stack.url}/openapi.json`);
     expect(response.status).toBe(200);
     const document = (await response.json()) as {

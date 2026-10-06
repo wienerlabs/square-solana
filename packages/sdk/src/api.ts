@@ -45,6 +45,12 @@ import type {
   TravelRuleStatus,
   TxRequest,
   UnsignedTx,
+  X402Endpoint,
+  X402EndpointCreate,
+  X402EndpointUpdate,
+  X402EndpointUsage,
+  X402Payment,
+  X402PaymentReport,
 } from '@squaresdk/solana-types';
 
 export interface PageParams {
@@ -59,6 +65,15 @@ export interface SquareApi {
   listApiKeys(): Promise<ApiEnvelope<ApiKey[]>>;
   createApiKey(body: ApiKeyCreate): Promise<ApiEnvelope<ApiKeyCreated>>;
   deleteApiKey(id: string): Promise<void>;
+
+  listX402Endpoints(): Promise<ApiEnvelope<X402Endpoint[]>>;
+  createX402Endpoint(body: X402EndpointCreate): Promise<ApiEnvelope<X402Endpoint>>;
+  getX402Endpoint(id: string): Promise<ApiEnvelope<X402Endpoint>>;
+  updateX402Endpoint(id: string, body: X402EndpointUpdate): Promise<ApiEnvelope<X402Endpoint>>;
+  deleteX402Endpoint(id: string): Promise<void>;
+  getX402EndpointUsage(id: string): Promise<ApiEnvelope<X402EndpointUsage>>;
+  /** Geliştiricinin sunucusunun uzlaştırdığı ödeme; aynı `fingerprint` ikinci kez bildirilirse ilk kayıt döner. */
+  recordX402Payment(id: string, body: X402PaymentReport): Promise<ApiEnvelope<X402Payment>>;
 
   listJobs(
     query?: PageParams & { status?: JobStatus; institution?: Address; agentRecord?: Address; policy?: Address },
@@ -133,6 +148,13 @@ export const API_OPERATIONS = [
   'listApiKeys',
   'createApiKey',
   'deleteApiKey',
+  'listX402Endpoints',
+  'createX402Endpoint',
+  'getX402Endpoint',
+  'updateX402Endpoint',
+  'deleteX402Endpoint',
+  'getX402EndpointUsage',
+  'recordX402Payment',
   'listJobs',
   'getJob',
   'uploadDelivery',
