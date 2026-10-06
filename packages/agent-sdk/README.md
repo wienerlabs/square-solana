@@ -40,11 +40,20 @@ sequenceDiagram
   denetler ([a2a.md](../../docs/design/a2a.md) §4).
 - **Job kabulü:** Agent ayrıca kendi koşullarını denetler; uymayan görev `REJECTED` olur ve tx gönderilmez:
   spec parçası var; spec'in `capability` alanı bilinen bir beceri (tek beceride isteğe bağlı); job fonlanmış;
-  job'un agent cüzdanı `signer`; tutar becerinin fiyatından az değil; deadline geçmemiş. Sonra `accept_job`.
+  job'un agent cüzdanı `signer`; tutar becerinin fiyatından az değil; deadline'a teslim payından
+  (`retry.submitMarginSeconds`) fazla var; `admit` (verilirse, ör. kapasite) metin dönmüyor. Karar görev başına
+  bir kez verilir. Sonra `accept_job`.
 - **Teslim:** İşleyicinin çıktısı yüklenir, makbuz yerelde doğrulanır (`workHash` içeriğin SHA-256'sı,
-  `deliveryUri` en fazla 128 bayt), makbuz görevin `delivery` artefaktına yazılır, `submit_work` gönderilir ve
-  görev `COMPLETED` olur. İşleyici hata verirse ya da yükleme / tx düşerse görev `FAILED` olur; job zincirde
-  `accepted` kalır (kurum deadline'dan sonra `cancel_job` ile parasını geri alır).
+  `deliveryUri` en fazla 128 bayt), `submit_work` gönderilir; zincirdeki taahhütten sonra makbuz görevin
+  `delivery` artefaktına yazılır ve görev `COMPLETED` olur. İçerik `submit_work`'ten önce çağırana gösterilmez.
+- **Geçici ve kalıcı hata:** Her tur job zincirden okunur ve duruma göre sıradaki adım seçilir. Geçici hatada
+  (RPC, ağ, onay zaman aşımı, deponun `rate_limited` / `*_unavailable` / `internal_error` yanıtı) aynı yerden,
+  `retry.minDelayMs`'ten `retry.maxDelayMs`'e iki katına çıkan beklemelerle yeniden denenir; işin sonucu ve
+  makbuz saklanır, iş yeniden yapılmaz. Gönderilen tx program hatası verse de zincirde job ilerlemişse (önceki
+  deneme düşmüş sanılmışsa) akış sürer. Kalıcı hatada (program reddi, işleyicinin hatası ya da geçersiz çıktısı,
+  makbuzun içerikle tutmaması, deponun diğer retleri) ya da deadline'a teslim payı kalmayınca görev `FAILED`
+  olur; job zincirde `accepted` kalır (kurum deadline'dan sonra `cancel_job` ile parasını geri alır).
+  Onaylanmış kabulün gerisinde kalan okuma geçici sayılır.
 - **Alacak satışı:** `autoListClaim: { discountBps }` teslimden sonra alacağı nominal değerin
   `discountBps / 10000` altında listeler (`list_claim`). Listeleme hatası görevi değiştirmez, `onError`'a gider.
 - **Yeniden başlatma:** Görevler depodadır. `listen` önce yarım kalan görevleri kurar: job `accepted` ise
@@ -101,6 +110,8 @@ Dağıtıma bağlı hiçbir değerin varsayılanı yoktur.
 | `api` ya da `delivery` | Teslimat Square API'sine (`api: SquareApi` ya da `{ baseUrl, apiKey }`, `deliveries:write` kapsamlı anahtar) ya da özel bir `DeliveryUploader`'a yüklenir. Kart barındırma (`hosting: 'api'`) `api` ister |
 | `store`, `authenticate` | A2A görev deposu ve çağıran kimliği (`@squaresdk/solana-a2a`) |
 | `autoListClaim?` | `{ discountBps }`, 1 ile 9999 arası; `onClaimListed?` her listelemede |
+| `admit?` | `({ capability, job, spec, taskId })`: metin dönerse görev `accept_job`'dan önce bu gerekçeyle reddedilir (ör. kapasite) |
+| `retry?` | `{ minDelayMs, maxDelayMs, submitMarginSeconds }`; varsayılan `DEFAULT_RETRY` (1 sn, 30 sn, 30 sn) |
 | `limits?` | A2A sunucu sınırları; varsayılanlar `DEFAULT_A2A_LIMITS` |
 | `tx?` | `computeUnitPrice`, `addressLookupTables` |
 | `onError?`, `logger?`, `now?` | Hatalar tel üzerinden gönderilmez, buraya gelir |

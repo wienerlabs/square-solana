@@ -9,7 +9,7 @@ import { createApiClient, createSquareClient, type SquareApi } from '@squaresdk/
 import { A2A_PATH, WELL_KNOWN_AGENT_CARD_PATH, agentUrls, assertAgentId, buildAgentCard, encodeCard } from './card.js';
 import { createTxSender, toWallet } from './chain.js';
 import { apiDeliveryUploader } from './delivery.js';
-import { assertDiscountBps, createJobExecutor } from './job.js';
+import { DEFAULT_RETRY, assertDiscountBps, assertRetryOptions, createJobExecutor } from './job.js';
 import { registerAgent } from './register.js';
 import type { Agent, AgentOptions } from './types.js';
 
@@ -57,6 +57,8 @@ export async function createAgent(options: AgentOptions): Promise<Agent> {
   assertAgentId(options.agentId);
   const urls = agentUrls(options.publicUrl);
   if (options.autoListClaim) assertDiscountBps(options.autoListClaim.discountBps);
+  const retry = { ...DEFAULT_RETRY, ...options.retry };
+  assertRetryOptions(retry);
   const commitment = options.commitment ?? options.connection.commitment;
   if (!commitment) throw new Error('createAgent: commitment gerekli (options.commitment ya da bağlantının)');
 
@@ -116,6 +118,8 @@ export async function createAgent(options: AgentOptions): Promise<Agent> {
       delivery,
       ...(options.autoListClaim ? { autoListClaim: options.autoListClaim } : {}),
       ...(options.onClaimListed ? { onClaimListed: options.onClaimListed } : {}),
+      ...(options.admit ? { admit: options.admit } : {}),
+      retry,
       tx,
       now,
       ...(options.logger ? { logger: options.logger } : {}),

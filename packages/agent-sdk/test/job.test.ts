@@ -7,7 +7,8 @@ import type { JobStatus, Message } from '@squaresdk/solana-types';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createTxSender, toWallet } from '../src/chain.js';
 import { assertDiscountBps, claimPrice, createJobExecutor } from '../src/job.js';
-import type { ClaimListing, JobRequest } from '../src/types.js';
+import { DeliveryUploadError } from '../src/delivery.js';
+import type { Admission, ClaimListing, DeliveryUploader, JobRequest } from '../src/types.js';
 import { handler, STATS } from './helpers/harness.js';
 import { SimChain } from './helpers/sim.js';
 
@@ -47,7 +48,23 @@ const requests: JobRequest[] = [];
 const listings: ClaimListing[] = [];
 const errors: unknown[] = [];
 
-function executor(options: { discountBps?: number } = {}) {
+const FAST_RETRY = { minDelayMs: 1, maxDelayMs: 5, submitMarginSeconds: 30 };
+
+const receiptOf = async (content: Uint8Array, contentType: string) => ({
+  workHash: Buffer.from(await crypto.subtle.digest('SHA-256', content)).toString('hex'),
+  deliveryUri: 'ipfs://bafy-teslimat',
+  contentType,
+  size: content.length,
+});
+
+function executor(
+  options: {
+    discountBps?: number;
+    upload?: DeliveryUploader['upload'];
+    admit?: Admission;
+    now?: () => number;
+  } = {},
+) {
   return createJobExecutor({
     client: sim.client,
     sender: createTxSender({ connection: sim.connection(), commitment: 'confirmed', client: sim.client }),
@@ -58,17 +75,12 @@ function executor(options: { discountBps?: number } = {}) {
       await request.progress('çalışıyor');
       return handler(request);
     },
-    delivery: {
-      upload: async ({ content, contentType }) => ({
-        workHash: Buffer.from(await crypto.subtle.digest('SHA-256', content)).toString('hex'),
-        deliveryUri: 'ipfs://bafy-teslimat',
-        contentType,
-        size: content.length,
-      }),
-    },
+    delivery: { upload: options.upload ?? (async ({ content, contentType }) => receiptOf(content, contentType)) },
     ...(options.discountBps ? { autoListClaim: { discountBps: options.discountBps } } : {}),
+    ...(options.admit ? { admit: options.admit } : {}),
+    retry: FAST_RETRY,
     tx: { computeUnitPrice: 1_000n },
-    now: () => Math.floor(Date.now() / 1000),
+    now: options.now ?? (() => Math.floor(Date.now() / 1000)),
     onError: (error) => errors.push(error),
     onClaimListed: (listing) => listings.push(listing),
   });
@@ -196,6 +208,89 @@ describe('job yürütücüsü', () => {
       onError: () => undefined,
     });
     await expect(bad.onTask(fakeContext(await job('accepted'), specParts).context)).rejects.toThrow('content');
+  });
+});
+
+describe('geçici hatalar ve kabul kapısı', () => {
+  const kinds = () => sim.sent.map((ix) => ix.name);
+
+  it('kabulden sonra depo geçici olarak düşerse aynı sonuçla yeniden denenir: iş bir kez yapılır', async () => {
+    let attempts = 0;
+    const recorded = fakeContext(await job('funded'), specParts);
+    await executor({
+      upload: async ({ content, contentType }) => {
+        attempts += 1;
+        if (attempts === 1) throw new TypeError('fetch failed');
+        if (attempts === 2) throw new DeliveryUploadError('teslimat yüklenemedi: rate_limited', true);
+        return receiptOf(content, contentType);
+      },
+    }).onTask(recorded.context);
+    expect(kinds()).toEqual(['acceptJob', 'submitWork']);
+    expect(requests).toHaveLength(1);
+    expect(attempts).toBe(3);
+    expect(recorded.calls.at(-1)).toMatch(/^complete:teslim edildi/);
+    expect(errors).toHaveLength(2);
+  });
+
+  it('submit_work ve accept_job ağ hatasında yeniden gönderilir', async () => {
+    const failed = new Set<string>();
+    sim.failure = (name) => {
+      if (failed.has(name)) return null;
+      failed.add(name);
+      return new Error(`${name}: socket hang up`);
+    };
+    const recorded = fakeContext(await job('funded'), specParts);
+    await executor().onTask(recorded.context);
+    expect(kinds()).toEqual(['acceptJob', 'submitWork']);
+    expect(requests).toHaveLength(1);
+    expect(recorded.calls.at(-1)).toMatch(/^complete:teslim edildi/);
+  });
+
+  it('kalıcı program hatasında görev düşer ve teslimat artefaktı sunulmaz', async () => {
+    const address = await job('funded');
+    sim.before = async (name) => {
+      if (name === 'submitWork') await sim.patchJob(address, { agentWallet: Keypair.generate().publicKey });
+    };
+    const recorded = fakeContext(address, specParts);
+    await expect(executor().onTask(recorded.context)).rejects.toThrow(/submit_work: escrow agentMismatch/i);
+    expect(recorded.calls.some((call) => call.startsWith('addArtifact'))).toBe(false);
+    expect(recorded.calls.some((call) => call.startsWith('complete'))).toBe(false);
+  });
+
+  it('depo kalıcı olarak reddederse ya da süre dolarsa yeniden denenmez', async () => {
+    const forbidden = fakeContext(await job('funded'), specParts);
+    await expect(
+      executor({
+        upload: async () => {
+          throw new DeliveryUploadError('teslimat yüklenemedi: forbidden', false);
+        },
+      }).onTask(forbidden.context),
+    ).rejects.toThrow('forbidden');
+    let clock = Math.floor(Date.now() / 1000);
+    const late = fakeContext(await job('funded'), specParts);
+    await expect(
+      executor({
+        now: () => clock,
+        upload: async () => {
+          clock += 3_600;
+          throw new TypeError('fetch failed');
+        },
+      }).onTask(late.context),
+    ).rejects.toThrow('job süresi doldu');
+  });
+
+  it('admit metin dönerse görev kabulden önce reddedilir, tx gönderilmez', async () => {
+    const seen: string[] = [];
+    const recorded = fakeContext(await job('funded'), specParts);
+    await executor({
+      admit: ({ capability, taskId }) => {
+        seen.push(`${capability.id}:${taskId}`);
+        return 'kapasite dolu';
+      },
+    }).onTask(recorded.context);
+    expect(sim.sent).toEqual([]);
+    expect(recorded.calls).toEqual(['reject:kapasite dolu']);
+    expect(seen).toEqual([`${STATS.id}:${recorded.context.taskId}`]);
   });
 });
 
