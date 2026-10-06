@@ -10,6 +10,7 @@
       "/packages/identity/**",
       "/packages/policy/**",
       "/packages/config/**",
+      "/circuits/payment-compliance/artifacts/manifest.json",
       "/package.json",
       "/pnpm-lock.yaml",
       "/pnpm-workspace.yaml"

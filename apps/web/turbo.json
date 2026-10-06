@@ -3,7 +3,15 @@
   "extends": ["//"],
   "tasks": {
     "build": {
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/circuits/payment-compliance/artifacts/manifest.json"],
       "outputs": [".next/**", "!.next/cache/**"]
+    },
+    "test": {
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/circuits/payment-compliance/artifacts/manifest.json",
+        "$TURBO_ROOT$/programs/square-verifier/src/release_vk.rs"
+      ]
     }
   }
 }
