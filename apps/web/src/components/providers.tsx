@@ -7,6 +7,7 @@ import { WalletModalProvider } from '@solana/wallet-adapter-react-ui';
 import { PhantomWalletAdapter } from '@solana/wallet-adapter-phantom';
 import { SolflareWalletAdapter } from '@solana/wallet-adapter-solflare';
 import type { Cluster, WebConfig } from '@/lib/config';
+import { ApiSessionProvider } from './api-session';
 import { NetworkGuardProvider } from './network-guard';
 import { RoleProvider } from './role-provider';
 
@@ -48,7 +49,9 @@ export function Providers({ config, children }: { config: WebConfig; children: R
         <WalletProvider wallets={wallets} onError={onError} autoConnect>
           <WalletModalProvider>
             <NetworkGuardProvider cluster={config.cluster}>
-              <RoleProvider>{children}</RoleProvider>
+              <RoleProvider>
+                <ApiSessionProvider apiUrl={config.apiUrl}>{children}</ApiSessionProvider>
+              </RoleProvider>
             </NetworkGuardProvider>
           </WalletModalProvider>
         </WalletProvider>
