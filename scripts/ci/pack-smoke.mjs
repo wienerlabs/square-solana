@@ -34,6 +34,8 @@ export const EXCLUDED = {
     'servislerin iç paketi (private): maskeleyen logger, metrikler, health, alarmlar (BE-12)',
   '@squaresdk/solana-hardening':
     'servislerin iç paketi (private): SSRF, idempotency, hız sınırı, RPC failover, imzalı eylemler (BE-13)',
+  '@squaresdk/solana-cctp':
+    "servislerin iç paketi (private): CCTP relayer'ın deposu, attestation takibi ve fonlama tx'i (BE-26)",
 };
 
 const ROOT = fileURLToPath(new URL('../..', import.meta.url));
