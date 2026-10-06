@@ -68,9 +68,15 @@ function chain(config: ReturnType<typeof parseClusterConfig>, authority: PublicK
 }
 
 function context(
-  options: { authority?: PublicKey | null; alt?: 'full' | 'partial'; squads?: boolean; keys?: RoleKeys } = {},
+  options: {
+    authority?: PublicKey | null;
+    alt?: 'full' | 'partial';
+    squads?: boolean;
+    keys?: RoleKeys;
+    lookupTable?: boolean;
+  } = {},
 ): Context {
-  const raw = rawConfig({ lookupTable: lookupTable.toBase58() });
+  const raw = rawConfig(options.lookupTable === false ? {} : { lookupTable: lookupTable.toBase58() });
   const config = parseClusterConfig(
     options.squads === false
       ? raw
@@ -130,6 +136,10 @@ describe('Squads yolu (upgrade authority vault)', () => {
       /Squads vault'u .* değil/,
     );
     await expect(runInit(context({ authority: null, squads: false }))).rejects.toThrow(/değiştirilemez/);
+  });
+
+  it('localnet dışında ALT açılmaz: deploy kaydındaki ALT yapılandırmaya yazılır', async () => {
+    await expect(runInit(context({ lookupTable: false }))).rejects.toThrow(/ikinci bir ALT açılmaz/);
   });
 });
 
