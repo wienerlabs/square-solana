@@ -27,7 +27,7 @@ use instructions::*;
 pub use state::{DisputeResolution, EscrowParams, LinkedPrograms, ValidationOutcome};
 
 // Kaynak programın (Covenant) adresi; Square'in program kimlikleri BC-09'da.
-declare_id!("5hstj5grBUL1BeSaPLYpgkD6n3ALasmbseRvKRFfCVNT");
+declare_id!("6yBTEVbizMVCWAp4c3jx6Xdsay3CiUmrJmTswY7QRWaX");
 
 square_common::square_escrow_events!();
 

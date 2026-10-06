@@ -2,7 +2,7 @@ import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import * as t from '../dist/index.js';
 
-const JOB = '5hstj5grBUL1BeSaPLYpgkD6n3ALasmbseRvKRFfCVNT';
+const JOB = 'A8osQqNBGBFB2j1PdLwhANRNzjCYjJKsYVKbbrR75FbZ';
 const HASH = 'ab'.repeat(32);
 const NOW = '2026-10-03T12:00:00.000Z';
 

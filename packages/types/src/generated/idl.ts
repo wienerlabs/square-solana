@@ -610,7 +610,7 @@ export type WorkSubmitted = z.infer<typeof WorkSubmittedSchema>;
 /** IDL özeti: program adresleri (geçici, BC-09), hesap / event / instruction adları ve hata kodları. */
 export const IDL_PROGRAMS = {
   "registry": {
-    "address": "CgchXu2dRV3r9E1YjRhp4kbeLLtv1Xz61yoerJzp1Vbc",
+    "address": "AL5p4aTWrmBmWa4vxJFbBjQG7Xnx2juc15FJRGpwSsA9",
     "name": "square_registry_contract",
     "version": "0.1.0",
     "accounts": [
@@ -681,7 +681,7 @@ export const IDL_PROGRAMS = {
     ]
   },
   "policy": {
-    "address": "FXD7ycSguBQw7o3DXqq4VUBHtdx5ZQpu9P2zb4KG4ZEU",
+    "address": "63HKPj2L8a9DGeTa9Eh3NaZXthMrFUEgbs9Y28SNEc4",
     "name": "square_policy_contract",
     "version": "0.1.0",
     "accounts": [
@@ -733,7 +733,7 @@ export const IDL_PROGRAMS = {
     ]
   },
   "verifier": {
-    "address": "AzKirEv7h5PstLNYNqLj7fCXU9EFA6nSnuoed3QkmUfU",
+    "address": "8yLdDR5zoAzeEWzkNX19DKy4HfVYXb7VcU3wWStwTFPh",
     "name": "square_verifier_contract",
     "version": "0.1.0",
     "accounts": [
@@ -813,7 +813,7 @@ export const IDL_PROGRAMS = {
     ]
   },
   "escrow": {
-    "address": "5hstj5grBUL1BeSaPLYpgkD6n3ALasmbseRvKRFfCVNT",
+    "address": "6yBTEVbizMVCWAp4c3jx6Xdsay3CiUmrJmTswY7QRWaX",
     "name": "square_escrow_contract",
     "version": "0.1.0",
     "accounts": [

@@ -10,6 +10,7 @@ smoke ([§9](../docs/analysis/square-solana-analysis.md#9-%C3%B6nerilen-monorepo
 | [`ci/`](ci/): program CI'ı: programların sözleşmeye göre durumu (`programs.mjs`), program IDL'lerinin sözleşmeyle uyumu (`idl-conformance.mjs`), Rust biçim ve lint kapsamı (`rust-lint.mjs`), araç sürümlerinin `Anchor.toml` ile aynılığı (`toolchain.mjs`) ([docs/ci.md](../docs/ci.md)) | [BC-13] |
 | [`security/`](security/): gitleaks çalıştırıcısı (`gitleaks.mjs`: `staged` kancada, `history` CI'da ve `pnpm secrets:scan`'de), sabitlenen sürüm (`gitleaks.env`), Solana kurallarının testi (`gitleaks-rules.check.mjs`, gitleaks ister) | [BC-13] |
 | [`hooks/`](hooks/): `pnpm install`'da git kancalarını `.githooks/`'a bağlar (`install.mjs`) | [BC-13] |
+| [`deploy/`](deploy/): program kimliklerinin depoya uygulanması (`set-program-ids.mjs`; anahtar okumaz), Squads v4 multisig'inin kurulması ve doğrulanması (`squads-multisig.mjs`) ve [upgrade runbook'u](../docs/runbooks/upgrade.md) | [BC-09] |
 | Address Lookup Table, compute budget, priority fee | [BC-28] |
 | Devnet deploy + init (escrow config, screener authority, ALT) | [BC-30] |
 | Devnet uçtan uca smoke: 8 adım gerçek işlemlerle, tx / CU / ücret raporu | [BC-31] |

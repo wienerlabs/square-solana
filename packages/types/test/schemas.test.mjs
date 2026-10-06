@@ -2,7 +2,7 @@ import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import * as t from '../dist/index.js';
 
-const ADDR = '5hstj5grBUL1BeSaPLYpgkD6n3ALasmbseRvKRFfCVNT';
+const ADDR = 'A8osQqNBGBFB2j1PdLwhANRNzjCYjJKsYVKbbrR75FbZ';
 const HASH = 'ab'.repeat(32);
 
 test('U64: ondalık string, aralık kontrolü', () => {

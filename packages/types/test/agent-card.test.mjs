@@ -2,7 +2,7 @@ import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import * as t from '../dist/index.js';
 
-const WALLET = 'CgchXu2dRV3r9E1YjRhp4kbeLLtv1Xz61yoerJzp1Vbc';
+const WALLET = 'GkBszSapkCQ9xwrLvhtTHNFkEXoC68KJp54MZ5chcYBe';
 
 const v1Card = (overrides = {}) => ({
   did: `did:aip:${WALLET}:summary-bot`,
