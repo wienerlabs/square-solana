@@ -11,6 +11,7 @@ import { PUBLISHABLE } from './pack-smoke.mjs';
 const AFFECTED_SAFE = [
   /^packages\/[^/]+\//,
   /^apps\/[^/]+\//,
+  /^tests\/smoke\//,
   /^(packages|apps)\/README\.md$/,
   /^db\//,
   /^\.changeset\//,

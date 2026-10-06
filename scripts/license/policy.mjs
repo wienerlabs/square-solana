@@ -47,7 +47,8 @@ export const ASSESSED = {
     note:
       'GPL-3.0. Groth16 ispatı üretimi; çalışma zamanında yalnızca apps/prover (BE-11). ' +
       '@squaresdk/solana-policy (BE-10) yalnızca testlerde kullanır: createLocalProver snarkjs içermez, çağıranın ' +
-      'kurduğu groth16 nesnesini alır. Servis imajı dağıtılmadan önce hukuki onay gerekir.',
+      "kurduğu groth16 nesnesini alır. tests/smoke (BC-31, private, yayımlanmaz) operatör makinesinde ve CI'da " +
+      'in-process ispat için kullanır. Servis imajı dağıtılmadan önce hukuki onay gerekir.',
   },
   'npm:@fontsource/open-runde': {
     status: 'cleared',
