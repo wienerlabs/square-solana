@@ -95,7 +95,10 @@ export async function startStack(options: {
   travelRule?: { box: SecretBox; retentionSeconds: number };
   /** CCTP ile fonlama; verilmezse kapalı. */
   cctp?: CctpSettings;
+  /** API'yi çağıran web uygulamasının adresi: CORS'a girer, giriş mesajının alanı onun host'udur (web e2e testi). */
+  webOrigin?: string;
 }): Promise<Stack> {
+  const webOrigin = options.webOrigin ?? 'https://app.square.test';
   const db = createDatabaseClient({ connectionString: options.databaseUrl ?? inject('databaseUrl') });
   const s3 = inject('s3');
   const rpc = new FixtureRpc();
@@ -198,7 +201,7 @@ export async function startStack(options: {
     read,
     auth: createAuthService({
       db,
-      domain: 'app.square.test',
+      domain: new URL(webOrigin).host,
       challengeTtlSeconds: 300,
       sessionTtlSeconds: 3_600,
       ...(options.clock ? { clock: options.clock } : {}),
@@ -240,7 +243,7 @@ export async function startStack(options: {
     metrics,
     log,
     errors,
-    corsOrigins: ['https://app.square.test'],
+    corsOrigins: [webOrigin],
     trustProxyHops: 0,
     jsonMaxBytes: 64 * 1024,
     deliveryMaxBytes: options.deliveryMaxBytes ?? 1024 * 1024,
