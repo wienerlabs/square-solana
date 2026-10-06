@@ -7,7 +7,7 @@ import { logger } from './utils/logger.js';
 import { errorHandler } from './middleware/error-handler.js';
 import proofRouter from './routes/proof.js';
 import attestationRouter from './routes/attestation.js';
-import complianceReportRouter from './routes/compliance-report.js';
+import { createComplianceReportRouter } from './routes/compliance-report.js';
 import mppReportRouter from './routes/mpp-report.js';
 import healthRouter from './routes/health.js';
 import stripeWebhookRouter from './routes/stripe-webhook.js';
@@ -20,6 +20,7 @@ import { startStripeReconciler, stopStripeReconciler } from './watchers/stripe-w
 import { swaggerSpec } from './swagger.js';
 import { httpMetricsMiddleware } from '@squaresdk/solana-observability';
 import { alarms, createMetricsApp, metrics, routeLabel } from './observability.js';
+import { purgeExpiredReplayGuards, x402Paywall, x402Ready } from './x402.js';
 
 const app = express();
 
@@ -30,8 +31,14 @@ app.use(
   cors({
     origin: [...config.corsOrigins],
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'x-402-payment', 'x-mpp-credential', 'x-aperture-proof-record'],
-    exposedHeaders: ['WWW-Authenticate', 'Payment-Receipt'],
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'PAYMENT-SIGNATURE',
+      'x-mpp-credential',
+      'x-aperture-proof-record',
+    ],
+    exposedHeaders: ['WWW-Authenticate', 'Payment-Receipt', 'PAYMENT-REQUIRED', 'PAYMENT-RESPONSE'],
     credentials: true,
   }),
 );
@@ -49,7 +56,10 @@ app.get('/api-docs.json', (_req, res) => {
 app.use(healthRouter);
 app.use('/api/v1/proofs', proofRouter);
 app.use('/api/v1/attestations', attestationRouter);
-app.use('/api/v1/compliance', complianceReportRouter);
+app.use(
+  '/api/v1/compliance',
+  createComplianceReportRouter(x402Paywall(config.x402.reportPrice, 'Aperture Compliance Report')),
+);
 app.use('/api/v1/compliance', mppReportRouter);
 app.use('/api/v1/compliance', mppPublicConfigRouter);
 app.use('/api/v1', agentStripeRouter);
@@ -70,12 +80,18 @@ const server = app.listen(config.port, () => {
 });
 const metricsServer = createMetricsApp().listen(config.metricsPort);
 const stopAlarms = alarms.start(config.observability.alertEvaluationSeconds * 1000);
+const stopReplayPurge = purgeExpiredReplayGuards();
+x402Ready.catch((error: unknown) => {
+  logger.error('x402 setup failed', { error: error instanceof Error ? error.message : String(error) });
+  process.exit(1);
+});
 
 function gracefulShutdown(signal: string): void {
   logger.info(`Received ${signal}, shutting down gracefully`);
   stopSolanaWatcher();
   stopStripeReconciler();
   stopAlarms();
+  stopReplayPurge();
   metricsServer.close();
   server.close(() => {
     logger.info('Server closed');

@@ -19,7 +19,7 @@ kopyaları `pnpm license:write` yazar, `pnpm license:check` denetler.
 | [`hardening/`](hardening/) | `@squaresdk/solana-hardening` | SSRF, idempotency, kalıcı hız sınırı, RPC failover, cüzdan imzalı eylemler, webhook imzası ve tekrar koruması, AES-256-GCM gizli değer kutusu | [BE-13] |
 | [`a2a/`](a2a/) | `@squaresdk/solana-a2a` | A2A v1.0 görev protokolü (JSON-RPC 2.0 + SSE), görev ↔ job durum eşlemesi, Postgres görev deposu ([tasarım](../docs/design/a2a.md)) | [BE-17] |
 | [`agent-sdk/`](agent-sdk/) | `@squaresdk/solana-agent-sdk` | agent yazma kiti: well-known agent card, A2A uç noktası, job kabulü ve teslimi (teslimat yükleme + `submit_work`), isteğe bağlı `list_claim`, `register_agent` yardımcısı; LLM işleyicisi `/anthropic` alt yolunda | [BE-19] |
-| `x402/` | `@squaresdk/solana-x402` | x402 v2 gateway (resmi `@x402/*` üzerine) | [BE-24] |
+| [`x402/`](x402/) | `@squaresdk/solana-x402` | x402 v2 geçidi (resmi `@x402/*` üzerine): Solana exact şeması, kendi ya da harici facilitator ([ADR 0018](../docs/decisions/0018-x402-facilitator.md)), kalıcı tekrar koruması, ücretli Express route'u, ödeyen `fetch` | [BE-24] |
 | [`mcp/`](mcp/) | `@squaresdk/solana-mcp` | Square MCP sunucusu (okuma ve imzasız tx hazırlayan yazma tool'ları, stdio ve Streamable HTTP) + agent'lar için havuzlu MCP istemcisi (`/client`) | [BE-28] |
 | `hosted/` | `@squaresdk/solana-hosted` | konfigürasyondan çalışan kurum agent'ı | [BE-29] |
 | `cli/` | `@squaresdk/solana-cli` | komut satırı aracı | [BE-30] |
