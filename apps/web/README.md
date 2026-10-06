@@ -30,6 +30,7 @@ Değerler ortamdan gelir ve kök layout'ta **istek anında, sunucuda** okunur (`
 | `SQUARE_PROVER_URL` | İsteğe bağlı: release ispatını üreten prover servisinin kök adresi ([`apps/prover`](../prover/README.md)); `https` (yalnızca `localnet` için `http`). Tanımlı değilse kurum iş sayfasında ispat üretemez, ispatın durumu yine görünür. Prover'ın `CORS_ORIGINS`'i web'in adresini içermeli |
 | `SQUARE_API_URL` | İsteğe bağlı: Square API'nin kök adresi ([`apps/api`](../api/README.md)); `https` (yalnızca `localnet` için `http`). Keeper günlüğü buradan okunur, cüzdan oturumu buradan açılır, teslim dosyası buraya yüklenir; tanımlı değilse sayfa bunu söyler. API'nin `CORS_ORIGINS`'i web'in adresini, `API_AUTH_DOMAIN`'i web'in host'unu (`location.host`, ör. `app.example.com`) içermeli |
 | `SQUARE_PROGRAM_ID_{REGISTRY,POLICY,VERIFIER,ESCROW}` | İsteğe bağlı: programların o cluster'daki adresi (db ile aynı adlar; IDL'deki adres kullanılmaz). Tanımlı olan program landing'de adresi ve zincirdeki deploy durumuyla, tanımlı olmayan "Not configured" olarak görünür. USDC bakiyesi escrow'un config'inden okunduğu için `ESCROW` gerekir. Geçersiz bir değer yapılandırma hatasıdır |
+| `SQUARE_CCTP_*` | İsteğe bağlı, hepsi birlikte: başka zincirden fonlama ([aşağıda](#başka-zincirden-fonlama-fe-19)). `SQUARE_CCTP_SOURCE_CHAIN_ID` (EVM zincir kimliği; zincirin adı ve gezgini viem'in zincir kayıtlarından, sunucuda), `SQUARE_CCTP_SOURCE_DOMAIN` (Circle domain'i), `SQUARE_CCTP_TOKEN_MESSENGER` ve `SQUARE_CCTP_USDC` (kaynak zincirin `TokenMessengerV2`'si ve USDC'si), `SQUARE_CCTP_ATTESTATION_URL` (Circle'ın attestation servisi, ücret tablosu; `https`), `SQUARE_CCTP_MESSAGE_TRANSMITTER` (Solana'daki `MessageTransmitterV2`; fonlama tx'inin denetimi). `SQUARE_API_URL` de gerekir. Devnet değerleri [deploy kaydında](../../docs/deploy/devnet.md#cctp-relayer-be-26). Eksik ya da geçersiz değer yapılandırma hatasıdır |
 | `SQUARE_LOOKUP_TABLE` | İsteğe bağlı: Square address lookup table'ı (BC-28; servislerde `API_LOOKUP_TABLE`, devnet'teki [kayıt](../../docs/deploy/devnet.md#square-alt)). Ağ sayfası tablonun durumunu ve içeriğinin SDK'nın beklediği adreslerle aynı olup olmadığını gösterir; tanımlı değilse bunu söyler. Geçersiz bir değer yapılandırma hatasıdır |
 
 RPC adresi istemci bileşenine (`ConnectionProvider`) gider, yani tarayıcıya iner: ekranda yalnızca host gösterilse de sayfa yükünde görünür. İçinde API anahtarı olan bir RPC kullanılacaksa ya alan adıyla kısıtlanmış (domain allowlist'li) bir anahtar ya da anahtarı sunucuda tutan bir vekil gerekir.
@@ -112,6 +113,21 @@ hesabından okunur (program arayüzü §4). Tx'ler SDK'nın akışıyla (`flow.c
 | Screening | Kurumun ve agent cüzdanının `ScreeningRecord`'u, escrow'un kuralıyla (`square_common::screening`): kayıt yok, işaretli, süresi dolmuş. Biri temiz değilse fonlama kapanır ve hangi cüzdanın neden kapattığı yazılır; program yine reddederse `ScreeningRequired` / `ScreeningExpired` / `ScreeningFlagged` aynı açıklamayla gösterilir, iş açık kalır |
 | Fonlama | Kurumun USDC bakiyesi yetmiyorsa ya da tutar Travel Rule eşiğindeyse (BC-34) fonlama kapanır |
 | Tx | İki tx, kurum cüzdanının imzasıyla: `create_job` (iş ve vault), `fund_job` (tutar vault'a). Escrow hata kodu IDL'deki mesajıyla. Hesaplar ağ doğrulanmadan okunmaz |
+
+## Başka zincirden fonlama (FE-19)
+
+Sihirbazın "Create and fund" bölümünde, açılmış iş için: USDC'si başka bir zincirde duran kurum, işi köprü kullanmadan
+CCTP V2 ile fonlar. `SQUARE_API_URL` ve `SQUARE_CCTP_*` gerekir; tanımlı değilse bölüm bunu söyler. Akış, relayer ve
+hata durumları [cctp-funding.md](../../docs/design/cctp-funding.md)'de.
+
+| Parça | Davranış |
+|---|---|
+| Kaynak cüzdan | EIP-6963 ile kendini duyuran EVM cüzdanları (MetaMask, Rabby …). Sayfa anahtar tutmaz: okuma (`eth_call`), gönderim ve makbuz cüzdanın kendi RPC'sinden. Cüzdan başka zincirdeyse kaynak zincire geçmesi önerilir (`wallet_switchEthereumChain`). Kaynak zincirdeki USDC, TokenMessenger'a verilmiş izin ve gas okunur |
+| Tutar | Kurumun Solana'daki USDC'sinin job'u karşılamayan kısmı. Kesinlik seçilir: hızlı (yaklaşık bir dakika; ücret Circle'ın tablosundaki baz puan) ya da standart (Ethereum'da 15–20 dakika, ücretsiz). Burn, ücret düşüldükten sonra eksiği karşılayan en küçük tutardır; mint alıcısı kurumun Solana'daki USDC hesabıdır |
+| Burn | İzin yetmiyorsa önce tam bu tutarlık `approve`, sonra `depositForBurn` (SDK'nın `cctpApproveCall` ve `cctpBurnCall`'u). Gönderilen burn'ün hash'i tarayıcıda tutulur; makbuz gelince burn job'a kaydedilir (`registerCctpTransfer`, cüzdan oturumuyla). Kayıt düşerse ya da sekme kapanırsa "Link the burn" ile, başka tarayıcıdan yapılmış burn hash'iyle de kaydedilir. Kaydedilmemiş burn varken yenisi açılmaz |
+| İlerleme | Job'un transferleri (`listCctpTransfers`) süren transfer varken 5 saniyede bir okunur: burn, Circle'ın attestation'ı, Solana'da mint, fonlama. Başarısız transferin sebebi relayer'ınkidir |
+| Fonlama | Mesaj imzalanınca "Mint and fund the job" (mesaj teslim edilmediyse, mint ve `fund_job` tek tx) ya da "Fund the job" (relayer teslim ettiyse). Tx'i API kurar ve simüle eder (`prepareCctpFundTx`); sayfa imzadan önce denetler: tx'i yalnızca bu cüzdan öder ve imzalar; çağrılan programlar compute bütçesi, escrow ve mint varsa Circle'ın `MessageTransmitterV2`'si ile associated token programıdır; tek `fund_job` bu job'u bu kurum adına fonlar; tek `receive_message` transferin attestation'lı mesajını teslim eder. Denetimden geçmeyen tx imzalatılmaz |
+| Kapanış | Screening ya da Travel Rule fonlamayı kapatıyorsa burn da açılmaz: mint edilen USDC job'a gidemezdi |
 
 ## İş detayı (FE-07)
 

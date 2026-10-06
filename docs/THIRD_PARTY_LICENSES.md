@@ -124,7 +124,7 @@ pnpm license:write
 | `typescript-eslint` | npm | MIT | runtime | `@squaresdk/solana-config` | ✓ |
 | `undici` | npm | MIT | runtime | `@squaresdk/solana-hardening` | ✓ |
 | `uuid` | npm | MIT | runtime | `@squaresdk/solana-compliance-api` | ✓ |
-| `viem` | npm | MIT | dev | `@squaresdk/solana-cctp`, `@squaresdk/solana-monorepo` | ✓ |
+| `viem` | npm | MIT | runtime | `@squaresdk/solana-cctp`, `@squaresdk/solana-monorepo`, `@squaresdk/solana-web` | ✓ |
 | `vitest` | npm | MIT | dev | `@squaresdk/solana-a2a`, `@squaresdk/solana-api`, `@squaresdk/solana-cctp`, `@squaresdk/solana-db`, `@squaresdk/solana-hardening`, `@squaresdk/solana-identity`, `@squaresdk/solana-indexer`, `@squaresdk/solana-keeper`, `@squaresdk/solana-observability`, `@squaresdk/solana-policy`, `@squaresdk/solana-prover`, `@squaresdk/solana-sdk`, `@squaresdk/solana-types`, `@squaresdk/solana-web` | ✓ |
 | `yaml` | npm | ISC | dev | `@squaresdk/solana-monorepo`, `@squaresdk/solana-sdk`, `@squaresdk/solana-types` | ✓ |
 | `zod` | npm | MIT | runtime | `@squaresdk/solana-a2a`, `@squaresdk/solana-api`, `@squaresdk/solana-compliance-api`, `@squaresdk/solana-indexer`, `@squaresdk/solana-keeper`, `@squaresdk/solana-mcp`, `@squaresdk/solana-observability`, `@squaresdk/solana-prover`, `@squaresdk/solana-types`, `@squaresdk/solana-web` | ✓ |

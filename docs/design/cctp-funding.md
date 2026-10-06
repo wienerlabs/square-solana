@@ -1,6 +1,6 @@
 # CCTP ile fonlama (BC-36, BE-26)
 
-**Issue:** BC-36 (#77), BE-26 (#81) · **Program sözleşmesi:** v0.5.1 ([§7](program-interface.md#7-m5m6-taslakları)) · **API sözleşmesi:** v0.18.0 ([api-sdk-contract.md](api-sdk-contract.md)) · **Paketler:** `@squaresdk/solana-sdk` `cctp`, `flow.receiveAndFundJob`; `@squaresdk/solana-cctp` (relayer)
+**Issue:** BC-36 (#77), BE-26 (#81), FE-19 (#83) · **Program sözleşmesi:** v0.5.1 ([§7](program-interface.md#7-m5m6-taslakları)) · **API sözleşmesi:** v0.18.0 ([api-sdk-contract.md](api-sdk-contract.md)) · **Paketler:** `@squaresdk/solana-sdk` `cctp`, `flow.receiveAndFundJob`; `@squaresdk/solana-cctp` (relayer)
 
 USDC'si başka bir zincirde (Ethereum, Base, Arbitrum …) duran kurum, bir Square job'unu köprü kullanmadan
 fonlar. Circle'ın Cross-Chain Transfer Protocol'ü (CCTP V2) USDC'yi kaynak zincirde yakar ve Circle'ın
@@ -128,6 +128,27 @@ Keeper tek örnek çalışır (finalize crank'iyle aynı kural): aynı transferi
 Değerler ağın yapılandırmasındadır (`scripts/deploy/networks/<ağ>.json`, `cctp`). Metrikler:
 `keeper_cctp_transitions_total{from,to}`, `keeper_cctp_open_transfers{status}`; teslim hataları `keeper_errors`
 alarmına sayılır.
+
+## Arayüz (FE-19)
+
+Web'in iş sihirbazı, açılmış bir işi aynı akışla fonlar ([apps/web](../../apps/web/README.md#başka-zincirden-fonlama-fe-19)):
+
+1. **Kaynak cüzdan:** EIP-6963 ile kendini duyuran EVM cüzdanı bağlanır, kaynak zincire geçilir. Sayfa anahtar tutmaz;
+   okumalar ve gönderim cüzdanın RPC'sinden.
+2. **Tutar:** Kurumun Solana'daki USDC'sinin job'u karşılamayan kısmı. Ücretli kesinlikte burn `⌈eksik · 10⁴ / (10⁴ − bps)⌉`:
+   `maxFee` düşüldükten sonra eksiği karşılayan en küçük tutar.
+3. **Burn:** Gerekirse tam bu tutarlık `approve`, sonra `depositForBurn`. Makbuz gelince burn `POST /v1/cctp/transfers` ile
+   job'a kaydedilir. Hash tarayıcıda tutulur; kayıt düşerse burn hash'iyle yeniden kaydedilir.
+4. **İlerleme:** Transfer süren durumdayken API'den yeniden okunur; attestation'ı relayer izler.
+5. **Fonlama:** `attested` ya da `received` olunca kurum, API'nin kurduğu tx'i imzalar. İmzadan önce sayfa denetler:
+   - tx'i yalnızca kurum öder ve imzalar;
+   - programlar compute bütçesi, escrow ve (mint varsa) `MessageTransmitterV2` ile associated token programıdır;
+   - tek `fund_job` bu job'u bu kurum adına fonlar;
+   - tek `receive_message` transferin attestation'lı mesajını teslim eder.
+
+   API'nin yanlış kurduğu ya da değiştirilmiş bir tx imzalatılmaz.
+
+Burn'den önce, fonlamayı kapatan her şey (screening, Travel Rule) burn'ü de kapatır: mint edilen USDC job'a gidemezdi.
 
 ## Devnet örnekleri (2026-10-06)
 

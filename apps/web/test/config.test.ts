@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { caip2ChainId, parseWebConfig, rpcLabel } from '../src/lib/config';
+import { evmChainInfo } from '../src/lib/evm-chains';
 
 const valid = { SQUARE_SOLANA_CLUSTER: 'devnet', SQUARE_SOLANA_RPC_URL: 'https://rpc.example.org/v1?api-key=secret' };
 
@@ -125,6 +126,74 @@ describe('api', () => {
     const insecure = parseWebConfig({ ...valid, SQUARE_API_URL: 'http://api.example.org' });
     expect(insecure.ok === false && insecure.errors).toEqual([
       'SQUARE_API_URL must use https unless SQUARE_SOLANA_CLUSTER is localnet',
+    ]);
+  });
+});
+
+describe('cctp', () => {
+  // Devnet'in değerleri (scripts/deploy/networks/devnet.json, `cctp.sources.sepolia`).
+  const CCTP = {
+    SQUARE_CCTP_SOURCE_CHAIN_ID: '11155111',
+    SQUARE_CCTP_SOURCE_DOMAIN: '0',
+    SQUARE_CCTP_TOKEN_MESSENGER: '0x8FE6B999Dc680CcFDD5Bf7EB0974218be2542DAA',
+    SQUARE_CCTP_USDC: '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238',
+    SQUARE_CCTP_ATTESTATION_URL: 'https://iris-api-sandbox.circle.com/',
+    SQUARE_CCTP_MESSAGE_TRANSMITTER: 'CCTPV2Sm4AdWt5296sk4P66VBZ7bEhcARwFaaS9YPbeC',
+  };
+  const withApi = { ...valid, SQUARE_API_URL: 'https://api.example.org' };
+
+  it('is off without its variables, and names its source chain from the chain id', () => {
+    expect(parseWebConfig(withApi, evmChainInfo)).toEqual(parseWebConfig(withApi));
+    const result = parseWebConfig({ ...withApi, ...CCTP }, evmChainInfo);
+    expect(result.ok && result.config.cctp).toEqual({
+      chain: { id: 11155111, name: 'Sepolia', explorerUrl: 'https://sepolia.etherscan.io' },
+      domain: 0,
+      tokenMessenger: '0x8FE6B999Dc680CcFDD5Bf7EB0974218be2542DAA',
+      usdc: '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238',
+      attestationUrl: 'https://iris-api-sandbox.circle.com',
+      messageTransmitter: 'CCTPV2Sm4AdWt5296sk4P66VBZ7bEhcARwFaaS9YPbeC',
+    });
+  });
+
+  it('needs all of its variables and the Square API', () => {
+    const partial = parseWebConfig(
+      { ...withApi, SQUARE_CCTP_SOURCE_CHAIN_ID: '11155111', SQUARE_CCTP_USDC: CCTP.SQUARE_CCTP_USDC },
+      evmChainInfo,
+    );
+    expect(partial.ok === false && partial.errors).toEqual([
+      'CCTP funding needs all of its variables; not set: SQUARE_CCTP_SOURCE_DOMAIN, SQUARE_CCTP_TOKEN_MESSENGER, SQUARE_CCTP_ATTESTATION_URL, SQUARE_CCTP_MESSAGE_TRANSMITTER',
+    ]);
+    const noApi = parseWebConfig({ ...valid, ...CCTP }, evmChainInfo);
+    expect(noApi.ok === false && noApi.errors).toEqual([
+      'CCTP funding needs SQUARE_API_URL: transfers are registered and funded there',
+    ]);
+  });
+
+  it('rejects malformed values and a chain it does not know', () => {
+    const result = parseWebConfig(
+      {
+        ...withApi,
+        ...CCTP,
+        SQUARE_CCTP_SOURCE_CHAIN_ID: '0xaa36a7',
+        SQUARE_CCTP_SOURCE_DOMAIN: '-1',
+        SQUARE_CCTP_TOKEN_MESSENGER: '0x8FE6B999',
+        SQUARE_CCTP_USDC: 'usdc',
+        SQUARE_CCTP_ATTESTATION_URL: 'http://iris-api-sandbox.circle.com',
+        SQUARE_CCTP_MESSAGE_TRANSMITTER: '0x8FE6B999Dc680CcFDD5Bf7EB0974218be2542DAA',
+      },
+      evmChainInfo,
+    );
+    expect(result.ok === false && result.errors).toEqual([
+      'SQUARE_CCTP_SOURCE_CHAIN_ID must be a positive integer (the EVM chain id)',
+      'SQUARE_CCTP_SOURCE_DOMAIN must be a Circle domain id (an unsigned 32-bit integer)',
+      'SQUARE_CCTP_TOKEN_MESSENGER is not an EVM address',
+      'SQUARE_CCTP_USDC is not an EVM address',
+      'SQUARE_CCTP_ATTESTATION_URL must use https unless SQUARE_SOLANA_CLUSTER is localnet',
+      'SQUARE_CCTP_MESSAGE_TRANSMITTER is not a Solana address',
+    ]);
+    const unknown = parseWebConfig({ ...withApi, ...CCTP, SQUARE_CCTP_SOURCE_CHAIN_ID: '4294967296' }, evmChainInfo);
+    expect(unknown.ok === false && unknown.errors).toEqual([
+      "SQUARE_CCTP_SOURCE_CHAIN_ID 4294967296 is not an EVM chain this app knows (viem's chain list)",
     ]);
   });
 });

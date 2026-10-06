@@ -1,16 +1,19 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useId, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useId, useMemo, useState, type ReactNode } from 'react';
 import { useConnection } from '@solana/wallet-adapter-react';
 import { PublicKey } from '@solana/web3.js';
+import { CctpFunding } from '@/components/jobs/job-cctp';
 import { useNetworkGuard, useSendTransaction } from '@/components/network-guard';
+import { useWebConfig } from '@/components/providers';
 import { Address } from '@/components/ui/address';
 import { Button } from '@/components/ui/button';
 import { CopyButton } from '@/components/ui/copy-button';
 import { StatusBadge, type Tone } from '@/components/ui/status-badge';
 import { TxConfirmation } from '@/components/ui/tx-confirmation';
 import { chainRefOf, hex } from '@/lib/agent-registration';
+import { CCTP_ENV_PREFIX, ENV_VARS } from '@/lib/config';
 import { institutionAddress, policyAddress } from '@/lib/idl-pda';
 import {
   escrowErrorMessage,
@@ -41,6 +44,8 @@ type Load<T> = { state: 'loading' } | { state: 'ready'; value: T } | { state: 'e
 
 const inputClass =
   'w-full rounded-lg border border-border bg-surface px-3 py-2 font-mono text-sm text-text aria-invalid:border-danger-text';
+const TRAVEL_RULE_TEXT =
+  'Jobs of this size need a Travel Rule commitment before funding, which this page cannot attach yet.';
 const SCREENING_TONE: Readonly<Record<ScreeningState['state'], Tone>> = {
   clear: 'success',
   missing: 'warning',
@@ -101,6 +106,7 @@ interface ActivePolicy {
 /** Kurum cüzdanının iş açması ve fonlaması: `create_job` + `fund_job` (akışın 3. adımı). */
 export function JobWizard({ owner, escrowProgramId }: { owner: string; escrowProgramId: string }) {
   const { connection } = useConnection();
+  const config = useWebConfig();
   const guard = useNetworkGuard();
   const send = useSendTransaction();
   const ownerKey = useMemo(() => new PublicKey(owner), [owner]);
@@ -195,6 +201,7 @@ export function JobWizard({ owner, escrowProgramId }: { owner: string; escrowPro
 
   const jobAddress = setup && spec.ok ? setup.client.pda.job(ownerKey, spec.hash)[0].toBase58() : null;
   const [refresh, setRefresh] = useState(0);
+  const reread = useCallback(() => setRefresh((n) => n + 1), []);
   const [job, setJob] = useState<Load<{ status: string; amount: bigint; agentWallet: PublicKey } | null> | null>(null);
   useEffect(() => {
     if (!setup || !jobAddress) {
@@ -579,11 +586,7 @@ export function JobWizard({ owner, escrowProgramId }: { owner: string; escrowPro
             {insufficient && <span className="text-danger-text"> — not enough to fund this job.</span>}
           </p>
         )}
-        {travelRule && (
-          <p className="text-sm text-danger-text">
-            Jobs of this size need a Travel Rule commitment before funding, which this page cannot attach yet.
-          </p>
-        )}
+        {travelRule && <p className="text-sm text-danger-text">{TRAVEL_RULE_TEXT}</p>}
         <div className="flex flex-wrap items-center gap-3">
           <Button onClick={() => void run('create')} loading={busy === 'create'} disabled={!canCreate || busy !== null}>
             Create the job
@@ -606,6 +609,36 @@ export function JobWizard({ owner, escrowProgramId }: { owner: string; escrowPro
         </p>
         {error && <p className="text-sm text-danger-text">{error}</p>}
         {status && <TxConfirmation stage={status.stage} signature={signature ?? undefined} error={status.error} />}
+        {existingJob &&
+          jobAddress &&
+          token &&
+          (config.cctp && config.apiUrl ? (
+            <CctpFunding
+              source={config.cctp}
+              apiUrl={config.apiUrl}
+              owner={ownerKey}
+              job={jobAddress}
+              jobAmount={existingJob.amount}
+              jobStatus={existingJob.status}
+              token={token}
+              balance={balance ? balance.amount : undefined}
+              escrowProgramId={escrowProgramId}
+              blocked={
+                screening?.state !== 'ready'
+                  ? 'The sanctions screenings are not read yet.'
+                  : (fundBlock ?? (travelRule ? TRAVEL_RULE_TEXT : null))
+              }
+              onFunded={reread}
+            />
+          ) : (
+            existingJob.status === 'open' && (
+              <p className="text-caption text-muted">
+                Funding from another chain (CCTP) is not configured here: it needs{' '}
+                <span className="font-mono">{ENV_VARS.apiUrl}</span> and the{' '}
+                <span className="font-mono">{CCTP_ENV_PREFIX}*</span> variables.
+              </p>
+            )
+          ))}
       </Section>
     </div>
   );
