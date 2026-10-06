@@ -2,7 +2,8 @@
 
 **Issue:** BE-03 (#17), BC-12 (#12), BC-13 (#13)
 
-Her PR'da koşan kontroller, neyi denetledikleri, yerelde nasıl çalıştırıldıkları ve merge kuralı.
+Her PR'da koşan kontroller, elle tetiklenen iş akışları, neyi denetledikleri, yerelde nasıl çalıştırıldıkları ve
+merge kuralı.
 İş akışları [`.github/workflows/`](../.github/workflows/) altındadır; indirilen her araç (Agave, Anchor,
 circom, gitleaks, solana-verify) SHA-256 ile, action'lar commit SHA'sıyla sabitlenir.
 
@@ -18,6 +19,7 @@ PR sayfasında görünen ad, iş akışındaki işin adıdır.
 | `Security` | Sır taraması (gitleaks) | her PR, main, haftalık | Bütün git geçmişinde sır; kuralların testleri (BC-13) |
 | `Programs` | SBF derleme ve program testleri | programları, crate'leri, IDL'leri, Rust araç dosyalarını, SDK'nın işlem profilini (`packages/sdk/src/tx-profile.json`) ya da bu iş akışının betiklerini değiştiren PR, main | Araç sürümleri, `cargo fmt`, `anchor build`, program IDL'lerinin sözleşmeyle uyumu, `cargo clippy`, birim testleri, `anchor test` (LiteSVM; işlem bütçesi dahil, BC-28), test kapsamı (escrow'da talimat, ret dalı ve hata kodu oranı en az %80) ve CU raporu (BC-29) (BC-12, BC-13) |
 | `Circuits` | Devre derlemesi, testleri ve release artefaktları | `circuits/` ya da verifier'ın VK dosyalarını değiştiren PR, main | circom 2.2.3 derlemesi, devre testleri (atlamasız), test girdileri ve release artefaktları güncel (BC-13) |
+| `Smoke` | Localnet smoke (geçici validator) · Devnet smoke | yalnızca elle (`workflow_dispatch`, küme girişte seçilir); devnet işi `devnet` environment'ının onayını bekler | 8 adım ve ispat-ret / ispat-yok varyantları gerçek işlemlerle, tx / CU / ücret raporu iş özetinde ve artefaktta ([`tests/smoke`](../tests/smoke/), BC-31). Localnet: `anchor build`, devre, `smoke:localnet`. Devnet: anahtarlar environment secret'larından, yapılandırma `SMOKE_CONFIG` değişkeninden |
 | `Verifiable build` | Verifiable build (solana-verify) | main'de programları etkileyen push; elle; PR'da yalnızca kendi dosyası değişince | Programların Docker'da deterministik derlemesi ve executable hash'leri (BC-13) |
 
 `reviewer` iş akışı kontrol değildir: PR'a reviewer ister.
@@ -133,4 +135,5 @@ pnpm secrets:scan                       # gitleaks, bütün geçmiş
 node scripts/ci/monitoring.mjs          # izleme kuralları ve pano ↔ servis metrikleri (docs/slo.md)
 node --test "scripts/ci/*.test.mjs"     # CI betiklerinin testleri
 cd circuits/payment-compliance && CIRCUIT_TESTS_STRICT=1 npm test   # devre testleri, atlamasız
+pnpm --filter @squaresdk/solana-smoke smoke:localnet                # uçtan uca smoke (anchor build ve devre derlemesinden sonra)
 ```
