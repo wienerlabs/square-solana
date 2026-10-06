@@ -42,7 +42,10 @@ export function delegateTool(delegator: Delegator): LocalTool {
           },
           amount: { type: 'string', description: 'Escrow amount in base units of the settlement mint (u64).' },
           category: { type: 'string', description: 'Payment category (default: the configured category).' },
-          deadline: { type: 'integer', description: 'Delivery deadline, unix seconds (default: configured offset).' },
+          deadline: {
+            type: 'integer',
+            description: 'Delivery deadline, unix seconds (default and latest: now + configured offset).',
+          },
         },
         required: ['agentRecord', 'spec', 'amount'],
         additionalProperties: false,

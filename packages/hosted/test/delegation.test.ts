@@ -196,6 +196,9 @@ describe('politika limitine uyma', () => {
     await expect(
       d.delegate({ agentRecord: agentRecord.toBase58(), spec: spec(18), amount: 1n, deadline: NOW - 1 }),
     ).rejects.toThrow(/deadline/);
+    await expect(
+      d.delegate({ agentRecord: agentRecord.toBase58(), spec: spec(18), amount: 1n, deadline: NOW + 3_601 }),
+    ).rejects.toThrow(/deadline en geç/);
     const unregistered = Keypair.generate().publicKey.toBase58();
     const loose = delegator({ config: config({ allowedAgents: [{ agentRecord: unregistered }] }) });
     await expect(loose.delegate({ agentRecord: unregistered, spec: spec(19), amount: 1n })).rejects.toThrow(
