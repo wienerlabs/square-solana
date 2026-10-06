@@ -3,14 +3,16 @@
 Akışın 7. adımı: kurum, release'ten önce Groth16 ispatını job'a bağlar; program ispatı doğrular ve
 escrow'un release'te okuyacağı `ReleaseProof` hesabını yazar. Arayüz
 [program arayüzü §10.3](../../docs/design/program-interface.md#103-square_verifier)'tedir; IDL'i sözleşme
-IDL'iyle (`idl/square_verifier_contract.json`) aynıdır, Stripe MPP yolu (`verify_mpp_payment_proof`,
-`update_mpp_authority`) BC-37'de.
+IDL'iyle (`idl/square_verifier_contract.json`) aynıdır. Stripe MPP fiat rayı (BC-37):
+[ADR 0024](../../docs/decisions/0024-stripe-mpp-fiat-rayi.md).
 
 | Talimat | Ne yapar |
 |---|---|
 | `init_verifier_config` | Tekil `VerifierConfig`'i açar; yalnızca programın yükseltme yetkilisi (`program` + `program_data`). Okunan escrow ve policy programlarının kimlikleri, MPP yetkilisi, doğrulama anahtarının sürümü |
 | `set_compliance_proof` | İspatı release devresinin 13 sinyaline karşı doğrular ve `ReleaseProof`'u yazar (ret kodu 0 ise `Compliant`, değilse `Refused` + kod). Tüketilene kadar yeniden bağlanabilir |
 | `record_release` | Yalnızca escrow'un `["escrow_authority"]` PDA'sıyla (CPI): ispatı tüketir, `Compliant` ise günlük sayacı net tutar kadar ilerletir |
+| `verify_mpp_payment_proof` | Fiat işin Stripe ödemesini bağlar. Hemen önceki talimat, `config.mpp_authority`'nin `"square/mpp-attestation/v1" ‖ job ‖ stripe_receipt_hash ‖ amount` üzerindeki imzasını doğrulayan Ed25519 precompile talimatıdır (tek imza, kendi verisinde). İspat aynı 13 sinyale karşı: `refusal_code` 0, net işin tutarı, payee agent, sinyal 12 makbuz commitment'ı. `Compliant` `ReleaseProof`, `MppPaymentVerified` |
+| `update_mpp_authority` | Config admin'i (Squads vault'u) MPP attestation anahtarını program upgrade'i olmadan değiştirir; sıfır anahtar fiat rayını kapatır |
 
 - **Sinyaller** ([`src/signals.rs`](src/signals.rs), [release-circuit.md](../../docs/design/release-circuit.md)
   §2, §6 yol A): 10'unu program hesaplardan kurar. Bunlar:
@@ -24,7 +26,8 @@ IDL'iyle (`idl/square_verifier_contract.json`) aynıdır, Stripe MPP yolu (`veri
 - **Bağlama koşulları:**
   - imzacı kurumun güncel yetkilisi (multisig bağlıysa vault'u);
   - politika kuruma ve job'a ait;
-  - job `Delivered` ya da `Disputed`;
+  - `set_compliance_proof`'ta escrow rayındaki job `Delivered`, `Disputed` ya da `Resolved`;
+    `verify_mpp_payment_proof`'ta fiat job `Delivered` (yanlış ray `RailMismatch`);
   - ispatın anı zincirin saatine 600 s içinde.
 
   Hesaplar CPI'sız okunur ([`src/linked.rs`](src/linked.rs)): owner `VerifierConfig`'teki program
@@ -34,8 +37,8 @@ IDL'iyle (`idl/square_verifier_contract.json`) aynıdır, Stripe MPP yolu (`veri
   - Release'te ispat ancak payee, net tutar, mint, gün ve sayaç aynıysa tazedir
     (`square_common::release::check_fresh`, escrow BC-24).
   - `record_release` gün ve sayaç kuralını ilerletmeden önce yeniden uygular.
-- **CU:** `set_compliance_proof` ~178 bin (13 public input'lu Groth16 doğrulaması; işlem compute unit
-  sınırını yükseltmelidir), `record_release` ~12,6 bin.
+- **CU:** `set_compliance_proof` ~195 bin (13 public input'lu Groth16 doğrulaması; işlem compute unit
+  sınırını yükseltmelidir), `verify_mpp_payment_proof` ~179 bin, `record_release` ~11 bin.
 
 ## Doğrulama anahtarı
 
@@ -49,7 +52,7 @@ IDL'iyle (`idl/square_verifier_contract.json`) aynıdır, Stripe MPP yolu (`veri
 ```bash
 anchor build
 cargo test -p square-verifier
-cargo test --manifest-path tests/programs/Cargo.toml --test verifier
+cargo test --manifest-path tests/programs/Cargo.toml --test verifier --test mpp
 ```
 
 - `cargo test -p square-verifier` iki şeyi doğrular:
@@ -66,5 +69,6 @@ cargo test --manifest-path tests/programs/Cargo.toml --test verifier
 Aperture `programs/verifier`'dan geçmişiyle taşındı (BC-05, [provenance](../../docs/provenance/BC-05.md)).
 BC-11, RISC Zero v1'i ve transfer-hook yollarını kaldırdı. BC-21 programı Square arayüzüne göre yeniden
 yazdı: Aperture'ın 10 sinyalli anahtarı (`APERTURE_PAYMENT_VK`), eski MPP talimatı, `initialize_operator_state`,
-`ProofRecord` ve `ComplianceStatus` kaldırıldı; MPP yolu release devresiyle BC-37'de gelir. Lisans: MIT,
+`ProofRecord` ve `ComplianceStatus` kaldırıldı. BC-37 MPP yolunu release devresiyle yeniden yazdı: anahtar
+derleme zamanı sabiti yerine config'tedir, attestation işe ve tutara bağlıdır. Lisans: MIT,
 [`LICENSE`](LICENSE) (Aperture'ın telif bildirimi).

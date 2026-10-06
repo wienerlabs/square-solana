@@ -2,7 +2,7 @@
 // raporu (BC-31). Girdiler zincirden okunmuş düz değerlerdir; biçim `docs/deploy/` kayıtlarınınkidir.
 import type { TxRecord } from './chain.js';
 
-export type Section = 'init' | 'hazırlık' | 'akış' | 'ispat-ret' | 'ispat-yok';
+export type Section = 'init' | 'hazırlık' | 'akış' | 'ispat-ret' | 'ispat-yok' | 'fiat';
 
 /** Kayıttaki bir tx ve ait olduğu bölüm. */
 export interface SectionedTx extends TxRecord {
@@ -198,10 +198,11 @@ const SECTION_TITLES: Readonly<Record<Section, string>> = {
   akış: '8 adım',
   'ispat-ret': 'Varyant: ispat-ret (kesin ret → iade)',
   'ispat-yok': 'Varyant: ispat-yok (escrow bekler, ispat bağlanınca ödenir)',
+  fiat: 'Varyant: fiat (Stripe MPP attestation, BC-37)',
 };
 
 export function smokeReportMarkdown(report: SmokeReport): string {
-  const sections: Section[] = ['hazırlık', 'akış', 'ispat-ret', 'ispat-yok'];
+  const sections: Section[] = ['hazırlık', 'akış', 'ispat-ret', 'ispat-yok', 'fiat'];
   const all = report.transactions.filter((r) => r.section !== 'init');
   const totalCu = all.reduce((sum, r) => sum + r.computeUnits, 0);
   const totalFee = all.reduce((sum, r) => sum + r.feeLamports, 0);

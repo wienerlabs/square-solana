@@ -223,9 +223,9 @@ describe('fiat iş (BC-37, ADR 0024)', () => {
     expect(Buffer.from(message0.compiledInstructions[at - 1]!.data)).toEqual(Buffer.from(signed.data));
 
     const refused = { ...proof, publicInputs: ['0'.repeat(63) + '1', ...proof.publicInputs.slice(1)] };
-    await expect(buildVerifyMppPaymentProofTx(state.client, { ...params, proof: refused }, { feePayer })).rejects.toThrow(
-      /uyumlu/,
-    );
+    await expect(
+      buildVerifyMppPaymentProofTx(state.client, { ...params, proof: refused }, { feePayer }),
+    ).rejects.toThrow(/uyumlu/);
     const noReceipt = { ...proof, publicInputs: [...proof.publicInputs.slice(0, 12), '0'.repeat(64)] };
     await expect(
       buildVerifyMppPaymentProofTx(state.client, { ...params, proof: noReceipt }, { feePayer }),

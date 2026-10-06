@@ -101,7 +101,9 @@ export async function buildReleaseWitness(params: {
   const fiat = 'fiat' in account.rail;
   const stripeReceiptHash = params.stripeReceiptHash ?? 0n;
   if (fiat && (stripeReceiptHash <= 0n || stripeReceiptHash >= BN254_R)) {
-    throw new Error("fiat iş: Stripe makbuzunun commitment'ı (stripeReceiptHash) sıfırdan farklı bir alan elemanı olmalı");
+    throw new Error(
+      "fiat iş: Stripe makbuzunun commitment'ı (stripeReceiptHash) sıfırdan farklı bir alan elemanı olmalı",
+    );
   }
   if (!fiat && stripeReceiptHash !== 0n) throw new Error("escrow işinin ispatında makbuz commitment'ı olmaz");
 
