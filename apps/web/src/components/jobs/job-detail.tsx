@@ -7,6 +7,7 @@ import { PublicKey } from '@solana/web3.js';
 import { squareIdentity } from '@squaresdk/solana-identity';
 import type { ClaimListingAccount, JobAccount } from '@squaresdk/solana-sdk';
 import type { DeliveryReceipt } from '@squaresdk/solana-types';
+import { useApiClient } from '@/components/api-client';
 import { useApiSession } from '@/components/api-session';
 import { useNetworkGuard, useSendTransaction } from '@/components/network-guard';
 import { useWebConfig } from '@/components/providers';
@@ -41,10 +42,10 @@ import { readReleaseState, type ReleaseState } from '@/lib/release-proof';
 import { TransactionBlockedError } from '@/lib/send-transaction';
 import { formatUnits } from '@/lib/settlement';
 import { JOB_STATUS_TONE, statusLabel } from '@/lib/status';
+import type { TravelRuleVerification } from '@/lib/travel-rule';
 import { useSettlementToken } from '@/lib/use-settlement';
 import { useChainClock } from '@/lib/use-chain-clock';
 import { useSignatureStatus } from '@/lib/use-signature-status';
-import { useTravelRuleVault } from '@/lib/use-travel-rule-vault';
 
 type Load<T> = { state: 'loading' } | { state: 'ready'; value: T } | { state: 'error'; message: string };
 type JobStatusName = keyof typeof JOB_STATUS_TONE;
@@ -190,9 +191,9 @@ export function JobDetail({ jobAddress, escrowProgramId }: { jobAddress: string;
 
   // Agent eylemleri: yalnızca job'un agent cüzdanı.
   const isAgent = Boolean(account && publicKey?.equals(account.agentWallet));
-  // Travel Rule kayıtları işi açan kurumun bu tarayıcıdaki şifreli deposunda (FE-18).
   const institutionKey = account && publicKey?.equals(account.institution) ? publicKey : null;
-  const vault = useTravelRuleVault(institutionKey?.toBase58() ?? null);
+  const apiClient = useApiClient();
+  const [travelVerification, setTravelVerification] = useState<TravelRuleVerification | null>(null);
   const fileId = useId();
   const uriId = useId();
   const [deliveryUri, setDeliveryUri] = useState('');
@@ -401,7 +402,9 @@ export function JobDetail({ jobAddress, escrowProgramId }: { jobAddress: string;
           commitment: Uint8Array.from(account.travelRuleCommitment),
         }}
         institution={institutionKey}
-        vault={vault}
+        api={apiClient}
+        verification={travelVerification}
+        onVerification={setTravelVerification}
         formatAmount={formatAmount}
         onConfirmed={refresh}
       />
