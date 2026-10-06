@@ -4,10 +4,20 @@
 // dondurulduğu için değişmez; authority'nin elinde kalan bir yetki yoktur. Program kimliği ya da mint
 // değişirse yeni tablo kurulur. Ödeyici ve geçici authority verilen keypair'dir.
 //
-//   node scripts/deploy/create-lookup-table.mjs --network devnet --payer <keypair>
+// `--cctp <kaynak>` verilirse Square ALT'ı yerine o kaynak zincirin CCTP ALT'ı kurulur: Circle'ın Solana
+// programları ve `receive_message`'ın sabit hesapları (SDK `cctpLookupTableAddresses`; BC-36). Mint ile
+// fonlamanın tek tx'e sığması için iki ALT birlikte kullanılır.
+//
+//   node scripts/deploy/create-lookup-table.mjs --network devnet --payer <keypair> [--cctp sepolia]
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { createLookupTableInstructions, createPda, squareLookupTableAddresses } from '@squaresdk/solana-sdk';
+import {
+  cctpLookupTableAddresses,
+  createLookupTableInstructions,
+  createPda,
+  fetchCctpFeeRecipient,
+  squareLookupTableAddresses,
+} from '@squaresdk/solana-sdk';
 import {
   AddressLookupTableProgram,
   Keypair,
@@ -31,11 +41,34 @@ async function send(connection, payer, instructions) {
   return signature;
 }
 
+/** Kaynak zincirin CCTP ALT'ı: Circle'ın programları ve `receive_message`'ın sabit hesapları. */
+async function cctpAddresses(connection, network, sourceName, usdcMint) {
+  const source = network.cctp?.sources[sourceName];
+  if (!source) throw new Error(`${network.cluster} yapılandırmasında ${sourceName} CCTP kaynağı yok`);
+  const programs = {
+    messageTransmitter: new PublicKey(network.cctp.messageTransmitter),
+    tokenMessengerMinter: new PublicKey(network.cctp.tokenMessengerMinter),
+  };
+  const mint = await connection.getAccountInfo(usdcMint);
+  if (!mint) throw new Error(`settlement mint'i yok: ${usdcMint.toBase58()}`);
+  return cctpLookupTableAddresses({
+    programs,
+    usdcMint,
+    sourceDomain: source.domain,
+    burnToken: Buffer.concat([Buffer.alloc(12), Buffer.from(source.usdc.slice(2), 'hex')]),
+    feeRecipient: await fetchCctpFeeRecipient(connection, programs),
+    tokenProgram: mint.owner,
+  });
+}
+
 async function main() {
   const argv = process.argv.slice(2);
-  const value = (flag) => {
+  const value = (flag, required = true) => {
     const index = argv.indexOf(flag);
-    if (index === -1 || !argv[index + 1]) throw new Error(`${flag} gerekli`);
+    if (index === -1 || !argv[index + 1]) {
+      if (required) throw new Error(`${flag} gerekli`);
+      return null;
+    }
     return argv[index + 1];
   };
   const network = loadNetwork(ROOT, value('--network'));
@@ -44,15 +77,16 @@ async function main() {
   const programIds = Object.fromEntries(
     Object.entries(network.programs).map(([name, id]) => [name, new PublicKey(id)]),
   );
-  const addresses = squareLookupTableAddresses({
-    programIds,
-    pda: createPda(programIds),
-    settlementMint: new PublicKey(network.escrow.settlementMint),
-  });
+  const settlementMint = new PublicKey(network.escrow.settlementMint);
+  const cctpSource = value('--cctp', false);
+  const addresses = cctpSource
+    ? await cctpAddresses(connection, network, cctpSource, settlementMint)
+    : squareLookupTableAddresses({ programIds, pda: createPda(programIds), settlementMint });
   const { lookupTable, instructions } = createLookupTableInstructions({
     authority: payer.publicKey,
     payer: payer.publicKey,
-    recentSlot: await connection.getSlot('finalized'),
+    // Tablo adresi bu slottan türer; slot SlotHashes'te (son ~512 slot) olmalı: gönderimden hemen önce okunur.
+    recentSlot: await connection.getSlot('confirmed'),
     addresses,
   });
   const create = await send(connection, payer, instructions);

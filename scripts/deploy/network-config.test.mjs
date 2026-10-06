@@ -59,6 +59,32 @@ test('programların kuralları: eşik, arbitrator seti, keeper ücreti, süreler
   assert.throws(() => validateNetwork({ ...base(), rpc: 'http://x' }), /rpc/);
 });
 
+test('CCTP bölümü isteğe bağlı; adresler ve zincir bilgileri doğrulanır', () => {
+  assert.equal(validateNetwork(base()).cctp, null);
+  const cctp = {
+    attestationApi: 'https://iris-api-sandbox.circle.com',
+    messageTransmitter: A,
+    tokenMessengerMinter: B,
+    sources: {
+      sepolia: {
+        domain: 0,
+        chainId: 11155111,
+        rpc: 'https://rpc.sepolia.example',
+        tokenMessenger: '0x8FE6B999Dc680CcFDD5Bf7EB0974218be2542DAA',
+        usdc: '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238',
+      },
+    },
+  };
+  assert.equal(validateNetwork({ ...base(), cctp }).cctp.sources.sepolia.domain, 0);
+  const broken = (change) => ({
+    ...base(),
+    cctp: { ...cctp, sources: { sepolia: { ...cctp.sources.sepolia, ...change } } },
+  });
+  assert.throws(() => validateNetwork(broken({ usdc: '0x12' })), /usdc/);
+  assert.throws(() => validateNetwork(broken({ domain: -1 })), /domain/);
+  assert.throws(() => validateNetwork({ ...base(), cctp: { ...cctp, sources: {} } }), /en az bir kaynak/);
+});
+
 test('Anchor.toml bölümü: dört program zorunlu', () => {
   const toml = `[programs.localnet]\nsquare_policy = "${A}"\n\n[programs.devnet]\nsquare_policy = "${A}"\nsquare_verifier = "${B}"\nsquare_registry = "${C}"\nsquare_escrow = "${A}"\n`;
   assert.deepEqual(anchorPrograms(toml, 'devnet'), { policy: A, verifier: B, registry: C, escrow: A });

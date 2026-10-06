@@ -12,7 +12,8 @@ import {
 } from '@solana/spl-token';
 import { SystemProgram, type Connection, type PublicKey, type TransactionInstruction } from '@solana/web3.js';
 import BN from 'bn.js';
-import { withComputeProfile } from './budget.js';
+import { computeUnitLimitFor, withComputeProfile } from './budget.js';
+import { CCTP_RECEIVE_COMPUTE_UNITS, cctpMintedAmount, decodeCctpMessage, receiveMessageInstruction } from './cctp.js';
 import type { SquareFlow } from './client.js';
 import type { SquarePda } from './pda.js';
 import type { SquareIdls, SquareProgramIds } from './programs.js';
@@ -69,6 +70,29 @@ export function createFlow(deps: FlowDeps): SquareFlow {
       address,
       create: createAssociatedTokenAccountIdempotentInstruction(payer, address, owner, mint, program),
     };
+  }
+
+  /** `fund_job`: kurumun token hesabından vault'a; iki tarafın screening kaydı okunur. */
+  async function fundJobInstruction(params: {
+    institution: PublicKey;
+    job: PublicKey;
+    institutionTokenAccount: PublicKey;
+  }): Promise<TransactionInstruction> {
+    const account = await job(params.job);
+    return deps.escrow.methods
+      .fundJob()
+      .accountsStrict({
+        institution: params.institution,
+        config: pda.escrowConfig()[0],
+        job: params.job,
+        vault: pda.vault(params.job)[0],
+        institutionTokenAccount: params.institutionTokenAccount,
+        mint: account.mint,
+        institutionScreening: pda.screeningRecord(params.institution)[0],
+        agentScreening: pda.screeningRecord(account.agentWallet)[0],
+        tokenProgram: await tokenProgram(account.mint),
+      })
+      .instruction();
   }
 
   /** Payee: alacak satılmışsa alıcı, değilse job'daki agent cüzdanı (program-interface.md §6). */
@@ -187,22 +211,42 @@ export function createFlow(deps: FlowDeps): SquareFlow {
     },
 
     async fundJob(params, options) {
+      return deps.buildTx([await fundJobInstruction(params)], withComputeProfile(options, 'fundJob'));
+    },
+
+    async receiveAndFundJob(params, options) {
+      const message = decodeCctpMessage(params.message);
       const account = await job(params.job);
-      const ix = await deps.escrow.methods
-        .fundJob()
-        .accountsStrict({
-          institution: params.institution,
-          config: pda.escrowConfig()[0],
-          job: params.job,
-          vault: pda.vault(params.job)[0],
-          institutionTokenAccount: params.institutionTokenAccount,
-          mint: account.mint,
-          institutionScreening: pda.screeningRecord(params.institution)[0],
-          agentScreening: pda.screeningRecord(account.agentWallet)[0],
-          tokenProgram: await tokenProgram(account.mint),
-        })
-        .instruction();
-      return deps.buildTx([ix], withComputeProfile(options, 'fundJob'));
+      const program = await tokenProgram(account.mint);
+      if (!account.mint.equals(params.cctp.usdcMint)) {
+        throw new Error(`job'un mint'i (${account.mint.toBase58()}) CCTP'nin mint ettiği USDC değil`);
+      }
+      // Mint kurumun token hesabına yapılır, fonlama o hesaptan çeker: ikisi aynı hesap olmalı.
+      const institutionTokenAccount = getAssociatedTokenAddressSync(account.mint, params.institution, true, program);
+      if (!message.burn.mintRecipient.equals(institutionTokenAccount)) {
+        throw new Error(
+          `mesajın mint alıcısı ${message.burn.mintRecipient.toBase58()}, kurumun USDC hesabı ${institutionTokenAccount.toBase58()}`,
+        );
+      }
+      const receive = receiveMessageInstruction({
+        context: { ...params.cctp, tokenProgram: program },
+        message: params.message,
+        attestation: params.attestation,
+        payer: options.feePayer,
+        caller: params.institution,
+      });
+      const fund = await fundJobInstruction({
+        institution: params.institution,
+        job: params.job,
+        institutionTokenAccount,
+      });
+      const built = await deps.buildTx(
+        [receive, fund],
+        options.computeUnitLimit !== undefined
+          ? options
+          : { ...options, computeUnitLimit: computeUnitLimitFor(['fundJob']) + CCTP_RECEIVE_COMPUTE_UNITS },
+      );
+      return { ...built, minted: cctpMintedAmount(message) };
     },
 
     async acceptJob(params, options) {
