@@ -173,6 +173,21 @@ testin kendi Postgres'iydi.
 
 Her kayıtta zincirdeki `source_hash` denetim kaydındakidir; `expires_at − screened_at` config'teki süredir (30 gün).
 
+## x402 (BE-24)
+
+Ücretli ucun uçtan uca koşusu, 2026-10-06 (`packages/x402/test/devnet.e2e.test.ts`).
+- **Ödeme:** Fiyat 0,01 USDC (Circle devnet USDC'si `4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU`).
+- **Taraflar:** Ödeyen BC-36'nın kurumu (`7xNWRmEb…`), alıcı BC-36'nın agent'ı (`C6iFdvJp…`), ücret ödeyen deployer.
+- **Hazırlık:** Alıcının USDC hesabı koşudan önce açıldı (`DZ4fUUgJvREe4W8dWy9ce1oJafBRmf4cDPE32yfAVaEpPsLDzRYmsEnYE3xyCxaAk5auiHQAzKf5XNp991puS2x`).
+- **Depolar:** Tekrar koruması ve idempotent yanıt testin Postgres'iydi.
+
+| Adım | Sonuç | Uzlaştırma tx'i |
+|---|---|---|
+| Ödeyen fetch: 402 → ödeme → 200 | Alıcının bakiyesi 10 000 arttı | `5CSPep7Qh4Nd7dFfMP9vvo96c1RFqumKEHuBfgaCNkYrgdm5KDxGixs17pwp6y9JdYqwSHFceGcYKo5es5wXUTRW` |
+| Aynı başlık yeniden (yanıt kayboldu) | 200, aynı gövde ve makbuz; bakiye değişmedi | — |
+| Kimliksiz aynı başlıkla eşzamanlı iki istek | Biri 200, diğeri 402 (`replay_rejected`) | `2MYysDru1hnH4jjvj7gdfL9135BKzhjoRqgSdg7ZmroHChXcPPcyvm9V8zCeizcxZedQJ4WBbspyxsHxg9Htr51W` |
+| Uzlaşmış başlık yeniden | 402: facilitator'ın simülasyonu işlenmiş işlemi reddetti | — |
+
 ## Yükseltmeler
 
 ### Escrow v0.6.0: dispute (BC-32, BC-33), 2026-10-06
