@@ -67,6 +67,7 @@ Notlar:
 | `agent_cards` | Barındırılan ya da indirilen agent card: ham baytlar, SHA-256, ayrıştırılmış JSON, yetenekler, zincirdeki hash ile eşleşme | API (`putAgentCard`), indexer | BE-18, BE-09 |
 | `deliveries` | Teslimat içeriğinin nesne deposundaki konumu ve `submit_work`'e giden hash / URI | API (`uploadDelivery`) | BE-18 |
 | `keeper_actions` | Keeper günlüğü (`KeeperAction`) | keeper | BE-15 |
+| `screening_decisions` | Screener'ın denetim kaydı: her tarama kararı. Satırda cüzdan, tetikleyici (`request` / `renewal`) ve sonuç bulunur: `recorded`, `sourceError` ya da `txFailed`. Ayrıca kaynak başına sonuçlar, kanıt belgesi ve onun SHA-256'sı olan `source_hash`, tx imzası ve slot, zincirden okunan `screened_at` / `expires_at`, çağıranın anahtar parmak izi. Sonuca göre dolu alanlar CHECK kısıtıyla zorunlu. Zincirdeki kaydın aynası `screenings`'tir; TTL yenilemesi ikisinden aday bulur | screener | BE-16 |
 | `users`, `auth_challenges`, `sessions`, `api_keys` | Cüzdan Ed25519 oturumu ve API anahtarları | API | BE-18 |
 | `mpp_payments` | İmzası doğrulanmış Stripe webhook'undan gelen fiat ödemesi; makbuzun Poseidon commitment'ı ve MPP authority imzası | MPP rayı | BE-25 |
 | `cctp_transfers` | CCTP mesajı (kaynak domain + nonce), Circle attestation'ı, Solana'da receive ve fund imzaları | CCTP relayer | BE-26 |
