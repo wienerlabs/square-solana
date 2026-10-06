@@ -5,9 +5,9 @@ import assert from 'node:assert/strict';
 import * as t from '../dist/index.js';
 
 // Fixture adresleri: IDL'lerdeki kaynak program kimlikleri (geçerli base58 adresler).
-const A = 'CgchXu2dRV3r9E1YjRhp4kbeLLtv1Xz61yoerJzp1Vbc';
-const B = 'FXD7ycSguBQw7o3DXqq4VUBHtdx5ZQpu9P2zb4KG4ZEU';
-const C = 'AzKirEv7h5PstLNYNqLj7fCXU9EFA6nSnuoed3QkmUfU';
+const A = 'GkBszSapkCQ9xwrLvhtTHNFkEXoC68KJp54MZ5chcYBe';
+const B = '7LsXiT8CF2KhVEQkpLQeYJjmpRdhZYgUbcKNLByDK7AY';
+const C = 'C7Vws9e7vKCjt5DWpXSM7o8QAez4gANaYeZeBdqzMNBE';
 
 const base = () => ({
   institution: A,

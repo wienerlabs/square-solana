@@ -50,7 +50,7 @@ export interface FakeSquareApi {
   expireSessions(): void;
 }
 
-export function fakeSquareApi(): FakeSquareApi {
+export function fakeSquareApi(domain = globalThis.location?.host ?? 'app.square.test'): FakeSquareApi {
   const challenges = new Map<string, { wallet: string; message: string }>();
   const sessions = new Map<string, string>();
   const keys: (ApiKey & { secret: string })[] = [];
@@ -61,7 +61,7 @@ export function fakeSquareApi(): FakeSquareApi {
     if (method === 'POST' && path === '/v1/auth/challenge') {
       const { wallet } = body as { wallet: string };
       const nonce = randomUUID().replaceAll('-', '');
-      const message = `app.square.test wants you to sign in with your Solana account:\n${wallet}\n\nSign in to Square.\n\nNonce: ${nonce}`;
+      const message = `${domain} wants you to sign in with your Solana account:\n${wallet}\n\nSign in to Square.\n\nNonce: ${nonce}`;
       challenges.set(nonce, { wallet, message });
       return ok({ nonce, message, expiresAt: NOW + 300 });
     }

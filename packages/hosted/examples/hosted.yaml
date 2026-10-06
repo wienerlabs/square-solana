@@ -19,10 +19,10 @@ chain:
   rpcUrl: https://rpc.kurum.example
   commitment: confirmed
   programIds:
-    registry: CgchXu2dRV3r9E1YjRhp4kbeLLtv1Xz61yoerJzp1Vbc
-    policy: FXD7ycSguBQw7o3DXqq4VUBHtdx5ZQpu9P2zb4KG4ZEU
-    verifier: AzKirEv7h5PstLNYNqLj7fCXU9EFA6nSnuoed3QkmUfU
-    escrow: 5hstj5grBUL1BeSaPLYpgkD6n3ALasmbseRvKRFfCVNT
+    registry: AL5p4aTWrmBmWa4vxJFbBjQG7Xnx2juc15FJRGpwSsA9
+    policy: 63HKPj2L8a9DGeTa9Eh3NaZXthMrFUEgbs9Y28SNEc4
+    verifier: 8yLdDR5zoAzeEWzkNX19DKy4HfVYXb7VcU3wWStwTFPh
+    escrow: 6yBTEVbizMVCWAp4c3jx6Xdsay3CiUmrJmTswY7QRWaX
 api: { baseUrl: https://api.square.example, apiKeyEnv: SQUARE_API_KEY }
 store: { type: postgres, urlEnv: DATABASE_URL }
 signers:

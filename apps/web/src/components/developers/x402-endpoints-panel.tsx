@@ -20,11 +20,11 @@ import {
   isUsdc,
   networkLabel,
   newEndpointDraft,
-  unwrap,
   type DraftField,
   type EndpointDraft,
 } from '@/lib/developer-portal';
 import { formatUnits } from '@/lib/settlement';
+import { unwrap } from '@/lib/square-api';
 import { ErrorText, Field, headingClass, inputClass, panelClass } from './field';
 
 const draftOf = (endpoint: X402Endpoint): EndpointDraft => ({
@@ -293,10 +293,13 @@ export function X402EndpointsPanel({
     setUsage(null);
     if (!selected) return;
     let active = true;
-    unwrap(api.getX402EndpointUsage(selected)).then(
-      (result) => active && setUsage(result),
-      (cause: unknown) => active && setError(failed(cause)),
-    );
+    api
+      .getX402EndpointUsage(selected)
+      .then(unwrap)
+      .then(
+        (result) => active && setUsage(result),
+        (cause: unknown) => active && setError(failed(cause)),
+      );
     return () => {
       active = false;
     };
@@ -319,8 +322,8 @@ export function X402EndpointsPanel({
       const check = checkEndpointDraft(draft);
       if (!check.ok) return;
       const saved = editing
-        ? await unwrap(api.updateX402Endpoint(editing.id, check.body))
-        : await unwrap(api.createX402Endpoint(check.body));
+        ? unwrap(await api.updateX402Endpoint(editing.id, check.body))
+        : unwrap(await api.createX402Endpoint(check.body));
       setEditing(null);
       setInitial(newEndpointDraft(cluster, wallet));
       await onChange();
@@ -329,7 +332,7 @@ export function X402EndpointsPanel({
 
   const setEnabled = (endpoint: X402Endpoint, enabled: boolean) =>
     run(endpoint.id, async () => {
-      await unwrap(api.updateX402Endpoint(endpoint.id, { enabled }));
+      unwrap(await api.updateX402Endpoint(endpoint.id, { enabled }));
       await onChange();
     });
 

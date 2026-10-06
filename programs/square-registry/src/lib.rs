@@ -16,7 +16,7 @@ pub mod state;
 use instructions::*;
 pub use state::{AgentStatus, ScreeningStatus};
 
-declare_id!("CgchXu2dRV3r9E1YjRhp4kbeLLtv1Xz61yoerJzp1Vbc");
+declare_id!("AL5p4aTWrmBmWa4vxJFbBjQG7Xnx2juc15FJRGpwSsA9");
 
 square_common::square_registry_events!();
 

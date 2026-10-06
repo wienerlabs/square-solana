@@ -8,7 +8,8 @@ import type { SquareApi } from '@squaresdk/solana-sdk';
 import { Button } from '@/components/ui/button';
 import { CopyButton } from '@/components/ui/copy-button';
 import { Table, type Column } from '@/components/ui/table';
-import { API_KEY_SCOPES, SCOPE_INFO, formatTime, unwrap } from '@/lib/developer-portal';
+import { API_KEY_SCOPES, SCOPE_INFO, formatTime } from '@/lib/developer-portal';
+import { unwrap } from '@/lib/square-api';
 import { ErrorText, Field, headingClass, inputClass, panelClass } from './field';
 
 export function ApiKeysPanel({
@@ -47,8 +48,8 @@ export function ApiKeysPanel({
 
   const create = () =>
     run('create', async () => {
-      const result = await unwrap(
-        api.createApiKey({ label: label.trim(), scopes: API_KEY_SCOPES.filter((scope) => scopes.has(scope)) }),
+      const result = unwrap(
+        await api.createApiKey({ label: label.trim(), scopes: API_KEY_SCOPES.filter((scope) => scopes.has(scope)) }),
       );
       setCreated(result);
       setLabel('');

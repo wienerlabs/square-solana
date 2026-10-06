@@ -147,19 +147,18 @@ describe('biçim kısıtları', () => {
       storedAt: new Date(),
       retainUntil: new Date(Date.now() + 1_000),
     };
+    // SecretBox biçimi (`sq1.<anahtar>.<iv>.<veri>`); içerik bu test için önemsiz.
     const sealed = {
-      ciphertext: randomBytes(48),
-      algorithm: 'aes-256-gcm',
-      iv: randomBytes(12),
+      ciphertext: `sq1.record.${randomBytes(12).toString('base64url')}.${randomBytes(48).toString('base64url')}`,
       keyId: 'k1',
-      wrappedKey: randomBytes(60),
+      wrappedKey: `sq1.k1.${randomBytes(12).toString('base64url')}.${randomBytes(48).toString('base64url')}`,
     };
     await expect(db.client.travelRuleRecord.create({ data: stored })).rejects.toThrow();
     const row = await db.client.travelRuleRecord.create({ data: { ...stored, ...sealed } });
     await expect(
       db.client.travelRuleRecord.update({ where: { id: row.id }, data: { purgedAt: new Date() } }),
     ).rejects.toThrow();
-    const cleared = { ciphertext: null, algorithm: null, iv: null, keyId: null, wrappedKey: null };
+    const cleared = { ciphertext: null, keyId: null, wrappedKey: null };
     await db.client.travelRuleRecord.update({ where: { id: row.id }, data: { purgedAt: new Date(), ...cleared } });
     const grant = { job: stored.job, grantee: address(), purpose: 'karşı VASP', grantedBy: stored.storedBy };
     const now = new Date();

@@ -33,7 +33,6 @@ import type { OpenApiDocument } from '../../src/openapi.js';
 import { createPolicyMetaService } from '../../src/policy-meta.js';
 import { createProverProxy } from '../../src/prover.js';
 import { createDeliveryStore, createEvidenceStore } from '../../src/storage.js';
-import { createKeyring, type Keyring } from '../../src/travel-rule/crypto.js';
 import { createTravelRuleService, type TravelRuleService } from '../../src/travel-rule/service.js';
 import { createTxBuilder } from '../../src/tx.js';
 import { createX402EndpointService } from '../../src/x402.js';
@@ -91,7 +90,7 @@ export async function startStack(options: {
   /** Paylaşılan veritabanı yerine başka bir adres (ör. ulaşılamayan veritabanı testi). */
   databaseUrl?: string;
   /** Travel Rule ana anahtar halkası ve saklama süresi. */
-  travelRule?: { keyring: Keyring; retentionSeconds: number };
+  travelRule?: { box: SecretBox; retentionSeconds: number };
 }): Promise<Stack> {
   const db = createDatabaseClient({ connectionString: options.databaseUrl ?? inject('databaseUrl') });
   const s3 = inject('s3');
@@ -130,7 +129,7 @@ export async function startStack(options: {
     db,
     client,
     authority,
-    keyring: options.travelRule?.keyring ?? createKeyring(new Map([['test', randomBytes(32)]]), 'test'),
+    box: options.travelRule?.box ?? createSecretBox({ keys: { test: randomBytes(32) }, activeKeyId: 'test' }),
     retentionSeconds: options.travelRule?.retentionSeconds ?? 86_400,
     ...(options.clock ? { clock: options.clock } : {}),
   });

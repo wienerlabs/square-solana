@@ -1,54 +1,9 @@
-// Geliştirici portalı (FE-22): Square API'sine cüzdanla oturum açma, API anahtarı kapsamları ve x402 ücretli
-// uç nokta formu. Oturum `/v1/auth` akışıdır: API'nin verdiği Sign-In With Solana metni cüzdana imzalatılır
-// (wallet-adapter `signMessage`), imza base58 olarak gönderilir. Oturum belirteci yalnızca sayfanın belleğinde
-// tutulur; sayfa yenilenince yeniden imzalanır.
-import type { ApiEnvelope, ApiErrorCode, ApiKeyScope, X402EndpointCreate, X402Network } from '@squaresdk/solana-types';
+// Geliştirici portalı (FE-22): API anahtarı kapsamları ve x402 ücretli uç nokta formu.
+import type { ApiKeyScope, X402EndpointCreate, X402Network } from '@squaresdk/solana-types';
 import { ApiKeyScopeSchema, X402EndpointCreateSchema } from '@squaresdk/solana-types';
-import type { SquareApi } from '@squaresdk/solana-sdk';
-import bs58 from 'bs58';
 import type { Cluster } from './config';
 import { isAddress } from './config';
 import { formatUnits, parseUnits } from './settlement';
-
-/** API'nin hata zarfı; portal mesajı ve kodu ayrı gösterir (`unauthorized` oturumu kapatır). */
-export class PortalApiError extends Error {
-  constructor(
-    readonly code: ApiErrorCode,
-    message: string,
-  ) {
-    super(message);
-    this.name = 'PortalApiError';
-  }
-}
-
-/** Başarı zarfının verisi; hata zarfı `PortalApiError` olur. */
-export async function unwrap<T>(response: Promise<ApiEnvelope<T>>): Promise<T> {
-  const envelope = await response;
-  if (envelope.success) return envelope.data;
-  throw new PortalApiError(envelope.error.code, envelope.error.message);
-}
-
-export interface ApiSession {
-  readonly token: string;
-  readonly wallet: string;
-  /** Unix saniyesi. */
-  readonly expiresAt: number;
-}
-
-/** Cüzdanın imzalayacağı mesaj: API'nin challenge metninin UTF-8 baytları. */
-export async function signInToApi(params: {
-  api: Pick<SquareApi, 'createAuthChallenge' | 'createSession'>;
-  wallet: string;
-  signMessage: (message: Uint8Array) => Promise<Uint8Array>;
-}): Promise<ApiSession> {
-  const { api, wallet, signMessage } = params;
-  const challenge = await unwrap(api.createAuthChallenge({ wallet }));
-  const signature = await signMessage(new TextEncoder().encode(challenge.message));
-  const session = await unwrap(
-    api.createSession({ wallet, nonce: challenge.nonce, signature: bs58.encode(signature) }),
-  );
-  return { token: session.token, wallet: session.wallet, expiresAt: session.expiresAt };
-}
 
 /** Kapsamların açıklaması; sıra API'nin `ApiKeyScope` listesidir. */
 export const SCOPE_INFO: Readonly<Record<ApiKeyScope, string>> = {

@@ -3,10 +3,10 @@
 import { useEffect, useId, useState } from 'react';
 import { useConnection } from '@solana/wallet-adapter-react';
 import type { PublicKey } from '@solana/web3.js';
+import type { ApiClientState } from '@/components/api-client';
 import { useNetworkGuard, useSendTransaction } from '@/components/network-guard';
 import { Button } from '@/components/ui/button';
 import { TxConfirmation } from '@/components/ui/tx-confirmation';
-import { unwrap, type ApiSessionState } from '@/lib/api-session';
 import {
   decodeUnsignedTransaction,
   parseSplitAmount,
@@ -24,6 +24,7 @@ import {
 } from '@/lib/dispute';
 import { TransactionBlockedError } from '@/lib/send-transaction';
 import { formatUnits } from '@/lib/settlement';
+import { unwrap } from '@/lib/square-api';
 import { useSignatureStatus } from '@/lib/use-signature-status';
 
 type Choice = Exclude<DisputeResolution['kind'], 'pending'>;
@@ -47,7 +48,7 @@ export function VoteForm({
   formatAmount,
   onConfirmed,
 }: {
-  session: ApiSessionState;
+  session: ApiClientState;
   escrowProgramId: PublicKey;
   config: PublicKey;
   arbitrator: PublicKey;

@@ -1,9 +1,68 @@
 // Square API (BE-18, `apps/api`) istemcisi: sözleşmenin REST istemcisi (`createApiClient`). Okuma uçları
-// kimliksizdir; indexer'ın tablolarından ve keeper'ın günlüğünden okur.
-import { createApiClient, type SquareApi } from '@squaresdk/solana-sdk';
-import type { KeeperAction } from '@squaresdk/solana-types';
+// kimliksizdir; indexer'ın tablolarından ve keeper'ın günlüğünden okur. Yazma uçları cüzdan oturumuyla
+// (`Authorization: Bearer`, FE-03) çağrılır.
+import { ApiClientError, createApiClient, type SquareApi } from '@squaresdk/solana-sdk';
+import type { ApiEnvelope, ApiErrorCode, KeeperAction, ProgramErrorRef } from '@squaresdk/solana-types';
 
-export const squareApi = (apiUrl: string): SquareApi => createApiClient({ baseUrl: apiUrl });
+/** API istemcisi; oturum belirteci verilirse istekler onunla gider. */
+export const squareApi = (apiUrl: string, session?: string): SquareApi =>
+  createApiClient({ baseUrl: apiUrl, ...(session && { auth: { session } }) });
+
+/** Başarısız API yanıtı: zarfın hata kodu ve API'nin mesajı. */
+export class SquareApiError extends Error {
+  constructor(
+    readonly code: ApiErrorCode,
+    readonly apiMessage: string,
+    readonly programError: ProgramErrorRef | null = null,
+  ) {
+    super(`${apiMessage} (${code})`);
+    this.name = 'SquareApiError';
+  }
+}
+
+/** Zarfın verisi; başarısız yanıtta `SquareApiError`. */
+export function unwrap<T>(envelope: ApiEnvelope<T>): T {
+  if (!envelope.success) {
+    throw new SquareApiError(envelope.error.code, envelope.error.message, envelope.error.programError);
+  }
+  return envelope.data;
+}
+
+const API_ERROR_TEXT: Readonly<Record<ApiErrorCode, string>> = {
+  invalid_input: 'The API rejected the request as invalid.',
+  unauthorized: 'The API session is missing or has expired; sign in again.',
+  forbidden: 'The API does not allow this wallet to do that.',
+  not_found: 'The API does not know this resource yet; the indexer may not have caught up.',
+  conflict: 'The API refused because the state changed.',
+  rate_limited: 'Too many requests; wait a moment and try again.',
+  program_error: 'The program would reject this.',
+  simulation_failed: 'The transaction fails in simulation.',
+  rpc_unavailable: "The API cannot reach the chain's RPC right now.",
+  db_unavailable: 'The API cannot reach its database right now.',
+  prover_unavailable: 'The prover is unavailable.',
+  internal_error: 'The API failed with an internal error.',
+};
+
+export const isUnauthorized = (error: unknown): boolean =>
+  (error instanceof SquareApiError && error.code === 'unauthorized') ||
+  (error instanceof ApiClientError && error.status === 401);
+
+export function apiErrorText(error: unknown, programHint?: (name: string) => string | null): string {
+  const failure =
+    error instanceof ApiClientError && error.error
+      ? new SquareApiError(error.error.code, error.error.message, error.error.programError)
+      : error;
+  if (failure instanceof SquareApiError) {
+    const base = API_ERROR_TEXT[failure.code] ?? failure.apiMessage;
+    const program = failure.programError;
+    if (!program) return `${base} (${failure.apiMessage})`;
+    const hint = programHint?.(program.name);
+    return `${base} ${program.name} (${program.program}, ${program.code})${hint ? `: ${hint}` : '.'}`;
+  }
+  if (failure instanceof ApiClientError) return `The API answered unexpectedly (HTTP ${failure.status}).`;
+  if (failure instanceof TypeError) return 'The Square API could not be reached.';
+  return (failure as Error).message;
+}
 
 /** Keeper günlüğünde bir job için okunan en fazla deneme. */
 export const KEEPER_JOURNAL_LIMIT = 20;
@@ -20,6 +79,6 @@ export async function readKeeperJournal(
   job: string,
 ): Promise<{ items: KeeperAction[]; total: number }> {
   const envelope = await api.listKeeperActions({ job, limit: KEEPER_JOURNAL_LIMIT });
-  if (!envelope.success) throw new Error(`${envelope.error.message} (${envelope.error.code})`);
-  return { items: envelope.data, total: envelope.meta.total ?? envelope.data.length };
+  const items = unwrap(envelope);
+  return { items, total: envelope.meta.total ?? items.length };
 }

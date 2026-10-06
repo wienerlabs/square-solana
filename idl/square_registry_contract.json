@@ -1,5 +1,5 @@
 {
-  "address": "CgchXu2dRV3r9E1YjRhp4kbeLLtv1Xz61yoerJzp1Vbc",
+  "address": "AL5p4aTWrmBmWa4vxJFbBjQG7Xnx2juc15FJRGpwSsA9",
   "metadata": {
     "name": "square_registry_contract",
     "version": "0.1.0",
@@ -117,7 +117,7 @@
         },
         {
           "name": "program",
-          "address": "CgchXu2dRV3r9E1YjRhp4kbeLLtv1Xz61yoerJzp1Vbc"
+          "address": "AL5p4aTWrmBmWa4vxJFbBjQG7Xnx2juc15FJRGpwSsA9"
         },
         {
           "name": "program_data"

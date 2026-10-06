@@ -68,7 +68,14 @@ PR'dır; birleşmeden önce program kontrollerinin tamamı yeşil olmalıdır ([
 
 ## 3. Squads v4 multisig
 
-[Squads](https://app.squads.so) arayüzünden ya da Squads v4 SDK'sıyla, ağ başına bir multisig kurulur:
+[Squads](https://app.squads.so) arayüzünden ya da `scripts/deploy/squads-multisig.mjs` ile (Squads v4 SDK), ağ başına bir
+multisig kurulur:
+
+```bash
+node scripts/deploy/squads-multisig.mjs create --rpc <url> --creator <ücreti ödeyen keypair> \
+  --member <adres> --member <adres> --member <adres> --threshold 2 --time-lock 0
+node scripts/deploy/squads-multisig.mjs show --rpc <url> --multisig <adres>   # doğrulama, JSON
+```
 
 | Ayar | Değer |
 |---|---|
@@ -101,6 +108,11 @@ solana program show <program id>        # Authority: <vault>, Executable
 solana-verify get-program-hash -u <rpc> <program id>   # build'in hash'iyle aynı
 ```
 
+Genel devnet RPC'si yoğun yazmada hız sınırına (429) takılır. `--use-rpc` verilmez: CLI buffer'ı doğrudan
+validator'lara (TPU) yazar, RPC'yi yalnızca onay için kullanır. Yarıda kalan deploy'un buffer'ı
+`solana program close --buffers` ile kapatılıp rent'i geri alınır. `--max-len` program boyutundan büyük
+verilirse yükseltmelere yer kalır (devnet: 1,5 katı).
+
 Verifiable build (BC-13) ile derlenmiş `.so` kullanılır. Böylece zincirdeki hash, depodaki commit'ten herkesin
 yeniden üretebileceği hash olur. Dört programın kimliği, deploy imzası, executable hash'i ve authority'si
 deploy kaydına yazılır.
@@ -116,20 +128,22 @@ Her `init_*` talimatı bir Squads vault işlemidir. Squads arayüzünde "Transac
 |---|---|---|
 | `square_registry` | `init_registry_config(screener_authority, screening_ttl_secs)` | screener servisinin authority'si (BE-16), screening ömrü |
 | `square_verifier` | `init_verifier_config(escrow_program, policy_program, mpp_authority)` | escrow ve policy kimlikleri, MPP authority (BC-37) |
-| `square_escrow` | `init_config(settlement_mint, arbitrators, threshold, params, linked)` | USDC mint'i (devnet: Circle devnet USDC), arbitrator seti (2 ≤ M ≤ N ≤ 7, ADR 0016), `EscrowParams` (challenge sınırları, bond, keeper ücreti ≤ 100 bps, `proof_timeout_secs ≥ 0`, `dispute_timeout_secs > 0`, Travel Rule eşiği), bağlı program kimlikleri |
+| `square_escrow` | `init_config(settlement_mint, arbitrators, threshold, params, linked)` | USDC mint'i (devnet: Circle devnet USDC), arbitrator seti ve eşiği (2 ≤ M ≤ N ≤ 7, [ADR 0016](../decisions/0016-dispute-m-of-n-zaman-asimi-ve-ispatsiz-bekleme.md)), `EscrowParams` (challenge sınırları, bond, keeper ücreti ≤ 100 bps, `proof_timeout_secs ≥ 0`, `dispute_timeout_secs > 0`, Travel Rule eşiği), bağlı program kimlikleri |
 
-Talimat verileri SDK'nın builder'larıyla üretilir. [`tests/smoke`](../../tests/smoke/)'un `init` komutu
-bunu yapar: upgrade authority vault'sa talimatları göndermez, Squads'a girilecek biçimde (program, hesaplar ve
-imza / yazma bayrakları, base64 veri, okunur argümanlar) yazar. Squads'a girilecek talimatlar ve değerler PR'da
-ya da deploy kaydında, iki üyenin onayından önce yazılı olur. Kurulumdan sonra `init` yeniden koşulur: config
-hesapları okunur ve değerler kayıt satırları olarak yazılır. Square ALT'ı (BC-28,
-[tx-budget.md](../design/tx-budget.md)) aynı komutla bu adımdan sonra kurulur. Ardından uçtan uca smoke koşulur
-(BC-31, `smoke` komutu); rapor `docs/deploy/smoke-<ağ>.md`.
+Değerler `scripts/deploy/networks/<ağ>.json`'dadır (anahtar değil, açık değerler; `network-config.mjs`
+programların kurallarıyla doğrular). Betik her config için vault işlemini ve önerisini açar, iki üyeyle
+onaylar ve yürütür. Kurulmuş config atlanır; yarıda kalan öneri kaldığı adımdan sürdürülür:
 
 ```bash
-pnpm --filter @squaresdk/solana-smoke init  --config <ağ.json> --records <kayıt.md>
-pnpm --filter @squaresdk/solana-smoke smoke --config <ağ.json>
+node scripts/deploy/init-configs.mjs --network <ağ> --member <üye keypair> --member <üye keypair>
+node scripts/deploy/init-configs.mjs --network <ağ> --show       # zincirdeki config'ler, JSON
+node scripts/deploy/create-lookup-table.mjs --network <ağ> --payer <keypair>   # Square ALT, kurulup dondurulur
 ```
+
+Talimat verileri SDK'nın builder'larıyla (`createSquareClient(...).escrow.instructions.initConfig(...)`) üretilir.
+Squads'a girilecek talimatlar ve değerler PR'da ya da deploy kaydında, iki üyenin onayından önce yazılı olur.
+Kurulumdan sonra config hesapları okunur ve değerler kayda yazılır. Square ALT'ı (BC-28,
+[tx-budget.md](../design/tx-budget.md)) bu adımdan sonra kurulur.
 
 ## 6. Upgrade
 

@@ -2,13 +2,13 @@
 
 import { Address } from '@/components/ui/address';
 import { Button } from '@/components/ui/button';
-import type { ApiSessionState } from '@/lib/api-session';
+import type { ApiClientState } from '@/components/api-client';
 import { ENV_VARS } from '@/lib/config';
 
 const iso = (unix: number) => new Date(unix * 1000).toISOString().replace(/\.\d{3}Z$/, 'Z');
 
 /** Square API oturumunun durumu ve giriş / çıkış; `purpose` oturumun ne için gerektiğini söyler. */
-export function ApiSessionPanel({ session, purpose }: { session: ApiSessionState; purpose: string }) {
+export function ApiSessionPanel({ session, purpose }: { session: ApiClientState; purpose: string }) {
   if (!session.configured) {
     return (
       <p className="text-sm text-muted">

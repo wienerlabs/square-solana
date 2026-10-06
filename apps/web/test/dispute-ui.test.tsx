@@ -15,7 +15,7 @@ import { ArbitrationPage } from '@/components/arbitration/arbitration-page';
 import { QueueCard } from '@/components/arbitration/arbitration-console';
 import { JobDispute } from '@/components/jobs/job-dispute';
 import { Providers } from '@/components/providers';
-import type { ApiSessionState } from '@/lib/api-session';
+import type { ApiClientState } from '@/components/api-client';
 import { disputeParamsOf } from '@/lib/dispute';
 import type { EscrowSetup } from '@/lib/job-wizard';
 import { configAccount, encodeConfig, fakeClient, FakeChain, jobAccount, key } from './helpers/escrow-accounts';
@@ -150,7 +150,7 @@ describe('dispute section of the job page', () => {
 
 describe('arbitration console', () => {
   const meta = { requestId: 'r', page: null, limit: null, total: null };
-  const session = (): ApiSessionState => ({
+  const session = (): ApiClientState => ({
     configured: true,
     publicApi: null,
     api: createApiClient({
@@ -159,6 +159,7 @@ describe('arbitration console', () => {
     }),
     session: { token: 'sqs_x', wallet: arbitrators[0]!.toBase58(), expiresAt: 1_790_100_000 },
     canSignIn: true,
+    unavailable: null,
     signingIn: false,
     error: null,
     signIn: async () => undefined,

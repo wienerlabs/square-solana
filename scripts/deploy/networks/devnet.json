@@ -1,0 +1,33 @@
+{
+  "cluster": "devnet",
+  "rpc": "https://api.devnet.solana.com",
+  "squads": {
+    "multisig": "3ucyX6nmbz9ytRVWr3wrYQD2try58Jy1xCyuNo8q6PD5"
+  },
+  "registry": {
+    "screenerAuthority": "48DGxja6FefZHhZ8e5ynLKWLqxb1pVfiHFUVg1Jrm54b",
+    "screeningTtlSecs": 2592000
+  },
+  "verifier": {
+    "mppAuthority": "CPwxS6VAy25B9xFKGKjNkXBmFcztNDea68J76SDeTn6c"
+  },
+  "escrow": {
+    "settlementMint": "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU",
+    "arbitrators": [
+      "DPF8Myr3engeVLgCvxhTmLZQANYb7rKA8aSvZpz9cM3q",
+      "EZggdp7BCPLU84UBz2WFw4yvEC6KM3ZH6mjPANYQRPmQ",
+      "4DepaL4Dqp6NKzz5oHFjMY3b6FCDvFrqABd62YsUohtE"
+    ],
+    "threshold": 2,
+    "params": {
+      "minChallengePeriod": "60",
+      "maxChallengePeriod": "604800",
+      "minBondBps": 1000,
+      "minBondAbsolute": "1000000",
+      "keeperFeeBps": 50,
+      "proofTimeoutSecs": "86400",
+      "disputeTimeoutSecs": "604800",
+      "travelRuleThreshold": "1000000000"
+    }
+  }
+}

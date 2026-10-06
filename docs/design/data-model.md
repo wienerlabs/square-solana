@@ -77,7 +77,7 @@ Notlar:
 | `x402_payments` | Geliştiricinin sunucusunun bildirdiği uzlaştırılmış ödeme: `fingerprint` (ödeme yükünün tekrar koruması kimliği) ve `transaction` (makbuzun işlem imzası) ağ başına tekil; mint, tutar, ödeyen, alıcı, uzlaştırma ve bildirim zamanı. Tanım silinince silinir | API (`recordX402Payment`) | FE-22 |
 | `mpp_payments` | İmzası doğrulanmış Stripe webhook'undan gelen fiat ödemesi; makbuzun Poseidon commitment'ı ve MPP authority imzası | MPP rayı | BE-25 |
 | `cctp_transfers` | CCTP mesajı (kaynak domain + nonce), Circle attestation'ı, Solana'da receive ve fund imzaları | CCTP relayer | BE-26 |
-| `travel_rule_records` | Job başına Travel Rule kaydı: commitment, kaydın özeti, zarf şifrelemesiyle şifreli `{ kayıt, salt }` (IV, sarılmış veri anahtarı, ana anahtar kimliği), yazan, saklama sonu, silinme | API (`putTravelRule`) | BE-23 |
+| `travel_rule_records` | Job başına Travel Rule kaydı: commitment, kaydın özeti, zarf şifrelemesiyle şifreli `{ kayıt, salt }` (sarılmış veri anahtarı, ana anahtar kimliği), yazan, saklama sonu, silinme | API (`putTravelRule`) | BE-23 |
 | `travel_rule_grants` | Kaydı okuma izni: `(job, grantee)` tekil, amaç, veren, süre, geri alınma | API (`createTravelRuleGrant`) | BE-23 |
 | `travel_rule_accesses` | Erişim kaydı: kişisel veriye dokunan her işlem (`store`, `read`, `grant`, `revoke`, `purge`), yapan ve izin verilen cüzdan, istek kimliği; yalnızca eklenir | API | BE-23 |
 | `rate_limit_windows` | Hız sınırı sayacı: anahtar (ör. `api:<cüzdan>`), pencerenin başı, ağırlık toplamı | servisler (`@squaresdk/solana-hardening/prisma`) | BE-13 |
@@ -95,8 +95,8 @@ API'nin yazdığı tablolar (BE-18, [apps/api](../../apps/api/README.md)):
 - **`agent_cards`:** Barındırılan kartta `raw` kartın RFC 8785 kanonik JSON'u, `skills` beceri kimlikleri ve etiketleridir. `verified` yazma anındaki eşleşmedir; görünümdeki `cardVerified` zincirdeki güncel hash'le hesaplanır.
 - **`sessions`, `api_keys`:** Belirteç `sqs_…`, anahtar `sqk_…`; yalnızca SHA-256'ları durur.
 - **`travel_rule_records`:** Düz metin sütunu yoktur ([ADR 0017](../decisions/0017-travel-rule-saklama-erisim-ve-paylasim.md)).
-  - `{ kayıt, salt }` kayda özgü veri anahtarıyla AES-256-GCM ile şifrelenir. Veri anahtarı `key_id`'li ana
-    anahtarla sarılır.
+  - `{ kayıt, salt }` kayda özgü veri anahtarıyla şifrelenir; veri anahtarı `key_id`'li ana anahtarla sarılır.
+  - İkisi de `@squaresdk/solana-hardening`'in `SecretBox` değeridir (AES-256-GCM, `sq1.<anahtar>.<iv>.<veri>`).
   - Saklama süresi dolunca şifreli alanlar silinir (`purged_at`). Commitment ve özet kalır.
   - CHECK kısıtı: silinmiş satırın şifreli alanlarının hepsi boş, silinmemişin hepsi dolu.
 
@@ -175,4 +175,4 @@ Bir servis testlerinde bunu kullanacaksa `@testcontainers/postgresql`'i devDepen
 1. **Postgres sürümü (BE-05):** Test imajı `postgres:17-alpine`. Railway'deki sürüm farklıysa `TEST_POSTGRES_IMAGE` buna eşitlenir.
 2. **MPP ↔ job bağı (BE-25):** `mpp_payments.institution` ve `job` alanları ADR ile kesinleşir.
 3. **Event şeması (BC-16):** Normatif event şeması ayna tablolara sütun ekleyebilir. Ekleme yeni bir migration ile yapılır.
-4. **Travel Rule (BE-23):** KMS sağlayıcısı ve AEAD seçimi BE-23'te belirlenir. Tablo bunları `algorithm` ve `kms_key_id` olarak taşır.
+4. **Travel Rule (BE-23):** Kesinleşti ([ADR 0017](../decisions/0017-travel-rule-saklama-erisim-ve-paylasim.md)). Ana anahtarlar ortamdan gelir (`API_TRAVEL_RULE_KEYS`). Bir KMS kullanılırsa sarma ve açma KMS'e taşınır.

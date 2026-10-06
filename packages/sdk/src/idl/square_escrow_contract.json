@@ -1,5 +1,5 @@
 {
-  "address": "5hstj5grBUL1BeSaPLYpgkD6n3ALasmbseRvKRFfCVNT",
+  "address": "6yBTEVbizMVCWAp4c3jx6Xdsay3CiUmrJmTswY7QRWaX",
   "metadata": {
     "name": "square_escrow_contract",
     "version": "0.1.0",
@@ -1630,7 +1630,7 @@
         },
         {
           "name": "program",
-          "address": "5hstj5grBUL1BeSaPLYpgkD6n3ALasmbseRvKRFfCVNT"
+          "address": "6yBTEVbizMVCWAp4c3jx6Xdsay3CiUmrJmTswY7QRWaX"
         },
         {
           "name": "program_data"
