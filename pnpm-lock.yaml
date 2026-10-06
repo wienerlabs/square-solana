@@ -49,7 +49,7 @@ importers:
     dependencies:
       '@anchor-lang/core':
         specifier: 1.2.0
-        version: 1.2.0(bufferutil@4.1.0)(typescript@5.9.3)
+        version: 1.2.0(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@6.0.6)
       '@aws-sdk/client-s3':
         specifier: ^3.1146.0
         version: 3.1146.0
@@ -207,7 +207,7 @@ importers:
     dependencies:
       '@anchor-lang/core':
         specifier: 1.2.0
-        version: 1.2.0(bufferutil@4.1.0)(typescript@5.9.3)
+        version: 1.2.0(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@6.0.6)
       '@solana/web3.js':
         specifier: ^1.99.0
         version: 1.99.0(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@6.0.6)
@@ -262,7 +262,7 @@ importers:
     dependencies:
       '@anchor-lang/core':
         specifier: 1.2.0
-        version: 1.2.0(bufferutil@4.1.0)(typescript@5.9.3)
+        version: 1.2.0(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@6.0.6)
       '@solana/spl-token':
         specifier: ^0.4.15
         version: 0.4.15(@solana/web3.js@1.99.0(bufferutil@4.1.0)(typescript@5.9.3))(bufferutil@4.1.0)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)
@@ -360,7 +360,7 @@ importers:
     dependencies:
       '@anchor-lang/core':
         specifier: 1.2.0
-        version: 1.2.0(bufferutil@4.1.0)(typescript@5.9.3)
+        version: 1.2.0(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@6.0.6)
       '@fontsource/open-runde':
         specifier: ^5.3.0
         version: 5.3.0
@@ -406,6 +406,9 @@ importers:
       bn.js:
         specifier: ^5.2.5
         version: 5.2.5
+      bs58:
+        specifier: ^6.0.0
+        version: 6.0.0
       next:
         specifier: 16.3.8
         version: 16.3.8(@babel/core@7.29.7)(@opentelemetry/api@1.9.1)(@types/node@24.19.1)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
@@ -516,7 +519,7 @@ importers:
         version: 1.3.0(@grpc/grpc-js@1.14.5)(express@5.2.1)(mysql2@3.15.3)(pg@8.23.1)
       '@anchor-lang/core':
         specifier: 1.2.0
-        version: 1.2.0(bufferutil@4.1.0)(typescript@5.9.3)
+        version: 1.2.0(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@6.0.6)
       '@squaresdk/solana-config':
         specifier: workspace:*
         version: link:../config
@@ -605,7 +608,7 @@ importers:
     dependencies:
       '@anchor-lang/core':
         specifier: 1.2.0
-        version: 1.2.0(bufferutil@4.1.0)(typescript@5.9.3)
+        version: 1.2.0(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@6.0.6)
       '@noble/hashes':
         specifier: ^1.8.0
         version: 1.8.0
@@ -693,7 +696,7 @@ importers:
     devDependencies:
       '@anchor-lang/core':
         specifier: 1.2.0
-        version: 1.2.0(bufferutil@4.1.0)(typescript@5.9.3)
+        version: 1.2.0(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@6.0.6)
       '@noble/curves':
         specifier: 2.4.0
         version: 2.4.0
@@ -717,7 +720,7 @@ importers:
     dependencies:
       '@anchor-lang/core':
         specifier: 1.2.0
-        version: 1.2.0(bufferutil@4.1.0)(typescript@5.9.3)
+        version: 1.2.0(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@6.0.6)
       '@noble/hashes':
         specifier: ^1.8.0
         version: 1.8.0
@@ -6252,7 +6255,7 @@ snapshots:
       bn.js: 5.2.5
       buffer-layout: 1.2.2
 
-  '@anchor-lang/core@1.2.0(bufferutil@4.1.0)(typescript@5.9.3)':
+  '@anchor-lang/core@1.2.0(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@6.0.6)':
     dependencies:
       '@anchor-lang/borsh': 1.2.0(@solana/web3.js@1.99.0(bufferutil@4.1.0)(typescript@5.9.3))
       '@anchor-lang/errors': 1.2.0

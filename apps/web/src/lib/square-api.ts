@@ -1,9 +1,29 @@
 // Square API (BE-18, `apps/api`) istemcisi: sözleşmenin REST istemcisi (`createApiClient`). Okuma uçları
-// kimliksizdir; indexer'ın tablolarından ve keeper'ın günlüğünden okur.
+// kimliksizdir; indexer'ın tablolarından ve keeper'ın günlüğünden okur. Yazma uçları cüzdan oturumuyla
+// (`Authorization: Bearer`, FE-03) çağrılır.
 import { createApiClient, type SquareApi } from '@squaresdk/solana-sdk';
-import type { KeeperAction } from '@squaresdk/solana-types';
+import type { ApiEnvelope, ApiErrorCode, KeeperAction } from '@squaresdk/solana-types';
 
-export const squareApi = (apiUrl: string): SquareApi => createApiClient({ baseUrl: apiUrl });
+/** API istemcisi; oturum belirteci verilirse istekler onunla gider. */
+export const squareApi = (apiUrl: string, session?: string): SquareApi =>
+  createApiClient({ baseUrl: apiUrl, ...(session && { auth: { session } }) });
+
+/** Başarısız API yanıtı: zarfın hata kodu ve API'nin mesajı. */
+export class SquareApiError extends Error {
+  constructor(
+    readonly code: ApiErrorCode,
+    readonly apiMessage: string,
+  ) {
+    super(`${apiMessage} (${code})`);
+    this.name = 'SquareApiError';
+  }
+}
+
+/** Zarfın verisi; başarısız yanıtta `SquareApiError`. */
+export function unwrap<T>(envelope: ApiEnvelope<T>): T {
+  if (!envelope.success) throw new SquareApiError(envelope.error.code, envelope.error.message);
+  return envelope.data;
+}
 
 /** Keeper günlüğünde bir job için okunan en fazla deneme. */
 export const KEEPER_JOURNAL_LIMIT = 20;
@@ -20,6 +40,6 @@ export async function readKeeperJournal(
   job: string,
 ): Promise<{ items: KeeperAction[]; total: number }> {
   const envelope = await api.listKeeperActions({ job, limit: KEEPER_JOURNAL_LIMIT });
-  if (!envelope.success) throw new Error(`${envelope.error.message} (${envelope.error.code})`);
-  return { items: envelope.data, total: envelope.meta.total ?? envelope.data.length };
+  const items = unwrap(envelope);
+  return { items, total: envelope.meta.total ?? items.length };
 }

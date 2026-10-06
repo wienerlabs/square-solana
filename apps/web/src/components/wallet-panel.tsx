@@ -3,16 +3,23 @@
 import { useEffect, useState } from 'react';
 import { LAMPORTS_PER_SOL, type PublicKey } from '@solana/web3.js';
 import { useConnection, useWallet } from '@solana/wallet-adapter-react';
-import { PROGRAM_ID_ENV } from '@/lib/config';
+import { sessionUsable } from '@/lib/api-session';
+import { ENV_VARS, PROGRAM_ID_ENV } from '@/lib/config';
 import { formatUnits, type SettlementToken } from '@/lib/settlement';
 import { useSettlementToken, useTokenBalance } from '@/lib/use-settlement';
+import { useApiSession } from './api-session';
 import { useWebConfig } from './providers';
 import { Address } from './ui/address';
+import { Button } from './ui/button';
 
 type Balance = { status: 'loading' } | { status: 'ready'; lamports: number } | { status: 'error'; message: string };
 
 const formatSol = (lamports: number) =>
   (lamports / LAMPORTS_PER_SOL).toLocaleString('en-US', { maximumFractionDigits: 9 });
+const nowSeconds = () => Math.floor(Date.now() / 1000);
+const iso = (unix: number) => new Date(unix * 1000).toISOString().replace(/\.\d{3}Z$/, 'Z');
+/** Oturumun bitişinin yeniden değerlendirilme aralığı. */
+const SESSION_CLOCK_MS = 15_000;
 
 function SettlementBalance({ owner, token }: { owner: PublicKey; token: SettlementToken }) {
   const balance = useTokenBalance(owner, token);
@@ -47,6 +54,55 @@ function UsdcRow({ owner }: { owner: PublicKey }) {
           <span className="text-muted">Unavailable: the escrow config is not initialized on {cluster}</span>
         )}
         {settlement.state === 'error' && <span className="text-danger-text">{settlement.message}</span>}
+      </dd>
+    </>
+  );
+}
+
+/** Square API oturumu (FE-03): durumu, açma ve kapatma. Yenileme, oturum gereken bir sonraki istekte yeni imzadır. */
+function ApiSessionRow({ wallet }: { wallet: PublicKey }) {
+  const { apiUrl } = useWebConfig();
+  const api = useApiSession();
+  const [now, setNow] = useState(nowSeconds);
+  useEffect(() => {
+    const timer = setInterval(() => setNow(nowSeconds()), SESSION_CLOCK_MS);
+    return () => clearInterval(timer);
+  }, []);
+  const session = api.session;
+  const usable = sessionUsable(session, wallet.toBase58(), now);
+  const signIn = () => void api.signIn().catch(() => undefined);
+
+  return (
+    <>
+      <dt className="text-muted">Square API</dt>
+      <dd className="flex flex-col items-start gap-2">
+        {!apiUrl && (
+          <span className="text-muted">
+            Unavailable: <span className="font-mono">{ENV_VARS.apiUrl}</span> is not set
+          </span>
+        )}
+        {apiUrl && api.unavailable && <span className="text-muted">{api.unavailable}</span>}
+        {apiUrl && !api.unavailable && usable && session && (
+          <>
+            <span>Signed in until {iso(session.expiresAt)}</span>
+            <Button variant="secondary" size="sm" onClick={() => void api.signOut()}>
+              Sign out
+            </Button>
+          </>
+        )}
+        {apiUrl && !api.unavailable && !usable && (
+          <>
+            <span className="text-muted">
+              {session
+                ? `The session ends at ${iso(session.expiresAt)}; the next request asks for a new signature.`
+                : 'Not signed in. Deliveries are uploaded with a session; signing in proves this wallet with a signed message, not a transaction.'}
+            </span>
+            <Button variant="secondary" size="sm" onClick={signIn} loading={api.signingIn}>
+              {session ? 'Sign in again' : 'Sign in'}
+            </Button>
+          </>
+        )}
+        {api.error && <span className="text-danger-text">{api.error}</span>}
       </dd>
     </>
   );
@@ -95,6 +151,7 @@ export function WalletPanel() {
             {balance.status === 'error' && <span className="text-danger-text">{balance.message}</span>}
           </dd>
           <UsdcRow owner={publicKey} />
+          <ApiSessionRow wallet={publicKey} />
         </dl>
       ) : (
         <p className="mt-4 text-sm text-muted">Connect a wallet to see its address and balances.</p>
