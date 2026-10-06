@@ -28,6 +28,8 @@ describe('roles', () => {
     expect(roleSteps('institution')).toEqual([1, 3, 7]);
     expect(roleSteps('agent')).toEqual([2, 4, 5]);
     expect(roleSteps('buyer')).toEqual([5]);
+    // Arbitrator sekiz adımın dışındadır: uyuşmazlık (FE-17).
+    expect(roleSteps('arbitrator')).toEqual([]);
   });
 
   it('remembers the role per wallet', () => {
@@ -40,7 +42,7 @@ describe('roles', () => {
   });
 
   it('ignores a stored value that is not a role', () => {
-    window.localStorage.setItem('square-role:wallet-a', 'arbitrator');
+    window.localStorage.setItem('square-role:wallet-a', 'keeper');
     expect(readRole('wallet-a')).toBeNull();
   });
 });

@@ -15,7 +15,7 @@ export function RolePicker() {
           ? 'Choose how this wallet takes part. The choice is remembered for this wallet in this browser.'
           : 'Connect a wallet to choose a role.'}
       </p>
-      <fieldset disabled={!address} className="mt-4 grid gap-3 sm:grid-cols-3">
+      <fieldset disabled={!address} className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <legend className="sr-only">Role for this wallet</legend>
         {ROLES.map((option) => {
           const steps = roleSteps(option);
@@ -37,7 +37,9 @@ export function RolePicker() {
               </span>
               <span className="text-caption text-muted">{ROLE_INFO[option].summary}</span>
               <span className="text-caption text-muted">
-                {steps.length === 1 ? 'Step' : 'Steps'} {steps.join(', ')}
+                {steps.length === 0
+                  ? 'Disputes, outside the eight steps'
+                  : `${steps.length === 1 ? 'Step' : 'Steps'} ${steps.join(', ')}`}
               </span>
             </label>
           );

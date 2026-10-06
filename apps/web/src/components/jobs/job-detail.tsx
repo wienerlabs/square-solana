@@ -16,6 +16,7 @@ import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { TxConfirmation } from '@/components/ui/tx-confirmation';
 import { JobClaim } from './job-claim';
+import { JobDispute } from './job-dispute';
 import { JobRelease } from './job-release';
 import { JobSettlement } from './job-settlement';
 import { JobTravelRule } from './job-travel-rule';
@@ -28,7 +29,6 @@ import {
   deliveryUriProblem,
   describeJobEvent,
   JOB_POLL_INTERVAL_MS,
-  readChainTime,
   readJobTimeline,
   readNewestSignature,
   receiptProblem,
@@ -44,6 +44,7 @@ import { formatUnits } from '@/lib/settlement';
 import { JOB_STATUS_TONE, statusLabel } from '@/lib/status';
 import type { TravelRuleVerification } from '@/lib/travel-rule';
 import { useSettlementToken } from '@/lib/use-settlement';
+import { useChainClock } from '@/lib/use-chain-clock';
 import { useSignatureStatus } from '@/lib/use-signature-status';
 
 type Load<T> = { state: 'loading' } | { state: 'ready'; value: T } | { state: 'error'; message: string };
@@ -170,26 +171,7 @@ export function JobDetail({ jobAddress, escrowProgramId }: { jobAddress: string;
   }, [escrow, connection, escrowKey, jobKey, claimKey, seen, revision]);
 
   // Zincir saati: Clock sysvar'ından okunur, aradaki saniyeler yerel saatle ilerletilir.
-  const [chainOffset, setChainOffset] = useState<number | null>(null);
-  const [localNow, setLocalNow] = useState(() => Math.floor(Date.now() / 1000));
-  useEffect(() => {
-    if (!verified) return;
-    let active = true;
-    const sync = () =>
-      readChainTime(connection).then(
-        (chainTime) => active && setChainOffset(chainTime - Math.floor(Date.now() / 1000)),
-        () => active && setChainOffset(null),
-      );
-    void sync();
-    const resync = setInterval(() => void sync(), 60_000);
-    const tick = setInterval(() => setLocalNow(Math.floor(Date.now() / 1000)), 1_000);
-    return () => {
-      active = false;
-      clearInterval(resync);
-      clearInterval(tick);
-    };
-  }, [verified, connection, revision]);
-  const chainNow = chainOffset === null ? null : localNow + chainOffset;
+  const chainNow = useChainClock(verified, revision);
 
   const account = job.state === 'ready' ? job.value : null;
 
@@ -397,6 +379,17 @@ export function JobDetail({ jobAddress, escrowProgramId }: { jobAddress: string;
           )}
         </section>
       )}
+
+      <JobDispute
+        escrow={escrow}
+        jobKey={jobKey}
+        account={account}
+        token={token}
+        chainNow={chainNow}
+        revision={revision}
+        formatAmount={formatAmount}
+        onConfirmed={refresh}
+      />
 
       <JobTravelRule
         setup={escrow}
