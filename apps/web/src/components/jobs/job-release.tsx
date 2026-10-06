@@ -4,7 +4,14 @@ import Link from 'next/link';
 import { useEffect, useId, useState, type ReactNode } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
 import type { PublicKey } from '@solana/web3.js';
-import { buildReleaseWitness, buildSetComplianceProofTx, createRemoteProver, SIGNAL } from '@squaresdk/solana-policy';
+import {
+  buildReleaseWitness,
+  buildSetComplianceProofTx,
+  CLOCK_TOLERANCE_SECS,
+  createRemoteProver,
+  isFinalRefusal,
+  SIGNAL,
+} from '@squaresdk/solana-policy';
 import type { ClaimListingAccount, JobAccount } from '@squaresdk/solana-sdk';
 import type { ProveResponse } from '@squaresdk/solana-types';
 import { useNetworkGuard, useSendTransaction } from '@/components/network-guard';
@@ -16,8 +23,6 @@ import { TxConfirmation } from '@/components/ui/tx-confirmation';
 import { formatDuration, type EscrowSetup } from '@/lib/job-wizard';
 import { loadDrafts, loadSecret } from '@/lib/policy-local';
 import {
-  CLOCK_TOLERANCE_SECS,
-  isFinalRefusal,
   policyMaterialFor,
   proverErrorMessage,
   readReleaseState,

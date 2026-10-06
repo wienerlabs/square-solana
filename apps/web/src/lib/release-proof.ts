@@ -1,9 +1,21 @@
 // Uyum ispatı ve release durumu (FE-09, akışın 7. adımı). Politikaya bağlı işte escrow, kurumun bağladığı
 // release ispatı (`ReleaseProof`) tazeyse ve uyumluysa öder, kalıcı bir sebeple reddediyorsa kuruma iade
-// eder, değilse bekler (`ProofRequired`). Kurallar `square_common::release`'teki ve ADR 0012 / 0013'teki
-// kurallarla aynıdır; ispatı prover servisi üretir (snarkjs yalnızca `apps/prover`'da çalışır).
+// eder, değilse bekler (`ProofRequired`). Kurallar (ADR 0012 / 0013) `@squaresdk/solana-policy`'dendir,
+// zincirdekilerle ortak vektörlerle denetlenir; bu modül arayüzün metinlerini ve kararını kurar. İspatı
+// prover servisi üretir (snarkjs yalnızca `apps/prover`'da çalışır).
 import type { PublicKey } from '@solana/web3.js';
-import { computePolicyCommitment, derivePolicySalts, type PolicySalts } from '@squaresdk/solana-policy';
+import {
+  checkFresh,
+  CLOCK_TOLERANCE_SECS,
+  computePolicyCommitment,
+  derivePolicySalts,
+  isFinalRefusal,
+  refusalRules,
+  releaseNetAmount,
+  type PolicySalts,
+  type RefusalRule,
+  type Staleness,
+} from '@squaresdk/solana-policy';
 import { SQUARE_IDLS, type ClaimListingAccount, type JobAccount } from '@squaresdk/solana-sdk';
 import type { PolicyDocument } from '@squaresdk/solana-types';
 import manifest from '../../../../circuits/payment-compliance/artifacts/manifest.json';
@@ -19,49 +31,28 @@ import { programErrorMessage } from './program-error';
  */
 export const RELEASE_ARTIFACT_VERSION: string = manifest.zkey.sha256;
 
-/** `set_compliance_proof`'ta ispatın anı ile zincirin saati arasındaki en büyük fark (ADR 0012 §3). */
-export const CLOCK_TOLERANCE_SECS = 600;
+/** Ret kodunun kurallarının açıklaması; kurallar ve bitleri `@squaresdk/solana-policy`'nin (`REFUSAL`). */
+const REFUSAL_TEXT: Readonly<Record<RefusalRule, string>> = {
+  perTx: 'The amount is above the per-transaction limit',
+  dailyPrivate: 'The amount would exceed the private daily limit',
+  mintNotAllowed: 'The settlement mint is not on the token whitelist',
+  payeeBlocked: 'The payee is on the blocked list',
+  categoryNotAllowed: 'The payment category is not allowed',
+  outsideTimeWindow: 'The release is outside the allowed time window',
+  dailyCeiling: 'The amount would exceed the public daily ceiling',
+};
 
-const SECONDS_PER_DAY = 86_400;
+export const refusalReasons = (code: number): string[] => refusalRules(code).map((rule) => REFUSAL_TEXT[rule]);
 
-/** Ret kodunun bitleri (release-circuit.md §3), bit sırasıyla. */
-export const REFUSAL_RULES = [
-  'The amount is above the per-transaction limit',
-  'The amount would exceed the private daily limit',
-  'The settlement mint is not on the token whitelist',
-  'The payee is on the blocked list',
-  'The payment category is not allowed',
-  'The release is outside the allowed time window',
-  'The amount would exceed the public daily ceiling',
-] as const;
-
-const PERMANENT = 0b0001101; // işlem başı tavan, mint, engelli payee
-const DAILY = 0b1000010; // gizli günlük tavan, public günlük tavan
-
-export const refusalReasons = (code: number): string[] => REFUSAL_RULES.filter((_, bit) => (code >> bit) & 1);
-
-/**
- * Ret kesin mi (escrow neti kuruma iade eder) yoksa geçici mi (escrow bekler)? Kalıcı bitler ya da ispattaki
- * sayaç 0 iken günlük tavan bitleri kesindir (ADR 0013, `is_final_refusal`).
- */
-export const isFinalRefusal = (code: number, dailySpentBefore: bigint) =>
-  (code & PERMANENT) !== 0 || (dailySpentBefore === 0n && (code & DAILY) !== 0);
-
-const dayOf = (unix: number) => Math.floor(unix / SECONDS_PER_DAY);
-
-/**
- * Kurumun günlük sayacının `at` anındaki etkin değeri (`daily_spent_at`): aynı UTC günündeyse sayaç, daha
- * eski bir güne aitse 0; durum daha yeni bir güne aitse `at` için bilinemez (null).
- */
-export function dailySpentAt(dayStartUnix: number, dailySpent: bigint, at: number): bigint | null {
-  if (dayOf(dayStartUnix) === dayOf(at)) return dailySpent;
-  return dayOf(dayStartUnix) < dayOf(at) ? 0n : null;
-}
+const STALE_TEXT: Readonly<Record<Staleness, string>> = {
+  payee: 'The payee changed after the proof was made.',
+  netAmount: 'The net amount changed after the proof was made.',
+  mint: 'The proof is for another mint.',
+  day: 'A new UTC day started; the proof only pays out on the day it was made.',
+  dailyCounter: "Another release moved the institution's daily counter after the proof was made.",
+};
 
 const big = (value: { toString(): string }) => BigInt(value.toString());
-
-/** Payee'nin alacağı tutar: `amount − amount × keeper_fee_bps / 10 000`. */
-export const netAmountOf = (amount: bigint, keeperFeeBps: number) => amount - (amount * BigInt(keeperFeeBps)) / 10_000n;
 
 export interface ProofView {
   payee: PublicKey;
@@ -119,11 +110,10 @@ export async function readReleaseState(setup: EscrowSetup, jobKey: PublicKey, jo
 }
 
 /**
- * İspatın şimdi (zincir saatiyle) yapılacak bir release için bayat olma sebepleri; boşsa taze. Escrow'un
- * `check_fresh`'i (ADR 0012 §4): payee, net ve mint release'inkiyle aynı; release ispatın UTC gününde;
- * sayacın etkin değeri ispattakiyle aynı.
+ * İspatın şimdi (zincir saatiyle) yapılacak bir release için bayatlık sebebi; tazeyse null. Kural escrow'un
+ * `check_fresh`'idir (`checkFresh`, ADR 0012 §4); release'in payee'si, neti ve mint'i job'dan ve alacaktan.
  */
-export function staleReasons(
+export function staleReason(
   proof: ProofView,
   facts: {
     job: JobAccount;
@@ -132,31 +122,22 @@ export function staleReasons(
     operator: ReleaseState['operator'];
     chainNow: number;
   },
-): string[] {
-  const reasons: string[] = [];
+): string | null {
   const payee = payeeOf(facts.job, facts.listing);
-  if (!proof.payee.equals(payee.wallet)) {
-    reasons.push(
-      payee.sold
-        ? 'The receivable was sold after the proof was made, so the payee is now the buyer.'
-        : 'The payee changed after the proof was made.',
-    );
+  const reason = checkFresh(
+    proof,
+    facts.operator,
+    {
+      payee: payee.wallet,
+      netAmount: releaseNetAmount(big(facts.job.amount), facts.keeperFeeBps),
+      mint: facts.job.mint,
+    },
+    facts.chainNow,
+  );
+  if (reason === 'payee' && payee.sold) {
+    return 'The receivable was sold after the proof was made, so the payee is now the buyer.';
   }
-  if (proof.netAmount !== netAmountOf(big(facts.job.amount), facts.keeperFeeBps)) {
-    reasons.push('The net amount changed after the proof was made.');
-  }
-  if (!proof.mint.equals(facts.job.mint)) reasons.push('The proof is for another mint.');
-  if (dayOf(proof.proofTimestamp) !== dayOf(facts.chainNow)) {
-    reasons.push('A new UTC day started; the proof only pays out on the day it was made.');
-  } else {
-    const counter = facts.operator
-      ? dailySpentAt(facts.operator.dayStartUnix, facts.operator.dailySpent, facts.chainNow)
-      : 0n;
-    if (counter !== proof.dailySpentBefore) {
-      reasons.push("Another release moved the institution's daily counter after the proof was made.");
-    }
-  }
-  return reasons;
+  return reason && STALE_TEXT[reason];
 }
 
 /** Escrow'un şimdi yapılacak bir finalize'da ne yapacağı. */
@@ -177,14 +158,14 @@ export function releaseOutlook(
   const { proof } = state;
   if (!proof) return { kind: 'noProof' };
   if (proof.consumed) return { kind: 'consumed', proof };
-  const stale = staleReasons(proof, {
+  const stale = staleReason(proof, {
     job,
     listing,
     keeperFeeBps: state.keeperFeeBps,
     operator: state.operator,
     chainNow,
   });
-  if (stale.length > 0) return { kind: 'stale', proof, reasons: stale };
+  if (stale) return { kind: 'stale', proof, reasons: [stale] };
   if (proof.compliant) return { kind: 'pays', proof };
   const reasons = refusalReasons(proof.refusalCode);
   return isFinalRefusal(proof.refusalCode, proof.dailySpentBefore)

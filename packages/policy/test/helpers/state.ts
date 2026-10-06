@@ -99,6 +99,8 @@ export class State {
     const data = this.sample(this.client.verifier.program, 'releaseProof');
     await this.put(this.client.verifier.program, 'releaseProof', this.client.pda.releaseProof(world.job)[0], {
       ...data,
+      // Zincirde bağlayan kurumun PDA'sı: verifier sayacı bu kurumda tutar.
+      institution: world.institution,
       ...fields,
     });
   }
