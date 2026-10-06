@@ -15,6 +15,7 @@
       "/packages/observability/**",
       "/packages/sdk/**",
       "/packages/types/**",
+      "/packages/x402/**",
       "/package.json",
       "/pnpm-lock.yaml",
       "/pnpm-workspace.yaml"

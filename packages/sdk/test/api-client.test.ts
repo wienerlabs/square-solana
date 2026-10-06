@@ -91,6 +91,12 @@ describe('createApiClient', () => {
       ],
       [() => api.listApiKeys(), 'GET', '/api/v1/api-keys'],
       [() => api.createApiKey({ label: 'ci', scopes: ['read'] }), 'POST', '/api/v1/api-keys'],
+      [() => api.listX402Endpoints(), 'GET', '/api/v1/x402/endpoints'],
+      [() => api.createX402Endpoint({} as never), 'POST', '/api/v1/x402/endpoints'],
+      [() => api.getX402Endpoint('e/1'), 'GET', '/api/v1/x402/endpoints/e%2F1'],
+      [() => api.updateX402Endpoint('e1', { enabled: false }), 'PATCH', '/api/v1/x402/endpoints/e1'],
+      [() => api.getX402EndpointUsage('e1'), 'GET', '/api/v1/x402/endpoints/e1/usage'],
+      [() => api.recordX402Payment('e1', {} as never), 'POST', '/api/v1/x402/endpoints/e1/payments'],
       [() => api.getJob(job), 'GET', `/api/v1/jobs/${job}`],
       [() => api.getInstitution(job), 'GET', `/api/v1/institutions/${job}`],
       [() => api.getPolicy(job), 'GET', `/api/v1/policies/${job}`],
@@ -207,6 +213,8 @@ describe('createApiClient', () => {
     respond = () => ({ status: 204 });
     await expect(api.deleteApiKey('a/b')).resolves.toBeUndefined();
     expect(last().url).toBe('/api/v1/api-keys/a%2Fb');
+    await expect(api.deleteX402Endpoint('e1')).resolves.toBeUndefined();
+    expect(last()).toMatchObject({ method: 'DELETE', url: '/api/v1/x402/endpoints/e1' });
     await expect(api.deleteTravelRuleGrant(job, job)).resolves.toBeUndefined();
     expect(last()).toMatchObject({ method: 'DELETE', url: `/api/v1/jobs/${job}/travel-rule/grants/${job}` });
     respond = () => ({ status: 502, body: '<html>bad gateway</html>' });

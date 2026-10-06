@@ -39,6 +39,7 @@ import { startTravelRuleMaintenance } from './travel-rule/maintenance.js';
 import { createTravelRuleService } from './travel-rule/service.js';
 import { createTxBuilder } from './tx.js';
 import { createCctpService } from './cctp.js';
+import { createX402EndpointService } from './x402.js';
 
 const MS_PER_SECOND = 1000;
 /** did:aip v2 Solana ağ referansı: genesis hash'inin ilk 32 karakteri (CAIP-2). */
@@ -172,6 +173,7 @@ async function main(): Promise<void> {
     webhooks: createWebhookService({ db, box, arbitrators, urlPolicy }),
     evidenceMaxBytes: config.evidence.maxBytes,
     prover: createProverProxy(config.prover),
+    x402: createX402EndpointService({ db }),
     travelRule,
     cctp,
     limiters: { read: window(config.rateLimit.read), write: window(config.rateLimit.write) },

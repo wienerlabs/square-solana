@@ -22,7 +22,7 @@ Proje belgeleri. Mevcut olanlar bağlantılı; diğerleri ilgili issue ile eklen
 | [`did-aip/`](did-aip/) | [`did:aip` v2 Solana (CAIP-2) profil spesifikasyonu](did-aip/method-spec-v2-solana.md) ve [test vektörleri](did-aip/test-vectors.json) | [BC-14] |
 | [`design/`](design/) | [program arayüz sözleşmesi](design/program-interface.md), [API ve SDK sözleşmesi](design/api-sdk-contract.md), [veri modeli](design/data-model.md), [normatif event şeması](design/events.md), [işlem bütçesi](design/tx-budget.md), [CCTP ile fonlama](design/cctp-funding.md) | [BC-44], [BE-35], [BE-04], [BC-16], [BC-28], [BC-36] |
 | [`protocol.md`](protocol.md) | Protokolün özeti: roller, sekiz adım, job durum makinesi, event'ler, `did:aip`, uyum | [BE-31] |
-| [`api/`](api/) | [OpenAPI 3.1 spec](api/openapi.yaml) (37 operasyon); [`schemas/idl.json`](api/schemas/idl.json) IDL'den üretilen JSON Schema'lar, elle düzenlenmez | [BE-35] |
+| [`api/`](api/) | [OpenAPI 3.1 spec](api/openapi.yaml) (52 operasyon); [`schemas/idl.json`](api/schemas/idl.json) IDL'den üretilen JSON Schema'lar, elle düzenlenmez | [BE-35] |
 | [`provenance/`](provenance/) | taşınan dizinlerin kaynak repo, commit ve yöntem kayıtları (issue başına bir dosya) | [BC-04], [BC-05], [BC-06], [BC-07], [BE-02] |
 | [`environments.md`](environments.md) | ortamlar (PR preview, staging, production), secret politikası ve servislerin ortam değişkeni envanteri (üretilir) | [BE-05] |
 | [`ci.md`](ci.md) | CI kontrolleri, program durum listesi, sır taraması, verifiable build ve merge kuralı | [BE-03], [BC-12], [BC-13] |
