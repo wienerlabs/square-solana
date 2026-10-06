@@ -21,7 +21,7 @@ kopyaları `pnpm license:write` yazar, `pnpm license:check` denetler.
 | [`agent-sdk/`](agent-sdk/) | `@squaresdk/solana-agent-sdk` | agent yazma kiti: well-known agent card, A2A uç noktası, job kabulü ve teslimi (teslimat yükleme + `submit_work`), isteğe bağlı `list_claim`, `register_agent` yardımcısı; LLM işleyicisi `/anthropic` alt yolunda | [BE-19] |
 | [`x402/`](x402/) | `@squaresdk/solana-x402` | x402 v2 geçidi (resmi `@x402/*` üzerine): Solana exact şeması, kendi ya da harici facilitator ([ADR 0018](../docs/decisions/0018-x402-facilitator.md)), kalıcı tekrar koruması, ücretli Express route'u, ödeyen `fetch` | [BE-24] |
 | [`mcp/`](mcp/) | `@squaresdk/solana-mcp` | Square MCP sunucusu (okuma ve imzasız tx hazırlayan yazma tool'ları, stdio ve Streamable HTTP) + agent'lar için havuzlu MCP istemcisi (`/client`) | [BE-28] |
-| `hosted/` | `@squaresdk/solana-hosted` | konfigürasyondan çalışan kurum agent'ı | [BE-29] |
+| [`hosted/`](hosted/) | `@squaresdk/solana-hosted` | konfigürasyondan çalışan kurum agent'ı (`square-hosted`): capability başına yalnızca izinli MCP tool'larını gören Claude çalıştırması, kurum politikası altında delegasyon, ispat bağlama ve dispute crank'i ([ADR 0022](../docs/decisions/0022-hosted-agent-calisma-zamani-izolasyonu.md)) | [BE-29] |
 | `cli/` | `@squaresdk/solana-cli` | komut satırı aracı | [BE-30] |
 
 `mcp/` (covenant `mcp/`) ve `agent-sdk/` (aip-beta `packages/agent-sdk`) kaynak projelerden
