@@ -1,54 +1,32 @@
-#!/usr/bin/env node
-/**
- * covenant-mcp — Model Context Protocol server for Covenant.
- *
- * Covenant is the agent-to-agent settlement layer on Solana.
- * x402 powers paid access. Covenant powers paid work.
- *
- * This server exposes Covenant to any MCP-speaking agent (Claude Desktop,
- * Claude Code, Cursor, an autonomous loop). v0.1 ships the read-only
- * discovery surface, which needs no wallet and no credentials: find open
- * work, inspect a job's settlement state, read reputation, discover
- * counterparties, and check live protocol stats.
- *
- * The write surface (create_escrow / accept_job / deliver / release /
- * dispute / factor_claim) lands next; it activates when the server is
- * started with COVENANT_AGENT_KEYPAIR set, so an autonomous agent is its
- * own non-custodial wallet.
- *
- * Transport: stdio. Configure in your MCP client (see README).
- */
-
+// Square MCP sunucusu (BE-28): okuma araçları zincirden (tools/read.ts), yazma araçları imza akışıyla
+// (tools/write.ts, signing.ts). Taşımadan bağımsızdır; süreç giriş noktası bin.ts'tir (stdio).
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { loadConfig } from './config.js';
+import type { Connection } from '@solana/web3.js';
+import { createSquareClient } from '@squaresdk/solana-sdk';
+import { createChainReader } from './chain.js';
+import type { SquareMcpConfig } from './config.js';
 import { packageInfo } from './package-info.js';
-import { registerDiscoveryTools } from './tools/discover.js';
+import { createSigning } from './signing.js';
+import { registerReadTools } from './tools/read.js';
+import { registerWriteTools } from './tools/write.js';
 
-async function main(): Promise<void> {
-  const config = loadConfig();
+export const SERVER_INSTRUCTIONS = [
+  'Square is escrowed agent payments on Solana. An institution opens a job bound to an agent record and locks USDC',
+  'in the job escrow; the agent accepts, delivers (work hash and URI on chain) and, after the challenge window, the',
+  "keeper releases the escrow. With a spending policy the release also needs the institution's compliance proof.",
+  'Read tools need no wallet. Write tools need the signature of the role wallet (institution or agent): the server',
+  'signs only for its own keypair, otherwise it returns the unsigned transaction.',
+].join(' ');
 
-  const server = new McpServer({
-    name: packageInfo.name,
-    version: packageInfo.version,
-  });
-
-  // v0.1: read-only discovery tools (no wallet required).
-  registerDiscoveryTools(server, config);
-
-  const transport = new StdioServerTransport();
-  await server.connect(transport);
-
-  // stderr is safe to log to under stdio transport; stdout is the
-  // JSON-RPC channel and must not be polluted.
-  process.stderr.write(
-    `${packageInfo.name} v${packageInfo.version} connected. network=${config.network} api=${config.baseUrl}\n`,
+export function createSquareMcpServer(deps: { config: SquareMcpConfig; connection: Connection }): McpServer {
+  const { config, connection } = deps;
+  const client = createSquareClient({ connection, programIds: config.programIds, commitment: 'confirmed' });
+  const reader = createChainReader({ client, connection });
+  const server = new McpServer(
+    { name: packageInfo.name, version: packageInfo.version },
+    { instructions: SERVER_INSTRUCTIONS },
   );
+  registerReadTools(server, { reader, config });
+  registerWriteTools(server, { client, connection, reader, signing: createSigning({ connection, config }), config });
+  return server;
 }
-
-main().catch((err) => {
-  process.stderr.write(
-    `${packageInfo.name} fatal: ${err instanceof Error ? (err.stack ?? err.message) : String(err)}\n`,
-  );
-  process.exit(1);
-});
