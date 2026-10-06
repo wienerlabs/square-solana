@@ -1,126 +1,61 @@
-import type { Request, Response, NextFunction } from 'express';
-import { Connection } from '@solana/web3.js';
-import { config } from '../config.js';
-import { logger } from '../utils/logger.js';
+// x402 ödeme ara katmanı: `@squaresdk/solana-x402`'ye (BE-24) delege eder. Aperture'ün özel uygulaması
+// (`x-402-payment` başlığında zincirde önceden gönderilmiş işlemin imzası, RPC'den yalnızca varlık ve hata
+// denetimi) kaldırıldı: tutar, mint ve alıcı denetlenmiyordu, aynı imza sınırsız tekrar kullanılabiliyordu.
+// Şimdi x402 v2: 402 + `PAYMENT-REQUIRED`, `PAYMENT-SIGNATURE` ile kısmen imzalı SPL aktarımı, resmi exact
+// şemasıyla doğrulama ve uzlaştırma, `PAYMENT-RESPONSE` makbuzu ve Postgres'te kalıcı tekrar koruması.
+// Uzlaştırma işleyiciden önce yapılır (`before-handler`): rapor işlem imzasını içerir.
+import type { RequestHandler } from 'express';
+import { createKeyPairSignerFromBytes } from '@solana/kit';
+import bs58 from 'bs58';
+import {
+  createFacilitatorClient,
+  createX402Gateway,
+  type FacilitatorOptions,
+  type ReplayStore,
+  type SolanaNetwork,
+  type X402Event,
+} from '@squaresdk/solana-x402';
 
-export interface X402PaymentRequirement {
-  readonly version: '1';
-  readonly scheme: 'exact';
-  readonly network: typeof config.x402.network;
-  readonly token: string;
-  readonly amount: string;
-  readonly recipient: string;
-  readonly description: string;
-  readonly resource: string;
+export { getX402Payment, type X402Payment } from '@squaresdk/solana-x402';
+
+export interface ComplianceX402Options {
+  readonly facilitator: FacilitatorOptions;
+  readonly replay: ReplayStore;
+  readonly network: SolanaNetwork;
+  readonly paymentMint: string;
+  readonly publisherWallet: string;
+  readonly onEvent?: (event: X402Event) => void;
 }
 
-export interface X402PaymentProof {
-  readonly txSignature: string;
-  readonly zkProofHash?: string;
-  readonly payer: string;
+export interface ComplianceX402 {
+  /** Fiyat ödeme mint'inin taban biriminde. */
+  requireX402Payment(priceBaseUnits: number, description: string): RequestHandler;
 }
 
-/**
- * x402 payment middleware.
- * If x-402-payment header is present, verifies the payment on-chain.
- * If not, returns 402 with payment requirements.
- */
-export function requireX402Payment(priceBaseUnits: number, description: string) {
-  return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-    const paymentHeader = req.headers['x-402-payment'] as string | undefined;
-
-    if (!paymentHeader) {
-      // No payment -- return 402 with payment requirements
-      const requirement: X402PaymentRequirement = {
-        version: '1',
-        scheme: 'exact',
-        network: config.x402.network,
-        token: config.x402.paymentMint,
-        amount: String(priceBaseUnits),
-        recipient: config.x402.publisherWallet,
+export function createComplianceX402(options: ComplianceX402Options): ComplianceX402 {
+  const gateway = createX402Gateway({
+    facilitator: createFacilitatorClient(options.facilitator),
+    replay: options.replay,
+    networks: [options.network],
+    ...(options.onEvent ? { onEvent: options.onEvent } : {}),
+  });
+  return {
+    requireX402Payment: (priceBaseUnits, description) =>
+      gateway.paidRoute({
+        price: { amount: String(priceBaseUnits), asset: options.paymentMint },
+        payTo: options.publisherWallet,
+        network: options.network,
         description,
-        resource: req.originalUrl,
-      };
-
-      res.status(402).json({
-        success: false,
-        error: 'Payment Required',
-        data: null,
-        paymentRequirement: requirement,
-      });
-      return;
-    }
-
-    // Payment header present -- verify on-chain
-    try {
-      const proof: X402PaymentProof = JSON.parse(Buffer.from(paymentHeader, 'base64').toString('utf-8'));
-
-      if (!proof.txSignature || !proof.payer) {
-        res.status(400).json({
-          success: false,
-          error: 'Invalid x-402-payment header: missing txSignature or payer',
-          data: null,
-        });
-        return;
-      }
-
-      // Verify transaction on-chain with retries. Public RPC endpoints
-      // occasionally fails transient fetches and a freshly-submitted tx may
-      // not have been indexed yet — both look identical to a missing tx, so
-      // we poll for up to ~12s before giving up.
-      const connection = new Connection(config.solana.rpcUrl, 'confirmed');
-      let txInfo: Awaited<ReturnType<typeof connection.getTransaction>> = null;
-      let lastFetchError: unknown = null;
-      for (let attempt = 0; attempt < 6; attempt++) {
-        try {
-          txInfo = await connection.getTransaction(proof.txSignature, {
-            commitment: 'confirmed',
-            maxSupportedTransactionVersion: 0,
-          });
-          if (txInfo) break;
-        } catch (fetchErr) {
-          lastFetchError = fetchErr;
-        }
-        await new Promise((resolve) => setTimeout(resolve, 2000));
-      }
-
-      if (!txInfo) {
-        const hint = lastFetchError instanceof Error ? lastFetchError.message : 'not confirmed yet';
-        res.status(402).json({
-          success: false,
-          error: `Transaction ${proof.txSignature.slice(0, 12)}... not found on-chain: ${hint}`,
-          data: null,
-        });
-        return;
-      }
-
-      if (txInfo.meta?.err) {
-        res.status(402).json({
-          success: false,
-          error: `Transaction failed on-chain: ${JSON.stringify(txInfo.meta.err)}`,
-          data: null,
-        });
-        return;
-      }
-
-      // Attach payment proof to request for downstream handlers
-      (req as Request & { x402Payment: X402PaymentProof }).x402Payment = proof;
-
-      logger.info('x402 payment verified', {
-        txSignature: proof.txSignature,
-        payer: proof.payer,
-        resource: req.originalUrl,
-      });
-
-      next();
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Payment verification failed';
-      logger.error('x402 payment verification error', { error: message });
-      res.status(402).json({
-        success: false,
-        error: `Payment verification failed: ${message}`,
-        data: null,
-      });
-    }
+        settle: 'before-handler',
+        // Ara katman Express 4 tiplerine göre yazılı; servis `@types/express` 5 kullanıyor (çalışma anı Express 4).
+      }) as unknown as RequestHandler,
   };
+}
+
+/** Ücret ödeyen anahtar çifti: base58 ya da JSON dizi, 64 bayt (`MPP_AUTHORITY_KEYPAIR_BASE58` ile aynı biçim). */
+export function parseFeePayerKeypair(raw: string) {
+  const trimmed = raw.trim();
+  const bytes = trimmed.startsWith('[') ? new Uint8Array(JSON.parse(trimmed) as number[]) : bs58.decode(trimmed);
+  if (bytes.length !== 64) throw new Error(`X402_FEE_PAYER_KEYPAIR must decode to 64 bytes, got ${bytes.length}`);
+  return createKeyPairSignerFromBytes(bytes);
 }

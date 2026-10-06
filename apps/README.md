@@ -12,7 +12,7 @@ Uygulama ve servisler (pnpm workspace). `package.json` adları `@squaresdk/solan
 | [`indexer/`](indexer/) | Event tabanlı indexer: kesinleşmiş tx'lerden event'ler ve ayna tablolar, Helius webhook ve RPC backfill, uzlaştırma, okuma API'si (`@squaresdk/solana-indexer/read`) | [BE-14] |
 | [`keeper/`](keeper/) | Finalize crank: zincir doğrulaması, kârlılık eşiği, priority fee, `ProofRequired` ve screening için geri çekilme, `keeper_actions` günlüğü | [BE-15] |
 | [`prover/`](prover/) | Release devresi için Groth16 prover servisi (snarkjs, `POST /v1/prove`); Aperture `prover-service`'ten geçmişiyle taşındı [BE-02], yeni devreye uyarlandı | [BE-11] |
-| [`compliance-api/`](compliance-api/) | Aperture compliance API'si (MPP / Stripe, x402 raporu, kayıtsız ödeme izleyicisi); geçmişiyle taşındı [BE-02], uyarlama [BE-25] ve [BE-18] | [BE-25] |
+| [`compliance-api/`](compliance-api/) | Aperture compliance API'si (MPP / Stripe, x402 raporu `@squaresdk/solana-x402` üzerinden [BE-24], kayıtsız ödeme izleyicisi); geçmişiyle taşındı [BE-02], uyarlama [BE-25] ve [BE-18] | [BE-25] |
 | [`screener/`](screener/) | Sanctions screening: OFAC SDN listesi ve Chainalysis API ile tarama, screener authority anahtarıyla registry `record_screening` tx'i, TTL yenileme, denetim kaydı ve API ([ADR 0017](../docs/decisions/0017-sanctions-screening-kaynaklari-ve-saglayici.md)) | [BE-16] |
 
 Tüm servisler tek veritabanını ([`db/`](../db/)) kullanır.
@@ -25,5 +25,6 @@ Tüm servisler tek veritabanını ([`db/`](../db/)) kullanır.
 [BE-15]: https://github.com/wienerlabs/square-solana/issues/48
 [BE-16]: https://github.com/wienerlabs/square-solana/issues/49
 [BE-18]: https://github.com/wienerlabs/square-solana/issues/51
+[BE-24]: https://github.com/wienerlabs/square-solana/issues/79
 [BE-25]: https://github.com/wienerlabs/square-solana/issues/80
 [FE-01]: https://github.com/wienerlabs/square-solana/issues/21
