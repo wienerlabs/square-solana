@@ -28,6 +28,7 @@ const OBJECTS = {
   AgentPricing: t.AgentPricingSchema,
   AgentCard: t.AgentCardSchema,
   AgentService: t.AgentServiceSchema,
+  AgentInterface: t.AgentInterfaceSchema,
   AgentCardHosting: t.AgentCardHostingSchema,
   IndexedEvent: t.IndexedEventSchema,
   AuthChallengeRequest: t.AuthChallengeRequestSchema,

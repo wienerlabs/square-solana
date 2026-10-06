@@ -23,13 +23,19 @@ export const PUBLISHABLE = [
   '@squaresdk/solana-identity',
   '@squaresdk/solana-policy',
   '@squaresdk/solana-a2a',
+  '@squaresdk/solana-mcp',
+  '@squaresdk/solana-agent-sdk',
 ];
 
 export const EXCLUDED = {
   '@squaresdk/solana-config': 'yalnızca geliştirme araçlarının ortak ayarları (tsconfig, ESLint, Prettier)',
   '@squaresdk/solana-db': "servislerin iç paketi: tek veritabanının şeması, migration'ları ve istemcisi",
-  '@squaresdk/solana-agent-sdk': "kaynaktan taşındı, Square'e uyarlanması BE-19 (#52)",
-  '@squaresdk/solana-mcp': "kaynaktan taşındı, Square'e uyarlanması BE-28 (#87)",
+  '@squaresdk/solana-observability':
+    'servislerin iç paketi (private): maskeleyen logger, metrikler, health, alarmlar (BE-12)',
+  '@squaresdk/solana-hardening':
+    'servislerin iç paketi (private): SSRF, idempotency, hız sınırı, RPC failover, imzalı eylemler (BE-13)',
+  '@squaresdk/solana-cctp':
+    "servislerin iç paketi (private): CCTP relayer'ın deposu, attestation takibi ve fonlama tx'i (BE-26)",
 };
 
 const ROOT = fileURLToPath(new URL('../..', import.meta.url));
