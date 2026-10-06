@@ -5,7 +5,8 @@ import { useCallback, useEffect, useId, useMemo, useState, type ReactNode } from
 import { useConnection } from '@solana/wallet-adapter-react';
 import { PublicKey } from '@solana/web3.js';
 import { useApiClient } from '@/components/api-client';
-import { useNetworkGuard, useSendTransaction } from '@/components/network-guard';
+import { useActor } from '@/components/actor';
+import { useNetworkGuard } from '@/components/network-guard';
 import { Address } from '@/components/ui/address';
 import { Button } from '@/components/ui/button';
 import { CopyButton } from '@/components/ui/copy-button';
@@ -33,7 +34,7 @@ import {
 import { readPolicyChain } from '@/lib/policy-chain';
 import { hexToBytes } from '@/lib/policy-draft';
 import { loadDrafts } from '@/lib/policy-local';
-import { TransactionBlockedError } from '@/lib/send-transaction';
+import { sendErrorText } from '@/lib/sponsored-send';
 import { formatUnits, parseUnits, settlementAccount } from '@/lib/settlement';
 import { statusLabel } from '@/lib/status';
 import { isBound, travelRuleFundBlock, travelRuleRequired, type TravelRuleVerification } from '@/lib/travel-rule';
@@ -112,11 +113,14 @@ interface ActivePolicy {
   version: number;
 }
 
-/** Kurum cüzdanının iş açması ve fonlaması: `create_job` + `fund_job` (akışın 3. adımı). */
+/**
+ * Kurumun iş açması ve fonlaması: `create_job` + `fund_job` (akışın 3. adımı). Kurum cüzdan ya da smart account'un
+ * vault'udur (FE-21); fonlama vault'un USDC hesabından.
+ */
 export function JobWizard({ owner, escrowProgramId }: { owner: string; escrowProgramId: string }) {
   const { connection } = useConnection();
   const guard = useNetworkGuard();
-  const send = useSendTransaction();
+  const actor = useActor('institution');
   const ownerKey = useMemo(() => new PublicKey(owner), [owner]);
   const verified = guard.rpc.state === 'ready' && !guard.rpc.mismatch;
   const genesisHash = guard.rpc.state === 'ready' ? guard.rpc.genesisHash : null;
@@ -267,7 +271,7 @@ export function JobWizard({ owner, escrowProgramId }: { owner: string; escrowPro
     fundAmount !== null && balance !== null && (balance.amount === null || balance.amount < fundAmount);
   const travelRule = setup !== null && fundAmount !== null && travelRuleRequired(fundAmount, setup.travelRuleThreshold);
 
-  const apiClient = useApiClient();
+  const apiClient = useApiClient(actor.api);
   const [travelVerification, setTravelVerification] = useState<TravelRuleVerification | null>(null);
   const chainCommitment = existingJob?.commitment ?? NO_COMMITMENT;
   const travelBlock = travelRuleFundBlock({
@@ -314,6 +318,7 @@ export function JobWizard({ owner, escrowProgramId }: { owner: string; escrowPro
     setBusy(kind);
     setError(null);
     try {
+      const options = await actor.options();
       const built =
         kind === 'create'
           ? await setup.client.flow.createJob(
@@ -326,7 +331,7 @@ export function JobWizard({ owner, escrowProgramId }: { owner: string; escrowPro
                 deadline: deadline.ok ? deadline.unix : 0,
                 challengePeriod: challenge?.ok ? challenge.seconds : 0n,
               },
-              { feePayer: ownerKey },
+              options,
             )
           : await setup.client.flow.fundJob(
               {
@@ -334,13 +339,11 @@ export function JobWizard({ owner, escrowProgramId }: { owner: string; escrowPro
                 job: new PublicKey(jobAddress!),
                 institutionTokenAccount: settlementAccount(ownerKey, token),
               },
-              { feePayer: ownerKey },
+              options,
             );
-      setSignature(await send(built.transaction));
+      setSignature(await actor.send(built.transaction));
     } catch (err) {
-      setError(
-        err instanceof TransactionBlockedError ? err.message : (escrowErrorMessage(err) ?? (err as Error).message),
-      );
+      setError(sendErrorText(err, escrowErrorMessage));
     } finally {
       setBusy(null);
     }

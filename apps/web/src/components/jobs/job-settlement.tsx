@@ -1,12 +1,12 @@
 'use client';
 
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { useWallet } from '@solana/wallet-adapter-react';
 import { createAssociatedTokenAccountIdempotentInstruction } from '@solana/spl-token';
 import type { PublicKey } from '@solana/web3.js';
 import type { ClaimListingAccount, JobAccount } from '@squaresdk/solana-sdk';
 import type { KeeperAction } from '@squaresdk/solana-types';
-import { useNetworkGuard, useSendTransaction } from '@/components/network-guard';
+import { useActor } from '@/components/actor';
+import { useNetworkGuard } from '@/components/network-guard';
 import { useWebConfig } from '@/components/providers';
 import { Address } from '@/components/ui/address';
 import { Button } from '@/components/ui/button';
@@ -27,7 +27,7 @@ import {
 } from '@/lib/job-settlement';
 import { readScreening, type EscrowSetup } from '@/lib/job-wizard';
 import { refusalReasons, releaseOutlook, type ReleaseState } from '@/lib/release-proof';
-import { TransactionBlockedError } from '@/lib/send-transaction';
+import { sendErrorText } from '@/lib/sponsored-send';
 import { settlementAccount, type SettlementToken } from '@/lib/settlement';
 import { KEEPER_JOURNAL_POLL_MS, readKeeperJournal, squareApi } from '@/lib/square-api';
 import { KEEPER_OUTCOME_TONE, statusLabel, VALIDATION_OUTCOME_TONE } from '@/lib/status';
@@ -283,7 +283,8 @@ function FinalizePanel({
   token: SettlementToken | null;
   formatAmount(base: bigint): string;
 }) {
-  const { publicKey } = useWallet();
+  // Finalize herkese açık: tetikleyen cüzdandır (sponsorlu olabilir, FE-21), smart account değil.
+  const publicKey = useActor(null).address;
   if (release?.state === 'error') {
     return <p className="mt-3 text-sm text-danger-text">The compliance proof could not be read: {release.message}</p>;
   }
@@ -318,7 +319,7 @@ function Finalize({
   token: SettlementToken;
 }) {
   const guard = useNetworkGuard();
-  const send = useSendTransaction();
+  const actor = useActor(null);
   // Keeper ücreti tetikleyenin USDC hesabına gider; hesap yoksa finalize düşer, önce açılır.
   const keeperAccount = useTokenBalance(keeper, token);
   const [busy, setBusy] = useState<'account' | 'finalize' | null>(null);
@@ -334,31 +335,26 @@ function Finalize({
     setError(null);
     try {
       const destination = settlementAccount(keeper, token);
+      // Sponsorlu gönderimde ücreti ve hesabın rent'ini sponsor öder.
+      const options = await actor.options();
       const built =
         kind === 'account'
           ? await escrow.client.buildTx(
               [
                 createAssociatedTokenAccountIdempotentInstruction(
-                  keeper,
+                  options.feePayer,
                   destination,
                   keeper,
                   token.mint,
                   token.tokenProgram,
                 ),
               ],
-              { feePayer: keeper },
+              options,
             )
-          : await escrow.client.flow.finalizePayment(
-              { keeper, job: jobKey, keeperTokenAccount: destination },
-              { feePayer: keeper },
-            );
-      setSignature(await send(built.transaction));
+          : await escrow.client.flow.finalizePayment({ keeper, job: jobKey, keeperTokenAccount: destination }, options);
+      setSignature(await actor.send(built.transaction));
     } catch (caught) {
-      setError(
-        caught instanceof TransactionBlockedError
-          ? caught.message
-          : (finalizeErrorMessage(caught) ?? (caught as Error).message),
-      );
+      setError(sendErrorText(caught, finalizeErrorMessage));
     } finally {
       setBusy(null);
     }

@@ -146,12 +146,16 @@ export const COMMIT_STEP_LABEL: Readonly<Record<CommitStep, string>> = {
   setBuyerRoot: 'set_buyer_root: publish the approved-buyer root',
 };
 
-/** Planın talimatları; `owner` hem yetkili hem ücreti ve rent'i ödeyen. Ağa gitmez. */
+/**
+ * Planın talimatları; `owner` yetkili (cüzdan ya da smart account'un vault'u), `payer` rent'i ödeyen (verilmezse
+ * `owner`; sponsorlu gönderimde sponsor, FE-21). Ağa gitmez.
+ */
 export async function policyCommitInstructions(
   connection: Connection,
   input: {
     programId: PublicKey;
     owner: PublicKey;
+    payer?: PublicKey;
     policyId: Uint8Array;
     steps: readonly CommitStep[];
     target: CommitTarget;
@@ -161,18 +165,19 @@ export async function policyCommitInstructions(
   const institution = institutionAddress(input.programId, input.owner);
   const policy = policyAddress(input.programId, institution, input.policyId);
   const { owner, target } = input;
+  const payer = input.payer ?? owner;
   const build = (step: CommitStep): Promise<TransactionInstruction> => {
     switch (step) {
       case 'initInstitution':
         return program.methods
           .initInstitution(target.institutionName)
-          .accountsStrict({ payer: owner, authority: owner, institution, systemProgram: SystemProgram.programId })
+          .accountsStrict({ payer, authority: owner, institution, systemProgram: SystemProgram.programId })
           .instruction();
       case 'setPolicy':
         return program.methods
           .setPolicy(Array.from(input.policyId), Array.from(target.commitment), new BN(target.dailyCeiling.toString()))
           .accountsStrict({
-            payer: owner,
+            payer,
             authority: owner,
             institution,
             policy,
@@ -194,7 +199,7 @@ export async function policyCommitInstructions(
   return Promise.all(input.steps.map(build));
 }
 
-/** İmzasız v0 tx; blockhash bağlantıdan. */
+/** İmzasız v0 tx; ücret ödeyicisi `payer` (verilmezse `owner`), blockhash bağlantıdan. */
 export async function buildPolicyCommitTx(
   connection: Connection,
   input: Parameters<typeof policyCommitInstructions>[1],
@@ -204,7 +209,7 @@ export async function buildPolicyCommitTx(
     connection.getLatestBlockhash('confirmed'),
   ]);
   const message = new TransactionMessage({
-    payerKey: input.owner,
+    payerKey: input.payer ?? input.owner,
     recentBlockhash: blockhash,
     instructions,
   }).compileToV0Message();

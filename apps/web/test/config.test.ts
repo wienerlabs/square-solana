@@ -129,6 +129,30 @@ describe('api', () => {
   });
 });
 
+describe('fee payer', () => {
+  const api = { ...valid, SQUARE_API_URL: 'https://api.example.org' };
+
+  it('is optional, trimmed of the trailing slash and follows the RPC rules', () => {
+    expect(parseWebConfig(api)).toMatchObject({ ok: true });
+    expect('feePayerUrl' in (parseWebConfig(api) as { config: object }).config).toBe(false);
+    expect(parseWebConfig({ ...api, SQUARE_FEE_PAYER_URL: 'https://sponsor.example.org/' })).toMatchObject({
+      ok: true,
+      config: { feePayerUrl: 'https://sponsor.example.org' },
+    });
+    expect(parseWebConfig({ ...api, SQUARE_FEE_PAYER_URL: 'http://sponsor.example.org' })).toEqual({
+      ok: false,
+      errors: ['SQUARE_FEE_PAYER_URL must use https unless SQUARE_SOLANA_CLUSTER is localnet'],
+    });
+  });
+
+  it('needs the Square API, whose sessions it accepts', () => {
+    expect(parseWebConfig({ ...valid, SQUARE_FEE_PAYER_URL: 'https://sponsor.example.org' })).toEqual({
+      ok: false,
+      errors: ['SQUARE_FEE_PAYER_URL needs SQUARE_API_URL: the fee payer accepts Square API sessions'],
+    });
+  });
+});
+
 describe('display helpers', () => {
   it('shows only the RPC host, never its path, query or credentials', () => {
     expect(rpcLabel('https://user:pass@rpc.example.org:8443/v1?api-key=secret')).toBe('rpc.example.org:8443');

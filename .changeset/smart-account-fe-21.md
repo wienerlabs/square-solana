@@ -2,6 +2,7 @@
 '@squaresdk/solana-types': patch
 '@squaresdk/solana-sdk': minor
 '@squaresdk/solana-api': minor
+'@squaresdk/solana-web': minor
 ---
 
 Smart account ile çalışan roller (FE-21, API sözleşmesi v0.23.0).
@@ -14,3 +15,9 @@ anda okunur). Teslimat, agent kartı, politika meta verisi, Travel Rule ve dispu
 `@squaresdk/solana-sdk`: `ApiClientConfig.auth.smartAccount` başlığı her isteğe ekler.
 
 `@squaresdk/solana-types`: `API_CONTRACT_VERSION` 0.23.0.
+
+`@squaresdk/solana-web`: `/app/account` (FE-21). Sponsorlu gönderim (`SQUARE_FEE_PAYER_URL`, BE-27'nin servisi), rol
+başına Squads v4 smart account: sponsorla açma ya da var olanı seçme, üyelik görünümü (üyeler, eşik, vault ve
+bakiyeleri, öneriler; onay ve yürütme). Politika, agent kaydı, iş açma ve fonlama, kabul ve teslim, ispat, alacak ve
+uyuşmazlık adımları rolün adresiyle (cüzdan ya da vault) çalışır; smart account'ta her adım vault tx'i olarak önerilir
+ve yürütülür.

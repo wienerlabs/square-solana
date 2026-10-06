@@ -6,6 +6,7 @@ import { useRole } from './role-provider';
 
 const SECTIONS = [
   { href: '/app', label: 'Overview' },
+  { href: '/app/account', label: 'Account' },
   { href: '/app/network', label: 'Network' },
   { href: '/app/policy', label: 'Policy' },
   { href: '/app/agent', label: 'Agent' },

@@ -74,7 +74,7 @@ pnpm license:write
 | `@solana/wallet-adapter-solflare` | npm | Apache-2.0 | runtime | `@squaresdk/solana-web` | ✓ |
 | `@solana/wallet-standard-chains` | npm | Apache-2.0 | runtime | `@squaresdk/solana-web` | ✓ |
 | `@solana/web3.js` | npm | MIT | runtime | `@squaresdk/solana-a2a`, `@squaresdk/solana-agent-sdk`, `@squaresdk/solana-api`, `@squaresdk/solana-cctp`, `@squaresdk/solana-compliance-api`, `@squaresdk/solana-db`, `@squaresdk/solana-fee-payer`, `@squaresdk/solana-hardening`, `@squaresdk/solana-hosted`, `@squaresdk/solana-identity`, `@squaresdk/solana-indexer`, `@squaresdk/solana-keeper`, `@squaresdk/solana-mcp`, `@squaresdk/solana-monorepo`, `@squaresdk/solana-policy`, `@squaresdk/solana-screener`, `@squaresdk/solana-sdk`, `@squaresdk/solana-smoke`, `@squaresdk/solana-web` | ✓ |
-| `@sqds/multisig` | npm | MIT | runtime | `@squaresdk/solana-fee-payer`, `@squaresdk/solana-monorepo`, `@squaresdk/solana-sdk` | ✓ |
+| `@sqds/multisig` | npm | MIT | runtime | `@squaresdk/solana-fee-payer`, `@squaresdk/solana-monorepo`, `@squaresdk/solana-sdk`, `@squaresdk/solana-web` | ✓ |
 | `@tailwindcss/postcss` | npm | MIT | dev | `@squaresdk/solana-web` | ✓ |
 | `@testcontainers/postgresql` | npm | MIT | runtime | `@squaresdk/solana-a2a`, `@squaresdk/solana-agent-sdk`, `@squaresdk/solana-api`, `@squaresdk/solana-cctp`, `@squaresdk/solana-compliance-api`, `@squaresdk/solana-db`, `@squaresdk/solana-fee-payer`, `@squaresdk/solana-hardening`, `@squaresdk/solana-hosted`, `@squaresdk/solana-indexer`, `@squaresdk/solana-keeper`, `@squaresdk/solana-screener`, `@squaresdk/solana-x402` | ✓ |
 | `@testing-library/dom` | npm | MIT | dev | `@squaresdk/solana-web` | ✓ |

@@ -4,7 +4,8 @@ import { useEffect, useId, useMemo, useState } from 'react';
 import { useConnection } from '@solana/wallet-adapter-react';
 import { PublicKey } from '@solana/web3.js';
 import type { BuyerTree } from '@squaresdk/solana-policy';
-import { useNetworkGuard, useSendTransaction } from '@/components/network-guard';
+import { useActor } from '@/components/actor';
+import { useNetworkGuard } from '@/components/network-guard';
 import { useWebConfig } from '@/components/providers';
 import { Address } from '@/components/ui/address';
 import { Button } from '@/components/ui/button';
@@ -22,7 +23,7 @@ import {
 } from '@/lib/policy-chain';
 import { institutionAddress, policyAddress } from '@/lib/idl-pda';
 import { bytesToHex, hexToBytes } from '@/lib/policy-draft';
-import { TransactionBlockedError } from '@/lib/send-transaction';
+import { sendErrorText } from '@/lib/sponsored-send';
 import { useSignatureStatus } from '@/lib/use-signature-status';
 import { BuyerProofs } from './buyer-proofs';
 
@@ -60,7 +61,7 @@ export function PolicyCommit(props: Props) {
   const { cluster } = useWebConfig();
   const { connection } = useConnection();
   const guard = useNetworkGuard();
-  const send = useSendTransaction();
+  const actor = useActor('institution');
   const nameId = useId();
   const ownerKey = useMemo(() => new PublicKey(owner), [owner]);
   const programId = useMemo(() => new PublicKey(policyProgramId), [policyProgramId]);
@@ -133,20 +134,18 @@ export function PolicyCommit(props: Props) {
     setSubmitError(null);
     setSignature(null);
     try {
+      const { feePayer } = await actor.options();
       const transaction = await buildPolicyCommitTx(connection, {
         programId,
         owner: ownerKey,
+        payer: feePayer,
         policyId: hexToBytes(policyId),
         steps: plan.steps,
         target,
       });
-      setSignature(await send(transaction));
+      setSignature(await actor.send(transaction));
     } catch (error) {
-      setSubmitError(
-        error instanceof TransactionBlockedError
-          ? error.message
-          : (policyErrorMessage(error) ?? (error as Error).message),
-      );
+      setSubmitError(sendErrorText(error, policyErrorMessage));
     } finally {
       setSubmitting(false);
     }
