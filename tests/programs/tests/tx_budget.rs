@@ -1,4 +1,4 @@
-//! İşlem bütçesi (BC-28): 8 adımın her tx'i SDK'nın kurduğu biçimde ve en kötü durumuyla kurulur:
+//! İşlem bütçesi (BC-28; fiat rayı BC-37): 8 adımın ve fiat rayının her tx'i SDK'nın kurduğu biçimde ve en kötü durumuyla kurulur:
 //! compute budget talimatları (sınır profilden, öncelik ücreti), alıcı tarafın ATA'sını açan idempotent
 //! talimatlar, en uzun alanlar, en derin alıcı listesi, gerçek Groth16 ispatı ve `record_release` CPI'ı.
 //! Her tx için tel boyutu (lookup table'sız ve Square ALT'ıyla) ve compute unit ölçülür.
@@ -9,6 +9,7 @@
 //! (docs/design/tx-budget.md): `cargo test --test tx_budget -- --nocapture`.
 
 mod escrow_world;
+mod fiat_world;
 mod release_world;
 
 use std::collections::BTreeMap;
@@ -16,6 +17,7 @@ use std::collections::BTreeMap;
 use anchor_lang::prelude::Pubkey;
 use anchor_lang::solana_program::instruction::Instruction;
 use escrow_world::*;
+use fiat_world::*;
 use release_world::*;
 use serde_json::Value;
 use solana_keypair::Keypair;
@@ -539,6 +541,70 @@ fn proof_and_gated_release(profile: &Profile) -> Vec<Row> {
     meter.rows
 }
 
+/// Fiat rayı (BC-37): vault'suz iş, Ed25519 precompile attestation'ı ile MPP ispatı, ödemesiz kapanış.
+fn fiat_rail(profile: &Profile) -> Vec<Row> {
+    let mut f = FiatWorld::new();
+    let mut meter = Meter::new(profile, &mut f.r.w.h, f.r.w.usdc);
+    let key = f.institution();
+    let ix = f.create_ix(f.r.spec(FIAT), f.r.amount(FIAT), f.r.w.h.now() + 7 * DAY);
+    meter.run(
+        &mut f.r.w.h,
+        &["createFiatJob"],
+        "iki screening, policy snapshot'ı",
+        vec![ix],
+        &[&key],
+    );
+    let job = f.r.job_address(FIAT);
+    let wallet = f.r.agent.wallet.insecure_clone();
+    let ix =
+        f.r.w
+            .accept_ix(&wallet.pubkey(), &job, f.r.agent.record, f.r.spec(FIAT));
+    meter.run(
+        &mut f.r.w.h,
+        &["acceptJob"],
+        "fiat iş, açıkken",
+        vec![ix],
+        &[&wallet],
+    );
+    let ix =
+        f.r.w
+            .submit_ix(&wallet.pubkey(), &job, f.r.agent.record, DELIVERY_URI);
+    f.r.w.h.send(&[ix], &[&wallet]).expect("submit_work");
+    f.r.w.h.set_time(f.r.proof_time());
+
+    let attestation = f.attestation(&f.mpp, &job, f.r.amount(FIAT));
+    let verify = f.verify_ix(&job, &f.r.proof(SCENARIO), f.receipt());
+    meter.run(
+        &mut f.r.w.h,
+        &["verifyMppPaymentProof"],
+        "Ed25519 precompile + Groth16, 13 sinyal",
+        vec![attestation, verify],
+        &[&key],
+    );
+    let payer = f.r.w.h.funded(LAMPORTS);
+    let ix = f.finalize_ix(&payer.pubkey(), &job);
+    meter.run(
+        &mut f.r.w.h,
+        &["finalizeFiatPayment"],
+        "record_release CPI, itibar ve validation kaydı açılır",
+        vec![ix],
+        &[&payer],
+    );
+
+    let spec = sha256("job spec: fiat cancelled");
+    let ix = f.create_ix(spec, f.r.amount(FIAT), f.r.w.h.now() + 7 * DAY);
+    f.r.w.h.send(&[ix], &[&key]).expect("create_fiat_job");
+    let ix = f.cancel_ix(&job_address(&key.pubkey(), &spec));
+    meter.run(
+        &mut f.r.w.h,
+        &["cancelFiatJob"],
+        "açık iş",
+        vec![ix],
+        &[&key],
+    );
+    meter.rows
+}
+
 #[test]
 fn every_step_fits_the_packet_and_its_compute_profile() {
     let profile = profile();
@@ -546,6 +612,7 @@ fn every_step_fits_the_packet_and_its_compute_profile() {
     let rows: Vec<Row> = rows
         .into_iter()
         .chain(proof_and_gated_release(&profile))
+        .chain(fiat_rail(&profile))
         .collect();
     print_table(&rows);
     println!(

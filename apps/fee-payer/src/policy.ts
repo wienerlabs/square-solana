@@ -209,8 +209,9 @@ const programKindOf = (programId: PublicKey, ctx: PolicyContext) => ctx.programs
 
 function programKind(ix: Resolved, ctx: PolicyContext, inner: boolean): ProgramKind {
   const kind = programKindOf(ix.programId, ctx);
-  // Vault tx'inin içinde compute budget anlamsızdır; iç içe Squads akışı sponsorlanmaz.
-  if (!kind || (inner && (kind === 'computeBudget' || kind === 'squads'))) {
+  // Vault tx'inin içinde compute budget anlamsızdır, precompile CPI ile çağrılamaz; iç içe Squads akışı
+  // sponsorlanmaz.
+  if (!kind || (inner && (kind === 'computeBudget' || kind === 'squads' || kind === 'ed25519'))) {
     throw new PolicyRejection('program_not_allowed', 'program izin listesinde değil', {
       program: ix.programId.toBase58(),
       inner,

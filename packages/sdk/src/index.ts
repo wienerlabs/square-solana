@@ -14,6 +14,7 @@ export * from './api.js';
 export * from './api-client.js';
 export * from './budget.js';
 export * from './travel-rule.js';
+export * from './mpp.js';
 export * from './cctp.js';
 export * from './cctp-source.js';
 export * from './idl-json.js';

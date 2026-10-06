@@ -52,6 +52,7 @@ export class State {
       mint: USDC_DEVNET,
       amount: new BN(JOB_AMOUNT.toString()),
       status: { delivered: {} },
+      rail: { escrow: {} },
       policy: policyAccount,
       policyCommitment: Array.from(computePolicyCommitment(okPolicy, salts)),
       policyDailyCeiling: new BN(okPolicy.dailyCeiling),
@@ -82,6 +83,14 @@ export class State {
       institution: world.institution,
       dailySpent: new BN(dailySpent.toString()),
       dayStartUnix: new BN(dayStart),
+    });
+  }
+
+  async verifierConfig(mppAuthority: PublicKey) {
+    const data = this.sample(this.client.verifier.program, 'verifierConfig');
+    await this.put(this.client.verifier.program, 'verifierConfig', this.client.pda.verifierConfig()[0], {
+      ...data,
+      mppAuthority,
     });
   }
 

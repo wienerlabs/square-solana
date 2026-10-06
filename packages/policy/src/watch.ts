@@ -91,6 +91,8 @@ export function watchJobProof(params: WatchJobProofParams): () => void {
   async function tick(): Promise<void> {
     const account = await client.escrow.fetch('job', job);
     if (!account) throw new Error(`job bulunamadı: ${job.toBase58()}`);
+    // Fiat işin ispatını MPP attestation'ıyla `buildVerifyMppPaymentProofTx` bağlar (ADR 0024).
+    if ('fiat' in account.rail) throw new Error(`fiat iş izlenmez, ispatı verify_mpp_payment_proof bağlar: ${job.toBase58()}`);
     const status = Object.keys(account.status)[0]!;
     if (TERMINAL.has(status)) return finish(`job ${status}`);
     if (status !== 'delivered') return;
