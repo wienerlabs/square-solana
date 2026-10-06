@@ -18,11 +18,13 @@ Bu dizin pnpm workspace'inin parçası değildir; bağımlılıklar burada `npm 
 npm ci
 CIRCOM=/path/to/circom npm run build   # circom 2.2.3; build/ altına r1cs, wasm, sym
 npm run fetch-ptau                     # PPoT katkı 80, 2^14 (~19 MB), sha256 ve blake2b ile doğrulanır
-npm test                               # 52 test; tamper testleri gerçek Groth16 ispatı üretir
+npm test                               # 65 test; tamper ve tören testleri gerçek Groth16 ispatı ve anahtarı üretir
 npm run inputs                         # test-inputs/'u yeniden üretir (--check: güncel mi)
 npm run artifacts:check                # release artefaktlarını yeniden üretip karşılaştırır (Node 24)
 npm run program-proofs                 # program testlerinin gerçek ispatları (--squads: yalnızca BC-35'inki; --check: geçerli mi)
 scripts/clean-room.sh check            # aynısı, commit'lenmiş HEAD'in Docker'daki temiz klonunda
+npm run ceremony -- <komut>            # kamusal phase-2 töreni (BC-38): init, contribute, verify, beacon, finalize
+npm run ceremony:verify                # törenin kaydını baştan doğrular (yalnızca tören yapıldıysa)
 ```
 
 `npm test`, derleme yoksa devre testlerini, PPoT dosyası yoksa tamper testlerini atlar ve sebebini yazar. CI'da (`CIRCUIT_TESTS_STRICT=1`, [`circuits.yml`](../../.github/workflows/circuits.yml)) atlamaz, düşer; CI ayrıca `inputs:check`, `artifacts:check` ve `program-proofs:check`'i koşturur.
@@ -40,9 +42,10 @@ scripts/clean-room.sh check            # aynısı, commit'lenmiş HEAD'in Docker
 | `scripts/release-artifacts.mjs` | Release artefakt hattı: `setup`, `check`, `write` (aşağıda) |
 | `scripts/program-proofs.mjs` | `tests/programs/tests/fixtures/release-proofs.json`: verifier'ın program testleri (BC-21) için yedi senaryonun gerçek ispatı (uyumlu, ret, alıcıya, başka mint, başka politika, ikinci job, güncel sayaç). Senaryolar `release-input.mjs`'in test dünyasında kurulur; testler aynı etiketlerden aynı anahtarları türetir. Ayrıca `tests/programs/tests/fixtures/squads-proofs.json`: Squads vault'larıyla sekiz adım (BC-35); kurum, agent ve alıcı vault'u etiketlerden türetilen multisig adreslerinden, ispat alıcı vault'una ödeyen uyumlu release (`--squads` yalnızca bunu yazar). `--check` iki fikstürdeki her ispatı doğrulama anahtarına ve yeniden hesaplanan sinyallere karşı doğrular |
 | `scripts/clean-room.sh` | Hattı Docker'da temiz klonla çalıştırır (Node `.nvmrc`, circom 2.2.3 resmi ikilisi, sha256 doğrulanır) |
+| `scripts/ceremony.mjs` | Kamusal phase-2 töreni (BC-38): başlangıç anahtarı, katkılar (entropiyi snarkjs sorar), her adımda zincirin transcript'le karşılaştırılması, duyurulan drand quicknet turuyla kapanış, `artifacts/`'a yayın ve üçüncü tarafın doğrulaması (`verify-chain`). Adımlar [`docs/ceremony/`](../../docs/ceremony/)'de |
 | `scripts/groth16-solana.mjs`, `scripts/extract-vk-rust.mjs` | snarkjs → groth16-solana bayt düzeni; doğrulama anahtarı → Rust sabiti |
-| `artifacts/` | Release zkey'i, doğrulama anahtarı ve manifest (BC-20) |
-| `test/` | `node:test` testleri ve `test/circuits/` altındaki zaman damgası test devreleri |
+| `artifacts/` | Release zkey'i, doğrulama anahtarı ve manifest (BC-20); tören yapılınca `artifacts/ceremony/` transcript'i ve beacon turunun kaydını tutar |
+| `test/` | `node:test` testleri, `test/circuits/` altındaki zaman damgası test devreleri ve `test/fixtures/` (gerçek bir drand quicknet turu ve zincir bilgisi; tören testleri için) |
 
 ## Anahtarlar
 
@@ -70,7 +73,13 @@ Hat (`scripts/release-artifacts.mjs`):
   Bir fark hata verir. r1cs ve wasm macOS (circom kaynaktan) ile Linux'ta (resmi ikili) aynı hash'i verir.
 - `write [--vector]`: mevcut zkey'den doğrulama anahtarını, Rust dosyasını ve manifest'i yazar. `--vector`, `release_vk_vector.rs`'teki gerçek ispatı yeniler; `cargo test -p square-verifier` bu ispatı programın kullandığı groth16-solana ile doğrular.
 
+Manifest'in `phase2` kaydı iki türlüdür. `artifacts/ceremony/transcript.json` yoksa `development`: tek katkı ve yukarıdaki katkı adı beklenir. Varsa `ceremony`: zkey'in katkıları sırasıyla transcript'in katılımcıları ve sondaki drand beacon'ıdır (ad ve hash); manifest transcript'in SHA-256'sını ve beacon turunu tutar, Rust sabitinin başlığı da törenin kaydını gösterir. Uymayan kayıt hem `write`'ta hem `check`'te hatadır; tören anahtarının üstüne `setup` çalışmaz.
+
 Hat `.nvmrc`'deki Node sürümüyle (24) çalışır. snarkjs 0.7.6'nın zkey doğrulaması ptau dosyasını açıp kapatmıyor; Node 24 bunu uyarıyla geçer, Node 26 ise hata fırlatır.
+
+### Kamusal tören (BC-38)
+
+Plan, adımlar ve doğrulama [`docs/ceremony/`](../../docs/ceremony/)'dedir; araç `scripts/ceremony.mjs`. Tören yapılana kadar anahtar aşağıdaki geliştirme anahtarıdır. Tören bitince `finalize` son anahtarı ve kaydı `artifacts/`'a koyar ve bu hattın `write --vector`'ını koşturur. CI, kayıt varsa `npm run ceremony:verify` ile onu her koşuda baştan doğrular.
 
 ### Disclosure
 

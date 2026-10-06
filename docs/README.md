@@ -15,6 +15,7 @@ Proje belgeleri. Mevcut olanlar bağlantılı; diğerleri ilgili issue ile eklen
 | [`licensing.md`](licensing.md) | lisans politikası: proje lisansı, taşınan kodun bildirimleri, bağımlılık lisansları | [BC-02] |
 | [`THIRD_PARTY_LICENSES.md`](THIRD_PARTY_LICENSES.md) | üçüncü taraf lisans envanteri (üretilir) | [BC-02] |
 | `legal/relicensing/` | Covenant LGPL kodu için yazılı yeniden lisanslama onayları | [BC-03] |
+| [`ceremony/`](ceremony/) | release devresinin kamusal phase-2 töreni: [plan ve açık kararlar](ceremony/README.md), [yürütme](ceremony/running.md), [doğrulama](ceremony/verifying.md), [beacon](ceremony/beacon.md) | [BC-38] |
 | `deploy/` | ağ bazında deploy kayıtları (ör. `devnet.md`) | [BC-30] |
 | `runbooks/` | operasyon runbook'ları (ör. `upgrade.md`) | [BC-09] |
 
@@ -32,6 +33,7 @@ Proje belgeleri. Mevcut olanlar bağlantılı; diğerleri ilgili issue ile eklen
 [BC-28]: https://github.com/wienerlabs/square-solana/issues/36
 [BC-30]: https://github.com/wienerlabs/square-solana/issues/38
 [BC-36]: https://github.com/wienerlabs/square-solana/issues/77
+[BC-38]: https://github.com/wienerlabs/square-solana/issues/92
 [BC-44]: https://github.com/wienerlabs/square-solana/issues/101
 [BE-01]: https://github.com/wienerlabs/square-solana/issues/15
 [BE-04]: https://github.com/wienerlabs/square-solana/issues/18

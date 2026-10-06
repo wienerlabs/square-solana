@@ -11,6 +11,8 @@
     "test": "node --test \"test/*.test.mjs\"",
     "artifacts:check": "node scripts/release-artifacts.mjs check",
     "artifacts:setup": "node scripts/release-artifacts.mjs setup",
+    "ceremony": "node scripts/ceremony.mjs",
+    "ceremony:verify": "node scripts/ceremony.mjs verify-chain",
     "program-proofs": "node scripts/program-proofs.mjs",
     "program-proofs:check": "node scripts/program-proofs.mjs --check"
   },
