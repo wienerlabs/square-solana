@@ -14,10 +14,13 @@
 import { ed25519 } from '@noble/curves/ed25519.js';
 import {
   SQUADS_INSTRUCTIONS,
+  SQUADS_MULTISIG_DISCRIMINATOR,
   decodeVaultTransactionAccount,
   decodeVaultTransactionCreate,
   type VaultMessage,
 } from '@squaresdk/solana-sdk/squads';
+import * as sqds from '@sqds/multisig';
+import { TOKEN_2022_PROGRAM_ID } from '@solana/spl-token';
 import type { AddressLookupTableAccount, PublicKey, VersionedTransaction } from '@solana/web3.js';
 import { identify, type KnownInstruction, type ProgramKind } from './catalog.js';
 
@@ -38,6 +41,9 @@ export type RejectionReason =
   | 'inner_lookup_table'
   | 'squads_transaction_not_found'
   | 'squads_accounts_mismatch'
+  | 'squads_multisig_not_found'
+  | 'sponsor_rent_unbounded'
+  | 'sponsor_rent_extractable'
   | 'no_square_instruction';
 
 /** Politikanın reddi: sebep kodu metrik etiketi ve yanıttaki `details.reason`'dır. */
@@ -73,6 +79,7 @@ export interface Inspection {
   readonly computeUnitPrice: bigint;
   /** İmzası beklenen sponsor dışı hesaplar ve verilip verilmedikleri. */
   readonly signers: readonly { readonly key: string; readonly signed: boolean }[];
+  readonly sponsoredTokenAccounts: number;
 }
 
 /** Talimat başına varsayılan compute unit sınırı ve tx tavanı (runtime). */
@@ -132,6 +139,7 @@ export async function inspectTransaction(
 
   const names: string[] = [];
   const budget = { limit: null as number | null, price: null as bigint | null };
+  const rent = { tokenAccounts: 0 };
   let squareOrSquads = false;
   for (const [position, ix] of instructions.entries()) {
     const kind = programKind(ix, ctx, false);
@@ -156,12 +164,14 @@ export async function inspectTransaction(
           instruction: position,
         });
       }
-      names.push(...inspectVaultMessage(inner, ctx));
+      names.push(...inspectVaultMessage(inner, ctx, rent));
       continue;
     }
     checkSponsorSlots(ctx, kind, known, ix.accounts, position);
+    countTokenAccount(ctx, kind, known, ix, position, false, rent);
+    if (kind === 'squads') await checkRentCollector(ctx, known, ix, instructions, position);
     if (kind === 'squads' && known.name === 'vault_transaction_create') {
-      names.push(...inspectVaultMessage(createdMessage(ix.data, position), ctx));
+      names.push(...inspectVaultMessage(createdMessage(ix.data, position), ctx, rent));
     }
   }
   if (!squareOrSquads) {
@@ -183,7 +193,13 @@ export async function inspectTransaction(
       max: ctx.maxComputeUnitLimit,
     });
   }
-  return { instructions: names, computeUnitLimit, computeUnitPrice, signers };
+  return {
+    instructions: names,
+    computeUnitLimit,
+    computeUnitPrice,
+    signers,
+    sponsoredTokenAccounts: rent.tokenAccounts,
+  };
 }
 
 const isSquare = (kind: ProgramKind) =>
@@ -297,8 +313,101 @@ async function executedMessage(ix: Resolved, all: readonly Resolved[], ctx: Poli
   }
 }
 
+const sponsorPays = (ctx: PolicyContext, known: KnownInstruction, accounts: readonly PublicKey[]) =>
+  [...known.payerSlots].some((slot) => accounts[slot]?.equals(ctx.sponsor) ?? false);
+
+function countTokenAccount(
+  ctx: PolicyContext,
+  kind: ProgramKind,
+  known: KnownInstruction,
+  ix: Resolved,
+  position: number,
+  inner: boolean,
+  rent: { tokenAccounts: number },
+): void {
+  if (kind !== 'ata' || (known.name !== 'create' && known.name !== 'create_idempotent')) return;
+  if (!ix.accounts[0]?.equals(ctx.sponsor)) return;
+  if (ix.accounts[5]?.equals(TOKEN_2022_PROGRAM_ID)) {
+    throw new PolicyRejection(
+      'sponsor_rent_unbounded',
+      'Token-2022 hesabının boyutu mint’in uzantılarına bağlıdır; sponsor bu hesabın rent’ini ödemez',
+      { instruction: `${kind}:${known.name}`, position, inner },
+    );
+  }
+  rent.tokenAccounts += 1;
+}
+
+function decoded<T>(decode: () => T, details: Record<string, unknown>): T {
+  try {
+    return decode();
+  } catch (error) {
+    throw new PolicyRejection('invalid_squads_message', 'Squads verisi çözülemedi', {
+      ...details,
+      error: (error as Error).message,
+    });
+  }
+}
+
+const createdRentCollector = (data: Uint8Array, position: number) =>
+  decoded(() => sqds.generated.multisigCreateV2Struct.deserialize(Buffer.from(data))[0].args.rentCollector, {
+    instruction: position,
+  });
+
+async function checkRentCollector(
+  ctx: PolicyContext,
+  known: KnownInstruction,
+  ix: Resolved,
+  all: readonly Resolved[],
+  position: number,
+): Promise<void> {
+  if (!sponsorPays(ctx, known, ix.accounts)) return;
+  let collector: PublicKey | null;
+  if (known.name === 'multisig_create_v2') {
+    collector = createdRentCollector(ix.data, position);
+  } else if (known.name === 'vault_transaction_create' || known.name === 'proposal_create') {
+    collector = await multisigRentCollector(ix.accounts[0], all, ctx, position);
+  } else {
+    return;
+  }
+  if (collector !== null && !collector.equals(ctx.sponsor)) {
+    throw new PolicyRejection(
+      'sponsor_rent_extractable',
+      'sponsorun ödediği rent multisig’in rent_collector’ına döner; rent_collector yok ya da sponsor olmalı',
+      { instruction: `squads:${known.name}`, position, rentCollector: collector.toBase58() },
+    );
+  }
+}
+
+async function multisigRentCollector(
+  multisig: PublicKey | undefined,
+  all: readonly Resolved[],
+  ctx: PolicyContext,
+  position: number,
+): Promise<PublicKey | null> {
+  if (!multisig) throw new PolicyRejection('invalid_squads_message', 'Squads talimatının multisig hesabı yok');
+  for (const other of all) {
+    if (
+      programKindOf(other.programId, ctx) === 'squads' &&
+      identify('squads', other.data).name === 'multisig_create_v2' &&
+      other.accounts[2]?.equals(multisig)
+    ) {
+      return createdRentCollector(other.data, position);
+    }
+  }
+  const data = await ctx.squadsAccount(multisig);
+  if (!data || !Buffer.from(data.subarray(0, 8)).equals(Buffer.from(SQUADS_MULTISIG_DISCRIMINATOR))) {
+    throw new PolicyRejection('squads_multisig_not_found', 'multisig hesabı zincirde yok', {
+      multisig: multisig.toBase58(),
+      instruction: position,
+    });
+  }
+  return decoded(() => sqds.accounts.Multisig.deserialize(Buffer.from(data))[0].rentCollector, {
+    multisig: multisig.toBase58(),
+  });
+}
+
 /** Vault tx mesajının talimatları dış talimatlarla aynı kurallarla; lookup table kullanılamaz. */
-function inspectVaultMessage(message: VaultMessage, ctx: PolicyContext): string[] {
+function inspectVaultMessage(message: VaultMessage, ctx: PolicyContext, rent: { tokenAccounts: number }): string[] {
   if (message.addressTableLookups.length > 0) {
     throw new PolicyRejection('inner_lookup_table', 'vault tx mesajı address lookup table kullanamaz');
   }
@@ -311,6 +420,7 @@ function inspectVaultMessage(message: VaultMessage, ctx: PolicyContext): string[
     const kind = programKind(ix, ctx, true);
     const known = allowedInstruction(kind, ix, ctx, true);
     checkSponsorSlots(ctx, kind, known, ix.accounts, position, true);
+    countTokenAccount(ctx, kind, known, ix, position, true, rent);
     return `vault>${kind}:${known.name}`;
   });
 }

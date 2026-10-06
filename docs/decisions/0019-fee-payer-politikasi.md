@@ -72,6 +72,19 @@
 7. **Maliyet ve limitler:**
    - Ücret `getFeeForMessage`'dır. Rent, sponsorun simülasyondan önceki ve simülasyondaki bakiyesinin farkından
      ücret düşülerek bulunur.
+   - **Rent tabanı:** Sponsorun ödediği her ATA açılışı (`create`, `create_idempotent`; vault mesajının içi
+     dahil) bir token hesabının rent'i (`getMinimumBalanceForRentExemption(165)`) olarak sayılır. Simülasyon
+     daha büyük bir rent gösterirse o sayılır. `create_idempotent` hesap zaten varsa simülasyonda rent
+     göstermez; hesap simülasyonla tx'in zincire girmesi arasında kapatılırsa sponsor rent'i öder. Taban bu
+     farkı bütçeye yazar.
+   - **Token-2022 hesabı:** Boyutu mint'in uzantılarına bağlıdır, rent'i önceden sınırlanamaz. Sponsor
+     Token-2022 ATA'sının rent'ini ödemez (`sponsor_rent_unbounded`).
+   - **Squads rent'i:** VaultTransaction ve Proposal hesaplarının rent'i kapanışta multisig'in
+     `rent_collector`'ına döner. Sponsor `multisig_create_v2`'nin `creator`'ı ya da `vault_transaction_create` /
+     `proposal_create`'in `rent_payer`'ı ise `rent_collector` yok ya da sponsor olmalıdır
+     (`sponsor_rent_extractable`). Multisig zincirden okunur; aynı tx'te açılıyorsa açılışın argümanından.
+   - **Aynı tx'in tekrarı:** Sponsorun imzası tx'in kimliğidir. Aynı tx ikinci kez gelirse ilk kayıt döner:
+     bütçeye ikinci kez yazılmaz, gönderilmişse yeniden gönderilmez. Başarısız kaydı olan tx yeniden ölçülür.
    - Tek tx `FEE_PAYER_MAX_LAMPORTS_PER_TX`'i aşamaz.
    - Kullanıcı (cüzdan) başına ve servis toplamında günlük lamport bütçesi vardır (UTC günü). Bütçe
      `sponsored_txs` tablosundan, tek işlemde ve advisory kilitle denetlenir. Başarısız gönderim sayılmaz.
@@ -100,6 +113,10 @@
   durumunda servis tek başına durdurulabilir.
 - **Bütçe ve kilit:** Kaynak gerekçe vermez. "Kullanıcı başı limit" ve "kötüye kullanım koruması" iş
   kalemlerinin servisin birden çok örneğiyle tutarlı uygulanması için seçildi.
+- **Rent tabanı ve rent_collector:** Simülasyonla ölçülen maliyet, sonucu zincir durumuna bağlı olan
+  talimatlarda (idempotent açılış) gerçek maliyetin altında kalabilir; bütçe gerçek harcamayı sınırlamazsa
+  günlük toplam bütçe de bir devre kesici olmaz. Squads hesaplarının rent'i kapanışta başka bir adrese
+  dönebiliyorsa sponsorun ödediği rent o adrese aktarılmış olur.
 
 ## Sonuçlar
 
@@ -123,3 +140,9 @@
 - **Anahtarı KMS ya da HSM'e taşıma:** İmza uzaktan yapılır, gizli anahtar süreçte durmaz. Railway dağıtımında
   karar verilecek.
 - **Kullanıcı başına farklı bütçeler:** Ör. kurum planına göre. Şimdilik tek bir kullanıcı bütçesi var.
+- **Kullanıcının kapatabildiği hesaplar:** ATA'nın sahibi hesabı kapatıp rent'i kendine alabilir. Sponsorun
+  ödediği ATA rent'i bu yüzden kullanıcıya verilmiş sayılır; bütçeye yazılır, ama geri dönmez.
+- **Bütçe kimliğe bağlıdır:** Kullanıcı bütçesi oturumun ya da API anahtarının cüzdanına göredir ve cüzdan
+  açmak ücretsizdir. Bir saldırgan çok sayıda cüzdanla kullanıcı bütçelerini toplayabilir; servisin bir günde
+  kaybedebileceği en büyük tutar servis toplam bütçesidir (`FEE_PAYER_GLOBAL_DAILY_LAMPORTS`). Kayıtlı katılımcılara
+  (agent kaydı, kurum hesabı) bağlı bütçe ayrı bir karardır.

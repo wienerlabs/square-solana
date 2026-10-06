@@ -19,7 +19,7 @@ import {
 import BigNumber from 'bn.js';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createSampler } from './fixtures/idl-sample.js';
-import { vaultTransactionData } from './fixtures/squads.js';
+import { multisigData, vaultTransactionData } from './fixtures/squads.js';
 import { PROGRAM_IDS, startStack, truncate, type Stack } from './fixtures/stack.js';
 import { encode, key } from './fixtures/tx.js';
 
@@ -77,6 +77,10 @@ async function asVault(role: Party, instructions: readonly TransactionInstructio
     instructions,
   });
   role.next += 1n;
+  stack.rpc.setAccount(role.multisig, {
+    owner: plan.execute.programId.toBase58(),
+    data: multisigData({ members: [role.member.publicKey], rentCollector: null }),
+  });
   const options = { feePayer: sponsor, computeUnitPrice: PRICE };
   const propose = await client.buildTx(plan.propose, { ...options, computeUnitLimit: PROPOSE_UNITS });
   await send(role, propose.transaction);

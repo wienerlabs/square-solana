@@ -98,6 +98,8 @@ export class FixtureRpc {
         return { context, value: this.balances.get(params[0] as string) ?? 0 };
       case 'getFeeForMessage':
         return { context, value: this.fee };
+      case 'getMinimumBalanceForRentExemption':
+        return ((params[0] as number) + 128) * 3480 * 2;
       case 'simulateTransaction': {
         this.simulated.push(params[0] as string);
         const next = this.simulations.shift() ?? { err: null, logs: [], unitsConsumed: 12_345, rent: 0 };
