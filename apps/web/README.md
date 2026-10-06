@@ -228,7 +228,10 @@ M-of-N arbitration ve dispute zaman aşımının arayüzü ([ADR 0016](../../doc
 | Hatalar | Escrow hata kodları IDL mesajı ve ne yapılacağıyla: `InsufficientBond`, `DisputeWindowClosed`, `DisputeAlreadyRaised`, `DisputeAlreadyActive`, `NoActiveDispute`, `NotArbitrator`, `AlreadyVoted`, `ResolutionMismatch`, `ResolutionNotDecided`, `InvalidSplitAmount`, `DisputeNotExpired`, `ProofTimeoutNotReached`, `InvalidDisputeTimeout`, `ProofRequired`, `StaleReleaseProof`, screening kodları. API'nin `simulation_failed` / `program_error` yanıtındaki program hatası da aynı açıklamayla gösterilir |
 | Zaman çizelgesi | `DisputeRaised` (challenger, bond, son tarih), `DisputeVote` (arbitrator, oy, sayım), `DisputeDecided`, `DisputeResolved` (dağılım), `DisputeLapsed` (iade edilen bond, iş `Delivered`'a döndü), `MissingProofEscalated` |
 
-Bileşenler sahte zincir hesaplarıyla, tx'ler SDK akışıyla kurulup çözülerek test edilir. Arayüzün dayandığı API ve programlar devnet'te uçtan uca denendi ([apps/api](../api/README.md#testler)). Kalan: arayüzden, tarayıcı cüzdanlarıyla devnet'te uçtan uca koşu.
+Bileşenler sahte zincir hesaplarıyla, tx'ler SDK akışıyla kurulup çözülerek test edilir. Arayüzün dayandığı API ve programlar devnet'te uçtan uca denendi ([apps/api](../api/README.md#testler)). Arayüzden uçtan uca koşu `apps/api/test/web-dispute.e2e.test.ts`'tedir ([apps/api](../api/README.md#testler)):
+derlenmiş web, localnet'te gerçek programlar, gerçek indexer ve API, Chrome. Her rolün tarayıcı bağlamına bir Wallet
+Standard cüzdanı eklenir; imzalar rolün anahtarıyla atılır. Kurum itiraz eder, iki arbitrator konsoldan oy verir,
+karar iş sayfasından ödenir; ikinci işte son tarih geçince sayfadan lapse edilir.
 
 ## Geliştirici portalı (FE-22)
 

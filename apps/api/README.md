@@ -280,6 +280,21 @@ SQUARE_LOCALNET=1 SQUARE_PROGRAMS_DIR=<repo>/target/deploy SQUARE_LOCALNET_RPC_P
 
 Agave 4.1.2 ve `anchor build` çıktısı gerekir; senaryo yaklaşık iki dakika sürer.
 
+**Arayüzden uçtan uca (FE-17):** `test/web-dispute.e2e.test.ts`, `SQUARE_LOCALNET=1` ve `SQUARE_WEB_E2E=1` ile çalışır.
+- **Kurulum:** Localnet dünyası `test/fixtures/localnet.ts`'tir (BE-22 testiyle ortak). Web derlenmiş hâliyle ayrı
+  süreçte açılır; API'nin CORS'u ve giriş mesajının alanı web'in adresidir.
+- **Tarayıcı:** Playwright. Her rolün bağlamına bir Wallet Standard cüzdanı eklenir (`test/fixtures/standard-wallet.js`);
+  imzalar test sürecinde rolün anahtarıyla atılır.
+- **Senaryo:** Kurum iş sayfasında API'ye girer, kanıt dosyasını seçer, itiraz eder. İki arbitrator `/app/arbitration`'da
+  oy verir. Karar iş sayfasından ödenir. İkinci işte son tarih geçince sayfa "Can be lapsed" der ve sayfadan lapse
+  edilir.
+
+```bash
+pnpm turbo build --filter @squaresdk/solana-api... --filter @squaresdk/solana-web
+SQUARE_LOCALNET=1 SQUARE_WEB_E2E=1 SQUARE_WEB_E2E_CHANNEL=chrome SQUARE_LOCALNET_RPC_PORT=8899 \
+  pnpm --filter @squaresdk/solana-api exec vitest run test/web-dispute.e2e.test.ts
+```
+
 **Devnet uçtan uca (BE-22):** `test/devnet.e2e.test.ts` yalnızca ortamla çalışır; anahtarlar repoda tutulmaz.
 - **Ne kullanır:** Devnet'teki programlar ve escrow config'i. Indexer gerçek süreç olarak devnet'i indexler.
 - **Senaryo:** kanıt → `raise_dispute` → kuyruk → iki arbitrator'ın API'den aldığı oy tx'leri → üçüncü oyun reddi →
