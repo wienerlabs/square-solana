@@ -87,25 +87,28 @@ yazılır.
 
 ## Devnet: adım adım
 
-Devnet deploy'u, Squads multisig'i ve config'ler [runbook](../../docs/runbooks/upgrade.md)'tadır. Kayıtlar
-deploy'la oluşur: `docs/deploy/devnet.md` (BC-30) ve `docs/deploy/smoke-devnet.md` (BC-31).
+Devnet'te programlar, Squads multisig'i, üç config ve Square ALT'ı kuruludur (BC-30); değerler
+[`docs/deploy/devnet.md`](../../docs/deploy/devnet.md) ve `scripts/deploy/networks/devnet.json`'dadır. Smoke bu
+kurulumu kullanır, yeniden kurmaz. Kayıt deploy'la oluşur: `docs/deploy/smoke-devnet.md` (BC-31).
 
-1. **Deploy ve authority devri:** Runbook adım 1–4. Program kimlikleri depoya uygulanır (`Anchor.toml`
-   `[programs.devnet]`).
-2. **Anahtar dosyaları:** Her rol için ayrı anahtar, depo dışında ve şifreli diskte tutulur. Kalıcı kopyalar
-   secret store'dadır.
+1. **Program sürümü:** Devnet'teki escrow, kaydın gösterdiği commit'in derlemesidir. Smoke'un 8 adımı ve iki
+   varyantı dispute talimatı kullanmaz; dispute'lu bir koşu için escrow'un Squads ile yükseltilmesi (runbook
+   adım 6) beklenir.
+2. **Anahtar dosyaları:** `payer`, `institution`, `agent`, `buyer` ve `keeper` için ayrı anahtarlar, depo dışında ve
+   şifreli diskte tutulur.
 
    ```bash
    mkdir -p ~/square-devnet/keys && chmod 700 ~/square-devnet/keys
-   for role in payer screener institution agent buyer keeper; do
+   for role in payer institution agent buyer keeper; do
      solana-keygen new --no-bip39-passphrase --silent -o ~/square-devnet/keys/$role.json
    done
    ```
 
-   `screener` anahtarının açık anahtarı `init.registry.screenerAuthority`'dir. Screener servisi (BE-16) kendi
-   anahtarını kullanacaksa smoke da o anahtarla koşar.
-3. **SOL:** `payer` en az 0,2 SOL, `keeper` en az 0,05 SOL ister. Config'leri vault kuracağı için vault da
-   rent için fonlanır (runbook adım 3).
+   `screener` yeni üretilmez: registry config'indeki screener authority
+   (`48DGxja6FefZHhZ8e5ynLKWLqxb1pVfiHFUVg1Jrm54b`) secret store'dadır ve screening kayıtlarını o imzalar. Smoke
+   başka bir anahtarla açılmaz (`init.registry.screenerAuthority` zincirdekiyle karşılaştırılır). Authority'yi
+   değiştirmek bir Squads işlemidir (`update_registry_config`, 2 / 3 onay).
+3. **SOL:** `payer` en az 0,2 SOL, `keeper` en az 0,05 SOL ister.
 
    ```bash
    solana airdrop 2 $(solana-keygen pubkey ~/square-devnet/keys/payer.json) -u devnet
@@ -116,20 +119,19 @@ deploy'la oluşur: `docs/deploy/devnet.md` (BC-30) ve `docs/deploy/smoke-devnet.
 4. **Devnet USDC:** Circle'ın devnet mint'i `4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU`. Kurumun ve
    alıcının adresine <https://faucet.circle.com> ("Solana Devnet") ile gönderilir: kuruma en az
    `3 × jobAmount`, alıcıya en az `claimPrice`. Faucet ATA'yı açar.
-5. **Yapılandırma:** `~/square-devnet/devnet.json`; yukarıdaki tablo. `keys` yolları `keys/<rol>.json`
-   biçiminde göreli verilebilir. `admin` verilmez: authority vault'tur.
-6. **Init:**
+5. **Yapılandırma:** `~/square-devnet/devnet.json`; yukarıdaki tablo ve devnet kaydının değerleri:
+   `programIds`, `settlementMint`, `lookupTable: 3cjUqPz9ECuym9w8trGRVUadGbj24Z7BvYALvEfmCCoG`,
+   `init.squads.multisig: 3ucyX6nmbz9ytRVWr3wrYQD2try58Jy1xCyuNo8q6PD5`. `keys` yolları `keys/<rol>.json` biçiminde
+   göreli verilebilir. `admin` verilmez: authority vault'tur.
+6. **Init (yalnızca okur):**
 
    ```bash
    pnpm --filter @squaresdk/solana-smoke init --config ~/square-devnet/devnet.json --records init-devnet.md
    ```
 
-   - Config talimatları Squads'a girilecek biçimde yazılır. Squads'ta talimat başına bir vault işlemi açılır,
-     iki üye onaylar ve işlem yürütülür.
-   - Square ALT'ı aynı koşuda açılır. Adresi yapılandırmaya `lookupTable` olarak yazılır.
-   - `init` yeniden koşulur: config'ler zincirden okunur. Çıktı (programlar, executable hash'leri, config'ler,
-     ALT) `docs/deploy/devnet.md`'ye deploy imzaları ve Squads işlem adresleriyle birlikte yazılır.
-   - Executable hash'leri verifiable build'in hash'leriyle karşılaştırılır ([docs/ci.md](../../docs/ci.md#verifiable-build)).
+   Config'ler ve ALT zincirden okunup doğrulanır, kayıt satırları yazılır; kurulu config'e talimat üretilmez.
+   Localnet dışında `init` ALT açmaz: `lookupTable` verilmezse durur, böylece devnet kaydındaki dondurulmuş ALT'ın
+   yanında ikinci bir tablo oluşmaz.
 7. **Smoke:**
 
    ```bash
