@@ -51,6 +51,11 @@ jobs:
         run: node --test "scripts/ci/*.test.mjs" "scripts/deploy/*.test.mjs"
       - name: Her workspace paketi yayınlanabilir ya da gerekçeli dışlanmış
         run: node scripts/ci/pack-smoke.mjs --classify-only
+      # BE-05: servislerin env şeması ↔ .env.example ↔ docs/environments.md ve Railway servis tanımları.
+      - name: Ortam değişkenleri, secret envanteri ve Railway tanımları güncel
+        run: |
+          node scripts/ci/env-inventory.mjs --check
+          node scripts/ci/railway.mjs --check
       - name: Kapsam (PR'da etkilenen paketler, main'de hepsi)
         id: scope
         env:

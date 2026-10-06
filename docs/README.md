@@ -24,6 +24,7 @@ Proje belgeleri. Mevcut olanlar bağlantılı; diğerleri ilgili issue ile eklen
 | [`protocol.md`](protocol.md) | Protokolün özeti: roller, sekiz adım, job durum makinesi, event'ler, `did:aip`, uyum | [BE-31] |
 | [`api/`](api/) | [OpenAPI 3.1 spec](api/openapi.yaml) (37 operasyon); [`schemas/idl.json`](api/schemas/idl.json) IDL'den üretilen JSON Schema'lar, elle düzenlenmez | [BE-35] |
 | [`provenance/`](provenance/) | taşınan dizinlerin kaynak repo, commit ve yöntem kayıtları (issue başına bir dosya) | [BC-04], [BC-05], [BC-06], [BC-07], [BE-02] |
+| [`environments.md`](environments.md) | ortamlar (PR preview, staging, production), secret politikası ve servislerin ortam değişkeni envanteri (üretilir) | [BE-05] |
 | [`ci.md`](ci.md) | CI kontrolleri, program durum listesi, sır taraması, verifiable build ve merge kuralı | [BE-03], [BC-12], [BC-13] |
 | [`slo.md`](slo.md) | SLO'lar, hata bütçesi ve burn-rate politikası; panolar ve alarm kuralları [`infra/monitoring/`](../infra/monitoring/)'da | [BE-33] |
 | [`licensing.md`](licensing.md) | lisans politikası: proje lisansı, taşınan kodun bildirimleri, bağımlılık lisansları | [BC-02] |
@@ -56,3 +57,4 @@ Proje belgeleri. Mevcut olanlar bağlantılı; diğerleri ilgili issue ile eklen
 [BE-33]: https://github.com/wienerlabs/square-solana/issues/95
 [BE-03]: https://github.com/wienerlabs/square-solana/issues/17
 [BE-31]: https://github.com/wienerlabs/square-solana/issues/90
+[BE-05]: https://github.com/wienerlabs/square-solana/issues/19

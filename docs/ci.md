@@ -13,7 +13,7 @@ PR sayfasında görünen ad, iş akışındaki işin adıdır.
 
 | İş akışı | Kontrol (PR'daki ad) | Ne zaman | Ne denetler |
 |---|---|---|---|
-| `packages` | Kapsam, ad kuralı ve lint · Derleme, tip kontrolü ve testler · Paket kurulum smoke'u · Prisma migration kontrolü · `ci-ok` | her PR, main | TS paketleri ve servisler: ad kuralı, ESLint + Prettier, `scripts/ci` testleri, derleme / tip / test (PR'da etkilenen paketler), paket kurulumu, migration kuralları (BE-03) |
+| `packages` | Kapsam, ad kuralı ve lint · Derleme, tip kontrolü ve testler · Paket kurulum smoke'u · Prisma migration kontrolü · `ci-ok` | her PR, main | TS paketleri ve servisler: ad kuralı, ESLint + Prettier, `scripts/ci` testleri, derleme / tip / test (PR'da etkilenen paketler), paket kurulumu, migration kuralları (BE-03), servislerin env şeması ↔ `.env.example` ↔ [`environments.md`](environments.md) ve Railway tanımları (BE-05) |
 | `contract` | `api-sdk-contract` | her PR, main | IDL'den türetilen dosyalar (`packages/types`, SDK IDL kopyaları, `docs/api/schemas`) `idl/` ile güncel: `pnpm contract:check` (BE-35); OpenAPI lint ve API referansının bütünlüğü (`pnpm openapi:lint`); SDK referansının bütünlüğü (`pnpm docs:check`, BE-31) |
 | `License` | Lisans envanteri | her PR, main | Bağımlılık lisansları ve `docs/THIRD_PARTY_LICENSES.md` güncel (BC-02) |
 | `Security` | Sır taraması (gitleaks) | her PR, main, haftalık | Bütün git geçmişinde sır; kuralların testleri (BC-13) |
