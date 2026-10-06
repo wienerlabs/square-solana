@@ -38,7 +38,7 @@ Her servis bir Railway servisidir; derleme ve sağlık denetimi `apps/<servis>/r
 
 ### api
 
-`apps/api/.env.example` · 53 değişken, 8 secret
+`apps/api/.env.example` · 56 değişken, 8 secret
 
 | Değişken | Bölüm | Secret | Not |
 |---|---|---|---|
@@ -69,8 +69,8 @@ Her servis bir Railway servisidir; derleme ve sağlık denetimi `apps/<servis>/r
 | `API_EVIDENCE_S3_BUCKET` | Dispute kanıtı (zorunlu, BE-22) |  | Kanıtların kovası: teslimat deposuyla aynı uç nokta ve kimlik; herkese açık OKUNMAZ (kanıt API'den indirilir) |
 | `API_EVIDENCE_MAX_BYTES` | Dispute kanıtı (zorunlu, BE-22) |  |  |
 | `API_ARBITRATOR_CACHE_SECONDS` | Dispute kanıtı (zorunlu, BE-22) |  | Escrow config'inden okunan arbitrator setinin önbellek süresi |
-| `API_SECRET_BOX_KEYS` | Arbitrator bildirimleri (zorunlu, BE-22) | **secret** | Webhook sırlarının şifreleme anahtar halkası: kimlik:base64,kimlik:base64 (her anahtar 32 bayt; openssl rand -base64 32) ve yeni değerleri şifreleyen anahtarın kimliği |
-| `API_SECRET_BOX_ACTIVE_KEY` | Arbitrator bildirimleri (zorunlu, BE-22) |  |  |
+| `API_WEBHOOK_SECRET_KEYS` | Arbitrator bildirimleri (zorunlu, BE-22) | **secret** | Webhook sırlarının şifreleme anahtar halkası: kimlik:base64,kimlik:base64 (her anahtar 32 bayt; openssl rand -base64 32) ve yeni değerleri şifreleyen anahtarın kimliği. Travel Rule'un halkasından ayrıdır. |
+| `API_WEBHOOK_SECRET_ACTIVE_KEY_ID` | Arbitrator bildirimleri (zorunlu, BE-22) |  |  |
 | `API_NOTIFY_INTERVAL_MS` | Arbitrator bildirimleri (zorunlu, BE-22) |  | Outbox turu aralığı ve tur başına en fazla teslimat |
 | `API_NOTIFY_BATCH_SIZE` | Arbitrator bildirimleri (zorunlu, BE-22) |  |  |
 | `API_NOTIFY_TIMEOUT_MS` | Arbitrator bildirimleri (zorunlu, BE-22) |  | Bir teslimatın süre sınırı; aşan ya da 2xx dışı dönen teslimat yeniden denenir |
@@ -81,6 +81,9 @@ Her servis bir Railway servisidir; derleme ve sağlık denetimi `apps/<servis>/r
 | `API_NOTIFY_ALLOW_INSECURE` | Arbitrator bildirimleri (zorunlu, BE-22) |  | true yalnızca geliştirmede: webhook ucu http ve özel ağ adresi olabilir |
 | `API_LOOKUP_TABLE` | Tx hazırlama |  | İsteğe bağlı: Square address lookup table'ı (BC-28); verilirse her tx'e eklenir |
 | `API_COMPUTE_UNIT_PRICE` | Tx hazırlama |  | Zorunlu: computeUnitPrice verilmeyen tx'lerin priority fee'si (mikro-lamport / CU) |
+| `API_CCTP_MESSAGE_TRANSMITTER` | CCTP ile fonlama (BE-26; isteğe bağlı, üçü birlikte) |  | Circle'ın Solana programları (MessageTransmitterV2, TokenMessengerMinterV2) ve kaynak domain başına CCTP ALT'ı: virgülle domain:adres (scripts/deploy/networks/<ağ>.json, cctp). Verilmezse CCTP kaydı ve tx'i reddedilir. |
+| `API_CCTP_TOKEN_MESSENGER_MINTER` | CCTP ile fonlama (BE-26; isteğe bağlı, üçü birlikte) |  |  |
+| `API_CCTP_LOOKUP_TABLES` | CCTP ile fonlama (BE-26; isteğe bağlı, üçü birlikte) |  |  |
 | `API_PROVER_URL` | Prover vekili (zorunlu) |  |  |
 | `API_PROVER_API_KEY` | Prover vekili (zorunlu) | **secret** | API'nin prover'a gönderdiği servis anahtarı (prover'ın PROVER_API_KEY_SHA256 listesinde) |
 | `API_PROVER_TIMEOUT_MS` | Prover vekili (zorunlu) |  |  |
@@ -98,7 +101,7 @@ Her servis bir Railway servisidir; derleme ve sağlık denetimi `apps/<servis>/r
 
 ### compliance-api
 
-`apps/compliance-api/.env.example` · 41 değişken, 11 secret
+`apps/compliance-api/.env.example` · 42 değişken, 11 secret
 
 | Değişken | Bölüm | Secret | Not |
 |---|---|---|---|
@@ -128,6 +131,7 @@ Her servis bir Railway servisidir; derleme ve sağlık denetimi `apps/<servis>/r
 | `X402_PUBLISHER_WALLET` | x402 (zorunlu; @squaresdk/solana-x402, BE-24) |  |  |
 | `X402_REPORT_PRICE` | x402 (zorunlu; @squaresdk/solana-x402, BE-24) |  | /api/v1/compliance/protected-report fiyatı (ödeme mint'inin taban birimi) |
 | `DATABASE_URL` | x402 (zorunlu; @squaresdk/solana-x402, BE-24) | **secret** | Square'in tek veritabanı (db/): ödeme yüklerinin tekrar korumaları `replay_guards` tablosunda |
+| `X402_IDEMPOTENCY_TTL_SECONDS` | x402 (zorunlu; @squaresdk/solana-x402, BE-24) |  | Uzlaştırılmış raporun aynı ödeme kimliğiyle tekrar istenince ücretsiz döndüğü süre (saniye; `idempotency_records`) |
 | `X402_FEE_PAYER_KEYPAIR` | x402 facilitator (ADR 0018) | **secret** | Boşsa kendi facilitator'ımız: işlem ücretini aşağıdaki cüzdan öder, SOLANA_RPC_URL ile doğrular ve gönderir. Yalnızca SOL tutan, X402_PUBLISHER_WALLET'tan ayrı 64 baytlık keypair (base58 ya da JSON dizi) |
 | `X402_FACILITATOR_URL` | x402 facilitator (ADR 0018) |  | Doluysa harici x402 facilitator'ı (…/verify, …/settle, …/supported) ve isteğe bağlı bearer belirteci |
 | `X402_FACILITATOR_TOKEN` | x402 facilitator (ADR 0018) | **secret** |  |
@@ -209,7 +213,7 @@ Her servis bir Railway servisidir; derleme ve sağlık denetimi `apps/<servis>/r
 
 ### keeper
 
-`apps/keeper/.env.example` · 26 değişken, 4 secret
+`apps/keeper/.env.example` · 33 değişken, 4 secret
 
 | Değişken | Bölüm | Secret | Not |
 |---|---|---|---|
@@ -229,6 +233,13 @@ Her servis bir Railway servisidir; derleme ve sağlık denetimi `apps/<servis>/r
 | `KEEPER_MIN_MARGIN_BPS` | Kârlılık ve priority fee (zorunlu) |  | Keeper ücretinin maliyeti aşması gereken pay (baz puan); 0 başa baş |
 | `KEEPER_PRIORITY_FEE_PERCENTILE` | Kârlılık ve priority fee (zorunlu) |  | Priority fee: job'un yazılabilir hesaplarının son ücretlerinin yüzdeliği (0-100) ve üst sınırı (mikro-lamport / CU) |
 | `KEEPER_MAX_COMPUTE_UNIT_PRICE` | Kârlılık ve priority fee (zorunlu) |  |  |
+| `KEEPER_CCTP_MESSAGE_TRANSMITTER` | CCTP relayer (BE-26; isteğe bağlı, hepsi birlikte) |  | Circle'ın Solana programları ve kaynak domain başına CCTP ALT'ı (virgülle domain:adres; scripts/deploy/networks/<ağ>.json, cctp). Verilmezse relayer çalışmaz. |
+| `KEEPER_CCTP_TOKEN_MESSENGER_MINTER` | CCTP relayer (BE-26; isteğe bağlı, hepsi birlikte) |  |  |
+| `KEEPER_CCTP_LOOKUP_TABLES` | CCTP relayer (BE-26; isteğe bağlı, hepsi birlikte) |  |  |
+| `KEEPER_CCTP_ATTESTATION_URL` | CCTP relayer (BE-26; isteğe bağlı, hepsi birlikte) |  | Circle'ın attestation servisi (https) |
+| `KEEPER_CCTP_RELAY_AFTER_SECONDS` | CCTP relayer (BE-26; isteğe bağlı, hepsi birlikte) |  | Kurumun mint + fonlama tx'i için beklenen süre; dolunca relayer mesajı kendisi teslim eder |
+| `KEEPER_CCTP_BACKOFF_BASE_SECONDS` | CCTP relayer (BE-26; isteğe bağlı, hepsi birlikte) |  | Attestation ve fonlama yoklamasının geri çekilmesi: ilk aralık, her tekrarda ikiye katlanır, üst sınır |
+| `KEEPER_CCTP_BACKOFF_MAX_SECONDS` | CCTP relayer (BE-26; isteğe bağlı, hepsi birlikte) |  |  |
 | `KEEPER_ALERT_MIN_BALANCE_LAMPORTS` | Alarmlar (zorunlu) |  |  |
 | `KEEPER_ALERT_STALL_SECONDS` | Alarmlar (zorunlu) |  |  |
 | `KEEPER_ALERT_DUE_SECONDS` | Alarmlar (zorunlu) |  |  |

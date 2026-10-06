@@ -9,6 +9,7 @@
       "/packages/config/**",
       "/packages/hardening/**",
       "/packages/observability/**",
+      "/packages/policy/**",
       "/packages/sdk/**",
       "/packages/types/**",
       "/package.json",

@@ -8,6 +8,7 @@
       "/apps/indexer/**",
       "/apps/keeper/**",
       "/db/**",
+      "/packages/cctp/**",
       "/packages/config/**",
       "/packages/hardening/**",
       "/packages/identity/**",

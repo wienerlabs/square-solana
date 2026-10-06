@@ -6,6 +6,7 @@
     "watchPatterns": [
       "/apps/keeper/**",
       "/db/**",
+      "/packages/cctp/**",
       "/packages/config/**",
       "/packages/hardening/**",
       "/packages/observability/**",
