@@ -3,14 +3,15 @@
 // öneri açabilen (`Initiate`) üyeler yazar. Düzen Squads v4'ün `state/multisig.rs`'idir:
 //   discriminator · create_key · config_authority · threshold u16 · time_lock u32 · transaction_index u64 ·
 //   stale_transaction_index u64 · rent_collector Option<Pubkey> · bump u8 · members Vec<{ key, permissions u8 }>
+// Program kimliği, discriminator ve yetki bitleri SDK'nın Squads yardımcılarındandır
+// (`@squaresdk/solana-sdk/squads`, crate'teki `square_common::squads` ile aynı).
+import { SQUADS_MULTISIG_DISCRIMINATOR, SQUADS_PROGRAM_ID, SquadsPermission } from '@squaresdk/solana-sdk/squads';
 import { PublicKey } from '@solana/web3.js';
 
-/** Squads v4 programı (her kümede aynı adres; `square_common::squads::PROGRAM_ID`). */
-export const SQUADS_PROGRAM_ID = new PublicKey('SQDS4ep65T869zMMBKyuUq6aD6EgTu8psMjkvj52pCf');
-/** `sha256("account:Multisig")[..8]` (`square_common::squads::MULTISIG_DISCRIMINATOR`). */
-const MULTISIG_DISCRIMINATOR = Buffer.from([224, 116, 121, 186, 68, 161, 79, 236]);
+export { SQUADS_PROGRAM_ID };
+const MULTISIG_DISCRIMINATOR = Buffer.from(SQUADS_MULTISIG_DISCRIMINATOR);
 /** `Permission::Initiate`. */
-export const PERMISSION_INITIATE = 1;
+export const PERMISSION_INITIATE = SquadsPermission.initiate;
 
 const KEY = 32;
 /** discriminator + create_key + config_authority + threshold + time_lock + iki sayaç. */
