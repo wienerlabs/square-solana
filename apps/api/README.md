@@ -120,7 +120,7 @@ oturumuyla çağrılır; API anahtarı kabul edilmez.
 | `POST /v1/jobs/{job}/travel-rule/grants`, `DELETE …/grants/{grantee}` | Kurumun yetkilisi | Karşı VASP'a ya da denetçiye süreli okuma izni verir, geri alır |
 | `GET /v1/jobs/{job}/travel-rule/access` | Kurumun yetkilisi | Erişim kaydı: yazma, okuma, izin, geri alma, silme; işlemi yapan cüzdan ve istek kimliği |
 
-- **Şifreleme:** Zarf şifrelemesi, AES-256-GCM.
+- **Şifreleme:** Zarf şifrelemesi, `@squaresdk/solana-hardening`'in `SecretBox`'ı (AES-256-GCM).
   - Her kayıt kendi rastgele veri anahtarıyla şifrelenir; veri anahtarı `API_TRAVEL_RULE_KEYS` halkasındaki
     etkin ana anahtarla sarılır.
   - Ek doğrulanan veri, şifreli kaydı job'a ve commitment'a bağlar. Başka bir satıra kopyalanan veri açılmaz.
@@ -131,7 +131,7 @@ oturumuyla çağrılır; API anahtarı kabul edilmez.
 - **Erişim kaydı:** Kişisel veriye dokunan her işlem, işlemle aynı transaction'da `travel_rule_accesses`'a
   yazılır. Okumada kayıt, erişim kaydı yazıldıktan sonra açılır.
 - **Saklama:** Kayıt son yazmadan `API_TRAVEL_RULE_RETENTION_DAYS` gün sonra silinir. Silinenler şifreli kayıt,
-  IV ve sarılmış anahtardır; commitment, özet ve erişim kaydı kalır. Süre hukuki karardır ve kurulumda verilir.
+  sarılmış anahtar ve anahtar kimliğidir; commitment, özet ve erişim kaydı kalır. Süre hukuki karardır ve kurulumda verilir.
 - **Bakım:** Silme ve yeniden sarma her `API_TRAVEL_RULE_MAINTENANCE_INTERVAL_SECONDS`'ta bir koşar. Hatası
   `api_errors` alarmına sayılır.
 

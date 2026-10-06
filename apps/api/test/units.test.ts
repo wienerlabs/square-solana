@@ -3,13 +3,14 @@ import { randomBytes } from 'node:crypto';
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { createSecretBox } from '@squaresdk/solana-hardening';
 import { createLogger } from '@squaresdk/solana-observability';
 import { Keypair, PublicKey } from '@solana/web3.js';
 import { describe, expect, it } from 'vitest';
 import { loadConfig } from '../src/config.js';
 import { loadOpenApi } from '../src/openapi.js';
 import { PERMISSION_INITIATE, SQUADS_PROGRAM_ID, multisigMembers } from '../src/squads.js';
-import { createKeyring, open, rewrap, seal } from '../src/travel-rule/crypto.js';
+import { open, rewrap, seal } from '../src/travel-rule/crypto.js';
 import { startTravelRuleMaintenance } from '../src/travel-rule/maintenance.js';
 
 const ENV = {
@@ -64,19 +65,19 @@ describe('yapılandırma', () => {
     });
     const table = Keypair.generate().publicKey.toBase58();
     expect(loadConfig({ ...ENV, API_LOOKUP_TABLE: table }).tx.lookupTable).toBe(table);
-    expect([...config.travelRule.keys.keys()]).toEqual(['k2', 'k1']);
-    expect(config.travelRule.keys.get('k1')).toHaveLength(32);
+    expect(Object.keys(config.travelRule.keys)).toEqual(['k2', 'k1']);
+    expect(config.travelRule.keys['k1']).toHaveLength(32);
     expect(config.travelRule).toMatchObject({ activeKeyId: 'k2', retentionSeconds: 1825 * 86_400 });
   });
 
-  it('Travel Rule anahtar halkası: biçim, tekrar eden kimlik, halkada olmayan etkin anahtar', () => {
+  it('Travel Rule anahtar halkası (hardening kuralları): uzunluk, biçim, tekrar eden kimlik, halkada olmayan etkin anahtar', () => {
     const key = randomBytes(32).toString('base64');
-    expect(() => loadConfig({ ...ENV, API_TRAVEL_RULE_KEYS: `k1:${randomBytes(16).toString('base64')}` })).toThrow(
-      /API_TRAVEL_RULE_KEYS/,
+    expect(() => loadConfig({ ...ENV, API_TRAVEL_RULE_KEYS: `k2:${randomBytes(16).toString('base64')}` })).toThrow(
+      /API_TRAVEL_RULE_KEYS.*32 bayt/,
     );
-    expect(() => loadConfig({ ...ENV, API_TRAVEL_RULE_KEYS: `K1:${key}` })).toThrow(/API_TRAVEL_RULE_KEYS/);
-    expect(() => loadConfig({ ...ENV, API_TRAVEL_RULE_KEYS: `k2:${key},k2:${key}` })).toThrow(/aynı kimlik/);
-    expect(() => loadConfig({ ...ENV, API_TRAVEL_RULE_ACTIVE_KEY_ID: 'k3' })).toThrow(/içinde yok/);
+    expect(() => loadConfig({ ...ENV, API_TRAVEL_RULE_KEYS: key })).toThrow(/kimlik:base64/);
+    expect(() => loadConfig({ ...ENV, API_TRAVEL_RULE_KEYS: `k2:${key},k2:${key}` })).toThrow(/tekrar ediyor/);
+    expect(() => loadConfig({ ...ENV, API_TRAVEL_RULE_ACTIVE_KEY_ID: 'k3' })).toThrow(/etkin anahtar halkada yok: k3/);
     expect(() => loadConfig({ ...ENV, API_TRAVEL_RULE_RETENTION_DAYS: '0' })).toThrow(/RETENTION_DAYS/);
   });
 
@@ -157,40 +158,40 @@ describe('OpenAPI yükleyicisi', () => {
 });
 
 describe('Travel Rule zarf şifrelemesi', () => {
-  const keys = new Map([
-    ['k1', randomBytes(32)],
-    ['k2', randomBytes(32)],
-  ]);
-  const keyring = createKeyring(keys, 'k1');
+  const keys = { k1: randomBytes(32), k2: randomBytes(32) };
+  const box = createSecretBox({ keys, activeKeyId: 'k1' });
   const context = { job: Keypair.generate().publicKey.toBase58(), commitment: 'ab'.repeat(32) };
   const plaintext = Buffer.from('{"record":{},"salt":"00"}');
 
-  it('açılır; başka job ya da commitment, değiştirilmiş veri ve başka anahtar açmaz', () => {
-    const sealed = seal(keyring, plaintext, context);
-    expect(sealed).toMatchObject({ algorithm: 'aes-256-gcm', keyId: 'k1' });
-    expect(sealed.iv).toHaveLength(12);
-    expect(sealed.wrappedKey).toHaveLength(12 + 32 + 16);
-    expect(sealed.ciphertext.includes(plaintext)).toBe(false);
-    expect(open(keyring, sealed, context)).toEqual(plaintext);
-    expect(() => open(keyring, sealed, { ...context, commitment: 'cd'.repeat(32) })).toThrow();
-    expect(() => open(keyring, sealed, { ...context, job: Keypair.generate().publicKey.toBase58() })).toThrow();
-    const tampered = Buffer.from(sealed.ciphertext);
+  it('açılır; başka job ya da commitment, değiştirilmiş veri ve sarılmış anahtar açmaz', () => {
+    const sealed = seal(box, plaintext, context);
+    expect(sealed.keyId).toBe('k1');
+    expect(sealed.ciphertext).toMatch(/^sq1\.record\./);
+    expect(sealed.wrappedKey).toMatch(/^sq1\.k1\./);
+    expect(sealed.ciphertext.includes(plaintext.toString('base64url'))).toBe(false);
+    expect(Buffer.from(open(box, sealed, context))).toEqual(plaintext);
+    expect(() => open(box, sealed, { ...context, commitment: 'cd'.repeat(32) })).toThrow();
+    expect(() => open(box, sealed, { ...context, job: Keypair.generate().publicKey.toBase58() })).toThrow();
+    const [version, id, iv, body] = sealed.ciphertext.split('.') as [string, string, string, string];
+    const tampered = Buffer.from(body, 'base64url');
     tampered[0]! ^= 1;
-    expect(() => open(keyring, { ...sealed, ciphertext: tampered }, context)).toThrow();
-    expect(() => open(keyring, { ...sealed, keyId: 'k2' }, context)).toThrow();
+    expect(() =>
+      open(box, { ...sealed, ciphertext: [version, id, iv, tampered.toString('base64url')].join('.') }, context),
+    ).toThrow();
+    // Başka bir kaydın veri anahtarıyla açılmaz.
+    const other = seal(box, plaintext, context);
+    expect(() => open(box, { ...sealed, wrappedKey: other.wrappedKey }, context)).toThrow();
   });
 
-  it('yeniden sarma etkin anahtarı kullanır; halkada olmayan anahtar hata', () => {
-    const sealed = seal(keyring, plaintext, context);
-    const rotated = createKeyring(keys, 'k2');
-    const wrapped = rewrap(rotated, sealed, context.job);
+  it('yeniden sarma etkin anahtarı kullanır; halkada olmayan anahtarla açılmaz', () => {
+    const sealed = seal(box, plaintext, context);
+    const rotated = createSecretBox({ keys, activeKeyId: 'k2' });
+    const wrapped = rewrap(rotated, sealed.wrappedKey, context.job);
     expect(wrapped.keyId).toBe('k2');
-    expect(open(rotated, { ...sealed, ...wrapped }, context)).toEqual(plaintext);
-    expect(() =>
-      open(createKeyring(new Map([['k1', keys.get('k1')!]]), 'k1'), { ...sealed, ...wrapped }, context),
-    ).toThrow(/k2 halkada yok/);
-    expect(() => createKeyring(keys, 'k3')).toThrow(/halkada yok/);
-    expect(() => createKeyring(new Map([['k1', randomBytes(16)]]), 'k1')).toThrow(/32 bayt/);
+    expect(wrapped.wrappedKey).toMatch(/^sq1\.k2\./);
+    expect(Buffer.from(open(rotated, { ...sealed, ...wrapped }, context))).toEqual(plaintext);
+    const retired = createSecretBox({ keys: { k1: keys.k1 }, activeKeyId: 'k1' });
+    expect(() => open(retired, { ...sealed, ...wrapped }, context)).toThrow(/anahtar halkada yok: k2/);
   });
 });
 
