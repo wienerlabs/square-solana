@@ -38,7 +38,7 @@ export interface WebConfig {
   proverUrl?: string;
   /**
    * İsteğe bağlı: Square API'nin kök adresi (`apps/api`, BE-18; sondaki eğik çizgi olmadan); indexer'dan okunan
-   * veriler, keeper günlüğü ve geliştirici portalı (FE-22).
+   * veriler, keeper günlüğü (FE-10), dispute kanıtı ve arbitrator konsolu (FE-17), geliştirici portalı (FE-22).
    */
   apiUrl?: string;
 }

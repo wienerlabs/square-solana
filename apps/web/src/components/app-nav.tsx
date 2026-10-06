@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useRole } from './role-provider';
 
 const SECTIONS = [
   { href: '/app', label: 'Overview' },
@@ -15,11 +16,16 @@ const SECTIONS = [
   { href: '/app/developers', label: 'Developers' },
 ] as const;
 
+/** Arbitrator rolündeki cüzdana konsol bağlantısı (FE-17). */
+const ARBITRATION = { href: '/app/arbitration', label: 'Arbitration' } as const;
+
 export function AppNav() {
   const pathname = usePathname();
+  const { role } = useRole();
+  const sections = role === 'arbitrator' ? [...SECTIONS, ARBITRATION] : SECTIONS;
   return (
-    <nav aria-label="App" className="flex gap-1 text-sm">
-      {SECTIONS.map((section) => {
+    <nav aria-label="App" className="flex flex-wrap gap-1 text-sm">
+      {sections.map((section) => {
         const current = pathname === section.href;
         return (
           <Link
