@@ -1,9 +1,12 @@
 import { randomBytes } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { BN, type BorshInstructionCoder, type Idl, type Program } from '@anchor-lang/core';
 import { getAssociatedTokenAddressSync, TOKEN_2022_PROGRAM_ID, TOKEN_PROGRAM_ID } from '@solana/spl-token';
 import { ComputeBudgetProgram, Connection, Keypair, PublicKey, SystemProgram } from '@solana/web3.js';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { TX_COMPUTE_UNIT_LIMITS, type TxKind } from '../src/budget.js';
+import { squareLookupTableAddresses, TX_COMPUTE_UNIT_LIMITS, type TxKind } from '../src/budget.js';
+import { CCTP_RECEIVE_COMPUTE_UNITS, cctpLookupTableAddresses, RECEIVE_MESSAGE_DISCRIMINATOR } from '../src/cctp.js';
 import { createSquareClient, type SquareClient } from '../src/client.js';
 import { specHashing } from '../src/spec.js';
 import type { BuiltTx } from '../src/types.js';
@@ -490,5 +493,79 @@ describe('flow', () => {
       vault: b58(client.pda.vault(address)[0]),
       rentPayer: b58(account.rentPayer as PublicKey),
     });
+  });
+});
+
+describe('receiveAndFundJob (BC-36)', () => {
+  // Devnet koşusunun gerçek attestation'lı mesajı: Sepolia'da yakılan 5 USDC, mint alıcısı kurumun USDC hesabı.
+  const fixture = JSON.parse(
+    readFileSync(fileURLToPath(new URL('./fixtures/cctp-sepolia-to-solana.json', import.meta.url)), 'utf8'),
+  ) as { message: string; attestation: string };
+  const bytes = (hex: string) => new Uint8Array(Buffer.from(hex.replace(/^0x/, ''), 'hex'));
+  const institution = new PublicKey('7xNWRmEbp5aQFQuL1vAnJAW3iZn6NXA3CisMSAmnXoi4');
+  const usdcMint = new PublicKey('4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU');
+  const cctp = {
+    programs: {
+      messageTransmitter: new PublicKey('CCTPV2Sm4AdWt5296sk4P66VBZ7bEhcARwFaaS9YPbeC'),
+      tokenMessengerMinter: new PublicKey('CCTPV2vPZJS2u2BBsUoscuikbYjnpFmbFsvVuJdgUMQe'),
+    },
+    usdcMint,
+    sourceDomain: 0,
+    burnToken: Buffer.concat([Buffer.alloc(12), Buffer.from('1c7D4B196Cb0C7B01d743Fbc6116a902379C7238', 'hex')]),
+    feeRecipient: new PublicKey('AYG63YgrKLbp9B23ntcRemU8kSD7rZ7cNFGDo8DbEfTd'),
+  };
+
+  it('mint ve fonlama tek tx’te: Circle’ın talimatı, ardından fund_job; compute payı ikisinin toplamı', async () => {
+    chain.setAccount(usdcMint, TOKEN_PROGRAM_ID, Buffer.alloc(82));
+    const { address } = await jobAccount({ mint: usdcMint, institution, agentWallet: key(), agentRecord: key() });
+    const square = key();
+    const cctpTable = key();
+    chain.setLookupTable(
+      square,
+      squareLookupTableAddresses({ programIds: PROGRAM_IDS, pda: client.pda, settlementMint: usdcMint }),
+    );
+    chain.setLookupTable(cctpTable, cctpLookupTableAddresses({ ...cctp, tokenProgram: TOKEN_PROGRAM_ID }));
+    const built = await client.flow.receiveAndFundJob(
+      { cctp, message: bytes(fixture.message), attestation: bytes(fixture.attestation), institution, job: address },
+      { feePayer, addressLookupTables: [square, cctpTable] },
+    );
+    expect(built.minted).toBe(5_000_000n);
+    const keys = built.transaction.message.getAccountKeys({
+      addressLookupTableAccounts: [square, cctpTable].map((table) => chain.lookupTable(table)),
+    });
+    const [budget, receive, fund] = built.transaction.message.compiledInstructions
+      .filter((ix) => !keys.get(ix.programIdIndex)!.equals(ComputeBudgetProgram.programId) || ix.data[0] === 2)
+      .map((ix) => ({
+        program: keys.get(ix.programIdIndex)!,
+        data: Buffer.from(ix.data),
+        keys: ix.accountKeyIndexes.map((i) => keys.get(i)!),
+      }));
+    expect(budget!.data.readUInt32LE(1)).toBe(TX_COMPUTE_UNIT_LIMITS.fundJob + CCTP_RECEIVE_COMPUTE_UNITS);
+    expect(receive!.program.equals(cctp.programs.messageTransmitter)).toBe(true);
+    expect(receive!.data.subarray(0, 8)).toEqual(Buffer.from(RECEIVE_MESSAGE_DISCRIMINATOR));
+    // Circle'ın talimatında payer ücret ödeyici, caller kurum; mint alıcısı (16.) kurumun USDC hesabı.
+    const recipient = getAssociatedTokenAddressSync(usdcMint, institution, true, TOKEN_PROGRAM_ID);
+    expect([receive!.keys[0], receive!.keys[1], receive!.keys[15]].map(b58)).toEqual([
+      b58(feePayer),
+      b58(institution),
+      b58(recipient),
+    ]);
+    expect(fund!.program.equals(PROGRAM_IDS.escrow)).toBe(true);
+    const { name } = (escrow().coder.instruction as BorshInstructionCoder).decode(fund!.data)!;
+    expect(name).toBe('fundJob');
+    expect(fund!.keys.map(b58)).toContain(b58(recipient));
+  });
+
+  it('mint alıcısı kurumun USDC hesabı değilse ya da job başka mint’teyse reddedilir', async () => {
+    chain.setAccount(usdcMint, TOKEN_PROGRAM_ID, Buffer.alloc(82));
+    const params = { cctp, message: bytes(fixture.message), attestation: bytes(fixture.attestation) };
+    const other = await jobAccount({ mint: usdcMint, institution: key(), agentWallet: key(), agentRecord: key() });
+    await expect(
+      client.flow.receiveAndFundJob({ ...params, institution: key(), job: other.address }, options()),
+    ).rejects.toThrow(/mint alıcısı/);
+    const wrongMint = await jobAccount({ mint: mint(), institution, agentWallet: key(), agentRecord: key() });
+    await expect(
+      client.flow.receiveAndFundJob({ ...params, institution, job: wrongMint.address }, options()),
+    ).rejects.toThrow(/CCTP'nin mint ettiği USDC değil/);
   });
 });

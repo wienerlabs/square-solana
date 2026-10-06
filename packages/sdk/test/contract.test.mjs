@@ -26,22 +26,31 @@ test('SQUARE_IDLS, idl/ dosyalarıyla aynı', () => {
   }
 });
 
-test('SDK çalışma zamanı dışa aktarımları beklenen yüzeyle aynı (BE-35 + BE-08 + BC-28 + BC-34 + BE-14 + BE-18)', () => {
+test('SDK çalışma zamanı dışa aktarımları beklenen yüzeyle aynı (BE-35 + BE-08 + BC-28 + BC-34 + BE-14 + BE-18 + BC-36)', () => {
   assert.deepEqual(Object.keys(sdk).sort(), [
     'API_OPERATIONS',
     'ApiClientError',
+    'CCTP_RECEIVE_COMPUTE_UNITS',
+    'CCTP_SOLANA_DOMAIN',
     'IdlJsonError',
     'MAX_COMPUTE_UNIT_LIMIT',
     'PACKET_DATA_SIZE',
+    'RECEIVE_MESSAGE_DISCRIMINATOR',
     'SQUARE_IDLS',
     'TRAVEL_RULE_DOMAIN',
     'TX_COMPUTE_UNIT_LIMITS',
+    'cctpLookupTableAddresses',
+    'cctpMintedAmount',
+    'cctpStaticAccounts',
     'computeUnitLimitFor',
     'createApiClient',
     'createLookupTableInstructions',
     'createPda',
     'createSquareClient',
+    'decodeCctpMessage',
+    'fetchCctpFeeRecipient',
     'fromIdlJson',
+    'receiveMessageInstruction',
     'specHashing',
     'squareLookupTableAddresses',
     'toIdlJson',

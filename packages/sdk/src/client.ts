@@ -10,6 +10,7 @@ import { createFlow } from './flow.js';
 import { createPda, type SquarePda } from './pda.js';
 import { SQUARE_IDLS, type SquareIdls, type SquareProgramIds, type SquareProgramName } from './programs.js';
 import { buildVersionedTx } from './tx.js';
+import type { CctpReceiveContext } from './cctp.js';
 import type {
   BuildOptions,
   BuiltTx,
@@ -77,6 +78,22 @@ export interface SquareFlow {
     params: { institution: PublicKey; job: PublicKey; institutionTokenAccount: PublicKey },
     options: BuildOptions,
   ): Promise<BuiltTx>;
+  /**
+   * Adım 3b, CCTP ile (BC-36): başka zincirde yakılan USDC'nin Solana'da mint edilmesi (Circle
+   * `receive_message`) ve aynı tx'te `fund_job`. Mesajın mint alıcısı kurumun USDC hesabı olmalıdır; fonlama
+   * job'un tutarını o hesaptan çeker. `minted` mint edilen tutardır (yakılan eksi Circle'ın ücreti). Tx'in boyutu
+   * için `options.addressLookupTables`'a Square ALT'ı ve CCTP ALT'ı (`cctpLookupTableAddresses`) verilir.
+   */
+  receiveAndFundJob(
+    params: {
+      cctp: Omit<CctpReceiveContext, 'tokenProgram'>;
+      message: Uint8Array;
+      attestation: Uint8Array;
+      institution: PublicKey;
+      job: PublicKey;
+    },
+    options: BuildOptions,
+  ): Promise<BuiltTx & { minted: bigint }>;
   /** Adım 4: kabul. */
   acceptJob(params: { agent: PublicKey; job: PublicKey }, options: BuildOptions): Promise<BuiltTx>;
   /** Adım 4: teslim. */
