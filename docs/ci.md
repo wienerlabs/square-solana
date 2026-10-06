@@ -16,7 +16,7 @@ PR sayfasında görünen ad, iş akışındaki işin adıdır.
 | `contract` | `api-sdk-contract` | her PR, main | IDL'den türetilen dosyalar (`packages/types`, SDK IDL kopyaları, `docs/api/schemas`) `idl/` ile güncel: `pnpm contract:check` (BE-35) |
 | `License` | Lisans envanteri | her PR, main | Bağımlılık lisansları ve `docs/THIRD_PARTY_LICENSES.md` güncel (BC-02) |
 | `Security` | Sır taraması (gitleaks) | her PR, main, haftalık | Bütün git geçmişinde sır; kuralların testleri (BC-13) |
-| `Programs` | SBF derleme ve program testleri | programları, crate'leri, IDL'leri, Rust araç dosyalarını, SDK'nın işlem profilini (`packages/sdk/src/tx-profile.json`) ya da bu iş akışının betiklerini değiştiren PR, main | Araç sürümleri, `cargo fmt`, `anchor build`, program IDL'lerinin sözleşmeyle uyumu, `cargo clippy`, birim testleri, `anchor test` (LiteSVM; işlem bütçesi dahil, BC-28) (BC-12, BC-13) |
+| `Programs` | SBF derleme ve program testleri | programları, crate'leri, IDL'leri, Rust araç dosyalarını, SDK'nın işlem profilini (`packages/sdk/src/tx-profile.json`) ya da bu iş akışının betiklerini değiştiren PR, main | Araç sürümleri, `cargo fmt`, `anchor build`, program IDL'lerinin sözleşmeyle uyumu, `cargo clippy`, birim testleri, `anchor test` (LiteSVM; işlem bütçesi dahil, BC-28), test kapsamı (escrow'da talimat, ret dalı ve hata kodu oranı en az %80) ve CU raporu (BC-29) (BC-12, BC-13) |
 | `Circuits` | Devre derlemesi, testleri ve release artefaktları | `circuits/` ya da verifier'ın VK dosyalarını değiştiren PR, main | circom 2.2.3 derlemesi, devre testleri (atlamasız), test girdileri ve release artefaktları güncel (BC-13) |
 | `Verifiable build` | Verifiable build (solana-verify) | main'de programları etkileyen push; elle; PR'da yalnızca kendi dosyası değişince | Programların Docker'da deterministik derlemesi ve executable hash'leri (BC-13) |
 
@@ -107,7 +107,7 @@ birleştirilmiş hâlinde şu kontroller yerelde yeşil olmalı ve PR'a yazılma
 - `validate_repo`: `cargo build`, `anchor build`, `pnpm install --frozen-lockfile`, `pnpm turbo build`,
   `cargo clippy`, gitleaks.
 - Program iş akışının adımları: `toolchain.mjs`, `rust-lint.mjs`, `idl-conformance.mjs`,
-  `cargo test --workspace --locked` ve program testleri.
+  `cargo test --workspace --locked`, program testleri ve `program-coverage.mjs`.
 - `pnpm turbo run test`, `pnpm lint`, `pnpm license:check`, `pnpm contract:check`,
   `node --test "scripts/**/*.test.mjs"`, `pnpm secrets:scan`.
 - Devreye dokunan PR'da `program-proofs.mjs --check`.
@@ -126,6 +126,7 @@ node scripts/ci/toolchain.mjs           # araç sürümleri Anchor.toml ile ayn�
 node scripts/ci/rust-lint.mjs           # cargo fmt --check + clippy (kapsam: programs.mjs); fmt | clippy
 anchor build && node scripts/ci/idl-conformance.mjs   # program IDL'leri ↔ idl/
 anchor test --validator legacy --skip-build            # program testleri (LiteSVM)
+node scripts/ci/program-coverage.mjs                   # test kapsamı (escrow kapısı %80, BC-29)
 pnpm contract:check                     # IDL'den türetilen dosyalar
 pnpm secrets:scan                       # gitleaks, bütün geçmiş
 node --test "scripts/ci/*.test.mjs"     # CI betiklerinin testleri
