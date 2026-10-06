@@ -24,6 +24,7 @@ export const PUBLISHABLE = [
   '@squaresdk/solana-policy',
   '@squaresdk/solana-a2a',
   '@squaresdk/solana-mcp',
+  '@squaresdk/solana-agent-sdk',
 ];
 
 export const EXCLUDED = {
@@ -33,7 +34,6 @@ export const EXCLUDED = {
     'servislerin iç paketi (private): maskeleyen logger, metrikler, health, alarmlar (BE-12)',
   '@squaresdk/solana-hardening':
     'servislerin iç paketi (private): SSRF, idempotency, hız sınırı, RPC failover, imzalı eylemler (BE-13)',
-  '@squaresdk/solana-agent-sdk': "kaynaktan taşındı, Square'e uyarlanması BE-19 (#52)",
 };
 
 const ROOT = fileURLToPath(new URL('../..', import.meta.url));
