@@ -116,6 +116,7 @@ export function createDuties(options: DutiesOptions): Duties {
   const watchers = new Map<string, () => void>();
   let timer: ReturnType<typeof setTimeout> | undefined;
   let running = false;
+  let generation = 0;
   const act = (action: DutyAction) => options.onAction?.(action);
 
   /** API'de kurumun bu durumlardaki job'ları (sayfalı). */
@@ -191,13 +192,16 @@ export function createDuties(options: DutiesOptions): Duties {
   }
 
   async function tick(): Promise<void> {
+    const current = generation;
     for (const address of await candidates()) {
+      if (generation !== current) return;
       try {
         const job = new PublicKey(address);
         const account = await client.escrow.fetch('job', job);
         if (!account || !account.institution.equals(institution)) continue;
         const status = Object.keys(account.status)[0]!;
         await crank(job, status, account.dispute.deadline.toNumber());
+        if (generation !== current) return;
         if (config.policyWatch && account.policy && !TERMINAL.has(status) && !watchers.has(address)) {
           startWatch(job);
         }
@@ -208,23 +212,25 @@ export function createDuties(options: DutiesOptions): Duties {
   }
 
   const loop = async () => {
-    running = true;
+    const current = generation;
     try {
       await tick();
     } catch (error) {
       options.onError(error);
     }
-    if (running) timer = setTimeout(loop, config.intervalMs);
+    if (running && generation === current) timer = setTimeout(loop, config.intervalMs);
   };
 
   return {
     start() {
       if (running) return;
-      timer = setTimeout(loop, 0);
       running = true;
+      generation += 1;
+      timer = setTimeout(loop, 0);
     },
     stop() {
       running = false;
+      generation += 1;
       if (timer) clearTimeout(timer);
       for (const stop of watchers.values()) stop();
       watchers.clear();

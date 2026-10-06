@@ -15,9 +15,10 @@ duty'ler.
   denetlenir: yer yoksa görev reddedilir, kabul edilmiş iş yer bekler ve düşmez.
 - **Delegasyon (`square_delegate_job`):** Başka agent'lara `create_job`, gerekirse `commit_travel_rule` ve `fund_job`
   gönderir. Kurumun yerel politika belgesi (`normalizePolicy`, ret bitleri) uygulanır: işlem başı ve günlük tavanlar,
-  mint, payee, kategori, zaman penceresi ve izinli agent'lar. Aşan istek tx kurulmadan reddedilir. Tx'ler yerel
-  keypair'le imzalanır ya da imzasız dışa verilir. Eşik üstü işte Travel Rule kaydı Square API'sinde (BE-23) kurumun
-  oturumuyla saklanır; zincire API'nin döndürdüğü commitment bağlanır, defterde kişisel veri tutulmaz.
+  mint, payee, kategori, zaman penceresi ve izinli agent'lar. Job'un son tarihi en geç şimdi + `deadlineSecs`'tir.
+  Aşan istek tx kurulmadan reddedilir. Tx'ler yerel keypair'le imzalanır ya da imzasız dışa verilir. Eşik üstü işte
+  Travel Rule kaydı Square API'sinde (BE-23) kurumun oturumuyla saklanır; zincire API'nin döndürdüğü commitment
+  bağlanır, defterde kişisel veri tutulmaz.
 - **Duty'ler:** Yalnızca kurumun job'larında çalışır. `policyWatch` (`watchJobProof` ile ispat bağlama) ve `crank`
-  (`execute_resolution`, `lapse_dispute`).
+  (`execute_resolution`, `lapse_dispute`). `stop` sürmekte olan turun yeni izleyici açmasını engeller.
 - **İzolasyon:** Capability başına süreç içi çalıştırma bağlamı (ADR 0022).

@@ -233,6 +233,40 @@ describe('ispat bağlama (policy watch)', () => {
     expect(item.watching()).toEqual([]);
   });
 
+  it('stop, sürmekte olan turun izleyici açmasını engeller', async () => {
+    await job({ status: 'delivered', policy: policyAccount });
+    let release: () => void = () => undefined;
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    let listed = 0;
+    const api = {
+      listJobs: async () => {
+        listed += 1;
+        await gate;
+        return { success: true, data: [], error: null, meta: { requestId: 'r', page: 1, limit: 100, total: 0 } };
+      },
+    } as unknown as SquareApi;
+    let started = 0;
+    const { item, errors } = duties({
+      config: dutiesConfig({ crank: undefined, policyWatch, discovery: { api: true } }),
+      api,
+      proofs: { policy: policyDocument(sim.settlementMint.toBase58()), salts, prover },
+      watch: () => {
+        started += 1;
+        return () => undefined;
+      },
+    });
+    item.start();
+    const deadline = Date.now() + 2_000;
+    while (listed === 0 && Date.now() < deadline) await new Promise((resolve) => setTimeout(resolve, 5));
+    expect(listed).toBe(1);
+    item.stop();
+    release();
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(errors).toEqual([]);
+    expect(started).toBe(0);
+    expect(item.watching()).toEqual([]);
+  });
+
   it('policyWatch politika ve prover olmadan kurulmaz', () => {
     expect(() => duties({ config: dutiesConfig({ policyWatch }) })).toThrow(/politika, salt ve prover/);
   });
