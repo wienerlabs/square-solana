@@ -327,6 +327,9 @@ export function JobDetail({ jobAddress, escrowProgramId }: { jobAddress: string;
           </Row>
           <Row label="Agent">
             <Address value={account.agentRecord.toBase58()} label="agent record" />
+            <Link href={`/app/agents/${account.agentRecord.toBase58()}`} className="text-link underline">
+              Profile
+            </Link>
             {did && (
               <Link href={`/app/did?did=${encodeURIComponent(did)}`} className="text-link underline">
                 Resolve DID
