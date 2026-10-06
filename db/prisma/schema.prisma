@@ -431,6 +431,54 @@ model KeeperAction {
   @@map("keeper_actions")
 }
 
+// ---------------------------------------------------------------- screener (BE-16)
+
+enum ScreeningTrigger {
+  /// API'den gelen tarama isteği.
+  request
+  /// TTL yenileme döngüsü.
+  renewal
+}
+
+enum ScreeningOutcome {
+  /// Karar verildi ve `record_screening` tx'i onaylandı.
+  recorded
+  /// Bir kaynak yanıt vermedi; karar verilmedi, tx gönderilmedi.
+  sourceError
+  /// Karar verildi ama tx reddedildi, düştü ya da süresi doldu.
+  txFailed
+}
+
+/// Screener'ın denetim kaydı: her tarama kararı (kaynak sonuçları, kanıt, tx imzası, zaman). Zincir dışı
+/// tablodur; zincirdeki `ScreeningRecord`'un aynası `screenings`'tir (indexer). `evidence` kanonik JSON'unun
+/// (RFC 8785) SHA-256'sı zincire yazılan `source_hash`'tir: kayıt kanıttan yeniden hesaplanarak doğrulanır.
+model ScreeningDecision {
+  id         String           @id @default(uuid()) @db.Uuid
+  wallet     String           @db.VarChar(44)
+  trigger    ScreeningTrigger
+  outcome    ScreeningOutcome
+  /// Kaynakların birleşik kararı; kaynak hatasında null.
+  status     ScreeningStatus?
+  /// Kaynak başına sonuç ya da hata (`SourceOutcome[]` JSON'u).
+  sources    Json
+  evidence   Json?
+  sourceHash String?          @map("source_hash") @db.Char(64)
+  signature  String?          @db.VarChar(88)
+  /// Tx'in onaylandığı slot ve zincirden okunan kaydın zamanları (Unix saniyesi).
+  slot       BigInt?
+  screenedAt BigInt?          @map("screened_at")
+  expiresAt  BigInt?          @map("expires_at")
+  /// Başarısızlığın sebebi; başarılı kararda null.
+  error      String?
+  /// İsteği yapan API anahtarının SHA-256 önekidir; yenilemede null.
+  caller     String?          @db.VarChar(16)
+  at         DateTime         @default(now()) @db.Timestamptz(3)
+
+  @@index([wallet, at])
+  @@index([outcome, wallet])
+  @@map("screening_decisions")
+}
+
 // ---------------------------------------------------------------- kullanıcılar ve yetki
 
 /// Cüzdanla oturum açan kullanıcı. Kimlik cüzdan adresidir.

@@ -9,8 +9,8 @@
 Kayıt `Clear` ve süresi dolmamış (`expires_at > now`) olmalı. Değilse fonlama ve alım reddedilir; ödeme bekler,
 iade edilmez.
 
-> Otomatik screener servisi BE-16'dadır (`apps/screener`). Servis gelene kadar ve onun yedeği olarak tarama bu
-> runbook'la, `scripts/deploy/record-screening.mjs` ile yapılır.
+> Otomatik tarama ve TTL yenileme screener servisindedir ([`apps/screener`](../../apps/screener/README.md)). Servis
+> dağıtılana kadar ve onun yedeği olarak tarama bu runbook'la, `scripts/deploy/record-screening.mjs` ile yapılır.
 
 ## Roller ve anahtar
 

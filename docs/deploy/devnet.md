@@ -158,6 +158,21 @@ Servislerin değerleri:
 | `API_CCTP_LOOKUP_TABLES`, `KEEPER_CCTP_LOOKUP_TABLES` | `0:2Zg2NRhkLqdFHq3SZcxqHmZkTTLXmKx4yeZNbfSqPbUY` |
 | `KEEPER_CCTP_ATTESTATION_URL` | `https://iris-api-sandbox.circle.com` |
 
+## Screener (BE-16)
+
+Screener'ın uçtan uca koşusu, 2026-10-06 (`apps/screener/test/devnet.e2e.test.ts`). OFAC'ın canlı listesi indirildi:
+SHA-256 `b61f54ea…5e72`, 4 SOL adresi. Screener authority `48DGxja6…` deployer'dan 0.1 SOL aldı. Denetim kaydı
+testin kendi Postgres'iydi.
+
+| Adım | Cüzdan | Tx |
+|---|---|---|
+| Listedeki adres → `Flagged` (SDN uid 194570) | `42RLPACwZPx3vYYmxSueqsogfynBDqXK298EDsNoyoHi` | `4q9mdB83DVj5RqSvXgNJ1TykRTLpMCQTRoZLK5SjE3AYnH9evHR11TbaZ7m26gAKKRziXGyrmch48YFqDJnHtgmw` |
+| Listede olmayan yeni cüzdan → `Clear` | `H5GBLjvy3B6mKqo6jmHGoxuxs1Nm87CgnFMpSTLvur6x` | `44FvHdGAdSaH5gfwvfwE4MqiWph1cNLM6XtYGEPyfqYwgKMkmVG24PmsGY6dLuedy4fiZktFWiyWuQFuRrFMY2NG` |
+| Yenileme (`Flagged`, `expires_at` ileri) | `42RLPACw…` | `32M8xSmp75UtsncZzPJLGcy8YUzYi8TYJkHg33UGweo5qSsPZCNySMDw7iP4JcXLN7f7m3rGHM2ZQcNUznxMicdj` |
+| Yenileme (`Clear`, `expires_at` ileri) | `H5GBLjvy…` | `3jug8pk42psPLuGi3qEa7v4GxaEvmZzzhDv6gyVxZfdtypCaNtUFjPR8UJjzQBPyJSq2y1gBKG54tceEcpHK3B57` |
+
+Her kayıtta zincirdeki `source_hash` denetim kaydındakidir; `expires_at − screened_at` config'teki süredir (30 gün).
+
 ## Yükseltmeler
 
 ### Escrow v0.6.0: dispute (BC-32, BC-33), 2026-10-06

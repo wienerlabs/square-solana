@@ -1,0 +1,67 @@
+<?xml version="1.0" standalone="yes"?>
+<!-- Sentetik test fikstürü: OFAC SDN.XML biçiminde, gerçek liste değildir. Adlar ve kimlikler uydurmadır;
+     Solana adresleri test anahtarlarından (Keypair.fromSeed, bayt 101 ve 102) türetilmiştir. -->
+<sdnList xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="https://sanctionslistservice.ofac.treas.gov/api/PublicationPreview/exports/XML">
+  <publshInformation>
+    <Publish_Date>10/01/2026</Publish_Date>
+    <Record_Count>4</Record_Count>
+  </publshInformation>
+  <sdnEntry>
+    <uid>900001</uid>
+    <lastName>SENTETIK KURUM &amp; ORTAKLARI</lastName>
+    <sdnType>Entity</sdnType>
+    <programList>
+      <program>CYBER2</program>
+    </programList>
+    <idList>
+      <id>
+        <uid>910001</uid>
+        <idType>Digital Currency Address - SOL</idType>
+        <idNumber>FR5pWwinRBn35GNhg7bsvw8Q13kRept2pm561DwZCQzT</idNumber>
+      </id>
+      <id>
+        <uid>910002</uid>
+        <idType>Digital Currency Address - XBT</idType>
+        <idNumber>bc1qsentetikadresdegil0000000000000000000</idNumber>
+      </id>
+    </idList>
+  </sdnEntry>
+  <sdnEntry>
+    <uid>900002</uid>
+    <firstName>Deneme</firstName>
+    <lastName>KISI</lastName>
+    <sdnType>Individual</sdnType>
+    <programList>
+      <program>CYBER2</program>
+    </programList>
+    <idList>
+      <id>
+        <uid>910003</uid>
+        <idType>Digital Currency Address - SOL</idType>
+        <idNumber> 4Yk9HoDSfJv9QcmJbLcXdWVgS7nfvdUqiVcvbSu8VBru </idNumber>
+      </id>
+      <id>
+        <uid>910004</uid>
+        <idType>Digital Currency Address - SOL</idType>
+        <idNumber>gecersiz-adres</idNumber>
+      </id>
+    </idList>
+  </sdnEntry>
+  <sdnEntry>
+    <uid>900003</uid>
+    <lastName>AYNI ADRESIN IKINCI KAYDI</lastName>
+    <sdnType>Entity</sdnType>
+    <idList>
+      <id>
+        <uid>910005</uid>
+        <idType>Digital Currency Address - SOL</idType>
+        <idNumber>FR5pWwinRBn35GNhg7bsvw8Q13kRept2pm561DwZCQzT</idNumber>
+      </id>
+    </idList>
+  </sdnEntry>
+  <sdnEntry>
+    <uid>900004</uid>
+    <lastName>KIMLIKSIZ KAYIT</lastName>
+    <sdnType>Vessel</sdnType>
+  </sdnEntry>
+</sdnList>
