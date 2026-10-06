@@ -5,6 +5,7 @@ import { BorshCoder, EventParser, type Idl } from '@anchor-lang/core';
 import { PublicKey, SYSVAR_CLOCK_PUBKEY, type Connection } from '@solana/web3.js';
 import { SQUARE_IDLS, workHash } from '@squaresdk/solana-sdk';
 import { formatDiscount } from './claim-market';
+import { describeResolution, resolutionOf } from './dispute';
 import { refusalReasons } from './release-proof';
 
 /** `Job.delivery_uri` üst sınırı (square_escrow `DELIVERY_URI_MAX_LEN`, `DeliveryUriTooLong`). */
@@ -122,6 +123,7 @@ export class SignatureTracker {
   }
 }
 
+const isoTime = (unix: number) => new Date(unix * 1000).toISOString().replace(/\.\d{3}Z$/, 'Z');
 const str = (value: unknown) => (value instanceof PublicKey ? value.toBase58() : String(value));
 const num = (value: unknown) => BigInt((value as { toString(): string }).toString());
 
@@ -165,17 +167,29 @@ export function describeJobEvent(
     case 'TravelRuleCommitted':
       return { title: 'Travel Rule commitment bound' };
     case 'DisputeRaised':
-      return { title: 'Dispute raised', detail: `bond ${formatAmount(num(d.bond))}` };
+      return {
+        title: 'Dispute raised',
+        detail: `by ${str(d.challenger)}, bond ${formatAmount(num(d.bond))}, deadline ${isoTime(Number(num(d.deadline)))}`,
+      };
     case 'DisputeVote':
-      return { title: 'Arbitrator vote' };
+      return {
+        title: 'Arbitrator vote',
+        detail: `${str(d.arbitrator)}: ${describeResolution(resolutionOf(d.resolution), formatAmount)}; ${String(d.approval_count)} approval(s) in the count`,
+      };
     case 'DisputeDecided':
-      return { title: 'Dispute decided' };
+      return { title: 'Dispute decided', detail: describeResolution(resolutionOf(d.resolution), formatAmount) };
     case 'DisputeResolved':
-      return { title: 'Dispute resolved' };
+      return {
+        title: 'Decision paid out',
+        detail: `${formatAmount(num(d.agent_side_amount))} to the agent side, ${formatAmount(num(d.institution_refund))} back to the institution; bond ${formatAmount(num(d.bond_to_agent_side))} to the agent side, ${formatAmount(num(d.bond_returned))} returned`,
+      };
     case 'DisputeLapsed':
-      return { title: 'Dispute lapsed' };
+      return {
+        title: 'Dispute lapsed',
+        detail: `No decision by the deadline: bond ${formatAmount(num(d.bond_refunded))} refunded to the institution; the job is back to Delivered`,
+      };
     case 'MissingProofEscalated':
-      return { title: 'Missing proof escalated' };
+      return { title: 'Missing proof escalated', detail: `by the agent wallet ${str(d.agent_wallet)}, without a bond` };
     case 'ValidationRecorded':
       return { title: 'Validation recorded' };
     case 'ReputationRecorded':

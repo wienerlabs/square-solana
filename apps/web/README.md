@@ -10,7 +10,8 @@ Square'in web uygulaması: Next.js 16 (App Router), React 19, Tailwind CSS 4 ve 
 | `/app/agent` | Agent kaydı: kimlik, DID ve kayıt adresi tx'ten önce, kartın indirilip doğrulanması, `register_agent` (FE-05) |
 | `/app/did` | did:aip çözümü: kayıt zincirden, kart kendi adresinden; DID belgesi ve meta verisi. `?did=` ile paylaşılır (FE-05) |
 | `/app/jobs/new` | İş açma ve fonlama: agent, tutar, deadline, challenge süresi, politika bağlama, iş tanımı ve hash'i, iki tarafın screening'i, `create_job` + `fund_job` (FE-06); eşik üstünde Travel Rule formu ve `commit_travel_rule` (FE-18) |
-| `/app/jobs/[job]` | İş detayı: zincirdeki job, event'lerden canlı zaman çizelgesi, zincir saatine göre challenge sayacı; agent cüzdanı için kabul ve teslim (FE-07); alacağın listelenmesi, geri çekilmesi ve onaylı alıcının alımı, payee (FE-08); uyum ispatının durumu, kurumun ispatı üretip bağlaması (FE-09); Travel Rule durumu, commitment ve yerel kayıtla doğrulama (FE-18) |
+| `/app/jobs/[job]` | İş detayı: zincirdeki job, event'lerden canlı zaman çizelgesi, zincir saatine göre challenge sayacı; agent cüzdanı için kabul ve teslim (FE-07); alacağın listelenmesi, geri çekilmesi ve onaylı alıcının alımı, payee (FE-08); uyum ispatının durumu, kurumun ispatı üretip bağlaması (FE-09); Travel Rule durumu, commitment ve yerel kayıtla doğrulama (FE-18); uyuşmazlık: itiraz, ispatsız bekleme başvurusu, oy durumu ve son tarih, kararın ödenmesi, lapse (FE-17) |
+| `/app/arbitration` | Arbitrator konsolu: açık dispute'lar, kanıtlar, oylar, oy ve webhook abonelikleri; navigasyonda arbitrator rolünde görünür (FE-17) |
 | `/app/claims` | Alacak piyasası: satıştaki alacaklar, fiyat, iskonto, kimin alabileceği (FE-08) |
 | `/design` | Bileşen kataloğu |
 | `/healthz` | Sağlık kontrolü (Railway) |
@@ -24,7 +25,7 @@ Değerler ortamdan gelir ve kök layout'ta **istek anında, sunucuda** okunur (`
 | `SQUARE_SOLANA_CLUSTER` | `devnet`, `testnet`, `mainnet-beta` ya da `localnet` |
 | `SQUARE_SOLANA_RPC_URL` | O cluster'ın JSON-RPC ucu; `https` (yalnızca `localnet` için `http`). WebSocket ucu web3.js tarafından bundan türetilir |
 | `SQUARE_PROVER_URL` | İsteğe bağlı: release ispatını üreten prover servisinin kök adresi ([`apps/prover`](../prover/README.md)); `https` (yalnızca `localnet` için `http`). Tanımlı değilse kurum iş sayfasında ispat üretemez, ispatın durumu yine görünür. Prover'ın `CORS_ORIGINS`'i web'in adresini içermeli |
-| `SQUARE_API_URL` | İsteğe bağlı: Square API'nin kök adresi ([`apps/api`](../api/README.md)); `https` (yalnızca `localnet` için `http`). Keeper günlüğü buradan okunur; tanımlı değilse sayfa bunu söyler. API'nin `CORS_ORIGINS`'i web'in adresini içermeli |
+| `SQUARE_API_URL` | İsteğe bağlı: Square API'nin kök adresi ([`apps/api`](../api/README.md)); `https` (yalnızca `localnet` için `http`). Keeper günlüğü, dispute kanıtı, arbitrator kuyruğu, oy tx'i ve webhook abonelikleri buradan gelir (FE-10, FE-17). Tanımlı değilse sayfa bunu söyler: kurum yalnızca kanıtın hash'iyle itiraz eder, arbitrator konsolu kapanır. API'nin `CORS_ORIGINS`'i web'in adresini içermeli |
 | `SQUARE_PROGRAM_ID_{REGISTRY,POLICY,VERIFIER,ESCROW}` | İsteğe bağlı: programların o cluster'daki adresi (db ile aynı adlar; IDL'deki adres kullanılmaz). Tanımlı olan program landing'de adresi ve zincirdeki deploy durumuyla, tanımlı olmayan "Not configured" olarak görünür. USDC bakiyesi escrow'un config'inden okunduğu için `ESCROW` gerekir. Geçersiz bir değer yapılandırma hatasıdır |
 
 RPC adresi istemci bileşenine (`ConnectionProvider`) gider, yani tarayıcıya iner: ekranda yalnızca host gösterilse de sayfa yükünde görünür. İçinde API anahtarı olan bir RPC kullanılacaksa ya alan adıyla kısıtlanmış (domain allowlist'li) bir anahtar ya da anahtarı sunucuda tutan bir vekil gerekir.
@@ -42,8 +43,8 @@ RPC adresi istemci bileşenine (`ConnectionProvider`) gider, yani tarayıcıya i
 | Ağ koruması | RPC'nin genesis hash'i kümenin CAIP-2 referansıyla karşılaştırılır (did:aip v2 Solana profili §3.3; değerler `@squaresdk/solana-identity`'de). Uyuşmazsa, RPC'ye ulaşılamazsa ya da bağlı Wallet Standard hesabı kümenin zincirini (`solana:devnet` …) listelemiyorsa her sayfada uyarı çıkar ve işlem kapanır. localnet'te genesis'in public bir kümeye ait olmaması yeterlidir |
 | Gönderim | Yazmalar `useSendTransaction()`'dan geçer: korumadan geçmeyen işlem cüzdana gitmez. Cüzdana yalnızca imzalatılır, işlemi ağı doğrulanmış uygulama bağlantısı gönderir. wallet-adapter'ın `sendTransaction`'ı kullanılmaz: Wallet Standard cüzdanlarda zinciri RPC adresinin metninden tahmin eder ve adında `devnet` geçmeyen bir devnet RPC'sini mainnet sayar |
 | Bakiyeler | SOL ve USDC, hesap aboneliğiyle canlı. USDC'nin mint'i ortamdan değil, escrow'un `EscrowConfig` hesabındaki `settlement_mint`'ten okunur (işlerin kullanabildiği tek mint). `SQUARE_PROGRAM_ID_ESCROW` tanımlı değilse ya da config init edilmemişse bakiye yerine sebebi görünür |
-| Rol | Institution, agent ya da buyer (Square sözlüğü); her rolün adımları 8 adımlı akıştan türetilir. Seçim cüzdan başına, bu tarayıcıda (`localStorage.square-role:<adres>`) tutulur; `useRole()` ile okunur |
-| Oturum | Ed25519 imzalı API oturumu, imzalanacak mesajın biçimini belirleyecek BE-18'i (`apps/api`) bekliyor |
+| Rol | Institution, agent, buyer ya da arbitrator (Square sözlüğü); her rolün adımları 8 adımlı akıştan türetilir, arbitrator akışın dışındadır (uyuşmazlık). Seçim cüzdan başına, bu tarayıcıda (`localStorage.square-role:<adres>`) tutulur; `useRole()` ile okunur |
+| Oturum | Square API'nin `/v1/auth` cüzdan oturumu (`src/lib/api-session.ts`, FE-17): API'nin verdiği giriş mesajı yalnızca bağlı cüzdanın adresini ve istenen nonce'u taşıyorsa cüzdana imzalatılır (mesaj, işlem değil); imza base58 gönderilir. Belirteç bu sekmenin `sessionStorage`'ında (`square-api-session:<api origin>:<cüzdan>`) bitişine 30 s kalana kadar durur; 401'de silinir, çıkışta sunucuda da kapatılır |
 
 ## Politika sayfası (FE-04)
 
@@ -160,6 +161,26 @@ Eşiği aşan işte kurum, fonlamadan önce Travel Rule kaydının salt'lı comm
 | Durum (iş sayfası) | Herkese açık: "Not required", "Waiting for the commitment" (eşik üstü, `Open`), "Commitment bound" (commitment hex), "No commitment" (eşik sonradan yükseldi). İşi açan kurum depoyu açıp "Verify with the local record" ile commitment'ı kayıttan ve salt'tan yeniden hesaplar ve zincirdekiyle karşılaştırır. Zaman çizelgesinde `TravelRuleCommitted` |
 
 Kalan: kaydın sunucuda şifreli saklanması ve karşı tarafa iletilmesi BE-23'ü (#73) bekliyor; API'si gelince şifreli zarfın sunucuya gönderilmesi eklenecek. O zamana kadar tek kopya bu tarayıcı ve kurumun indirdiği şifreli dosyadır.
+
+## Uyuşmazlık (FE-17)
+
+M-of-N arbitration ve dispute zaman aşımının arayüzü ([ADR 0016](../../docs/decisions/0016-dispute-m-of-n-zaman-asimi-ve-ispatsiz-bekleme.md)). Kurallar programındır; arayüz aynılarını düğmeleri açmak ve açıklamak için uygular (`src/lib/dispute.ts`, testli). Süreler zincir saatine göredir (Clock sysvar'ı, `useChainClock`). Arbitrator seti, eşik, bond kuralı ve süreler her değişiklikte escrow config'inden yeniden okunur.
+
+| Parça | Davranış |
+|---|---|
+| Durum (iş sayfası) | Herkese açık: challenger (kurum ya da ispatsız bekleme başvurusundaki agent), bond, `reason_hash`, açılış, son tarih ve geri sayım, oy sayısı / eşik (M), bekleyen karar. Dispute'un set sürümü config'tekinden eskiyse eski oylar sayılmaz ve bunu söyler. Durum rozetleri: açık, son tarih geçti, karara bağlandı, lapse, kapandı |
+| İtiraz (kurum) | İş `Delivered`, işte ilk dispute ve challenge penceresi açıkken (kalan süre gösterilir). Minimum bond `max(amount × min_bond_bps / 10 000, min_bond_absolute)` (en az 1) config'ten hesaplanıp önerilir, altı ve USDC bakiyesini aşanı reddedilir. Kanıt dosyası tarayıcıda SHA-256'lanır; API tanımlıysa `POST /v1/jobs/{job}/dispute/evidence` ile özel depoya yüklenir ve dönen `reasonHash` yerel hash'le aynı olmalıdır. Sonra `raise_dispute` (SDK `flow.raiseDispute`, bond kurumun USDC hesabından bond vault'una) |
+| Başvuru (agent) | Policy'li ve `Delivered` işte `challenge_end + proof_timeout_secs`'ten (önceki dispute lapse olduysa kapanışından) sonra; geri sayım gösterilir. Bugün işi kapatan bir ispat bağlıysa (uyumlu ya da kesin ret, aynı UTC günü) finalize'a yönlendirir. `escalate_missing_proof` bond'suzdur |
+| Kararın ödenmesi | `Resolved` işte herkes `execute_resolution` gönderir; agent tarafına, kuruma ve bond'a ne gideceği önceden gösterilir. Policy'li işte agent tarafı tutarı ispat kapısından geçer: taze uyumlu ispat yoksa ödeme `ProofRequired` ile bekler, sayfa bunu söyler |
+| Lapse | Son tarihte ve sonrasında karara bağlanmamış dispute için uyarı ve herkese `lapse_dispute` (keeper'ın lapse crank'i de yapar). Lapse sonrası iş `Delivered`'a döner; bölüm "bond iade edildi" bilgisini (bond'suz başvuruda iade yok) ve kapanış anını gösterir |
+| Kanıtlar | Taraflara (kurum, agent cüzdanı, aktif arbitrator'lar) API oturumuyla: liste (`isDisputeReason` işaretli), indirme (ek olarak, sayfada açılmaz), dispute açıkken ve karara bağlıyken kanıt ekleme. Yetkiyi API denetler |
+| Arbitrator konsolu | `/app/arbitration`: cüzdan zincirdeki aktif sette değilse açılmaz. Kuyruk `GET /v1/arbitration/queue`'dan, her dispute'un job'u zincirden okunur. Kart: tutar, challenger, bond, son tarih ve geri sayım, oylar, oy sayısı / eşik, kanıtlar. Oy: lehine agent, lehine kurum ya da split (agent payı USDC, en fazla escrow tutarı). İlk oy kararı belirlediyse yalnızca o karar seçilebilir; son tarih geçtiyse, oy verildiyse (zincir ya da API'nin `hasVoted`'ı) oy kapalıdır |
+| Oy tx'i | `POST /v1/disputes/{job}/votes` imzasız v0 tx döndürür. Tx imzadan önce çözülür (ALT'ler zincirden): fee payer ve tek imzacı arbitrator, talimatlar compute budget ve tek bir escrow `resolve_dispute`, hesaplar `[arbitrator, config, job]`, karar seçilenle aynı. Değilse imzalatılmaz |
+| Bildirim | Konsolda webhook abonelikleri: liste, ekleme (https; localnet'te http, olay seçimi) ve silme. İmza sırrı (`whsec_…`) yalnızca ekleme yanıtında bir kez gösterilir |
+| Hatalar | Escrow hata kodları IDL mesajı ve ne yapılacağıyla: `InsufficientBond`, `DisputeWindowClosed`, `DisputeAlreadyRaised`, `DisputeAlreadyActive`, `NoActiveDispute`, `NotArbitrator`, `AlreadyVoted`, `ResolutionMismatch`, `ResolutionNotDecided`, `InvalidSplitAmount`, `DisputeNotExpired`, `ProofTimeoutNotReached`, `InvalidDisputeTimeout`, `ProofRequired`, `StaleReleaseProof`, screening kodları. API'nin `simulation_failed` / `program_error` yanıtındaki program hatası da aynı açıklamayla gösterilir |
+| Zaman çizelgesi | `DisputeRaised` (challenger, bond, son tarih), `DisputeVote` (arbitrator, oy, sayım), `DisputeDecided`, `DisputeResolved` (dağılım), `DisputeLapsed` (iade edilen bond, iş `Delivered`'a döndü), `MissingProofEscalated` |
+
+Kalan: devnet'te gerçek API ve programlarla uçtan uca deneme, devnet deploy'u (BC-30) ve yayımlanmış bir API'ye bağlıdır; burada bileşenler sahte zincir hesaplarıyla, tx'ler SDK akışıyla kurulup çözülerek test edilir.
 
 ## Tasarım sistemi
 

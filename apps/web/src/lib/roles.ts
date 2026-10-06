@@ -1,9 +1,10 @@
 // Rol seçimi (FE-03). Roller Square sözlüğündeki kullanıcı rolleridir (analiz §7, "Rol terminolojisi": institution, agent,
-// buyer); arbitrator ve keeper uygulamada rol seçmez. Rolün adımları sekiz adımlı akışın aktör alanından
-// türetilir, ayrı bir liste tutulmaz.
+// buyer) ve uyuşmazlık için arbitrator (FE-17); keeper uygulamada rol seçmez. Rolün adımları sekiz adımlı akışın aktör
+// alanından türetilir, ayrı bir liste tutulmaz; arbitrator akışın dışındadır (dispute, ADR 0016). Rol yalnızca arayüzü
+// düzenler: arbitrator konsolu cüzdanın zincirdeki aktif arbitrator setinde olup olmadığını ayrıca denetler.
 import { FLOW_STEPS } from './flow';
 
-export const ROLES = ['institution', 'agent', 'buyer'] as const;
+export const ROLES = ['institution', 'agent', 'buyer', 'arbitrator'] as const;
 export type Role = (typeof ROLES)[number];
 
 export const ROLE_INFO: Readonly<Record<Role, { label: string; summary: string }>> = {
@@ -18,6 +19,10 @@ export const ROLE_INFO: Readonly<Record<Role, { label: string; summary: string }
   buyer: {
     label: 'Buyer',
     summary: "Buys a receivable at a discount when the institution's policy approves the buyer.",
+  },
+  arbitrator: {
+    label: 'Arbitrator',
+    summary: "Votes on disputes with the escrow's M-of-N panel and follows them from the arbitration console.",
   },
 };
 
