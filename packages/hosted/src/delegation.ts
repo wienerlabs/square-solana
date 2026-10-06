@@ -251,8 +251,10 @@ export function createDelegator(options: DelegatorOptions): Delegator {
       if (target.categories && !target.categories.includes(category)) {
         return refused(jobKey, 0, ['categoryNotAllowed']);
       }
-      const deadline = request.deadline ?? now + config.deadlineSecs;
+      const latest = now + config.deadlineSecs;
+      const deadline = request.deadline ?? latest;
       if (deadline <= now) throw new DelegationError(`deadline geçmiş: ${deadline}`);
+      if (deadline > latest) throw new DelegationError(`deadline en geç ${latest} olabilir (deadlineSecs)`);
 
       const { mint, travelRuleThreshold } = await settlement();
       const needsTravelRule = travelRuleThreshold > 0n && request.amount >= travelRuleThreshold;
