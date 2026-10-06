@@ -1,0 +1,3002 @@
+{
+  "refusals": [
+    {
+      "code": 0,
+      "dailySpentBefore": "0",
+      "rules": [],
+      "final": false
+    },
+    {
+      "code": 1,
+      "dailySpentBefore": "0",
+      "rules": [
+        "perTx"
+      ],
+      "final": true
+    },
+    {
+      "code": 2,
+      "dailySpentBefore": "0",
+      "rules": [
+        "dailyPrivate"
+      ],
+      "final": true
+    },
+    {
+      "code": 3,
+      "dailySpentBefore": "0",
+      "rules": [
+        "perTx",
+        "dailyPrivate"
+      ],
+      "final": true
+    },
+    {
+      "code": 4,
+      "dailySpentBefore": "0",
+      "rules": [
+        "mintNotAllowed"
+      ],
+      "final": true
+    },
+    {
+      "code": 5,
+      "dailySpentBefore": "0",
+      "rules": [
+        "perTx",
+        "mintNotAllowed"
+      ],
+      "final": true
+    },
+    {
+      "code": 6,
+      "dailySpentBefore": "0",
+      "rules": [
+        "dailyPrivate",
+        "mintNotAllowed"
+      ],
+      "final": true
+    },
+    {
+      "code": 7,
+      "dailySpentBefore": "0",
+      "rules": [
+        "perTx",
+        "dailyPrivate",
+        "mintNotAllowed"
+      ],
+      "final": true
+    },
+    {
+      "code": 8,
+      "dailySpentBefore": "0",
+      "rules": [
+        "payeeBlocked"
+      ],
+      "final": true
+    },
+    {
+      "code": 9,
+      "dailySpentBefore": "0",
+      "rules": [
+        "perTx",
+        "payeeBlocked"
+      ],
+      "final": true
+    },
+    {
+      "code": 10,
+      "dailySpentBefore": "0",
+      "rules": [
+        "dailyPrivate",
+        "payeeBlocked"
+      ],
+      "final": true
+    },
+    {
+      "code": 11,
+      "dailySpentBefore": "0",
+      "rules": [
+        "perTx",
+        "dailyPrivate",
+        "payeeBlocked"
+      ],
+      "final": true
+    },
+    {
+      "code": 12,
+      "dailySpentBefore": "0",
+      "rules": [
+        "mintNotAllowed",
+        "payeeBlocked"
+      ],
+      "final": true
+    },
+    {
+      "code": 13,
+      "dailySpentBefore": "0",
+      "rules": [
+        "perTx",
+        "mintNotAllowed",
+        "payeeBlocked"
+      ],
+      "final": true
+    },
+    {
+      "code": 14,
+      "dailySpentBefore": "0",
+      "rules": [
+        "dailyPrivate",
+        "mintNotAllowed",
+        "payeeBlocked"
+      ],
+      "final": true
+    },
+    {
+      "code": 15,
+      "dailySpentBefore": "0",
+      "rules": [
+        "perTx",
+        "dailyPrivate",
+        "mintNotAllowed",
+        "payeeBlocked"
+      ],
+      "final": true
+    },
+    {
+      "code": 16,
+      "dailySpentBefore": "0",
+      "rules": [
+        "categoryNotAllowed"
+      ],
+      "final": false
+    },
+    {
+      "code": 17,
+      "dailySpentBefore": "0",
+      "rules": [
+        "perTx",
+        "categoryNotAllowed"
+      ],
+      "final": true
+    },
+    {
+      "code": 18,
+      "dailySpentBefore": "0",
+      "rules": [
+        "dailyPrivate",
+        "categoryNotAllowed"
+      ],
+      "final": true
+    },
+    {
+      "code": 19,
+      "dailySpentBefore": "0",
+      "rules": [
+        "perTx",
+        "dailyPrivate",
+        "categoryNotAllowed"
+      ],
+      "final": true
+    },
+    {
+      "code": 20,
+      "dailySpentBefore": "0",
+      "rules": [
+        "mintNotAllowed",
+        "categoryNotAllowed"
+      ],
+      "final": true
+    },
+    {
+      "code": 21,
+      "dailySpentBefore": "0",
+      "rules": [
+        "perTx",
+        "mintNotAllowed",
+        "categoryNotAllowed"
+      ],
+      "final": true
+    },
+    {
+      "code": 22,
+      "dailySpentBefore": "0",
+      "rules": [
+        "dailyPrivate",
+        "mintNotAllowed",
+        "categoryNotAllowed"
+      ],
+      "final": true
+    },
+    {
+      "code": 23,
+      "dailySpentBefore": "0",
+      "rules": [
+        "perTx",
+        "dailyPrivate",
+        "mintNotAllowed",
+        "categoryNotAllowed"
+      ],
+      "final": true
+    },
+    {
+      "code": 24,
+      "dailySpentBefore": "0",
+      "rules": [
+        "payeeBlocked",
+        "categoryNotAllowed"
+      ],
+      "final": true
+    },
+    {
+      "code": 25,
+      "dailySpentBefore": "0",
+      "rules": [
+        "perTx",
+        "payeeBlocked",
+        "categoryNotAllowed"
+      ],
+      "final": true
+    },
+    {
+      "code": 26,
+      "dailySpentBefore": "0",
+      "rules": [
+        "dailyPrivate",
+        "payeeBlocked",
+        "categoryNotAllowed"
+      ],
+      "final": true
+    },
+    {
+      "code": 27,
+      "dailySpentBefore": "0",
+      "rules": [
+        "perTx",
+        "dailyPrivate",
+        "payeeBlocked",
+        "categoryNotAllowed"
+      ],
+      "final": true
+    },
+    {
+      "code": 28,
+      "dailySpentBefore": "0",
+      "rules": [
+        "mintNotAllowed",
+        "payeeBlocked",
+        "categoryNotAllowed"
+      ],
+      "final": true
+    },
+    {
+      "code": 29,
+      "dailySpentBefore": "0",
+      "rules": [
+        "perTx",
+        "mintNotAllowed",
+        "payeeBlocked",
+        "categoryNotAllowed"
+      ],
+      "final": true
+    },
+    {
+      "code": 30,
+      "dailySpentBefore": "0",
+      "rules": [
+        "dailyPrivate",
+        "mintNotAllowed",
+        "payeeBlocked",
+        "categoryNotAllowed"
+      ],
+      "final": true
+    },
+    {
+      "code": 31,
+      "dailySpentBefore": "0",
+      "rules": [
+        "perTx",
+        "dailyPrivate",
+        "mintNotAllowed",
+        "payeeBlocked",
+        "categoryNotAllowed"
+      ],
+      "final": true
+    },
+    {
+      "code": 32,
+      "dailySpentBefore": "0",
+      "rules": [
+        "outsideTimeWindow"
+      ],
+      "final": false
+    },
+    {
+      "code": 33,
+      "dailySpentBefore": "0",
+      "rules": [
+        "perTx",
+        "outsideTimeWindow"
+      ],
+      "final": true
+    },
+    {
+      "code": 34,
+      "dailySpentBefore": "0",
+      "rules": [
+        "dailyPrivate",
+        "outsideTimeWindow"
+      ],
+      "final": true
+    },
+    {
+      "code": 35,
+      "dailySpentBefore": "0",
+      "rules": [
+        "perTx",
+        "dailyPrivate",
+        "outsideTimeWindow"
+      ],
+      "final": true
+    },
+    {
+      "code": 36,
+      "dailySpentBefore": "0",
+      "rules": [
+        "mintNotAllowed",
+        "outsideTimeWindow"
+      ],
+      "final": true
+    },
+    {
+      "code": 37,
+      "dailySpentBefore": "0",
+      "rules": [
+        "perTx",
+        "mintNotAllowed",
+        "outsideTimeWindow"
+      ],
+      "final": true
+    },
+    {
+      "code": 38,
+      "dailySpentBefore": "0",
+      "rules": [
+        "dailyPrivate",
+        "mintNotAllowed",
+        "outsideTimeWindow"
+      ],
+      "final": true
+    },
+    {
+      "code": 39,
+      "dailySpentBefore": "0",
+      "rules": [
+        "perTx",
+        "dailyPrivate",
+        "mintNotAllowed",
+        "outsideTimeWindow"
+      ],
+      "final": true
+    },
+    {
+      "code": 40,
+      "dailySpentBefore": "0",
+      "rules": [
+        "payeeBlocked",
+        "outsideTimeWindow"
+      ],
+      "final": true
+    },
+    {
+      "code": 41,
+      "dailySpentBefore": "0",
+      "rules": [
+        "perTx",
+        "payeeBlocked",
+        "outsideTimeWindow"
+      ],
+      "final": true
+    },
+    {
+      "code": 42,
+      "dailySpentBefore": "0",
+      "rules": [
+        "dailyPrivate",
+        "payeeBlocked",
+        "outsideTimeWindow"
+      ],
+      "final": true
+    },
+    {
+      "code": 43,
+      "dailySpentBefore": "0",
+      "rules": [
+        "perTx",
+        "dailyPrivate",
+        "payeeBlocked",
+        "outsideTimeWindow"
+      ],
+      "final": true
+    },
+    {
+      "code": 44,
+      "dailySpentBefore": "0",
+      "rules": [
+        "mintNotAllowed",
+        "payeeBlocked",
+        "outsideTimeWindow"
+      ],
+      "final": true
+    },
+    {
+      "code": 45,
+      "dailySpentBefore": "0",
+      "rules": [
+        "perTx",
+        "mintNotAllowed",
+        "payeeBlocked",
+        "outsideTimeWindow"
+      ],
+      "final": true
+    },
+    {
+      "code": 46,
+      "dailySpentBefore": "0",
+      "rules": [
+        "dailyPrivate",
+        "mintNotAllowed",
+        "payeeBlocked",
+        "outsideTimeWindow"
+      ],
+      "final": true
+    },
+    {
+      "code": 47,
+      "dailySpentBefore": "0",
+      "rules": [
+        "perTx",
+        "dailyPrivate",
+        "mintNotAllowed",
+        "payeeBlocked",
+        "outsideTimeWindow"
+      ],
+      "final": true
+    },
+    {
+      "code": 48,
+      "dailySpentBefore": "0",
+      "rules": [
+        "categoryNotAllowed",
+        "outsideTimeWindow"
+      ],
+      "final": false
+    },
+    {
+      "code": 49,
+      "dailySpentBefore": "0",
+      "rules": [
+        "perTx",
+        "categoryNotAllowed",
+        "outsideTimeWindow"
+      ],
+      "final": true
+    },
+    {
+      "code": 50,
+      "dailySpentBefore": "0",
+      "rules": [
+        "dailyPrivate",
+        "categoryNotAllowed",
+        "outsideTimeWindow"
+      ],
+      "final": true
+    },
+    {
+      "code": 51,
+      "dailySpentBefore": "0",
+      "rules": [
+        "perTx",
+        "dailyPrivate",
+        "categoryNotAllowed",
+        "outsideTimeWindow"
+      ],
+      "final": true
+    },
+    {
+      "code": 52,
+      "dailySpentBefore": "0",
+      "rules": [
+        "mintNotAllowed",
+        "categoryNotAllowed",
+        "outsideTimeWindow"
+      ],
+      "final": true
+    },
+    {
+      "code": 53,
+      "dailySpentBefore": "0",
+      "rules": [
+        "perTx",
+        "mintNotAllowed",
+        "categoryNotAllowed",
+        "outsideTimeWindow"
+      ],
+      "final": true
+    },
+    {
+      "code": 54,
+      "dailySpentBefore": "0",
+      "rules": [
+        "dailyPrivate",
+        "mintNotAllowed",
+        "categoryNotAllowed",
+        "outsideTimeWindow"
+      ],
+      "final": true
+    },
+    {
+      "code": 55,
+      "dailySpentBefore": "0",
+      "rules": [
+        "perTx",
+        "dailyPrivate",
+        "mintNotAllowed",
+        "categoryNotAllowed",
+        "outsideTimeWindow"
+      ],
+      "final": true
+    },
+    {
+      "code": 56,
+      "dailySpentBefore": "0",
+      "rules": [
+        "payeeBlocked",
+        "categoryNotAllowed",
+        "outsideTimeWindow"
+      ],
+      "final": true
+    },
+    {
+      "code": 57,
+      "dailySpentBefore": "0",
+      "rules": [
+        "perTx",
+        "payeeBlocked",
+        "categoryNotAllowed",
+        "outsideTimeWindow"
+      ],
+      "final": true
+    },
+    {
+      "code": 58,
+      "dailySpentBefore": "0",
+      "rules": [
+        "dailyPrivate",
+        "payeeBlocked",
+        "categoryNotAllowed",
+        "outsideTimeWindow"
+      ],
+      "final": true
+    },
+    {
+      "code": 59,
+      "dailySpentBefore": "0",
+      "rules": [
+        "perTx",
+        "dailyPrivate",
+        "payeeBlocked",
+        "categoryNotAllowed",
+        "outsideTimeWindow"
+      ],
+      "final": true
+    },
+    {
+      "code": 60,
+      "dailySpentBefore": "0",
+      "rules": [
+        "mintNotAllowed",
+        "payeeBlocked",
+        "categoryNotAllowed",
+        "outsideTimeWindow"
+      ],
+      "final": true
+    },
+    {
+      "code": 61,
+      "dailySpentBefore": "0",
+      "rules": [
+        "perTx",
+        "mintNotAllowed",
+        "payeeBlocked",
+        "categoryNotAllowed",
+        "outsideTimeWindow"
+      ],
+      "final": true
+    },
+    {
+      "code": 62,
+      "dailySpentBefore": "0",
+      "rules": [
+        "dailyPrivate",
+        "mintNotAllowed",
+        "payeeBlocked",
+        "categoryNotAllowed",
+        "outsideTimeWindow"
+      ],
+      "final": true
+    },
+    {
+      "code": 63,
+      "dailySpentBefore": "0",
+      "rules": [
+        "perTx",
+        "dailyPrivate",
+        "mintNotAllowed",
+        "payeeBlocked",
+        "categoryNotAllowed",
+        "outsideTimeWindow"
+      ],
+      "final": true
+    },
+    {
+      "code": 64,
+      "dailySpentBefore": "0",
+      "rules": [
+        "dailyCeiling"
+      ],
+      "final": true
+    },
+    {
+      "code": 65,
+      "dailySpentBefore": "0",
+      "rules": [
+        "perTx",
+        "dailyCeiling"
+      ],
+      "final": true
+    },
+    {
+      "code": 66,
+      "dailySpentBefore": "0",
+      "rules": [
+        "dailyPrivate",
+        "dailyCeiling"
+      ],
+      "final": true
+    },
+    {
+      "code": 67,
+      "dailySpentBefore": "0",
+      "rules": [
+        "perTx",
+        "dailyPrivate",
+        "dailyCeiling"
+      ],
+      "final": true
+    },
+    {
+      "code": 68,
+      "dailySpentBefore": "0",
+      "rules": [
+        "mintNotAllowed",
+        "dailyCeiling"
+      ],
+      "final": true
+    },
+    {
+      "code": 69,
+      "dailySpentBefore": "0",
+      "rules": [
+        "perTx",
+        "mintNotAllowed",
+        "dailyCeiling"
+      ],
+      "final": true
+    },
+    {
+      "code": 70,
+      "dailySpentBefore": "0",
+      "rules": [
+        "dailyPrivate",
+        "mintNotAllowed",
+        "dailyCeiling"
+      ],
+      "final": true
+    },
+    {
+      "code": 71,
+      "dailySpentBefore": "0",
+      "rules": [
+        "perTx",
+        "dailyPrivate",
+        "mintNotAllowed",
+        "dailyCeiling"
+      ],
+      "final": true
+    },
+    {
+      "code": 72,
+      "dailySpentBefore": "0",
+      "rules": [
+        "payeeBlocked",
+        "dailyCeiling"
+      ],
+      "final": true
+    },
+    {
+      "code": 73,
+      "dailySpentBefore": "0",
+      "rules": [
+        "perTx",
+        "payeeBlocked",
+        "dailyCeiling"
+      ],
+      "final": true
+    },
+    {
+      "code": 74,
+      "dailySpentBefore": "0",
+      "rules": [
+        "dailyPrivate",
+        "payeeBlocked",
+        "dailyCeiling"
+      ],
+      "final": true
+    },
+    {
+      "code": 75,
+      "dailySpentBefore": "0",
+      "rules": [
+        "perTx",
+        "dailyPrivate",
+        "payeeBlocked",
+        "dailyCeiling"
+      ],
+      "final": true
+    },
+    {
+      "code": 76,
+      "dailySpentBefore": "0",
+      "rules": [
+        "mintNotAllowed",
+        "payeeBlocked",
+        "dailyCeiling"
+      ],
+      "final": true
+    },
+    {
+      "code": 77,
+      "dailySpentBefore": "0",
+      "rules": [
+        "perTx",
+        "mintNotAllowed",
+        "payeeBlocked",
+        "dailyCeiling"
+      ],
+      "final": true
+    },
+    {
+      "code": 78,
+      "dailySpentBefore": "0",
+      "rules": [
+        "dailyPrivate",
+        "mintNotAllowed",
+        "payeeBlocked",
+        "dailyCeiling"
+      ],
+      "final": true
+    },
+    {
+      "code": 79,
+      "dailySpentBefore": "0",
+      "rules": [
+        "perTx",
+        "dailyPrivate",
+        "mintNotAllowed",
+        "payeeBlocked",
+        "dailyCeiling"
+      ],
+      "final": true
+    },
+    {
+      "code": 80,
+      "dailySpentBefore": "0",
+      "rules": [
+        "categoryNotAllowed",
+        "dailyCeiling"
+      ],
+      "final": true
+    },
+    {
+      "code": 81,
+      "dailySpentBefore": "0",
+      "rules": [
+        "perTx",
+        "categoryNotAllowed",
+        "dailyCeiling"
+      ],
+      "final": true
+    },
+    {
+      "code": 82,
+      "dailySpentBefore": "0",
+      "rules": [
+        "dailyPrivate",
+        "categoryNotAllowed",
+        "dailyCeiling"
+      ],
+      "final": true
+    },
+    {
+      "code": 83,
+      "dailySpentBefore": "0",
+      "rules": [
+        "perTx",
+        "dailyPrivate",
+        "categoryNotAllowed",
+        "dailyCeiling"
+      ],
+      "final": true
+    },
+    {
+      "code": 84,
+      "dailySpentBefore": "0",
+      "rules": [
+        "mintNotAllowed",
+        "categoryNotAllowed",
+        "dailyCeiling"
+      ],
+      "final": true
+    },
+    {
+      "code": 85,
+      "dailySpentBefore": "0",
+      "rules": [
+        "perTx",
+        "mintNotAllowed",
+        "categoryNotAllowed",
+        "dailyCeiling"
+      ],
+      "final": true
+    },
+    {
+      "code": 86,
+      "dailySpentBefore": "0",
+      "rules": [
+        "dailyPrivate",
+        "mintNotAllowed",
+        "categoryNotAllowed",
+        "dailyCeiling"
+      ],
+      "final": true
+    },
+    {
+      "code": 87,
+      "dailySpentBefore": "0",
+      "rules": [
+        "perTx",
+        "dailyPrivate",
+        "mintNotAllowed",
+        "categoryNotAllowed",
+        "dailyCeiling"
+      ],
+      "final": true
+    },
+    {
+      "code": 88,
+      "dailySpentBefore": "0",
+      "rules": [
+        "payeeBlocked",
+        "categoryNotAllowed",
+        "dailyCeiling"
+      ],
+      "final": true
+    },
+    {
+      "code": 89,
+      "dailySpentBefore": "0",
+      "rules": [
+        "perTx",
+        "payeeBlocked",
+        "categoryNotAllowed",
+        "dailyCeiling"
+      ],
+      "final": true
+    },
+    {
+      "code": 90,
+      "dailySpentBefore": "0",
+      "rules": [
+        "dailyPrivate",
+        "payeeBlocked",
+        "categoryNotAllowed",
+        "dailyCeiling"
+      ],
+      "final": true
+    },
+    {
+      "code": 91,
+      "dailySpentBefore": "0",
+      "rules": [
+        "perTx",
+        "dailyPrivate",
+        "payeeBlocked",
+        "categoryNotAllowed",
+        "dailyCeiling"
+      ],
+      "final": true
+    },
+    {
+      "code": 92,
+      "dailySpentBefore": "0",
+      "rules": [
+        "mintNotAllowed",
+        "payeeBlocked",
+        "categoryNotAllowed",
+        "dailyCeiling"
+      ],
+      "final": true
+    },
+    {
+      "code": 93,
+      "dailySpentBefore": "0",
+      "rules": [
+        "perTx",
+        "mintNotAllowed",
+        "payeeBlocked",
+        "categoryNotAllowed",
+        "dailyCeiling"
+      ],
+      "final": true
+    },
+    {
+      "code": 94,
+      "dailySpentBefore": "0",
+      "rules": [
+        "dailyPrivate",
+        "mintNotAllowed",
+        "payeeBlocked",
+        "categoryNotAllowed",
+        "dailyCeiling"
+      ],
+      "final": true
+    },
+    {
+      "code": 95,
+      "dailySpentBefore": "0",
+      "rules": [
+        "perTx",
+        "dailyPrivate",
+        "mintNotAllowed",
+        "payeeBlocked",
+        "categoryNotAllowed",
+        "dailyCeiling"
+      ],
+      "final": true
+    },
+    {
+      "code": 96,
+      "dailySpentBefore": "0",
+      "rules": [
+        "outsideTimeWindow",
+        "dailyCeiling"
+      ],
+      "final": true
+    },
+    {
+      "code": 97,
+      "dailySpentBefore": "0",
+      "rules": [
+        "perTx",
+        "outsideTimeWindow",
+        "dailyCeiling"
+      ],
+      "final": true
+    },
+    {
+      "code": 98,
+      "dailySpentBefore": "0",
+      "rules": [
+        "dailyPrivate",
+        "outsideTimeWindow",
+        "dailyCeiling"
+      ],
+      "final": true
+    },
+    {
+      "code": 99,
+      "dailySpentBefore": "0",
+      "rules": [
+        "perTx",
+        "dailyPrivate",
+        "outsideTimeWindow",
+        "dailyCeiling"
+      ],
+      "final": true
+    },
+    {
+      "code": 100,
+      "dailySpentBefore": "0",
+      "rules": [
+        "mintNotAllowed",
+        "outsideTimeWindow",
+        "dailyCeiling"
+      ],
+      "final": true
+    },
+    {
+      "code": 101,
+      "dailySpentBefore": "0",
+      "rules": [
+        "perTx",
+        "mintNotAllowed",
+        "outsideTimeWindow",
+        "dailyCeiling"
+      ],
+      "final": true
+    },
+    {
+      "code": 102,
+      "dailySpentBefore": "0",
+      "rules": [
+        "dailyPrivate",
+        "mintNotAllowed",
+        "outsideTimeWindow",
+        "dailyCeiling"
+      ],
+      "final": true
+    },
+    {
+      "code": 103,
+      "dailySpentBefore": "0",
+      "rules": [
+        "perTx",
+        "dailyPrivate",
+        "mintNotAllowed",
+        "outsideTimeWindow",
+        "dailyCeiling"
+      ],
+      "final": true
+    },
+    {
+      "code": 104,
+      "dailySpentBefore": "0",
+      "rules": [
+        "payeeBlocked",
+        "outsideTimeWindow",
+        "dailyCeiling"
+      ],
+      "final": true
+    },
+    {
+      "code": 105,
+      "dailySpentBefore": "0",
+      "rules": [
+        "perTx",
+        "payeeBlocked",
+        "outsideTimeWindow",
+        "dailyCeiling"
+      ],
+      "final": true
+    },
+    {
+      "code": 106,
+      "dailySpentBefore": "0",
+      "rules": [
+        "dailyPrivate",
+        "payeeBlocked",
+        "outsideTimeWindow",
+        "dailyCeiling"
+      ],
+      "final": true
+    },
+    {
+      "code": 107,
+      "dailySpentBefore": "0",
+      "rules": [
+        "perTx",
+        "dailyPrivate",
+        "payeeBlocked",
+        "outsideTimeWindow",
+        "dailyCeiling"
+      ],
+      "final": true
+    },
+    {
+      "code": 108,
+      "dailySpentBefore": "0",
+      "rules": [
+        "mintNotAllowed",
+        "payeeBlocked",
+        "outsideTimeWindow",
+        "dailyCeiling"
+      ],
+      "final": true
+    },
+    {
+      "code": 109,
+      "dailySpentBefore": "0",
+      "rules": [
+        "perTx",
+        "mintNotAllowed",
+        "payeeBlocked",
+        "outsideTimeWindow",
+        "dailyCeiling"
+      ],
+      "final": true
+    },
+    {
+      "code": 110,
+      "dailySpentBefore": "0",
+      "rules": [
+        "dailyPrivate",
+        "mintNotAllowed",
+        "payeeBlocked",
+        "outsideTimeWindow",
+        "dailyCeiling"
+      ],
+      "final": true
+    },
+    {
+      "code": 111,
+      "dailySpentBefore": "0",
+      "rules": [
+        "perTx",
+        "dailyPrivate",
+        "mintNotAllowed",
+        "payeeBlocked",
+        "outsideTimeWindow",
+        "dailyCeiling"
+      ],
+      "final": true
+    },
+    {
+      "code": 112,
+      "dailySpentBefore": "0",
+      "rules": [
+        "categoryNotAllowed",
+        "outsideTimeWindow",
+        "dailyCeiling"
+      ],
+      "final": true
+    },
+    {
+      "code": 113,
+      "dailySpentBefore": "0",
+      "rules": [
+        "perTx",
+        "categoryNotAllowed",
+        "outsideTimeWindow",
+        "dailyCeiling"
+      ],
+      "final": true
+    },
+    {
+      "code": 114,
+      "dailySpentBefore": "0",
+      "rules": [
+        "dailyPrivate",
+        "categoryNotAllowed",
+        "outsideTimeWindow",
+        "dailyCeiling"
+      ],
+      "final": true
+    },
+    {
+      "code": 115,
+      "dailySpentBefore": "0",
+      "rules": [
+        "perTx",
+        "dailyPrivate",
+        "categoryNotAllowed",
+        "outsideTimeWindow",
+        "dailyCeiling"
+      ],
+      "final": true
+    },
+    {
+      "code": 116,
+      "dailySpentBefore": "0",
+      "rules": [
+        "mintNotAllowed",
+        "categoryNotAllowed",
+        "outsideTimeWindow",
+        "dailyCeiling"
+      ],
+      "final": true
+    },
+    {
+      "code": 117,
+      "dailySpentBefore": "0",
+      "rules": [
+        "perTx",
+        "mintNotAllowed",
+        "categoryNotAllowed",
+        "outsideTimeWindow",
+        "dailyCeiling"
+      ],
+      "final": true
+    },
+    {
+      "code": 118,
+      "dailySpentBefore": "0",
+      "rules": [
+        "dailyPrivate",
+        "mintNotAllowed",
+        "categoryNotAllowed",
+        "outsideTimeWindow",
+        "dailyCeiling"
+      ],
+      "final": true
+    },
+    {
+      "code": 119,
+      "dailySpentBefore": "0",
+      "rules": [
+        "perTx",
+        "dailyPrivate",
+        "mintNotAllowed",
+        "categoryNotAllowed",
+        "outsideTimeWindow",
+        "dailyCeiling"
+      ],
+      "final": true
+    },
+    {
+      "code": 120,
+      "dailySpentBefore": "0",
+      "rules": [
+        "payeeBlocked",
+        "categoryNotAllowed",
+        "outsideTimeWindow",
+        "dailyCeiling"
+      ],
+      "final": true
+    },
+    {
+      "code": 121,
+      "dailySpentBefore": "0",
+      "rules": [
+        "perTx",
+        "payeeBlocked",
+        "categoryNotAllowed",
+        "outsideTimeWindow",
+        "dailyCeiling"
+      ],
+      "final": true
+    },
+    {
+      "code": 122,
+      "dailySpentBefore": "0",
+      "rules": [
+        "dailyPrivate",
+        "payeeBlocked",
+        "categoryNotAllowed",
+        "outsideTimeWindow",
+        "dailyCeiling"
+      ],
+      "final": true
+    },
+    {
+      "code": 123,
+      "dailySpentBefore": "0",
+      "rules": [
+        "perTx",
+        "dailyPrivate",
+        "payeeBlocked",
+        "categoryNotAllowed",
+        "outsideTimeWindow",
+        "dailyCeiling"
+      ],
+      "final": true
+    },
+    {
+      "code": 124,
+      "dailySpentBefore": "0",
+      "rules": [
+        "mintNotAllowed",
+        "payeeBlocked",
+        "categoryNotAllowed",
+        "outsideTimeWindow",
+        "dailyCeiling"
+      ],
+      "final": true
+    },
+    {
+      "code": 125,
+      "dailySpentBefore": "0",
+      "rules": [
+        "perTx",
+        "mintNotAllowed",
+        "payeeBlocked",
+        "categoryNotAllowed",
+        "outsideTimeWindow",
+        "dailyCeiling"
+      ],
+      "final": true
+    },
+    {
+      "code": 126,
+      "dailySpentBefore": "0",
+      "rules": [
+        "dailyPrivate",
+        "mintNotAllowed",
+        "payeeBlocked",
+        "categoryNotAllowed",
+        "outsideTimeWindow",
+        "dailyCeiling"
+      ],
+      "final": true
+    },
+    {
+      "code": 127,
+      "dailySpentBefore": "0",
+      "rules": [
+        "perTx",
+        "dailyPrivate",
+        "mintNotAllowed",
+        "payeeBlocked",
+        "categoryNotAllowed",
+        "outsideTimeWindow",
+        "dailyCeiling"
+      ],
+      "final": true
+    },
+    {
+      "code": 0,
+      "dailySpentBefore": "40000000",
+      "rules": [],
+      "final": false
+    },
+    {
+      "code": 1,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "perTx"
+      ],
+      "final": true
+    },
+    {
+      "code": 2,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "dailyPrivate"
+      ],
+      "final": false
+    },
+    {
+      "code": 3,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "perTx",
+        "dailyPrivate"
+      ],
+      "final": true
+    },
+    {
+      "code": 4,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "mintNotAllowed"
+      ],
+      "final": true
+    },
+    {
+      "code": 5,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "perTx",
+        "mintNotAllowed"
+      ],
+      "final": true
+    },
+    {
+      "code": 6,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "dailyPrivate",
+        "mintNotAllowed"
+      ],
+      "final": true
+    },
+    {
+      "code": 7,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "perTx",
+        "dailyPrivate",
+        "mintNotAllowed"
+      ],
+      "final": true
+    },
+    {
+      "code": 8,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "payeeBlocked"
+      ],
+      "final": true
+    },
+    {
+      "code": 9,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "perTx",
+        "payeeBlocked"
+      ],
+      "final": true
+    },
+    {
+      "code": 10,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "dailyPrivate",
+        "payeeBlocked"
+      ],
+      "final": true
+    },
+    {
+      "code": 11,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "perTx",
+        "dailyPrivate",
+        "payeeBlocked"
+      ],
+      "final": true
+    },
+    {
+      "code": 12,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "mintNotAllowed",
+        "payeeBlocked"
+      ],
+      "final": true
+    },
+    {
+      "code": 13,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "perTx",
+        "mintNotAllowed",
+        "payeeBlocked"
+      ],
+      "final": true
+    },
+    {
+      "code": 14,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "dailyPrivate",
+        "mintNotAllowed",
+        "payeeBlocked"
+      ],
+      "final": true
+    },
+    {
+      "code": 15,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "perTx",
+        "dailyPrivate",
+        "mintNotAllowed",
+        "payeeBlocked"
+      ],
+      "final": true
+    },
+    {
+      "code": 16,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "categoryNotAllowed"
+      ],
+      "final": false
+    },
+    {
+      "code": 17,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "perTx",
+        "categoryNotAllowed"
+      ],
+      "final": true
+    },
+    {
+      "code": 18,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "dailyPrivate",
+        "categoryNotAllowed"
+      ],
+      "final": false
+    },
+    {
+      "code": 19,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "perTx",
+        "dailyPrivate",
+        "categoryNotAllowed"
+      ],
+      "final": true
+    },
+    {
+      "code": 20,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "mintNotAllowed",
+        "categoryNotAllowed"
+      ],
+      "final": true
+    },
+    {
+      "code": 21,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "perTx",
+        "mintNotAllowed",
+        "categoryNotAllowed"
+      ],
+      "final": true
+    },
+    {
+      "code": 22,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "dailyPrivate",
+        "mintNotAllowed",
+        "categoryNotAllowed"
+      ],
+      "final": true
+    },
+    {
+      "code": 23,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "perTx",
+        "dailyPrivate",
+        "mintNotAllowed",
+        "categoryNotAllowed"
+      ],
+      "final": true
+    },
+    {
+      "code": 24,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "payeeBlocked",
+        "categoryNotAllowed"
+      ],
+      "final": true
+    },
+    {
+      "code": 25,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "perTx",
+        "payeeBlocked",
+        "categoryNotAllowed"
+      ],
+      "final": true
+    },
+    {
+      "code": 26,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "dailyPrivate",
+        "payeeBlocked",
+        "categoryNotAllowed"
+      ],
+      "final": true
+    },
+    {
+      "code": 27,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "perTx",
+        "dailyPrivate",
+        "payeeBlocked",
+        "categoryNotAllowed"
+      ],
+      "final": true
+    },
+    {
+      "code": 28,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "mintNotAllowed",
+        "payeeBlocked",
+        "categoryNotAllowed"
+      ],
+      "final": true
+    },
+    {
+      "code": 29,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "perTx",
+        "mintNotAllowed",
+        "payeeBlocked",
+        "categoryNotAllowed"
+      ],
+      "final": true
+    },
+    {
+      "code": 30,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "dailyPrivate",
+        "mintNotAllowed",
+        "payeeBlocked",
+        "categoryNotAllowed"
+      ],
+      "final": true
+    },
+    {
+      "code": 31,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "perTx",
+        "dailyPrivate",
+        "mintNotAllowed",
+        "payeeBlocked",
+        "categoryNotAllowed"
+      ],
+      "final": true
+    },
+    {
+      "code": 32,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "outsideTimeWindow"
+      ],
+      "final": false
+    },
+    {
+      "code": 33,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "perTx",
+        "outsideTimeWindow"
+      ],
+      "final": true
+    },
+    {
+      "code": 34,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "dailyPrivate",
+        "outsideTimeWindow"
+      ],
+      "final": false
+    },
+    {
+      "code": 35,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "perTx",
+        "dailyPrivate",
+        "outsideTimeWindow"
+      ],
+      "final": true
+    },
+    {
+      "code": 36,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "mintNotAllowed",
+        "outsideTimeWindow"
+      ],
+      "final": true
+    },
+    {
+      "code": 37,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "perTx",
+        "mintNotAllowed",
+        "outsideTimeWindow"
+      ],
+      "final": true
+    },
+    {
+      "code": 38,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "dailyPrivate",
+        "mintNotAllowed",
+        "outsideTimeWindow"
+      ],
+      "final": true
+    },
+    {
+      "code": 39,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "perTx",
+        "dailyPrivate",
+        "mintNotAllowed",
+        "outsideTimeWindow"
+      ],
+      "final": true
+    },
+    {
+      "code": 40,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "payeeBlocked",
+        "outsideTimeWindow"
+      ],
+      "final": true
+    },
+    {
+      "code": 41,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "perTx",
+        "payeeBlocked",
+        "outsideTimeWindow"
+      ],
+      "final": true
+    },
+    {
+      "code": 42,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "dailyPrivate",
+        "payeeBlocked",
+        "outsideTimeWindow"
+      ],
+      "final": true
+    },
+    {
+      "code": 43,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "perTx",
+        "dailyPrivate",
+        "payeeBlocked",
+        "outsideTimeWindow"
+      ],
+      "final": true
+    },
+    {
+      "code": 44,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "mintNotAllowed",
+        "payeeBlocked",
+        "outsideTimeWindow"
+      ],
+      "final": true
+    },
+    {
+      "code": 45,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "perTx",
+        "mintNotAllowed",
+        "payeeBlocked",
+        "outsideTimeWindow"
+      ],
+      "final": true
+    },
+    {
+      "code": 46,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "dailyPrivate",
+        "mintNotAllowed",
+        "payeeBlocked",
+        "outsideTimeWindow"
+      ],
+      "final": true
+    },
+    {
+      "code": 47,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "perTx",
+        "dailyPrivate",
+        "mintNotAllowed",
+        "payeeBlocked",
+        "outsideTimeWindow"
+      ],
+      "final": true
+    },
+    {
+      "code": 48,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "categoryNotAllowed",
+        "outsideTimeWindow"
+      ],
+      "final": false
+    },
+    {
+      "code": 49,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "perTx",
+        "categoryNotAllowed",
+        "outsideTimeWindow"
+      ],
+      "final": true
+    },
+    {
+      "code": 50,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "dailyPrivate",
+        "categoryNotAllowed",
+        "outsideTimeWindow"
+      ],
+      "final": false
+    },
+    {
+      "code": 51,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "perTx",
+        "dailyPrivate",
+        "categoryNotAllowed",
+        "outsideTimeWindow"
+      ],
+      "final": true
+    },
+    {
+      "code": 52,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "mintNotAllowed",
+        "categoryNotAllowed",
+        "outsideTimeWindow"
+      ],
+      "final": true
+    },
+    {
+      "code": 53,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "perTx",
+        "mintNotAllowed",
+        "categoryNotAllowed",
+        "outsideTimeWindow"
+      ],
+      "final": true
+    },
+    {
+      "code": 54,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "dailyPrivate",
+        "mintNotAllowed",
+        "categoryNotAllowed",
+        "outsideTimeWindow"
+      ],
+      "final": true
+    },
+    {
+      "code": 55,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "perTx",
+        "dailyPrivate",
+        "mintNotAllowed",
+        "categoryNotAllowed",
+        "outsideTimeWindow"
+      ],
+      "final": true
+    },
+    {
+      "code": 56,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "payeeBlocked",
+        "categoryNotAllowed",
+        "outsideTimeWindow"
+      ],
+      "final": true
+    },
+    {
+      "code": 57,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "perTx",
+        "payeeBlocked",
+        "categoryNotAllowed",
+        "outsideTimeWindow"
+      ],
+      "final": true
+    },
+    {
+      "code": 58,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "dailyPrivate",
+        "payeeBlocked",
+        "categoryNotAllowed",
+        "outsideTimeWindow"
+      ],
+      "final": true
+    },
+    {
+      "code": 59,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "perTx",
+        "dailyPrivate",
+        "payeeBlocked",
+        "categoryNotAllowed",
+        "outsideTimeWindow"
+      ],
+      "final": true
+    },
+    {
+      "code": 60,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "mintNotAllowed",
+        "payeeBlocked",
+        "categoryNotAllowed",
+        "outsideTimeWindow"
+      ],
+      "final": true
+    },
+    {
+      "code": 61,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "perTx",
+        "mintNotAllowed",
+        "payeeBlocked",
+        "categoryNotAllowed",
+        "outsideTimeWindow"
+      ],
+      "final": true
+    },
+    {
+      "code": 62,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "dailyPrivate",
+        "mintNotAllowed",
+        "payeeBlocked",
+        "categoryNotAllowed",
+        "outsideTimeWindow"
+      ],
+      "final": true
+    },
+    {
+      "code": 63,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "perTx",
+        "dailyPrivate",
+        "mintNotAllowed",
+        "payeeBlocked",
+        "categoryNotAllowed",
+        "outsideTimeWindow"
+      ],
+      "final": true
+    },
+    {
+      "code": 64,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "dailyCeiling"
+      ],
+      "final": false
+    },
+    {
+      "code": 65,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "perTx",
+        "dailyCeiling"
+      ],
+      "final": true
+    },
+    {
+      "code": 66,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "dailyPrivate",
+        "dailyCeiling"
+      ],
+      "final": false
+    },
+    {
+      "code": 67,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "perTx",
+        "dailyPrivate",
+        "dailyCeiling"
+      ],
+      "final": true
+    },
+    {
+      "code": 68,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "mintNotAllowed",
+        "dailyCeiling"
+      ],
+      "final": true
+    },
+    {
+      "code": 69,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "perTx",
+        "mintNotAllowed",
+        "dailyCeiling"
+      ],
+      "final": true
+    },
+    {
+      "code": 70,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "dailyPrivate",
+        "mintNotAllowed",
+        "dailyCeiling"
+      ],
+      "final": true
+    },
+    {
+      "code": 71,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "perTx",
+        "dailyPrivate",
+        "mintNotAllowed",
+        "dailyCeiling"
+      ],
+      "final": true
+    },
+    {
+      "code": 72,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "payeeBlocked",
+        "dailyCeiling"
+      ],
+      "final": true
+    },
+    {
+      "code": 73,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "perTx",
+        "payeeBlocked",
+        "dailyCeiling"
+      ],
+      "final": true
+    },
+    {
+      "code": 74,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "dailyPrivate",
+        "payeeBlocked",
+        "dailyCeiling"
+      ],
+      "final": true
+    },
+    {
+      "code": 75,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "perTx",
+        "dailyPrivate",
+        "payeeBlocked",
+        "dailyCeiling"
+      ],
+      "final": true
+    },
+    {
+      "code": 76,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "mintNotAllowed",
+        "payeeBlocked",
+        "dailyCeiling"
+      ],
+      "final": true
+    },
+    {
+      "code": 77,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "perTx",
+        "mintNotAllowed",
+        "payeeBlocked",
+        "dailyCeiling"
+      ],
+      "final": true
+    },
+    {
+      "code": 78,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "dailyPrivate",
+        "mintNotAllowed",
+        "payeeBlocked",
+        "dailyCeiling"
+      ],
+      "final": true
+    },
+    {
+      "code": 79,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "perTx",
+        "dailyPrivate",
+        "mintNotAllowed",
+        "payeeBlocked",
+        "dailyCeiling"
+      ],
+      "final": true
+    },
+    {
+      "code": 80,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "categoryNotAllowed",
+        "dailyCeiling"
+      ],
+      "final": false
+    },
+    {
+      "code": 81,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "perTx",
+        "categoryNotAllowed",
+        "dailyCeiling"
+      ],
+      "final": true
+    },
+    {
+      "code": 82,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "dailyPrivate",
+        "categoryNotAllowed",
+        "dailyCeiling"
+      ],
+      "final": false
+    },
+    {
+      "code": 83,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "perTx",
+        "dailyPrivate",
+        "categoryNotAllowed",
+        "dailyCeiling"
+      ],
+      "final": true
+    },
+    {
+      "code": 84,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "mintNotAllowed",
+        "categoryNotAllowed",
+        "dailyCeiling"
+      ],
+      "final": true
+    },
+    {
+      "code": 85,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "perTx",
+        "mintNotAllowed",
+        "categoryNotAllowed",
+        "dailyCeiling"
+      ],
+      "final": true
+    },
+    {
+      "code": 86,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "dailyPrivate",
+        "mintNotAllowed",
+        "categoryNotAllowed",
+        "dailyCeiling"
+      ],
+      "final": true
+    },
+    {
+      "code": 87,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "perTx",
+        "dailyPrivate",
+        "mintNotAllowed",
+        "categoryNotAllowed",
+        "dailyCeiling"
+      ],
+      "final": true
+    },
+    {
+      "code": 88,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "payeeBlocked",
+        "categoryNotAllowed",
+        "dailyCeiling"
+      ],
+      "final": true
+    },
+    {
+      "code": 89,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "perTx",
+        "payeeBlocked",
+        "categoryNotAllowed",
+        "dailyCeiling"
+      ],
+      "final": true
+    },
+    {
+      "code": 90,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "dailyPrivate",
+        "payeeBlocked",
+        "categoryNotAllowed",
+        "dailyCeiling"
+      ],
+      "final": true
+    },
+    {
+      "code": 91,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "perTx",
+        "dailyPrivate",
+        "payeeBlocked",
+        "categoryNotAllowed",
+        "dailyCeiling"
+      ],
+      "final": true
+    },
+    {
+      "code": 92,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "mintNotAllowed",
+        "payeeBlocked",
+        "categoryNotAllowed",
+        "dailyCeiling"
+      ],
+      "final": true
+    },
+    {
+      "code": 93,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "perTx",
+        "mintNotAllowed",
+        "payeeBlocked",
+        "categoryNotAllowed",
+        "dailyCeiling"
+      ],
+      "final": true
+    },
+    {
+      "code": 94,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "dailyPrivate",
+        "mintNotAllowed",
+        "payeeBlocked",
+        "categoryNotAllowed",
+        "dailyCeiling"
+      ],
+      "final": true
+    },
+    {
+      "code": 95,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "perTx",
+        "dailyPrivate",
+        "mintNotAllowed",
+        "payeeBlocked",
+        "categoryNotAllowed",
+        "dailyCeiling"
+      ],
+      "final": true
+    },
+    {
+      "code": 96,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "outsideTimeWindow",
+        "dailyCeiling"
+      ],
+      "final": false
+    },
+    {
+      "code": 97,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "perTx",
+        "outsideTimeWindow",
+        "dailyCeiling"
+      ],
+      "final": true
+    },
+    {
+      "code": 98,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "dailyPrivate",
+        "outsideTimeWindow",
+        "dailyCeiling"
+      ],
+      "final": false
+    },
+    {
+      "code": 99,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "perTx",
+        "dailyPrivate",
+        "outsideTimeWindow",
+        "dailyCeiling"
+      ],
+      "final": true
+    },
+    {
+      "code": 100,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "mintNotAllowed",
+        "outsideTimeWindow",
+        "dailyCeiling"
+      ],
+      "final": true
+    },
+    {
+      "code": 101,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "perTx",
+        "mintNotAllowed",
+        "outsideTimeWindow",
+        "dailyCeiling"
+      ],
+      "final": true
+    },
+    {
+      "code": 102,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "dailyPrivate",
+        "mintNotAllowed",
+        "outsideTimeWindow",
+        "dailyCeiling"
+      ],
+      "final": true
+    },
+    {
+      "code": 103,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "perTx",
+        "dailyPrivate",
+        "mintNotAllowed",
+        "outsideTimeWindow",
+        "dailyCeiling"
+      ],
+      "final": true
+    },
+    {
+      "code": 104,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "payeeBlocked",
+        "outsideTimeWindow",
+        "dailyCeiling"
+      ],
+      "final": true
+    },
+    {
+      "code": 105,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "perTx",
+        "payeeBlocked",
+        "outsideTimeWindow",
+        "dailyCeiling"
+      ],
+      "final": true
+    },
+    {
+      "code": 106,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "dailyPrivate",
+        "payeeBlocked",
+        "outsideTimeWindow",
+        "dailyCeiling"
+      ],
+      "final": true
+    },
+    {
+      "code": 107,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "perTx",
+        "dailyPrivate",
+        "payeeBlocked",
+        "outsideTimeWindow",
+        "dailyCeiling"
+      ],
+      "final": true
+    },
+    {
+      "code": 108,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "mintNotAllowed",
+        "payeeBlocked",
+        "outsideTimeWindow",
+        "dailyCeiling"
+      ],
+      "final": true
+    },
+    {
+      "code": 109,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "perTx",
+        "mintNotAllowed",
+        "payeeBlocked",
+        "outsideTimeWindow",
+        "dailyCeiling"
+      ],
+      "final": true
+    },
+    {
+      "code": 110,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "dailyPrivate",
+        "mintNotAllowed",
+        "payeeBlocked",
+        "outsideTimeWindow",
+        "dailyCeiling"
+      ],
+      "final": true
+    },
+    {
+      "code": 111,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "perTx",
+        "dailyPrivate",
+        "mintNotAllowed",
+        "payeeBlocked",
+        "outsideTimeWindow",
+        "dailyCeiling"
+      ],
+      "final": true
+    },
+    {
+      "code": 112,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "categoryNotAllowed",
+        "outsideTimeWindow",
+        "dailyCeiling"
+      ],
+      "final": false
+    },
+    {
+      "code": 113,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "perTx",
+        "categoryNotAllowed",
+        "outsideTimeWindow",
+        "dailyCeiling"
+      ],
+      "final": true
+    },
+    {
+      "code": 114,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "dailyPrivate",
+        "categoryNotAllowed",
+        "outsideTimeWindow",
+        "dailyCeiling"
+      ],
+      "final": false
+    },
+    {
+      "code": 115,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "perTx",
+        "dailyPrivate",
+        "categoryNotAllowed",
+        "outsideTimeWindow",
+        "dailyCeiling"
+      ],
+      "final": true
+    },
+    {
+      "code": 116,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "mintNotAllowed",
+        "categoryNotAllowed",
+        "outsideTimeWindow",
+        "dailyCeiling"
+      ],
+      "final": true
+    },
+    {
+      "code": 117,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "perTx",
+        "mintNotAllowed",
+        "categoryNotAllowed",
+        "outsideTimeWindow",
+        "dailyCeiling"
+      ],
+      "final": true
+    },
+    {
+      "code": 118,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "dailyPrivate",
+        "mintNotAllowed",
+        "categoryNotAllowed",
+        "outsideTimeWindow",
+        "dailyCeiling"
+      ],
+      "final": true
+    },
+    {
+      "code": 119,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "perTx",
+        "dailyPrivate",
+        "mintNotAllowed",
+        "categoryNotAllowed",
+        "outsideTimeWindow",
+        "dailyCeiling"
+      ],
+      "final": true
+    },
+    {
+      "code": 120,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "payeeBlocked",
+        "categoryNotAllowed",
+        "outsideTimeWindow",
+        "dailyCeiling"
+      ],
+      "final": true
+    },
+    {
+      "code": 121,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "perTx",
+        "payeeBlocked",
+        "categoryNotAllowed",
+        "outsideTimeWindow",
+        "dailyCeiling"
+      ],
+      "final": true
+    },
+    {
+      "code": 122,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "dailyPrivate",
+        "payeeBlocked",
+        "categoryNotAllowed",
+        "outsideTimeWindow",
+        "dailyCeiling"
+      ],
+      "final": true
+    },
+    {
+      "code": 123,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "perTx",
+        "dailyPrivate",
+        "payeeBlocked",
+        "categoryNotAllowed",
+        "outsideTimeWindow",
+        "dailyCeiling"
+      ],
+      "final": true
+    },
+    {
+      "code": 124,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "mintNotAllowed",
+        "payeeBlocked",
+        "categoryNotAllowed",
+        "outsideTimeWindow",
+        "dailyCeiling"
+      ],
+      "final": true
+    },
+    {
+      "code": 125,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "perTx",
+        "mintNotAllowed",
+        "payeeBlocked",
+        "categoryNotAllowed",
+        "outsideTimeWindow",
+        "dailyCeiling"
+      ],
+      "final": true
+    },
+    {
+      "code": 126,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "dailyPrivate",
+        "mintNotAllowed",
+        "payeeBlocked",
+        "categoryNotAllowed",
+        "outsideTimeWindow",
+        "dailyCeiling"
+      ],
+      "final": true
+    },
+    {
+      "code": 127,
+      "dailySpentBefore": "40000000",
+      "rules": [
+        "perTx",
+        "dailyPrivate",
+        "mintNotAllowed",
+        "payeeBlocked",
+        "categoryNotAllowed",
+        "outsideTimeWindow",
+        "dailyCeiling"
+      ],
+      "final": true
+    }
+  ],
+  "dailySpentAt": [
+    {
+      "name": "same day",
+      "dayStartUnix": 1789948800,
+      "dailySpent": "40000000",
+      "at": 1790000000,
+      "expected": "40000000"
+    },
+    {
+      "name": "first second of the day",
+      "dayStartUnix": 1789948800,
+      "dailySpent": "40000000",
+      "at": 1789948800,
+      "expected": "40000000"
+    },
+    {
+      "name": "last second of the day",
+      "dayStartUnix": 1789948800,
+      "dailySpent": "40000000",
+      "at": 1790035199,
+      "expected": "40000000"
+    },
+    {
+      "name": "state from an earlier day",
+      "dayStartUnix": 1789862400,
+      "dailySpent": "40000000",
+      "at": 1790000000,
+      "expected": "0"
+    },
+    {
+      "name": "state from a later day",
+      "dayStartUnix": 1790035200,
+      "dailySpent": "40000000",
+      "at": 1790000000,
+      "expected": null
+    },
+    {
+      "name": "new state",
+      "dayStartUnix": 0,
+      "dailySpent": "0",
+      "at": 1790000000,
+      "expected": "0"
+    },
+    {
+      "name": "moment at the epoch",
+      "dayStartUnix": 0,
+      "dailySpent": "7",
+      "at": 0,
+      "expected": "7"
+    },
+    {
+      "name": "moment before the epoch",
+      "dayStartUnix": 0,
+      "dailySpent": "7",
+      "at": -5,
+      "expected": "7"
+    }
+  ],
+  "fresh": [
+    {
+      "name": "fresh an hour later",
+      "proof": {
+        "payee": "2de57c27a4a55e72214dbf455d696c1458b0a0ea46a53ab422ba7f797c86c0f0",
+        "netAmount": "248750000",
+        "mint": "cae5bc61401094b57f3c718fe88c541f9e57eeb9430d0a8d07c4da585d647ea2",
+        "dailySpentBefore": "40000000",
+        "proofTimestamp": 1790000000
+      },
+      "operator": {
+        "dayStartUnix": 1789948800,
+        "dailySpent": "40000000"
+      },
+      "target": {
+        "payee": "2de57c27a4a55e72214dbf455d696c1458b0a0ea46a53ab422ba7f797c86c0f0",
+        "netAmount": "248750000",
+        "mint": "cae5bc61401094b57f3c718fe88c541f9e57eeb9430d0a8d07c4da585d647ea2"
+      },
+      "now": 1790003600,
+      "expected": null
+    },
+    {
+      "name": "fresh until the last second of the day",
+      "proof": {
+        "payee": "2de57c27a4a55e72214dbf455d696c1458b0a0ea46a53ab422ba7f797c86c0f0",
+        "netAmount": "248750000",
+        "mint": "cae5bc61401094b57f3c718fe88c541f9e57eeb9430d0a8d07c4da585d647ea2",
+        "dailySpentBefore": "40000000",
+        "proofTimestamp": 1790000000
+      },
+      "operator": {
+        "dayStartUnix": 1789948800,
+        "dailySpent": "40000000"
+      },
+      "target": {
+        "payee": "2de57c27a4a55e72214dbf455d696c1458b0a0ea46a53ab422ba7f797c86c0f0",
+        "netAmount": "248750000",
+        "mint": "cae5bc61401094b57f3c718fe88c541f9e57eeb9430d0a8d07c4da585d647ea2"
+      },
+      "now": 1790035199,
+      "expected": null
+    },
+    {
+      "name": "receivable sold after the proof",
+      "proof": {
+        "payee": "2de57c27a4a55e72214dbf455d696c1458b0a0ea46a53ab422ba7f797c86c0f0",
+        "netAmount": "248750000",
+        "mint": "cae5bc61401094b57f3c718fe88c541f9e57eeb9430d0a8d07c4da585d647ea2",
+        "dailySpentBefore": "40000000",
+        "proofTimestamp": 1790000000
+      },
+      "operator": {
+        "dayStartUnix": 1789948800,
+        "dailySpent": "40000000"
+      },
+      "target": {
+        "payee": "b07ef7110a58ac2daf0370904afa7b8530fc5992683826f8a47baced1d8d4f56",
+        "netAmount": "248750000",
+        "mint": "cae5bc61401094b57f3c718fe88c541f9e57eeb9430d0a8d07c4da585d647ea2"
+      },
+      "now": 1790000060,
+      "expected": "payee"
+    },
+    {
+      "name": "net amount changed",
+      "proof": {
+        "payee": "2de57c27a4a55e72214dbf455d696c1458b0a0ea46a53ab422ba7f797c86c0f0",
+        "netAmount": "248750000",
+        "mint": "cae5bc61401094b57f3c718fe88c541f9e57eeb9430d0a8d07c4da585d647ea2",
+        "dailySpentBefore": "40000000",
+        "proofTimestamp": 1790000000
+      },
+      "operator": {
+        "dayStartUnix": 1789948800,
+        "dailySpent": "40000000"
+      },
+      "target": {
+        "payee": "2de57c27a4a55e72214dbf455d696c1458b0a0ea46a53ab422ba7f797c86c0f0",
+        "netAmount": "248750001",
+        "mint": "cae5bc61401094b57f3c718fe88c541f9e57eeb9430d0a8d07c4da585d647ea2"
+      },
+      "now": 1790000060,
+      "expected": "netAmount"
+    },
+    {
+      "name": "another mint",
+      "proof": {
+        "payee": "2de57c27a4a55e72214dbf455d696c1458b0a0ea46a53ab422ba7f797c86c0f0",
+        "netAmount": "248750000",
+        "mint": "cae5bc61401094b57f3c718fe88c541f9e57eeb9430d0a8d07c4da585d647ea2",
+        "dailySpentBefore": "40000000",
+        "proofTimestamp": 1790000000
+      },
+      "operator": {
+        "dayStartUnix": 1789948800,
+        "dailySpent": "40000000"
+      },
+      "target": {
+        "payee": "2de57c27a4a55e72214dbf455d696c1458b0a0ea46a53ab422ba7f797c86c0f0",
+        "netAmount": "248750000",
+        "mint": "614188f27a2b46c4a360d5d21ef3702eb382bc44c910dafc41fe4795d4ee51c4"
+      },
+      "now": 1790000060,
+      "expected": "mint"
+    },
+    {
+      "name": "next UTC day",
+      "proof": {
+        "payee": "2de57c27a4a55e72214dbf455d696c1458b0a0ea46a53ab422ba7f797c86c0f0",
+        "netAmount": "248750000",
+        "mint": "cae5bc61401094b57f3c718fe88c541f9e57eeb9430d0a8d07c4da585d647ea2",
+        "dailySpentBefore": "40000000",
+        "proofTimestamp": 1790000000
+      },
+      "operator": {
+        "dayStartUnix": 1789948800,
+        "dailySpent": "40000000"
+      },
+      "target": {
+        "payee": "2de57c27a4a55e72214dbf455d696c1458b0a0ea46a53ab422ba7f797c86c0f0",
+        "netAmount": "248750000",
+        "mint": "cae5bc61401094b57f3c718fe88c541f9e57eeb9430d0a8d07c4da585d647ea2"
+      },
+      "now": 1790035200,
+      "expected": "day"
+    },
+    {
+      "name": "next UTC day with the counter unchanged",
+      "proof": {
+        "payee": "2de57c27a4a55e72214dbf455d696c1458b0a0ea46a53ab422ba7f797c86c0f0",
+        "netAmount": "248750000",
+        "mint": "cae5bc61401094b57f3c718fe88c541f9e57eeb9430d0a8d07c4da585d647ea2",
+        "dailySpentBefore": "0",
+        "proofTimestamp": 1789948740
+      },
+      "operator": {
+        "dayStartUnix": 1789862400,
+        "dailySpent": "0"
+      },
+      "target": {
+        "payee": "2de57c27a4a55e72214dbf455d696c1458b0a0ea46a53ab422ba7f797c86c0f0",
+        "netAmount": "248750000",
+        "mint": "cae5bc61401094b57f3c718fe88c541f9e57eeb9430d0a8d07c4da585d647ea2"
+      },
+      "now": 1789948920,
+      "expected": "day"
+    },
+    {
+      "name": "another release moved the counter",
+      "proof": {
+        "payee": "2de57c27a4a55e72214dbf455d696c1458b0a0ea46a53ab422ba7f797c86c0f0",
+        "netAmount": "248750000",
+        "mint": "cae5bc61401094b57f3c718fe88c541f9e57eeb9430d0a8d07c4da585d647ea2",
+        "dailySpentBefore": "40000000",
+        "proofTimestamp": 1790000000
+      },
+      "operator": {
+        "dayStartUnix": 1789948800,
+        "dailySpent": "140000000"
+      },
+      "target": {
+        "payee": "2de57c27a4a55e72214dbf455d696c1458b0a0ea46a53ab422ba7f797c86c0f0",
+        "netAmount": "248750000",
+        "mint": "cae5bc61401094b57f3c718fe88c541f9e57eeb9430d0a8d07c4da585d647ea2"
+      },
+      "now": 1790000060,
+      "expected": "dailyCounter"
+    },
+    {
+      "name": "counter state from a later day",
+      "proof": {
+        "payee": "2de57c27a4a55e72214dbf455d696c1458b0a0ea46a53ab422ba7f797c86c0f0",
+        "netAmount": "248750000",
+        "mint": "cae5bc61401094b57f3c718fe88c541f9e57eeb9430d0a8d07c4da585d647ea2",
+        "dailySpentBefore": "40000000",
+        "proofTimestamp": 1790000000
+      },
+      "operator": {
+        "dayStartUnix": 1790035200,
+        "dailySpent": "40000000"
+      },
+      "target": {
+        "payee": "2de57c27a4a55e72214dbf455d696c1458b0a0ea46a53ab422ba7f797c86c0f0",
+        "netAmount": "248750000",
+        "mint": "cae5bc61401094b57f3c718fe88c541f9e57eeb9430d0a8d07c4da585d647ea2"
+      },
+      "now": 1790000060,
+      "expected": "dailyCounter"
+    },
+    {
+      "name": "counter state from an earlier day reads as 0",
+      "proof": {
+        "payee": "2de57c27a4a55e72214dbf455d696c1458b0a0ea46a53ab422ba7f797c86c0f0",
+        "netAmount": "248750000",
+        "mint": "cae5bc61401094b57f3c718fe88c541f9e57eeb9430d0a8d07c4da585d647ea2",
+        "dailySpentBefore": "0",
+        "proofTimestamp": 1790000000
+      },
+      "operator": {
+        "dayStartUnix": 1789862400,
+        "dailySpent": "500000000"
+      },
+      "target": {
+        "payee": "2de57c27a4a55e72214dbf455d696c1458b0a0ea46a53ab422ba7f797c86c0f0",
+        "netAmount": "248750000",
+        "mint": "cae5bc61401094b57f3c718fe88c541f9e57eeb9430d0a8d07c4da585d647ea2"
+      },
+      "now": 1790000060,
+      "expected": null
+    },
+    {
+      "name": "payee is checked before the day",
+      "proof": {
+        "payee": "2de57c27a4a55e72214dbf455d696c1458b0a0ea46a53ab422ba7f797c86c0f0",
+        "netAmount": "248750000",
+        "mint": "cae5bc61401094b57f3c718fe88c541f9e57eeb9430d0a8d07c4da585d647ea2",
+        "dailySpentBefore": "40000000",
+        "proofTimestamp": 1790000000
+      },
+      "operator": {
+        "dayStartUnix": 1789948800,
+        "dailySpent": "40000000"
+      },
+      "target": {
+        "payee": "b07ef7110a58ac2daf0370904afa7b8530fc5992683826f8a47baced1d8d4f56",
+        "netAmount": "248750000",
+        "mint": "cae5bc61401094b57f3c718fe88c541f9e57eeb9430d0a8d07c4da585d647ea2"
+      },
+      "now": 1790035200,
+      "expected": "payee"
+    },
+    {
+      "name": "net is checked before the mint",
+      "proof": {
+        "payee": "2de57c27a4a55e72214dbf455d696c1458b0a0ea46a53ab422ba7f797c86c0f0",
+        "netAmount": "248750000",
+        "mint": "cae5bc61401094b57f3c718fe88c541f9e57eeb9430d0a8d07c4da585d647ea2",
+        "dailySpentBefore": "40000000",
+        "proofTimestamp": 1790000000
+      },
+      "operator": {
+        "dayStartUnix": 1789948800,
+        "dailySpent": "40000000"
+      },
+      "target": {
+        "payee": "2de57c27a4a55e72214dbf455d696c1458b0a0ea46a53ab422ba7f797c86c0f0",
+        "netAmount": "1",
+        "mint": "614188f27a2b46c4a360d5d21ef3702eb382bc44c910dafc41fe4795d4ee51c4"
+      },
+      "now": 1790000060,
+      "expected": "netAmount"
+    }
+  ]
+}

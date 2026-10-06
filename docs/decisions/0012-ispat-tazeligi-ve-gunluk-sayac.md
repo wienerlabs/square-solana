@@ -90,7 +90,9 @@
 - BC-24: escrow'un release talimatları `check_fresh`'i uygulayıp `StaleReleaseProof` döner ve
   `record_release`'i CPI ile çağırır. BC-21'in "bayat ispat release'te geçersiz sayılıyor" kriterinin
   escrow tarafı orada tamamlanır.
-- `@squaresdk/solana-policy` (BE-10) sayacı aynı kuralla okur (`witness.ts`: aynı gün değilse 0).
+- `@squaresdk/solana-policy` aynı kuralları uygular (`release.ts`: `dailySpentAt`, `checkFresh`); witness sayacı
+  ispat anına göre okur, izleyici (`watchJobProof`) ispatı `checkFresh`'le değerlendirir. Rust ve TypeScript
+  uygulamalarının uyumu ortak vektörlerle denetlenir (`crates/square-common/tests/fixtures/release-rule-vectors.json`).
 - Aynı günün iki release'i yarışır: ilki sayacı ilerletince ikincinin ispatı bayatlar. Arc bunu keeper'ın
   release'i önceden simüle edip bayat ispatta beklemesiyle çözdü; Solana keeper'ı için karar BC-23'te.
 

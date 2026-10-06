@@ -1,7 +1,7 @@
-// Uyum ispatı ve release durumu (FE-09): ret kodunun sebepleri ve kesinliği (ADR 0013), günlük sayaç ve
-// tazelik (ADR 0012), escrow'un finalize'da ne yapacağı, kurumun bu tarayıcıdaki politikasının job'un
-// snapshot'ıyla eşleşmesi, artefakt sürümü. Ağ kullanılmaz; gerçek prover ve programlara karşı bağlama PR
-// açıklamasındaki yerel validator denemesindedir.
+// Uyum ispatı ve release durumu (FE-09): ret kodunun sebepleri, bayatlık sebepleri, escrow'un finalize'da
+// ne yapacağı, kurumun bu tarayıcıdaki politikasının job'un snapshot'ıyla eşleşmesi, artefakt sürümü.
+// Kuralların kendisi `@squaresdk/solana-policy`'de ve zincirdekilerle ortak vektörlerle test edilir. Ağ
+// kullanılmaz; gerçek prover ve programlara karşı bağlama FE-09 PR'ındaki yerel validator denemesindedir.
 import { readFileSync } from 'node:fs';
 import BN from 'bn.js';
 import { Keypair } from '@solana/web3.js';
@@ -11,9 +11,6 @@ import { describe, expect, it } from 'vitest';
 import { institutionAddress, policyAddress } from '@/lib/idl-pda';
 import { draftDocument, hexToBytes, newDraft, type PolicyDraft } from '@/lib/policy-draft';
 import {
-  dailySpentAt,
-  isFinalRefusal,
-  netAmountOf,
   policyMaterialFor,
   proverErrorMessage,
   refusalReasons,
@@ -64,28 +61,9 @@ describe('refusal code', () => {
     expect(refusalReasons(8 | 16)).toEqual(['The payee is on the blocked list', 'The payment category is not allowed']);
     expect(refusalReasons(64)).toEqual(['The amount would exceed the public daily ceiling']);
   });
-
-  it('refunds only for a permanent reason, as the escrow does', () => {
-    // İşlem başı tavan, mint, engelli payee: her zaman kesin.
-    for (const code of [1, 4, 8, 1 | 16]) expect(isFinalRefusal(code, 40n)).toBe(true);
-    // Günlük tavanlar sayaç 0 iken kesin; sayaç doluyken ertesi gün geçebilir.
-    expect(isFinalRefusal(2, 0n)).toBe(true);
-    expect(isFinalRefusal(64, 0n)).toBe(true);
-    expect(isFinalRefusal(64, 40n)).toBe(false);
-    // Kategori ve zaman penceresi kurumun elinde: tek başına iade etmez.
-    expect(isFinalRefusal(16, 0n)).toBe(false);
-    expect(isFinalRefusal(32, 0n)).toBe(false);
-  });
 });
 
 describe('freshness', () => {
-  it('reads the daily counter on the UTC day of the moment', () => {
-    expect(dailySpentAt(noon - DAY / 2, 40n, noon)).toBe(40n);
-    expect(dailySpentAt(noon - DAY / 2 - DAY, 40n, noon)).toBe(0n);
-    expect(dailySpentAt(noon + DAY / 2, 40n, noon)).toBeNull();
-    expect(netAmountOf(250_000_000n, 50)).toBe(248_750_000n);
-  });
-
   it('tells what the escrow does at finalize now', () => {
     const operator = { dailySpent: 0n, dayStartUnix: noon - DAY / 2 };
     expect(releaseOutlook(state(null), job(), null, noon).kind).toBe('noProof');
