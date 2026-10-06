@@ -4,6 +4,7 @@
   "squads": {
     "multisig": "3ucyX6nmbz9ytRVWr3wrYQD2try58Jy1xCyuNo8q6PD5"
   },
+  "lookupTable": "3cjUqPz9ECuym9w8trGRVUadGbj24Z7BvYALvEfmCCoG",
   "registry": {
     "screenerAuthority": "48DGxja6FefZHhZ8e5ynLKWLqxb1pVfiHFUVg1Jrm54b",
     "screeningTtlSecs": 2592000
@@ -28,6 +29,21 @@
       "proofTimeoutSecs": "86400",
       "disputeTimeoutSecs": "604800",
       "travelRuleThreshold": "1000000000"
+    }
+  },
+  "cctp": {
+    "attestationApi": "https://iris-api-sandbox.circle.com",
+    "messageTransmitter": "CCTPV2Sm4AdWt5296sk4P66VBZ7bEhcARwFaaS9YPbeC",
+    "tokenMessengerMinter": "CCTPV2vPZJS2u2BBsUoscuikbYjnpFmbFsvVuJdgUMQe",
+    "sources": {
+      "sepolia": {
+        "domain": 0,
+        "chainId": 11155111,
+        "rpc": "https://ethereum-sepolia-rpc.publicnode.com",
+        "tokenMessenger": "0x8FE6B999Dc680CcFDD5Bf7EB0974218be2542DAA",
+        "usdc": "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238",
+        "lookupTable": "2Zg2NRhkLqdFHq3SZcxqHmZkTTLXmKx4yeZNbfSqPbUY"
+      }
     }
   }
 }

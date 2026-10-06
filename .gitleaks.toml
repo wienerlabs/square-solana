@@ -69,3 +69,22 @@ alanında Solana mainnet USDC mint adresi (EPjF…). Mint adresi açık anahtard
 Satır bazında, yalnızca bu alan adı ve bu adresle."""
 regexTarget = "line"
 regexes = ['''(?m)^\s*"?payment_token_mint"?:\s*['"]EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v['"],?$''']
+
+[[allowlists]]
+description = """BC-36 ile gelen CCTP V2 adresleri: Circle'ın Solana devnet programı
+(TokenMessengerMinterV2), onun PDA'ları (token_messenger, remote_token_messenger, token_minter,
+local_token, token_pair; devnet'te getAccountInfo ile okunur) ve Sepolia sözleşmeleri
+(TokenMessengerV2, USDC). Hepsi zincirde herkese açık adreslerdir, sır değildir. generic-api-key
+kuralı alan adındaki "token" yüzünden takılıyor. regexTarget = "secret": yalnızca değeri tam olarak
+bu adreslerden biri olan bulgu bastırılır; aynı satırdaki başka bir sır yine yakalanır."""
+regexTarget = "secret"
+regexes = [
+  '''^CCTPV2vPZJS2u2BBsUoscuikbYjnpFmbFsvVuJdgUMQe$''',
+  '''^AawthJCGRmggpfv9MMWV6Jmo9cue4gL9wUZgRBShg58W$''',
+  '''^3EzN2mcmdfSNGXRCAixSpTteK6ywdmFDZZWvkMnznFt9$''',
+  '''^E1bQJ8eMMn3zmeSewW3HQ8zmJr7KR75JonbwAtWx2bux$''',
+  '''^7MwmWTK2R9Na6rnoSAEt5gytFmSZj9WLVdazvxvru9AU$''',
+  '''^AR6mnr7XRVDUvK7SDGKpREBwGQMxZbKRsY22gXN8bvQU$''',
+  '''(?i)^0x8FE6B999Dc680CcFDD5Bf7EB0974218be2542DAA$''',
+  '''(?i)^0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238$''',
+]

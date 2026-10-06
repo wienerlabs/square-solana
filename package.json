@@ -37,6 +37,7 @@
     "prettier": "^3.9.9",
     "turbo": "^2.11.7",
     "typescript": "~5.9.3",
+    "viem": "^2.57.3",
     "yaml": "^2.9.1"
   },
   "engines": {
