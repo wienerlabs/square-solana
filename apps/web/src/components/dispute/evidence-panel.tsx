@@ -2,11 +2,12 @@
 
 import { useCallback, useEffect, useId, useState } from 'react';
 import type { DisputeEvidence } from '@squaresdk/solana-types';
+import type { ApiClientState } from '@/components/api-client';
 import { Address } from '@/components/ui/address';
 import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/ui/status-badge';
-import { unwrap, type ApiSessionState } from '@/lib/api-session';
 import { evidenceFileName } from '@/lib/arbitration';
+import { unwrap } from '@/lib/square-api';
 
 type Load<T> = { state: 'loading' } | { state: 'ready'; value: T } | { state: 'error'; message: string };
 
@@ -29,7 +30,7 @@ export function EvidencePanel({
   initial,
   revision = 0,
 }: {
-  session: ApiSessionState;
+  session: ApiClientState;
   job: string;
   canUpload: boolean;
   /** Kuyruk öğesinin taşıdığı liste: konsolda ayrı istek gerekmez. */

@@ -6,10 +6,11 @@ import {
   type ArbitrationEventType,
   type ArbitrationWebhook,
 } from '@squaresdk/solana-types';
+import type { ApiClientState } from '@/components/api-client';
 import { Button } from '@/components/ui/button';
 import { CopyButton } from '@/components/ui/copy-button';
-import { unwrap, type ApiSessionState } from '@/lib/api-session';
 import { ARBITRATION_EVENTS, webhookUrlProblem } from '@/lib/arbitration';
+import { unwrap } from '@/lib/square-api';
 
 type Load<T> = { state: 'loading' } | { state: 'ready'; value: T } | { state: 'error'; message: string };
 
@@ -19,7 +20,7 @@ const EVENTS = ArbitrationEventTypeSchema.options;
  * Arbitrator'ın webhook abonelikleri (`/v1/arbitration/webhooks`, yalnızca oturum): liste, ekleme ve silme.
  * Standard Webhooks sırrı (`whsec_…`) yalnızca ekleme yanıtında döner; sayfa onu bir kez gösterir, saklamaz.
  */
-export function WebhooksPanel({ session, allowHttp }: { session: ApiSessionState; allowHttp: boolean }) {
+export function WebhooksPanel({ session, allowHttp }: { session: ApiClientState; allowHttp: boolean }) {
   const { api, report } = session;
   const urlId = useId();
   const [list, setList] = useState<Load<ArbitrationWebhook[]>>({ state: 'loading' });

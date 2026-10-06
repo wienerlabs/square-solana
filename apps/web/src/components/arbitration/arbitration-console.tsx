@@ -6,6 +6,7 @@ import { useConnection, useWallet } from '@solana/wallet-adapter-react';
 import { PublicKey } from '@solana/web3.js';
 import type { JobAccount } from '@squaresdk/solana-sdk';
 import type { ArbitrationQueueItem } from '@squaresdk/solana-types';
+import { useApiClient, type ApiClientState } from '@/components/api-client';
 import { ApiSessionPanel } from '@/components/api-session-panel';
 import { EvidencePanel } from '@/components/dispute/evidence-panel';
 import { useNetworkGuard } from '@/components/network-guard';
@@ -13,7 +14,6 @@ import { useWebConfig } from '@/components/providers';
 import { Address } from '@/components/ui/address';
 import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/ui/status-badge';
-import { unwrap, useApiSession, type ApiSessionState } from '@/lib/api-session';
 import {
   describeResolution,
   disputeFacts,
@@ -25,6 +25,7 @@ import {
 } from '@/lib/dispute';
 import { formatDuration, readEscrowSetup, type EscrowSetup, type EscrowSetupLookup } from '@/lib/job-wizard';
 import { formatUnits } from '@/lib/settlement';
+import { unwrap } from '@/lib/square-api';
 import { useChainClock } from '@/lib/use-chain-clock';
 import { useSettlementToken } from '@/lib/use-settlement';
 import { VoteForm } from './vote-form';
@@ -51,7 +52,7 @@ export function ArbitrationConsole({ escrowProgramId }: { escrowProgramId: strin
   const { publicKey } = useWallet();
   const guard = useNetworkGuard();
   const { apiUrl, cluster } = useWebConfig();
-  const session = useApiSession(apiUrl);
+  const session = useApiClient();
   const verified = guard.rpc.state === 'ready' && !guard.rpc.mismatch;
   const escrowKey = useMemo(() => new PublicKey(escrowProgramId), [escrowProgramId]);
   const settlementState = useSettlementToken(verified ? escrowProgramId : undefined);
@@ -267,7 +268,7 @@ export function QueueCard({
   params: DisputeParams;
   arbitrator: PublicKey;
   chainNow: number | null;
-  session: ApiSessionState;
+  session: ApiClientState;
   decimals: number | null;
   formatAmount(base: bigint): string;
   onConfirmed(): void;
