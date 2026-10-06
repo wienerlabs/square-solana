@@ -1,4 +1,4 @@
-// @squaresdk/solana-sdk: BE-35 sözleşmesi (v0.19.0). IDL'ler, IDL'den türetilen tipler, PDA'lar,
+// @squaresdk/solana-sdk: BE-35 sözleşmesi (v0.22.0). IDL'ler, IDL'den türetilen tipler, PDA'lar,
 // spec / teslimat hash'i, typed client, event çözücü, hata eşleme ve 8 adımın tx builder'ları (BE-08),
 // işlem profili: compute unit sınırları ve Square address lookup table'ı (BC-28), Travel Rule
 // commitment'ı (BC-34), CCTP V2 ile fonlama (BC-36), CCTP'nin kaynak zincir tarafı ve attestation servisi

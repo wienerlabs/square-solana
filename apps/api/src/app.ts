@@ -1,4 +1,4 @@
-// HTTP yüzeyi: sözleşmedeki 37 operasyon (docs/api/openapi.yaml), `GET /openapi.json`. Metrikler ayrı
+// HTTP yüzeyi: sözleşmedeki 52 operasyon (docs/api/openapi.yaml), `GET /openapi.json`. Metrikler ayrı
 // uygulamada (`createMetricsApp`), iç ağdaki portta. Hız sınırı paylaşılan Postgres sayacıyla
 // (`@squaresdk/solana-hardening`): okuma ve yazma uçları ayrı kurallarla, kimliği olan istekte cüzdan, olmayanda
 // istemci IP'si başına.
@@ -23,17 +23,23 @@ import type { AuthService } from './auth/service.js';
 import type { CardService } from './cards.js';
 import type { CctpService } from './cctp.js';
 import type { DeliveryService } from './deliveries.js';
+import type { ArbitrationService } from './disputes/arbitration.js';
+import type { EvidenceService } from './disputes/evidence.js';
+import type { WebhookService } from './disputes/webhooks.js';
 import { HttpError, requestId, requestIdOf, sendError } from './http.js';
 import type { OpenApiDocument } from './openapi.js';
 import type { PolicyMetaService } from './policy-meta.js';
 import type { ProverProxy } from './prover.js';
 import { authRoutes } from './routes/auth.js';
 import { cctpRoutes } from './routes/cctp.js';
+import { disputeRoutes } from './routes/disputes.js';
 import { readRoutes } from './routes/reads.js';
 import { travelRuleRoutes } from './routes/travel-rule.js';
 import { writeRoutes } from './routes/writes.js';
+import { x402Routes } from './routes/x402.js';
 import type { TravelRuleService } from './travel-rule/service.js';
 import type { TxBuilder } from './tx.js';
+import type { X402EndpointService } from './x402.js';
 
 export interface AppDeps {
   readonly db: PrismaClient;
@@ -44,6 +50,7 @@ export interface AppDeps {
   readonly policyMeta: PolicyMetaService;
   readonly tx: TxBuilder;
   readonly prover: ProverProxy;
+  readonly x402: X402EndpointService;
   readonly travelRule: TravelRuleService;
   readonly cctp: CctpService;
   readonly limiters: { readonly read: RateLimiter; readonly write: RateLimiter };
@@ -57,6 +64,10 @@ export interface AppDeps {
   readonly trustProxyHops: number;
   readonly jsonMaxBytes: number;
   readonly deliveryMaxBytes: number;
+  readonly evidence: EvidenceService;
+  readonly arbitration: ArbitrationService;
+  readonly webhooks: WebhookService;
+  readonly evidenceMaxBytes: number;
 }
 
 /** `route` etiketi: eşleşen yol şablonu; eşleşmeyen istekler tek etikette (kardinalite). */
@@ -124,6 +135,7 @@ export function createApp(deps: AppDeps): express.Express {
   const readLimit = limit('read');
   const writeLimit = limit('write');
   app.use(authRoutes({ auth: deps.auth, readLimit, writeLimit }));
+  app.use(x402Routes({ x402: deps.x402, readLimit, writeLimit }));
   app.use(readRoutes({ db: deps.db, read: deps.read, readLimit }));
   app.use(travelRuleRoutes({ travelRule: deps.travelRule, readLimit, writeLimit }));
   app.use(cctpRoutes({ cctp: deps.cctp, readLimit, writeLimit }));
@@ -136,6 +148,16 @@ export function createApp(deps: AppDeps): express.Express {
       tx: deps.tx,
       prover: deps.prover,
       deliveryMaxBytes: deps.deliveryMaxBytes,
+      writeLimit,
+      readLimit,
+    }),
+  );
+  app.use(
+    disputeRoutes({
+      evidence: deps.evidence,
+      arbitration: deps.arbitration,
+      webhooks: deps.webhooks,
+      evidenceMaxBytes: deps.evidenceMaxBytes,
       writeLimit,
       readLimit,
     }),

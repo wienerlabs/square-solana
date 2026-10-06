@@ -54,8 +54,12 @@ ve `NOTICE` bulunması demektir.
   - sembolik bağ: pnpm de npm de bağı tarball'a koymaz.
 - `NOTICE` kırpılmadan kopyalanır. Madde 4(d) pakete ilgisiz bildirimleri çıkarmaya izin verir ama
   zorunlu tutmaz; paketlerde Aperture ve AIP'ten uyarlanan kod da var (ör. `packages/types`).
-- Apache-2.0 olmayan paket (ör. `packages/agent-sdk`, MIT) kuralın dışındadır: `LICENSE` dosyası
-  kaynağından gelir ve `pnpm license:write` ona dokunmaz.
+- Apache-2.0 olmayan paket kuralın dışındadır: `LICENSE` dosyası kaynağından gelir ve `pnpm license:write`
+  ona dokunmaz.
+- Taşınan dizin Apache-2.0 paketi olarak uyarlanırsa `LICENSE` kök kopyası olur; kaynağın lisans dosyası aynı
+  dizinde başka adla korunur ve `files`'ta listelenir. Örnek: `packages/agent-sdk` (aip-beta, MIT) BE-19'da
+  Apache-2.0'a geçti, kaynağın bildirimi `packages/agent-sdk/LICENSE-MIT`'tedir; aynı bildirim `NOTICE`'te de
+  durur.
 - `pnpm license:check` kuralı denetler ([`pack-files.mjs`](../scripts/license/pack-files.mjs)); kök
   `LICENSE` ya da `NOTICE` değişince `pnpm license:write` kopyaları günceller.
 

@@ -19,14 +19,15 @@ kopyaları `pnpm license:write` yazar, `pnpm license:check` denetler.
 | [`hardening/`](hardening/) | `@squaresdk/solana-hardening` | SSRF, idempotency, kalıcı hız sınırı, RPC failover, cüzdan imzalı eylemler, webhook imzası ve tekrar koruması, AES-256-GCM gizli değer kutusu | [BE-13] |
 | [`cctp/`](cctp/) | `@squaresdk/solana-cctp` | CCTP relayer'ın çekirdeği: burn kaydı, attestation takibi, Solana'da teslim, fonlamanın izlenmesi, kurumun mint + fonlama tx'i ([tasarım](../docs/design/cctp-funding.md#relayer-be-26)) | [BE-26] |
 | [`a2a/`](a2a/) | `@squaresdk/solana-a2a` | A2A v1.0 görev protokolü (JSON-RPC 2.0 + SSE), görev ↔ job durum eşlemesi, Postgres görev deposu ([tasarım](../docs/design/a2a.md)) | [BE-17] |
-| [`agent-sdk/`](agent-sdk/) | `@squaresdk/solana-agent-sdk` | agent yazma kiti | [BE-19] |
-| `x402/` | `@squaresdk/solana-x402` | x402 v2 gateway (resmi `@x402/*` üzerine) | [BE-24] |
-| [`mcp/`](mcp/) | `@squaresdk/solana-mcp` | Square MCP sunucusu + agent MCP istemcisi | [BE-28] |
-| `hosted/` | `@squaresdk/solana-hosted` | konfigürasyondan çalışan kurum agent'ı | [BE-29] |
+| [`agent-sdk/`](agent-sdk/) | `@squaresdk/solana-agent-sdk` | agent yazma kiti: well-known agent card, A2A uç noktası, job kabulü ve teslimi (teslimat yükleme + `submit_work`), isteğe bağlı `list_claim`, `register_agent` yardımcısı; LLM işleyicisi `/anthropic` alt yolunda | [BE-19] |
+| [`x402/`](x402/) | `@squaresdk/solana-x402` | x402 v2 geçidi (resmi `@x402/*` üzerine): Solana exact şeması, kendi ya da harici facilitator ([ADR 0018](../docs/decisions/0018-x402-facilitator.md)), kalıcı tekrar koruması, ücretli Express route'u, portal tanımından ücretli route (`paidRouteFromDefinition`, [ADR 0023](../docs/decisions/0023-x402-ucretli-uc-nokta-tanimlari.md)), ödeyen `fetch` | [BE-24], [FE-22] |
+| [`mcp/`](mcp/) | `@squaresdk/solana-mcp` | Square MCP sunucusu (okuma ve imzasız tx hazırlayan yazma tool'ları, stdio ve Streamable HTTP) + agent'lar için havuzlu MCP istemcisi (`/client`) | [BE-28] |
+| [`hosted/`](hosted/) | `@squaresdk/solana-hosted` | konfigürasyondan çalışan kurum agent'ı (`square-hosted`): capability başına yalnızca izinli MCP tool'larını gören Claude çalıştırması, kurum politikası altında delegasyon, ispat bağlama ve dispute crank'i ([ADR 0022](../docs/decisions/0022-hosted-agent-calisma-zamani-izolasyonu.md)) | [BE-29] |
 | `cli/` | `@squaresdk/solana-cli` | komut satırı aracı | [BE-30] |
 
 `mcp/` (covenant `mcp/`) ve `agent-sdk/` (aip-beta `packages/agent-sdk`) kaynak projelerden
-geçmişleriyle taşındı [BE-02]; uyarlanana kadar `private: true`. `covenant/sdk`,
+geçmişleriyle taşındı [BE-02]. `agent-sdk/` BE-19'da (Apache-2.0; kaynağın MIT bildirimi
+`agent-sdk/LICENSE-MIT`) ve `mcp/` BE-28'de Square'e uyarlandı ve yayınlanabilir paketlere katıldı. `covenant/sdk`,
 `aperture/shared/types` ve aip `src/lib/{identity,protocol}` toptan taşınmadı: ilgili paketin
 uygulama issue'sunda kaynak commit referansıyla işlenir (eşleme:
 [`docs/provenance/BE-02.md`](../docs/provenance/BE-02.md)).
@@ -43,6 +44,7 @@ uygulama issue'sunda kaynak commit referansıyla işlenir (eşleme:
 [BE-19]: https://github.com/wienerlabs/square-solana/issues/52
 [BE-24]: https://github.com/wienerlabs/square-solana/issues/79
 [BE-26]: https://github.com/wienerlabs/square-solana/issues/81
+[FE-22]: https://github.com/wienerlabs/square-solana/issues/86
 [BE-28]: https://github.com/wienerlabs/square-solana/issues/87
 [BE-29]: https://github.com/wienerlabs/square-solana/issues/88
 [BE-30]: https://github.com/wienerlabs/square-solana/issues/89

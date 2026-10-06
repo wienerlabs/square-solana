@@ -25,13 +25,19 @@ import { createAuthService } from '../../src/auth/service.js';
 import { createCardService } from '../../src/cards.js';
 import { createCctpService } from '../../src/cctp.js';
 import { createDeliveryService } from '../../src/deliveries.js';
+import { createArbitrationService } from '../../src/disputes/arbitration.js';
+import { createArbitrators, type Arbitrators } from '../../src/disputes/arbitrators.js';
+import { createEvidenceService } from '../../src/disputes/evidence.js';
+import { createParties } from '../../src/disputes/parties.js';
+import { createWebhookService } from '../../src/disputes/webhooks.js';
 import { createInstitutionAuthority } from '../../src/institution-authority.js';
 import type { OpenApiDocument } from '../../src/openapi.js';
 import { createPolicyMetaService } from '../../src/policy-meta.js';
 import { createProverProxy } from '../../src/prover.js';
-import { createDeliveryStore } from '../../src/storage.js';
+import { createDeliveryStore, createEvidenceStore } from '../../src/storage.js';
 import { createTravelRuleService, type TravelRuleService } from '../../src/travel-rule/service.js';
 import { createTxBuilder } from '../../src/tx.js';
+import { createX402EndpointService } from '../../src/x402.js';
 import { FixtureRpc, startRpc } from './rpc.js';
 
 /** IDL'lerin bildirdiği program kimlikleri. */
@@ -59,6 +65,9 @@ export interface Stack {
   readonly deliveryBaseUrl: string;
   readonly client: ReturnType<typeof createSquareClient>;
   readonly travelRule: TravelRuleService;
+  /** Webhook sırlarının kutusu ve arbitrator seti (bildirim testleri gönderiyi bunlarla kurar). */
+  readonly box: SecretBox;
+  readonly arbitrators: Arbitrators;
   /** İç ve bağımlılık hataları (alarm penceresi). */
   readonly errors: { count(): number };
   api(auth?: { session?: string; apiKey?: string }): SquareApi;
@@ -75,7 +84,10 @@ export async function startStack(options: {
   openapi: OpenApiDocument;
   rateLimit?: { read: number; write: number };
   deliveryMaxBytes?: number;
+  evidenceMaxBytes?: number;
   lookupTable?: PublicKey | null;
+  /** Fixture RPC yerine gerçek bir küme (localnet uçtan uca testi). */
+  rpcUrl?: string;
   clock?: () => number;
   /** Paylaşılan veritabanı yerine başka bir adres (ör. ulaşılamayan veritabanı testi). */
   databaseUrl?: string;
@@ -103,7 +115,7 @@ export async function startStack(options: {
   });
   const proverUrl = await listen(proverServer);
 
-  const connection = new Connection(rpcServer.url, 'confirmed');
+  const connection = new Connection(options.rpcUrl ?? rpcServer.url, 'confirmed');
   const client = createSquareClient({ connection, programIds: PROGRAM_IDS, commitment: 'confirmed' });
   const log = createLogger({ service: 'api-test', level: 'error' });
   const deliveryBaseUrl = `${s3.endpoint}/${s3.bucket}`;
@@ -144,6 +156,7 @@ export async function startStack(options: {
     timeoutMs: 5_000,
     logger: log,
   });
+  const read = createReadApi({ db, chainRef: CHAIN_REF, registryProgramId: PROGRAM_IDS.registry });
   const tx = createTxBuilder({
     client,
     connection,
@@ -164,9 +177,25 @@ export async function startStack(options: {
     tx,
     computeUnitPrice: 1_000n,
   });
+  const evidenceStore = createEvidenceStore({
+    endpoint: s3.endpoint,
+    region: 'us-east-1',
+    bucket: s3.evidenceBucket,
+    accessKeyId: s3.accessKeyId,
+    secretAccessKey: s3.secretAccessKey,
+    forcePathStyle: true,
+  });
+  // Anahtar halkası çalışma anında üretilir.
+  const box = createSecretBox({ keys: { t1: randomBytes(32) }, activeKeyId: 't1' });
+  const arbitrators = createArbitrators({ client, ttlMs: 0, ...(options.clock ? { clock: options.clock } : {}) });
+  const evidence = createEvidenceService({
+    db,
+    store: evidenceStore,
+    parties: createParties({ db, connection, arbitrators }),
+  });
   const app = createApp({
     db,
-    read: createReadApi({ db, chainRef: CHAIN_REF, registryProgramId: PROGRAM_IDS.registry }),
+    read,
     auth: createAuthService({
       db,
       domain: 'app.square.test',
@@ -184,7 +213,25 @@ export async function startStack(options: {
     }),
     policyMeta: createPolicyMetaService({ db, authority }),
     tx,
+    evidence,
+    arbitration: createArbitrationService({
+      db,
+      read,
+      client,
+      tx,
+      arbitrators,
+      evidence,
+      ...(options.clock ? { clock: options.clock } : {}),
+    }),
+    webhooks: createWebhookService({
+      db,
+      box,
+      arbitrators,
+      urlPolicy: { allowHttp: false, allowPrivateAddresses: false },
+    }),
+    evidenceMaxBytes: options.evidenceMaxBytes ?? 1024 * 1024,
     prover: createProverProxy({ url: proverUrl, apiKey: 'prover-service-key', timeoutMs: 2_000 }),
+    x402: createX402EndpointService({ db }),
     travelRule,
     cctp,
     limiters: { read: window(limits.read), write: window(limits.write) },
@@ -208,6 +255,8 @@ export async function startStack(options: {
     deliveryBaseUrl,
     client,
     travelRule,
+    box,
+    arbitrators,
     errors,
     api: (auth) => createApiClient({ baseUrl: url, ...(auth ? { auth } : {}) }),
     async close() {

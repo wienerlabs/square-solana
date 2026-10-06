@@ -158,6 +158,106 @@ Servislerin değerleri:
 | `API_CCTP_LOOKUP_TABLES`, `KEEPER_CCTP_LOOKUP_TABLES` | `0:2Zg2NRhkLqdFHq3SZcxqHmZkTTLXmKx4yeZNbfSqPbUY` |
 | `KEEPER_CCTP_ATTESTATION_URL` | `https://iris-api-sandbox.circle.com` |
 
+## Screener (BE-16)
+
+Screener'ın uçtan uca koşusu, 2026-10-06 (`apps/screener/test/devnet.e2e.test.ts`). OFAC'ın canlı listesi indirildi:
+SHA-256 `b61f54ea…5e72`, 4 SOL adresi. Screener authority `48DGxja6…` deployer'dan 0.1 SOL aldı. Denetim kaydı
+testin kendi Postgres'iydi.
+
+| Adım | Cüzdan | Tx |
+|---|---|---|
+| Listedeki adres → `Flagged` (SDN uid 194570) | `42RLPACwZPx3vYYmxSueqsogfynBDqXK298EDsNoyoHi` | `4q9mdB83DVj5RqSvXgNJ1TykRTLpMCQTRoZLK5SjE3AYnH9evHR11TbaZ7m26gAKKRziXGyrmch48YFqDJnHtgmw` |
+| Listede olmayan yeni cüzdan → `Clear` | `H5GBLjvy3B6mKqo6jmHGoxuxs1Nm87CgnFMpSTLvur6x` | `44FvHdGAdSaH5gfwvfwE4MqiWph1cNLM6XtYGEPyfqYwgKMkmVG24PmsGY6dLuedy4fiZktFWiyWuQFuRrFMY2NG` |
+| Yenileme (`Flagged`, `expires_at` ileri) | `42RLPACw…` | `32M8xSmp75UtsncZzPJLGcy8YUzYi8TYJkHg33UGweo5qSsPZCNySMDw7iP4JcXLN7f7m3rGHM2ZQcNUznxMicdj` |
+| Yenileme (`Clear`, `expires_at` ileri) | `H5GBLjvy…` | `3jug8pk42psPLuGi3qEa7v4GxaEvmZzzhDv6gyVxZfdtypCaNtUFjPR8UJjzQBPyJSq2y1gBKG54tceEcpHK3B57` |
+
+Her kayıtta zincirdeki `source_hash` denetim kaydındakidir; `expires_at − screened_at` config'teki süredir (30 gün).
+
+## x402 (BE-24)
+
+Ücretli ucun uçtan uca koşusu, 2026-10-06 (`packages/x402/test/devnet.e2e.test.ts`).
+- **Ödeme:** Fiyat 0,01 USDC (Circle devnet USDC'si `4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU`).
+- **Taraflar:** Ödeyen BC-36'nın kurumu (`7xNWRmEb…`), alıcı BC-36'nın agent'ı (`C6iFdvJp…`), ücret ödeyen deployer.
+- **Hazırlık:** Alıcının USDC hesabı koşudan önce açıldı (`DZ4fUUgJvREe4W8dWy9ce1oJafBRmf4cDPE32yfAVaEpPsLDzRYmsEnYE3xyCxaAk5auiHQAzKf5XNp991puS2x`).
+- **Depolar:** Tekrar koruması ve idempotent yanıt testin Postgres'iydi.
+
+| Adım | Sonuç | Uzlaştırma tx'i |
+|---|---|---|
+| Ödeyen fetch: 402 → ödeme → 200 | Alıcının bakiyesi 10 000 arttı | `5CSPep7Qh4Nd7dFfMP9vvo96c1RFqumKEHuBfgaCNkYrgdm5KDxGixs17pwp6y9JdYqwSHFceGcYKo5es5wXUTRW` |
+| Aynı başlık yeniden (yanıt kayboldu) | 200, aynı gövde ve makbuz; bakiye değişmedi | — |
+| Kimliksiz aynı başlıkla eşzamanlı iki istek | Biri 200, diğeri 402 (`replay_rejected`) | `2MYysDru1hnH4jjvj7gdfL9135BKzhjoRqgSdg7ZmroHChXcPPcyvm9V8zCeizcxZedQJ4WBbspyxsHxg9Htr51W` |
+| Uzlaşmış başlık yeniden | 402: facilitator'ın simülasyonu işlenmiş işlemi reddetti | — |
+
+## Geliştirici portalı (FE-22)
+
+Portalın API yüzeyiyle devnet koşusu, 2026-10-06 (`apps/api/test/x402-devnet.e2e.test.ts`).
+- **Anahtar ve tanım:** Geliştirici (MuhammedAkinci'nin üye cüzdanı) oturumla `x402:serve` kapsamlı bir API anahtarı oluşturdu ve
+  0,01 USDC'lik bir uç nokta tanımı açtı.
+- **Sunucu:** Geliştiricinin sunucusu tanımı bu anahtarla okudu (`paidRouteFromDefinition`). Ödeyen BC-36'nın kurumu,
+  alıcı agent'ı, ücret ödeyen deployer'dı.
+- **Uzlaştırma ve kullanım:** Uzlaştırma tx'i `4SqCKJnC8Ui9umWWFrRHpUwZMUY8x4xvH6pLhPG9ayxJur42ugYiXtPLktXYnFPkgKNcCPNsHTw8QCFX3hTPJ8yG`.
+  Kullanım: 1 ödeme, 10 000.
+- **Kapatma:** Pasifleştirilen tanım 503, silinen 404 döndü; iptal edilen anahtar tanımı okuyamadı.
+
+## Fee payer ve Squads smart account (BE-27)
+
+Uçtan uca koşu, 2026-10-06 (`apps/fee-payer/test/squads-devnet.e2e.test.ts`).
+- **Smart account'lar:** Kurum, agent ve alıcı rolleri gerçek Squads v4 smart account'larının vault'larıdır. Her
+  birinin tek üyesi ve eşiği 1'dir.
+- **Sponsor:** Fee payer servisi (testin Postgres'iyle). Sponsor deployer'dır; 22 tx'in ücretini ve rent'ini o
+  ödedi. Vault'lar hiç SOL tutmadı.
+- **Kurulum (sponsorsuz):**
+  - BC-36'nın kurumu vault'ların USDC hesaplarını açtı ve doldurdu.
+  - Screener authority vault'ları temiz kaydetti.
+- **İspat:** Zincirden kurulan witness'la üretilen gerçek Groth16 ispatı.
+- **Ödeme:** İş 1 USDC; alacak 0,9 USDC'ye alıcı vault'una satıldı. Finalize'da alıcı vault'una net 995 000 gitti,
+  keeper'a 5 000 (50 bps).
+
+| Adım | Tx (yürütme; öneri tx'leri test raporunda) |
+|---|---|
+| Smart account'lar (`multisig_create_v2`) | `5XX214pW9iY7Cv4e7h9G5x1vvWBgcJNvBxS53MNY5DUtp4qDvBwa9nv3qUpano5aq92jSqsNYf7WfSpVfcwDjmv3`, `3tGx9LjQ11Vi574wsh9qUXKgqxZorARu3J1nvT23J6nwvyrPCp3bQ3eahYXxydeuoGTJP17yFKXcGGfpmCaz95ro`, `3D1QpkJBNnbtfQWwtDNFRkLc46iUqgFspyDTcQ3aQDR7MgVKqB9Y1nTkwCpKxUEJRzi16GsovnZCrFme8vRrrnnA` |
+| 1. `init_institution` + `set_policy` + `set_buyer_root` | `4TxZvqidcpW24EZeiLNuz8WhYj5RnmDYeQPbSs957BBy3aN2pfsRfRWVvP161hE1UQ5ra5HejnTiEdRoZqEASkZc` |
+| 2. `register_agent` | `5t16zTqhEzRdMs4sHpBhvbrxwAD2gehKPR8v46bMvytwFByHFSv52HA2da6gN6ncce5t7fo4RWVLYtYEeugX5QVP` |
+| 3. `create_job` | `5H1WxNAqYtwTDGiFdJYk3SQDteikunYQvs7ecjPiUoBv6YPNNtgbeMNpNFsu5eyXaN5kM13hTBWGCM1YkAczXDGS` |
+| 3. `fund_job` | `RckLucP1g3YQwNZ7tiqXTsAYEj8kpk4PBD12efh2LSNQBMgGXDSBMKhvozqYk2oT4Et6X9gXvrxioQz4X7ZyzRT` |
+| 4. `accept_job` | `RR1t9Ah4cvekFiZDKfM5gL6u16godCMtwu45qo7a1TZ56ZDYuX6sULYRhfZifHQg7ZcEYRPwZKw8KwrV2AeoZKQ` |
+| 4. `submit_work` | `4QWM8p3QSzMRMgSg99XKYMtPYpSxC5Ykhxoz3k5BBfsb4x4rr6sY4LzpcCFbHz443CCGcQ5UFjqDqm6hBrCqaaAM` |
+| 5. `list_claim` | `2cccN6GWgBQnfBV831Q7zFvHcA3HT3X3rpmA1kWRwmVm2Cq4a6Z4SNxoCG4zGx9JYNrnf9brWTtxiZFSJp3J7fAX` |
+| 5. `buy_claim` | `5N2dj7eNnJdbZxKUbQDnfkCmn1x4dnPUCgMVgVSe8oZusQgVVW4CvNzrE8YYgC1gq6EwzgjkzPDeNY45jYtJv7Am` |
+| 7. `set_compliance_proof` | `5Lk7VtSaQ9cvdeTs5E6S6hKLvJmU6ABdDyTaXrzn5hde6apCikpmtCwt6h2tJ2r91kD4h1bzryvFuALP6Ny4C6Mi` |
+| 8. `finalize_payment` (keeper, sponsorlu) | `3duiU4XxhReQqTMMabuxx6FkCMMLy1z7BdikRcpntM9X9DKeyBY3AWf4pv8oTfo5gsTeSu9msXVqWmAUdBad8v5y` |
+
+CU ve boyut ölçümleri: [tx-budget.md §8](../design/tx-budget.md#8-sponsorlu-tx-ve-squads-vaultu).
+
+## Uyuşmazlık (BE-22)
+
+Uçtan uca koşu, 2026-10-06 (`apps/api/test/devnet.e2e.test.ts`).
+- **Taraflar:** Kurum ve agent BC-36'nınkiler (`7xNWRmEb…`, kayıt `52gxSYGG…`). Arbitrator'lar escrow config'indeki
+  üç üye cüzdanıdır, eşik 2.
+- **Indexer:** Gerçek süreç olarak devnet'i indexledi (testin Postgres'i). API kanıtı, kuyruğu ve oy tx'lerini bu
+  aynadan sundu.
+- **İş ve bond:** İş 1 USDC; bond config'in en azı, 1 USDC.
+
+| Adım | Tx |
+|---|---|
+| `create_job` | `5J2A3o4DwwSeAHr98M4JJPjYMp5hsy3hqmiy8bha62f4QtwYQemiLXYLQyuS7WZG486tCvFFJzkBSm5vQqWTiFo4` |
+| `fund_job` | `2bSTXGBGXDYbBvFvmJvutSrNDdNf1s35rq27nL3Spm9y9rMLBSfERTz17gw5kaNEvYt24Jkw1fM1PSFVePQ3268S` |
+| `accept_job` | `QJY9p1uu9VDZDiqsFt1Rx7AKFzwqzdLbVRjD1PoNC74dwhkJ3c9Rp3kZv9YMedvU6L57uBwz6Ng3D7ioHSEHPEK` |
+| `submit_work` | `LoKZZ3dcY4LtMtTAFJQCpqPeyj38JG8uaZLe9V3D7DtB6RdZfT8Vantu6f2NHZUXdREXKqmHijeRydmzArrofv8` |
+| Kanıt (`POST /v1/jobs/{job}/dispute/evidence`) → `raise_dispute` (reasonHash = kanıtın SHA-256'sı) | `3Y4tcWkLiakoHawqfP41hzand3bDoFTvSMMeFjTckYkTXj8fqP9hFVfopG2kKdxFtwnViKd98AYaMgZrFBSdJfWP` |
+| Oy 1 (`DPF8Myr3…`, API'nin hazırladığı `resolve_dispute`) | `1WyxdLTvZZxi6cxREccwQdoySPuRNiPVJ3VW6YwDgSF6NgRiQSm7rwhDoY4jEud37jqssn6iJxvxus1E9fMvDY` |
+| Oy 2 (`EZggdp7B…`); karar `FavorAgent`. Üçüncü oy API'de 409 | `5cD3kPHB4x2gj3ntFp4W4RgD8XuSvdJ6j3x25eA7McuC11MYNEs3mLhNFovUATrfHJ3tH5KxZguFfr1742o9saMA` |
+| `execute_resolution`: 1 USDC iş + 1 USDC bond agent'a | `4gsD7uozs5TPaYtCG53rwB62X6D4DEh9ceZfEt9rmr13gzWDTquCfeFpy1MxhEbM36vTnNxxyHxv3W8GQVDss34Z` |
+
+Lapse (dispute son tarihi devnet'te 7 gün) localnet testinde gerçek keeper süreciyle gösterilir
+(`apps/api/test/localnet.e2e.test.ts`).
+
+## Smoke (BC-31)
+
+8 adım ve iki varyant (ispat-ret, ispat-yok) gerçek işlemlerle, 2026-10-06: [smoke-devnet.md](smoke-devnet.md)
+(`tests/smoke`). Kurum ve agent BC-36'nınkiler; alıcı `H19475gy…` ve keeper `GCKxtmGg…` koşu için üretildi, kurum
+alıcıya 1 USDC, deployer keeper'a 0,1 SOL gönderdi.
+
 ## Yükseltmeler
 
 ### Escrow v0.6.0: dispute (BC-32, BC-33), 2026-10-06

@@ -97,8 +97,13 @@ const DISPUTE_COLUMNS = [
   'reasonHash',
   'raisedAt',
   'deadline',
+  'decidedAt',
+  'closedAt',
   'resolution',
   'lapsed',
+  'approvalMask',
+  'approvalCount',
+  'arbitratorSetVersion',
 ] as const;
 
 const comparable = (value: unknown) => (typeof value === 'object' && value !== null ? String(value) : value);

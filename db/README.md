@@ -8,7 +8,10 @@ Paket adı `@squaresdk/solana-db` (private); tasarım ve kararlar:
 
 On-chain durum (job, itibar vb.) için doğruluk kaynağı zincirdir. Veritabanı, indexer'ın
 event'lerden kurduğu görünümü [BE-14] ve zincire çıkmayan veriyi (ör. teslimatlar [BE-18], şifreli
-Travel Rule verisi [BE-23]) tutar.
+Travel Rule verisi [BE-23], screener'ın denetim kaydı `screening_decisions` [BE-16], dispute kanıtı ve
+arbitrator bildirim outbox'ı [BE-22], sponsorlu tx'lerin maliyet günlüğü `sponsored_txs` [BE-27], x402 ücretli uç nokta tanımları ve bildirilen
+ödemeler `x402_endpoints`, `x402_payments` [FE-22]) tutar. Tablolar:
+[veri modeli §2](../docs/design/data-model.md#2-tablolar).
 
 | Yol | İçerik |
 |---|---|
@@ -31,5 +34,9 @@ pnpm turbo test --filter @squaresdk/solana-db           # Docker gerekir
 
 [BE-04]: https://github.com/wienerlabs/square-solana/issues/18
 [BE-14]: https://github.com/wienerlabs/square-solana/issues/47
+[BE-16]: https://github.com/wienerlabs/square-solana/issues/49
 [BE-18]: https://github.com/wienerlabs/square-solana/issues/51
+[BE-22]: https://github.com/wienerlabs/square-solana/issues/72
 [BE-23]: https://github.com/wienerlabs/square-solana/issues/73
+[BE-27]: https://github.com/wienerlabs/square-solana/issues/82
+[FE-22]: https://github.com/wienerlabs/square-solana/issues/86

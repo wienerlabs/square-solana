@@ -1,7 +1,8 @@
 # Runbook: keeper
 
-**Issue:** BE-31 (#90). Keeper iki iş yapar:
+**Issue:** BE-31 (#90). Keeper üç iş yapar:
 - **Finalize crank'i (BE-15):** Challenge'ı biten job'ları öder.
+- **Lapse crank'i (BE-22):** Son tarihi geçmiş dispute'ları düşürür (`lapse_dispute`); bond kuruma döner.
 - **CCTP relayer'ı (BE-26):** Başka zincirden gelen fonlamayı izler.
 
 Nasıl çalıştığı: [apps/keeper](../../apps/keeper/README.md). Kararların günlüğü `keeper_actions`'tadır
@@ -30,7 +31,7 @@ Kârlılık, SOL maliyetini `KEEPER_MINT_UNITS_PER_SOL` ile settlement mint'ine 
 |---|---|---|
 | `keeper_stalled`, `KeeperStalled` | Log'da `round_failed`; `/ready` (veritabanı, RPC) | RPC uçlarını (`KEEPER_RPC_URLS`) ve veritabanını düzelt; failover logu `rpc_failover` |
 | `keeper_backlog`, `KeeperBacklog` | `GET /v1/keeper/actions?outcome=failed`, en eski job'un son kararları | Sebebe göre: `rpcError` → RPC; `programError` → log'daki program hatası; birikmiş `unprofitable` → kur ve marj |
-| `keeper_errors` | Log'da `finalize_error`, `cctp_step_failed`, `round_failed`, `cctp_round_failed` | Tekrarlayan hata türünü düzelt; tek seferlik ağ hataları geri çekilmeyle kendiliğinden yeniden denenir |
+| `keeper_errors` | Log'da `finalize_error`, `lapse_error`, `cctp_step_failed`, `round_failed`, `lapse_round_failed`, `cctp_round_failed` | Tekrarlayan hata türünü düzelt; tek seferlik ağ hataları geri çekilmeyle kendiliğinden yeniden denenir |
 | `keeper_low_balance` | `keeper_balance_lamports` | Cüzdanı fonla |
 | `SLOBurnRate_keeper_finalize_*` | `keeper_finalize_delay_seconds{gate}`, birikim | Birikim yoksa gecikme ispatsızdır: `gate="proof"` işlerde kurumun ispatı geç bağlanıyor |
 
@@ -39,6 +40,16 @@ Bekletme sebepleri keeper'ın değil başkasının işidir:
   indexlenince keeper beklemeden yeniden dener.
 - **`screeningPending`:** Payee'nin screening kaydı temiz ya da taze değil ([screener runbook'u](screener.md)).
 - **`challengeOpen`:** Ayna zincirin gerisinde; indexer'ın gecikmesine bak.
+
+## Lapse crank'i
+
+Günlükte kayıtlar talimatla ayrılır: `GET /v1/keeper/actions?job=<job>` kayıtlarında `action: lapseDispute`.
+Metrik `keeper_actions_total{action="lapseDispute"}`.
+- **Aday:** Açık (`disputed`), son tarihi geçmiş, job hesabı açık dispute. Ayna zincirin gerisindeyse keeper
+  zincirde yeniden denetler; karar verilmiş ya da yeniden açılmış dispute'a tx göndermez.
+- **Bekleyen dispute:** Son tarih geçtiği halde lapse edilmiyorsa log'da `lapse_error` ve günlükteki sebebe bak.
+  Kesin kural programdadır (ADR 0016); `programError` kalıcıdır, RPC hataları geri çekilmeyle yeniden denenir.
+- **Karar verilmiş dispute:** `execute_resolution`'ı herkes çağırabilir; keeper çağırmaz.
 
 ## CCTP relayer'ı
 

@@ -1,12 +1,13 @@
 # @squaresdk/solana-api
 
-Square'in REST API servisi (BE-18). Sözleşme [`docs/api/openapi.yaml`](../../docs/api/openapi.yaml)'dır
-(37 operasyon); servis `GET /openapi.json`'da sözleşmenin derlenmiş halini yayımlar. Web uygulaması ve
+Square'in REST API servisi (BE-18; Travel Rule kaydı BE-23, uyuşmazlık araçları BE-22, x402 uç nokta tanımları FE-22). Sözleşme
+[`docs/api/openapi.yaml`](../../docs/api/openapi.yaml)'dır (52 operasyon); servis `GET /openapi.json`'da sözleşmenin derlenmiş halini yayımlar. Web uygulaması ve
 entegrasyonlar SDK'nın `createApiClient`'ıyla bağlanır.
 
 | Etiket | Uygulama |
 |---|---|
 | auth | Cüzdan Ed25519 oturumu ve API anahtarları ([Kimlik](#kimlik)) |
+| x402 | Geliştiricinin ücretli uç nokta tanımları ve kullanımı ([x402 ücretli uç noktalar](#x402-ücretli-uç-noktalar)) |
 | okuma | Job, kurum, politika, agent, alacak, dispute, screening ve event görünümleri indexer'ın tablolarından (`@squaresdk/solana-indexer/read`); keeper günlüğü `keeper_actions`'tan |
 | tx | 8 adımın imzasız v0 tx'i ([Tx hazırlama](#tx-hazırlama)) |
 | teslimat | Dosya S3 uyumlu depoya yüklenir; `submit_work`'ün `workHash` ve `deliveryUri`'si döner ([Teslimat](#teslimat)) |
@@ -15,6 +16,7 @@ entegrasyonlar SDK'nın `createApiClient`'ıyla bağlanır.
 | travel rule | Kaydın şifreli saklanması, commitment'ı, izinli okuma ve erişim kaydı ([Travel Rule](#travel-rule)) |
 | cctp | Burn'ün job'a kaydı, transferin durumu, kurumun mint + fonlama tx'i ([CCTP](#cctp)) |
 | prover | `POST /v1/prove`, prover servisine (apps/prover) vekil |
+| uyuşmazlık | Dispute kanıtı (özel depo), arbitrator kuyruğu, ön denetimli oy tx'i, arbitrator webhook bildirimleri ([Uyuşmazlık](#uyuşmazlık)) |
 
 Tüm `/v1` yanıtları `{ success, data, error, meta }` zarfıyla döner; `meta.requestId` yanıtın `X-Request-Id`
 başlığıyla aynıdır. Zamanlar Unix saniyesidir.
@@ -39,7 +41,7 @@ başlığıyla aynıdır. Zamanlar Unix saniyesidir.
   - Belirteç `sqs_` + 32 rastgele bayttır; veritabanında yalnızca SHA-256'sı durur.
   - Belirteç `Authorization: Bearer` başlığıyla gönderilir; `DELETE /v1/auth/session` oturumu kapatır.
 - **API anahtarı:** Oturumla oluşturulur; kapsamlar `read`, `tx:prepare`, `deliveries:write`, `agents:write`,
-  `prove`.
+  `prove`, `disputes:write`, `x402:serve`.
   - Anahtar `sqk_` + 32 rastgele bayttır ve yalnızca oluşturma yanıtında bir kez döner.
   - Listelemede ilk 12 karakteri (`prefix`) görünür.
   - Anahtar `X-API-Key` başlığıyla gönderilir. İki başlık birlikte gönderilemez.
@@ -50,6 +52,10 @@ başlığıyla aynıdır. Zamanlar Unix saniyesidir.
   | Anahtar yönetimi, oturum kapatma, politika meta | Oturum |
   | `uploadDelivery`, `putAgentCard`, `prepareTx` | Oturum ya da kapsamlı anahtar |
   | `prove` | Yalnızca `prove` kapsamlı anahtar |
+  | `uploadDisputeEvidence` (`disputes:write`), `prepareDisputeVote` (`tx:prepare`), `listDisputeEvidence`, `getDisputeEvidenceContent`, `getArbitrationQueue` (`read`) | Oturum ya da kapsamlı anahtar; kaynak üzerindeki yetki [Uyuşmazlık](#uyuşmazlık)'ta |
+  | Webhook abonelikleri | Oturum; yalnızca aktif arbitrator |
+  | `createX402Endpoint`, `updateX402Endpoint`, `deleteX402Endpoint` | Oturum |
+  | `listX402Endpoints`, `getX402Endpoint`, `getX402EndpointUsage`, `recordX402Payment` | Oturum ya da `x402:serve` kapsamlı anahtar |
   | Okuma uçları | Açık; anahtarla gelen istek `read` ister |
 
   Geçersiz bir kimlik herkese açık uçta da 401 alır.
@@ -151,6 +157,83 @@ Mantık `@squaresdk/solana-cctp`'dedir; attestation'ı keeper'daki relayer izler
   (`fund`). Tx simüle edilir; zincirde düşecek tx 422.
 - **Yapılandırma:** `API_CCTP_MESSAGE_TRANSMITTER`, `API_CCTP_TOKEN_MESSENGER_MINTER`, `API_CCTP_LOOKUP_TABLES`
   birlikte verilir; verilmezse kayıt ve tx reddedilir.
+
+## Uyuşmazlık
+
+M-of-N arbitration ve dispute zaman aşımının zincir dışı tarafı (BE-22; zincir kuralları
+[ADR 0016](../../docs/decisions/0016-dispute-m-of-n-zaman-asimi-ve-ispatsiz-bekleme.md)). Son tarihi geçen
+dispute'u keeper'ın lapse crank'i düşürür ([apps/keeper](../keeper/README.md)).
+
+- **Taraflar:**
+  - Kurum: job'un `institution` cüzdanı. Job kurumun Squads vault'una aitse multisig'in `Initiate` yetkili
+    üyeleri.
+  - Agent: job'un agent cüzdanı ya da agent kaydının sahibi.
+  - Arbitrator: zincirdeki `EscrowConfig`'in aktif seti. SDK ile okunur, `API_ARBITRATOR_CACHE_SECONDS` boyunca
+    önbellekte durur.
+- **Kanıt (`reason_hash` ↔ zincir dışı kanıt):**
+  - `POST /v1/jobs/{job}/dispute/evidence` (multipart, `file` alanı). Dönen `reasonHash` içeriğin SHA-256'sıdır.
+  - Kurum kanıtı `raise_dispute`'tan önce yükler (job `delivered`) ve bu hash'i argüman olarak verir. Agent ve
+    arbitrator'lar dispute açıldıktan sonra (`disputed`, `resolved`) ekler.
+  - İçerik `API_EVIDENCE_S3_BUCKET` kovasında `<job>/<hash>` anahtarıyla durur. Kova teslimat kovasından ayrıdır
+    ve herkese açık okunmaz: hash zincirde açık olduğundan adres içeriği gizlemez.
+  - `GET /v1/disputes/{job}/evidence` listeler. `isDisputeReason`, zincirdeki dispute'un `reasonHash`'ine eşitliktir.
+    `GET /v1/disputes/{job}/evidence/{id}` baytları ek olarak (`content-disposition: attachment`) verir. Okuyan
+    yine üç taraftır.
+  - Aynı içerik ikinci kez yüklenirse ilk kayıt döner (`(job, hash)` tekil); istek doğal olarak idempotenttir.
+- **Kuyruk:** `GET /v1/arbitration/queue`, yalnızca aktif arbitrator içindir. Açık (`disputed`) dispute'lar
+  son tarihi en yakın önce gelir.
+  - Oylar `DisputeVote` event'lerindendir (dispute'un son açılışından sonra).
+  - `hasVoted`, aynadaki `approval_mask` ve set sürümünden gelir. Sürüm config'tekinden eskiyse sonraki oy
+    sayımı sıfırlar; arbitrator oy vermemiş sayılır.
+  - `canVote`: oy yok ve son tarih geçmedi.
+- **Oy:** `POST /v1/disputes/{job}/votes` → `resolve_dispute` için imzasız tx (genel tx hazırlayıcıyla, simüle
+  edilmiş). Ön denetim zincirdeki job ve config'le yapılır:
+  - aktif arbitrator değil → 403;
+  - dispute açık değil ya da son tarih geçti → 409;
+  - güncel sayımda oy verdi ya da oy ilk oyun kararından farklı → 409;
+  - `pending` oy ya da escrow'u aşan `split` → 400.
+
+  Fee payer verilmezse arbitrator'ın kendisidir. Kesin kural programdadır; zincirde düşecek tx 422 alır.
+- **Bildirim:**
+  - Arbitrator `POST /v1/arbitration/webhooks` ile https uç kaydeder (oturum, en çok 10). Standard Webhooks sırrı
+    (`whsec_…`) yalnızca bu yanıtta döner. Veritabanında secret box'la (`API_WEBHOOK_SECRET_KEYS`, AAD kaydın
+    kimliği) şifreli durur.
+  - Olaylar:
+    - `dispute.raised`, `dispute.escalated`, `dispute.vote` (oyu verene gitmez), `dispute.decided`: indexer'ın
+      `chain_events`'inden.
+    - `dispute.deadline`: son tarihe `API_NOTIFY_DEADLINE_WARNING_SECONDS` kala, oy vermemiş arbitrator'lara bir
+      kez. Bir tur en çok `API_NOTIFY_BATCH_SIZE` dispute için uyarı kuyruğa alır; kuyruğa girmiş uyarılar atlanır,
+      kalanlar sonraki turlarda son tarih sırasıyla alınır.
+  - Outbox: olay uç başına bir kez kuyruğa girer (`notification_outbox`, `(uç, olay)` tekil). API süreci her
+    `API_NOTIFY_INTERVAL_MS`'te kuyruğu işler.
+    - Satır kiralanır; birden çok API örneği aynı satırı göndermez.
+    - Gövde imzalı, SSRF korumalı istemciyle gider (yönlendirme izlenmez). Teslimat kimliği (`webhook-id`)
+      denemeler arasında değişmez.
+    - 2xx dışı yanıt ve hata üstel geri çekilmeyle yeniden denenir. `API_NOTIFY_MAX_ATTEMPTS`'ta `failed` olur.
+    - Arbitrator setten çıktıysa teslim edilmez.
+  - Metrik: `api_arbitration_notifications_total{result}`.
+  - İmleç yoksa en son event'ten başlanır: geçmiş event'ler bildirilmez. Gövde şeması OpenAPI
+    `webhooks.arbitrationNotification`'dadır. Alıcı `verifyWebhook` ile doğrular (`@squaresdk/solana-hardening`).
+
+## x402 ücretli uç noktalar
+
+Geliştirici portalının (FE-22, web `/app/developers`) arka ucu. Karar:
+[ADR 0023](../../docs/decisions/0023-x402-ucretli-uc-nokta-tanimlari.md).
+
+- **Tanım** (`x402_endpoints`) cüzdana aittir:
+  - ad, yol (geliştiricinin sunucusundaki route; cüzdan başına tekil, 409);
+  - fiyat (`amount`, mint'in taban biriminde, > 0), mint ve ağ (CAIP-2);
+  - alıcı (`payTo`), açıklama, etkin / pasif.
+- **Ödeme** geliştiricinin sunucusunda istenir: `@squaresdk/solana-x402` `paidRouteFromDefinition` tanımı
+  `getX402Endpoint` ile okur. Facilitator ve ücret ödeyen cüzdan o sunucudadır; API ödeme yolunda değildir.
+- **Bildirim** (`recordX402Payment`, `x402_payments`): sunucu uzlaştırdığı her ödemeyi bildirir.
+  - `fingerprint` ödeme yükünün tekrar koruması kimliği, `transaction` makbuzun işlem imzasıdır. İkisi de ağ
+    başına tekildir.
+  - Aynı bildirimin tekrarı ilk kaydı 200 ile döner; başka tanıma ya da farklı işlemle bildirim 409 alır.
+  - Ağ, mint ve alıcı tanımınkiyle aynı olmalıdır (400, `details.fields`). Tutar bildirildiği gibi kaydedilir.
+- **Kullanım** (`getX402EndpointUsage`): ödemeli çağrı sayısı, ağ ve mint başına toplam, son ödeme zamanı, son
+  20 ödeme. Tanım silinince kullanım kaydı da silinir.
+
 ## Çalıştırma
 
 Migration'lar ve `programs` tablosunun seed'i API'den önce uygulanır (indexer'la aynı; [apps/indexer](../indexer/README.md#çalıştırma)).
@@ -159,7 +242,7 @@ Ortam değişkenleri [`.env.example`](.env.example)'dadır; varsayılan değer y
 
 | Uç | Port |
 |---|---|
-| `/v1/*`, `/a/*`, `GET /openapi.json`, `/health`, `/ready` (veritabanı, RPC, depo) | `API_PORT` |
+| `/v1/*`, `/a/*`, `GET /openapi.json`, `/health`, `/ready` (veritabanı, RPC, teslimat ve kanıt depoları) | `API_PORT` |
 | `GET /metrics` | `API_METRICS_PORT` (iç ağ) |
 
 **Alarm:** `api_errors`: iç hatalar ve bağımlılık hataları (RPC, prover, depo, veritabanı) pencerede eşiğin
@@ -169,8 +252,55 @@ Ortam değişkenleri [`.env.example`](.env.example)'dadır; varsayılan değer y
 
 `pnpm --filter @squaresdk/solana-api test`. Testler Postgres ve S3 uyumlu depo (SeaweedFS) konteynerleri açar
 (Docker gerekir). Zincir ve prover yerel fixture sunucularıdır. Uçlar SDK'nın `createApiClient`'ıyla denenir.
-Sözleşmedeki 33 operasyonun hepsi ve yetkisiz erişim yolları test edilir. Gerçek programlarla uçtan uca
-deneme BE-36'dadır.
+Sözleşmedeki 52 operasyonun hepsi ve yetkisiz erişim yolları test edilir. Bildirim outbox'ı yerel bir alıcıya
+imzalı teslimle denenir (`test/notifier.test.ts`).
+
+**x402 kabulü (FE-22):** `test/x402.test.ts` ücretli uç nokta yönetimini uçtan uca dener:
+
+1. Oturumla tanım oluşturulur.
+2. Geliştiricinin sunucusu (`paidRouteFromDefinition`, kendi facilitator'ı, `x402:serve` anahtarı) ödemesiz
+   isteğe 402 döner.
+3. `createPayingFetch` ile ödeme yapılır: resmi exact şeması, x402 paketinin test fikstürü olan Solana JSON-RPC'si (`packages/x402/test/solana-rpc.ts`).
+   İstek 200 alır.
+4. Kullanım sayacı ve tahsil edilen tutar artar.
+5. Pasifleştirilen tanım 503, silinen tanım 404 alır.
+
+**Localnet uçtan uca (BE-22):** `test/localnet.e2e.test.ts`, `SQUARE_LOCALNET=1` ile çalışır (yoksa atlanır).
+Gerçek programları `solana-test-validator`'a yükler; indexer ve keeper'ı gerçek süreç olarak açar. İki senaryo
+koşar:
+
+- kanıt → `raise_dispute` → kuyruk → API'nin hazırladığı iki oy → `execute_resolution`;
+- `raise_dispute` → son tarih → keeper'ın `lapse_dispute`'u.
+
+```bash
+pnpm turbo build --filter @squaresdk/solana-api...
+SQUARE_LOCALNET=1 SQUARE_PROGRAMS_DIR=<repo>/target/deploy SQUARE_LOCALNET_RPC_PORT=8899 \
+  SQUARE_LOCALNET_ARGS="--faucet-port 9900" pnpm --filter @squaresdk/solana-api exec vitest run test/localnet.e2e.test.ts
+```
+
+Agave 4.1.2 ve `anchor build` çıktısı gerekir; senaryo yaklaşık iki dakika sürer.
+
+**Devnet uçtan uca (BE-22):** `test/devnet.e2e.test.ts` yalnızca ortamla çalışır; anahtarlar repoda tutulmaz.
+- **Ne kullanır:** Devnet'teki programlar ve escrow config'i. Indexer gerçek süreç olarak devnet'i indexler.
+- **Senaryo:** kanıt → `raise_dispute` → kuyruk → iki arbitrator'ın API'den aldığı oy tx'leri → üçüncü oyun reddi →
+  `execute_resolution`.
+- **Lapse:** Devnet'te dispute son tarihi 7 gündür; lapse senaryosu localnet testindedir.
+
+```bash
+pnpm turbo build --filter @squaresdk/solana-api... --filter @squaresdk/solana-indexer
+DISPUTE_E2E_INSTITUTION=<kurum keypair'i> DISPUTE_E2E_AGENT=<agent cüzdanı keypair'i> \
+DISPUTE_E2E_AGENT_RECORD=<agent kaydı> DISPUTE_E2E_ARBITRATORS=<üç arbitrator keypair'i, virgülle> \
+  pnpm --filter @squaresdk/solana-api exec vitest run test/devnet.e2e.test.ts
+```
+
+Koşu kaydı: [deploy kaydı](../../docs/deploy/devnet.md#uyuşmazlık-be-22).
+
+**Devnet: geliştirici portalı (FE-22):** `test/x402-devnet.e2e.test.ts` yalnızca ortamla çalışır.
+- **Akış:** API anahtarı portalın uçlarıyla oluşturulur → ücretli uç nokta tanımı → geliştiricinin sunucusu
+  (`paidRouteFromDefinition`) gerçek devnet USDC'siyle ödeme alır → kullanım → pasifleştirme ve silme → anahtar
+  iptali.
+- **Ortam:** `X402_PORTAL_E2E_DEVELOPER`, `X402_PORTAL_E2E_PAYER`, `X402_PORTAL_E2E_FEE_PAYER`, `X402_PORTAL_E2E_PAY_TO`.
+- **Kayıt:** [deploy kaydı](../../docs/deploy/devnet.md#geliştirici-portalı-fe-22).
 
 ## Kaynak
 

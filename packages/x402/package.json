@@ -1,0 +1,52 @@
+{
+  "name": "@squaresdk/solana-x402",
+  "version": "0.1.0",
+  "description": "x402 v2 ödeme geçidi (resmi @x402/* üzerine): Solana exact şeması, kendi ya da harici facilitator, kalıcı tekrar koruması, ücretli Express route'u ve ödeyen fetch; BE-24",
+  "license": "Apache-2.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run --coverage"
+  },
+  "dependencies": {
+    "@solana/kit": "^5.5.1",
+    "@solana/sysvars": "^5.5.1",
+    "@x402/core": "2.28.0",
+    "@x402/express": "2.28.0",
+    "@x402/extensions": "2.28.0",
+    "@x402/fetch": "2.28.0",
+    "@x402/svm": "2.28.0"
+  },
+  "peerDependencies": {
+    "express": "^4.21.2 || ^5.0.0"
+  },
+  "devDependencies": {
+    "@squaresdk/solana-config": "workspace:*",
+    "@squaresdk/solana-db": "workspace:*",
+    "@squaresdk/solana-hardening": "workspace:*",
+    "@squaresdk/solana-types": "workspace:*",
+    "@testcontainers/postgresql": "^12.2.0",
+    "@types/express": "^4.17.23",
+    "@types/node": "^24.0.0",
+    "@vitest/coverage-v8": "^5.0.3",
+    "express": "^4.21.2",
+    "vitest": "^5.0.3"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}

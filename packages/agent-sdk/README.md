@@ -1,215 +1,197 @@
 # @squaresdk/solana-agent-sdk
 
-> Migrated with history from [`dr-wilson-empty/aip-beta`](https://github.com/dr-wilson-empty/aip-beta)
-> `packages/agent-sdk` (BE-02, see `docs/provenance/BE-02.md`). Adaptation to Square
-> (did:aip v2, Square jobs and settlement) happens in BE-19. The marketplace, escrow and
-> payment sections below describe the AIP backend, which is not part of Square.
+Square agent yazma kiti (BE-19). Arc akışının agent tarafını tek bir çağrıda toplar: kayıt (adım 2), işi alma,
+zincirde kabul ve teslim (adım 4), alacağı listeleme (adım 5). Yapı taşları repodaki paketlerdir:
 
-Build AIP compatible AI agents in minutes. The SDK gives you the
-smallest possible runtime that satisfies the Agent Internet Protocol
-contract: an A2A JSON RPC endpoint at `/a2a`, an Agent Card at
-`/.well-known/agent.json`, per capability pricing in USDC, and a clean
-handler API for the actual work.
+| Parça | Paket |
+|---|---|
+| A2A v1.0 JSON-RPC + SSE sunucusu, görev ↔ job eşlemesi, görev deposu | `@squaresdk/solana-a2a` ([tasarım](../../docs/design/a2a.md)) |
+| `did:aip` v2 Solana DID'i | `@squaresdk/solana-identity` |
+| Agent card şeması (ERC-8004 kayıt dosyası + A2A AgentCard) | `@squaresdk/solana-types` |
+| `register_agent`, `accept_job`, `submit_work`, `list_claim` tx'leri, teslimat hash'i, REST istemcisi | `@squaresdk/solana-sdk` |
 
-Once your agent is running, you publish its identity on chain with
-[`@aipagents/cli`](https://www.npmjs.com/package/@aipagents/cli) (`aip
-register`) and it shows up in the public marketplace. Callers pay you
-in USDC per request through the x402 escrow flow handled by the AIP
-backend.
+## Ne yapar
 
-## Install
-
-Built inside the Square monorepo (not published to npm yet):
-
-```bash
-pnpm install
-pnpm --filter @squaresdk/solana-agent-sdk build
+```mermaid
+sequenceDiagram
+  participant K as Kurumun agent'ı (A2A istemcisi)
+  participant A as createAgent
+  participant Z as Zincir (escrow, registry)
+  participant D as Teslimat deposu (Square API)
+  A->>Z: register_agent (kart URI + SHA-256)
+  K->>A: GET /.well-known/agent-card.json
+  K->>A: SendMessage {job, specHash} + spec
+  A->>Z: Job'u oku (agent, kurum, durum, spec hash)
+  A->>Z: accept_job → görev WORKING
+  A->>A: handler(spec) → teslimat
+  A->>D: POST /v1/jobs/{job}/deliveries → {workHash, deliveryUri}
+  A->>Z: submit_work(workHash, deliveryUri) → görev COMPLETED
+  A->>Z: list_claim (autoListClaim)
 ```
 
-Requires Node 24 or later.
+- **Agent card:** `/.well-known/agent-card.json` (A2A v1.0 keşif yolu; did:aip Solana profilindeki
+  `Agent Card` servisi). Kart RFC 8785 kanonik JSON olarak sunulur; zincirdeki `agent_card_hash` bu baytların
+  SHA-256'sıdır, `ETag` de odur. Kart beceri (`skills`), fiyat (`pricing`: beceri başına settlement mint'in
+  atomik biriminde tutar ve mint), A2A uç noktası (`url`, `services`, `supportedInterfaces`), DID ve kayıt
+  bağlantısını (`registrations`) taşır. Settlement mint escrow config'inden okunur.
+- **A2A uç noktası:** `/a2a`. Görevi açan mesaj `metadata.square = { job, specHash }` ve job spec'ini ilk
+  `data` parçası olarak taşır. `@squaresdk/solana-a2a` kapısı job'un bu agent'a ve çağıranın kurumuna ait,
+  açık ya da fonlanmış olduğunu ve spec hash'inin hem job'unkiyle hem spec parçasınınkiyle aynı olduğunu
+  denetler ([a2a.md](../../docs/design/a2a.md) §4).
+- **Job kabulü:** Agent ayrıca kendi koşullarını denetler; uymayan görev `REJECTED` olur ve tx gönderilmez:
+  spec parçası var; spec'in `capability` alanı bilinen bir beceri (tek beceride isteğe bağlı); job fonlanmış;
+  job'un agent cüzdanı `signer`; tutar becerinin fiyatından az değil; deadline'a teslim payından
+  (`retry.submitMarginSeconds`) fazla var; `admit` (verilirse, ör. kapasite) metin dönmüyor. Karar görev başına
+  bir kez verilir. Sonra `accept_job`.
+- **Teslim:** İşleyicinin çıktısı yüklenir, makbuz yerelde doğrulanır (`workHash` içeriğin SHA-256'sı,
+  `deliveryUri` en fazla 128 bayt), `submit_work` gönderilir; zincirdeki taahhütten sonra makbuz görevin
+  `delivery` artefaktına yazılır ve görev `COMPLETED` olur. İçerik `submit_work`'ten önce çağırana gösterilmez.
+- **Geçici ve kalıcı hata:** Her tur job zincirden okunur ve duruma göre sıradaki adım seçilir. Geçici hatada
+  (RPC, ağ, onay zaman aşımı, deponun `rate_limited` / `*_unavailable` / `internal_error` yanıtı) aynı yerden,
+  `retry.minDelayMs`'ten `retry.maxDelayMs`'e iki katına çıkan beklemelerle yeniden denenir; işin sonucu ve
+  makbuz saklanır, iş yeniden yapılmaz. Gönderilen tx program hatası verse de zincirde job ilerlemişse (önceki
+  deneme düşmüş sanılmışsa) akış sürer. Kalıcı hatada (program reddi, işleyicinin hatası ya da geçersiz çıktısı,
+  makbuzun içerikle tutmaması, deponun diğer retleri) ya da deadline'a teslim payı kalmayınca görev `FAILED`
+  olur; job zincirde `accepted` kalır (kurum deadline'dan sonra `cancel_job` ile parasını geri alır).
+  Onaylanmış kabulün gerisinde kalan okuma geçici sayılır.
+- **Alacak satışı:** `autoListClaim: { discountBps }` teslimden sonra alacağı nominal değerin
+  `discountBps / 10000` altında listeler (`list_claim`). Listeleme hatası görevi değiştirmez, `onError`'a gider.
+- **Yeniden başlatma:** Görevler depodadır. `listen` önce yarım kalan görevleri kurar: job `accepted` ise
+  kabul tekrarlanmaz, `delivered` ise yalnızca görev tamamlanır (ve gerekirse alacak listelenir).
 
-## Quick start
+## Kullanım
 
 ```ts
-import { createAgent, haiku } from "@squaresdk/solana-agent-sdk";
+import { Connection, Keypair, PublicKey } from '@solana/web3.js';
+import { createPrismaTaskStore } from '@squaresdk/solana-a2a/prisma';
+import { createDatabaseClient } from '@squaresdk/solana-db';
+import { createAgent, createApiKeyAuthenticator } from '@squaresdk/solana-agent-sdk';
 
-const agent = createAgent({
-  name: "Summary Bot",
-  port: Number(process.env.PORT),
-  publicUrl: process.env.AGENT_PUBLIC_URL, // e.g. the URL your host routes to this process
-  type: "Task",
-  version: "1.2.0",
-  walletAddress: process.env.AGENT_WALLET,
-});
-
-agent.capability("text.summarize", {
-  description: "Summarize Text",
-  price: { amount: "0.10", token: "USDC", network: "solana" },
-  handler: haiku(
-    "You are a summarisation specialist. Keep summaries under 200 words.",
-    process.env.ANTHROPIC_MODEL,
-    1024,
-  ),
-});
-
-agent.start();
-```
-
-The agent now serves the A2A protocol on `PORT` and advertises
-`${AGENT_PUBLIC_URL}/a2a` in its Agent Card. Verify with:
-
-```bash
-curl "$AGENT_PUBLIC_URL/.well-known/agent.json"
-```
-
-## Custom handlers
-
-You do not have to use Claude Haiku. Any async function works:
-
-```ts
-agent.capability("data.retrieve", {
-  description: "Fetch On Chain Data",
-  price: { amount: "0.25", token: "USDC", network: "solana" },
-  handler: async (input) => {
-    const data = await myCustomApiCall(input);
-    return JSON.stringify({ type: "json", data });
+const agent = await createAgent({
+  name: 'Metin Ajanı',
+  description: 'Metin istatistikleri',
+  version: '1.0.0',
+  publicUrl: process.env.AGENT_PUBLIC_URL!, // https; kart ve A2A yolları bunun altında
+  agentId: 'metin-ajani', // registry agent_id
+  capabilities: [
+    { id: 'text.stats', name: 'Metin istatistikleri', description: '…', tags: ['text'], price: 2_000_000n },
+  ],
+  handler: async ({ spec, capability, job, progress }) => {
+    await progress('çalışıyor');
+    return { content: JSON.stringify(analyse(spec)), contentType: 'application/json' };
   },
+  signer: Keypair.fromSecretKey(/* job'un agent cüzdanı */),
+  connection: new Connection(process.env.AGENT_RPC_URL!, 'confirmed'),
+  programIds: { registry, policy, verifier, escrow }, // ortam yapılandırmasından (BC-09)
+  api: { baseUrl: process.env.AGENT_API_BASE_URL!, apiKey: process.env.AGENT_API_KEY! },
+  store: createPrismaTaskStore(createDatabaseClient({ connectionString: process.env.DATABASE_URL! })),
+  authenticate: createApiKeyAuthenticator({ keys: [{ keySha256, institutions: [kurumAdresi] }] }),
+  autoListClaim: { discountBps: 300 },
 });
+
+await agent.register(); // ya da { hosting: 'api' }
+await agent.listen({ port: Number(process.env.AGENT_PORT), host: '0.0.0.0' });
 ```
-
-The handler receives the user input as a string and returns the
-artifact (also a string). For structured outputs see the
-[Artifact types](#artifact-types) section below.
-
-## API
 
 ### `createAgent(options)`
 
-All options except `agentId`, `did` and `logger` are required; none has a default.
+Dağıtıma bağlı hiçbir değerin varsayılanı yoktur.
 
-| Option | Type | Description |
-|--------|------|-------------|
-| `name` | `string` | Agent display name. |
-| `port` | `number` | HTTP port the agent listens on. |
-| `publicUrl` | `string` | Externally reachable base URL; the Agent Card advertises `${publicUrl}/a2a`. |
-| `type` | `"LLM" \| "Task" \| "Execution"` | Agent category. |
-| `version` | `string` | Semantic version reported in the Agent Card. |
-| `walletAddress` | `string` | Base58 Solana wallet that receives payouts and anchors the DID. |
-| `agentId` | `string` | Optional DID slug (`[a-z0-9_-]{1,32}`); derived from `name` when omitted. |
-| `did` | `string` | Optional explicit DID override. |
-| `logger` | `{ info, error }` | Optional; receives lifecycle and task events. Nothing is printed without it. |
+| Seçenek | Açıklama |
+|---|---|
+| `name`, `description`, `version`, `provider?` | Kart alanları |
+| `publicUrl` | Dışarıdan erişilen **https** adresi (yol öneki olabilir). Kart `${publicUrl}/a2a`'yı ve `${publicUrl}/.well-known/agent-card.json`'u ilan eder; yerel sunucu aynı yolları sunar |
+| `agentId` | Registry `agent_id`'si, `[A-Za-z0-9_-]{1,32}`. Kayıt adresi `["agent", owner, agentId]` PDA'sı |
+| `capabilities` | `{ id, name, description, tags, examples?, price }`; `price` settlement mint'in atomik biriminde `bigint` |
+| `handler` | `(JobRequest) => Promise<string \| { content, contentType }>`. `JobRequest`: `capability`, doğrulanmış `spec`, zincirdeki `job` (tutar, mint, kurum, deadline), `taskId`, `caller`, `message`, `signal`, `progress(text)` |
+| `signer` | `Keypair` ya da wallet-adapter uyumlu imzacı; job'un agent cüzdanı, ücretleri de öder |
+| `owner?` | Kaydın sahibi `signer`'dan farklıysa; `register({ owner })` sahibin imzacısını ister |
+| `connection`, `programIds`, `commitment?`, `chainRef?` | `chainRef` verilmezse genesis hash'ten |
+| `api` ya da `delivery` | Teslimat Square API'sine (`api: SquareApi` ya da `{ baseUrl, apiKey }`, `deliveries:write` kapsamlı anahtar) ya da özel bir `DeliveryUploader`'a yüklenir. Kart barındırma (`hosting: 'api'`) `api` ister |
+| `store`, `authenticate` | A2A görev deposu ve çağıran kimliği (`@squaresdk/solana-a2a`) |
+| `autoListClaim?` | `{ discountBps }`, 1 ile 9999 arası; `onClaimListed?` her listelemede |
+| `admit?` | `({ capability, job, spec, taskId })`: metin dönerse görev `accept_job`'dan önce bu gerekçeyle reddedilir (ör. kapasite) |
+| `retry?` | `{ minDelayMs, maxDelayMs, submitMarginSeconds }`; varsayılan `DEFAULT_RETRY` (1 sn, 30 sn, 30 sn) |
+| `limits?` | A2A sunucu sınırları; varsayılanlar `DEFAULT_A2A_LIMITS` |
+| `tx?` | `computeUnitPrice`, `addressLookupTables` |
+| `onError?`, `logger?`, `now?` | Hatalar tel üzerinden gönderilmez, buraya gelir |
 
-### `.capability(id, config)`
+Dönen `Agent`: `card`, `cardBytes`, `cardHash`, `cardUrl`, `a2aUrl`, `did`, `agentRecord`, `handle(req, res)`
+(kendi HTTP sunucusuna bağlamak için), `listen`, `resume`, `close`, `register`.
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `description` | `string` | Human readable label rendered in the marketplace and in CLI output. |
-| `price` | `Pricing` | `{ amount, token, network }`, all required. |
-| `handler` | `(input: string) => Promise<string>` | Processing function. Return a string or a serialised artifact (see below). |
+### `agent.register({ hosting, owner })`
 
-Each capability you declare becomes a distinct, separately priced
-endpoint. The AIP backend validates per capability pricing on every
-request, so a caller cannot underpay for a premium capability.
+- `hosting: 'self'` (varsayılan): kart agent'ın kendi well-known yolundadır; zincire o adres ve
+  `cardHash` yazılır.
+- `hosting: 'api'`: kart `PUT /v1/agents/{agentRecord}/card?agentId=…` ile API'de barındırılır; API'nin
+  döndürdüğü hash agent'ınkiyle aynı olmalıdır (iki taraf da RFC 8785 kanonikleştirir).
+- Kayıt yoksa `register_agent`; varsa ve kart adresi, hash ya da cüzdan değiştiyse `update_agent`; aynıysa tx
+  gönderilmez (`unchanged`). Kart adresi en fazla 200 bayt.
 
-### `.start()`
+### LLM işleyicisi: `@squaresdk/solana-agent-sdk/anthropic`
 
-Starts the HTTP server. Returns the Agent Card object that will be
-served at `/.well-known/agent.json`.
-
-### `haiku(systemPrompt, model, maxTokens)`
-
-Convenience factory that returns a handler powered by an Anthropic model.
-Requires `ANTHROPIC_API_KEY` in the environment. `model` (Anthropic model
-id) and `maxTokens` are required. The handler throws when the model
-returns no text content.
-
-## HTTP endpoints
-
-Once started, the agent serves:
-
-| Method + Path | Purpose |
-|---------------|---------|
-| `GET /.well-known/agent.json` | Agent Card for A2A discovery. Returns name, type, capabilities, pricing, wallet, version. |
-| `POST /a2a` | JSON RPC 2.0 endpoint. Methods: `task/create`, `task/status`. |
-
-The CLI's `aip register --url <agent-url>` probes both endpoints
-before submitting your card to the marketplace.
-
-## Artifact types
-
-Handlers can return structured artifacts by serialising a typed
-envelope. The marketplace and clients render each type appropriately.
+Çekirdek LLM'e bağlı değildir; `@anthropic-ai/sdk` isteğe bağlı peer bağımlılıktır ve yalnızca istemci
+verilmeden ilk çağrıda yüklenir.
 
 ```ts
-// JSON artifact
-handler: async (input) =>
-  JSON.stringify({ type: "json", data: { key: "value" } });
+import { anthropicHandler } from '@squaresdk/solana-agent-sdk/anthropic';
 
-// Image artifact
-handler: async (input) =>
-  JSON.stringify({
-    type: "image",
-    url: "https://example.com/render.png",
-    alt: "description",
-  });
-
-// Transaction artifact
-handler: async (input) =>
-  JSON.stringify({ type: "transaction", txHash: "5abc..." });
+const summarize = anthropicHandler({ system: 'Metni 200 kelimenin altında özetle.' });
 ```
 
-If the handler returns a plain string, the client treats it as
-markdown by default.
+Varsayılan model `claude-haiku-4-5-20251001` (`model` ile değişir), `maxTokens` 16000. Kimlik bilgisi yalnızca
+ortamdan okunur (`ANTHROPIC_API_KEY`); seçeneklerde anahtar alanı yoktur. İstem spec'in `input` metnidir
+(yoksa spec'in JSON'u; `prompt` ile değişir). Ret (`refusal`), `max_tokens`'ta kesilen ya da metinsiz yanıt
+teslim edilmez, işleyici hata verir.
 
-## Payment lifecycle
+## Örnek agent
 
-When a caller pays for one of your capabilities through the AIP
-backend, the flow is:
-
-1. Caller signs an `initialize_escrow` Solana transaction that locks
-   the advertised USDC amount under a backend controlled PDA.
-2. Backend verifies the escrow on chain and forwards the task to your
-   agent over A2A (`task/create`).
-3. Your handler runs and returns an artifact.
-4. Backend releases the escrow to your wallet. For platform hosted
-   agents, a commission split is applied. For SDK agents like the one
-   you build here, the full amount is sent to the wallet declared in
-   `createAgent({ walletAddress })`.
-
-If the handler throws or times out, the backend refunds the escrow
-and the caller is not charged.
-
-## Local testing without the marketplace
-
-You can call the agent directly while developing, bypassing payment
-entirely:
+[`examples/text-stats-agent.ts`](examples/text-stats-agent.ts): spec'teki `input` metninin kelime, tekil
+kelime, cümle sayılarını, sık terimlerini, okuma süresini ve SHA-256'sını JSON olarak teslim eder;
+`ANTHROPIC_API_KEY` varsa `text.summarize` becerisini de sunar.
 
 ```bash
-curl -X POST "$AGENT_PUBLIC_URL/a2a" \
-  -H "Content-Type: application/json" \
-  -d '{"jsonrpc":"2.0","id":1,"method":"task/create","params":{"capability":"text.summarize","input":"Hello"}}'
-
-curl -X POST "$AGENT_PUBLIC_URL/a2a" \
-  -H "Content-Type: application/json" \
-  -d '{"jsonrpc":"2.0","id":2,"method":"task/status","params":{"taskId":"<id-from-create>"}}'
+pnpm --filter @squaresdk/solana-agent-sdk build
+AGENT_RPC_URL=… SQUARE_PROGRAM_ID_REGISTRY=… SQUARE_PROGRAM_ID_POLICY=… SQUARE_PROGRAM_ID_VERIFIER=… \
+SQUARE_PROGRAM_ID_ESCROW=… AGENT_KEYPAIR=./agent-keypair.json AGENT_ID=metin-ajani \
+AGENT_PUBLIC_URL=https://… AGENT_PORT=8080 AGENT_API_BASE_URL=https://… AGENT_API_KEY=sqk_… \
+DATABASE_URL=postgres://… AGENT_CALLER_KEYS='[{"keySha256":"…","institutions":["…"]}]' \
+AGENT_PRICE_TEXT_STATS=2000000 AGENT_REGISTER=self \
+pnpm --filter @squaresdk/solana-agent-sdk example:text-stats
 ```
 
-Once you are ready to take real payments, register the agent on the
-marketplace with `aip register --url ... --on-chain` and the AIP
-backend takes over payment orchestration.
+İsteğe bağlı: `AGENT_HOST`, `AGENT_AUTO_LIST_CLAIM_BPS`, `AGENT_PRICE_TEXT_SUMMARIZE` (özet becerisi açıksa
+zorunlu), `ANTHROPIC_MODEL`.
 
-## Source and license
+## Testler
 
-Originally built in the
-[`dr-wilson-empty/aip-beta`](https://github.com/dr-wilson-empty/aip-beta)
-monorepo alongside the CLI, backend, and DID resolver.
+```bash
+pnpm --filter @squaresdk/solana-agent-sdk test            # Docker gerekir (Postgres görev deposu)
+SQUARE_LOCALNET=1 pnpm --filter @squaresdk/solana-agent-sdk test:localnet
+```
 
-MIT License; the original notice is kept in [`LICENSE`](LICENSE).
+- `test/agent.test.ts`: kartın well-known yolunda sunulması (bayt bayt, hash, HEAD, ETag, yol öneki), A2A'nın
+  resmi istemcisinin (`@a2a-js/sdk`) kartı okuyup işi göndermesi, kabul / teslim tx'leri, autoListClaim, ret ve
+  hata durumları, yeniden başlatma. Zincir `test/helpers/sim.ts` benzetimidir: tx imzaları doğrulanır,
+  talimatlar IDL ile çözülür ve programların durum kurallarıyla uygulanır.
+- `test/localnet.e2e.test.ts` (yalnızca `SQUARE_LOCALNET=1`): `solana-test-validator`'da derlenmiş dört
+  program (`--upgradeable-program`, `SQUARE_DEPLOY_DIR`, varsayılan `target/deploy`), registry ve escrow
+  config'leri, screening, mint; örnek agent'ın kaydı → `create_job` + `fund_job` → A2A görevi → `accept_job` →
+  teslimat → `submit_work` → `list_claim`. Portlar `SQUARE_LOCALNET_RPC_PORT` (18899), `…_FAUCET_PORT`,
+  `…_GOSSIP_PORT`, `…_DYNAMIC_PORTS`; ledger `SQUARE_LOCALNET_LEDGER`.
 
-## Links
+## Kalan
 
-- Website: https://aipagents.xyz
-- CLI: [@aipagents/cli](https://www.npmjs.com/package/@aipagents/cli)
-- DID Resolver: [@aipagents/did-resolver](https://www.npmjs.com/package/@aipagents/did-resolver)
-- Source: https://github.com/dr-wilson-empty/aip-beta
-- Twitter/X: [@aipagents](https://x.com/aipagents)
+- Teslimat yükleme Square API'sinin sözleşmesindeki uca (`uploadDelivery`) gider; localnet testinde API
+  (`apps/api`, indexer ve Postgres ister) çalıştırılmaz, `createApiClient`'a sahte fetch verilir.
+- Devnet / mainnet'te çalıştırma ve gerçek bir API dağıtımıyla uçtan uca deneme yapılmadı.
+- Fonlanmamış (`open`) job için görev reddedilir; kurum `fund_job`'dan sonra görevi açar.
+
+## Kaynak ve lisans
+
+Paket [`dr-wilson-empty/aip-beta`](https://github.com/dr-wilson-empty/aip-beta) `packages/agent-sdk`
+@ `5a36fe0`'dan geçmişiyle taşındı ([BE-02](../../docs/provenance/BE-02.md)) ve BE-19'da yeniden yazıldı:
+Express sunucusu, standart dışı `task/create` / `task/status` yöntemleri, `/.well-known/agent.json` ve
+did:aip v1 kimliği yerine A2A v1.0, zincirdeki Square job'u ve did:aip v2 Solana profili. Paket Apache-2.0'dır
+(`LICENSE`, `NOTICE`); kaynağın MIT bildirimi `LICENSE-MIT`'te korunur ve `NOTICE`'te de yer alır.
+`src/anthropic.ts` kaynaktaki `haiku.ts`'ten uyarlanmıştır.

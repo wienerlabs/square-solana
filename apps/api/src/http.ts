@@ -25,6 +25,8 @@ export const badRequest = (message: string, details: Record<string, unknown> | n
 export const unauthorized = (message: string) => new HttpError(401, 'unauthorized', message);
 export const forbidden = (message: string) => new HttpError(403, 'forbidden', message);
 export const notFound = (message: string) => new HttpError(404, 'not_found', message);
+export const conflict = (message: string, details: Record<string, unknown> | null = null) =>
+  new HttpError(409, 'conflict', message, details);
 
 export const requestIdOf = (res: Response): string => res.locals['requestId'] as string;
 

@@ -1,198 +1,229 @@
+// `createAgent`: agent card'ı (well-known yolunda), A2A v1.0 uç noktasını (`@squaresdk/solana-a2a`) ve job
+// akışını (job.ts) tek bir `node:http` işleyicisinde birleştirir. Kaynak: aip-beta `packages/agent-sdk`
+// @ 5a36fe0 (MIT, LICENSE-MIT); Express sunucusu, standart dışı `task/create` / `task/status` yöntemleri ve
+// did:aip v1 kimliği yerine A2A v1.0, zincirdeki Square job'u ve did:aip v2 Solana profili (BE-19).
+import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
+import { createA2aServer, createChainJobSource, type A2aServer, type A2aServerLimits } from '@squaresdk/solana-a2a';
+import { squareIdentity } from '@squaresdk/solana-identity';
+import { createApiClient, createSquareClient, type SquareApi } from '@squaresdk/solana-sdk';
+import { A2A_PATH, WELL_KNOWN_AGENT_CARD_PATH, agentUrls, assertAgentId, buildAgentCard, encodeCard } from './card.js';
+import { createTxSender, toWallet } from './chain.js';
+import { apiDeliveryUploader } from './delivery.js';
+import { DEFAULT_RETRY, assertDiscountBps, assertRetryOptions, createJobExecutor } from './job.js';
+import { registerAgent } from './register.js';
+import type { Agent, AgentOptions } from './types.js';
+
 /**
- * @squaresdk/solana-agent-sdk — Agent builder with fluent API.
- *
- * Usage:
- *   const agent = createAgent({
- *     name: 'My Bot',
- *     port: Number(process.env.PORT),
- *     publicUrl: process.env.AGENT_PUBLIC_URL,
- *     type: 'Task',
- *     version: '1.2.0',
- *     walletAddress: process.env.AGENT_WALLET,
- *   });
- *   agent.capability('text.summarize', {
- *     description: 'Summarize Text',
- *     price: { amount: '0.10', token: 'USDC', network: 'solana' },
- *     handler: async (input) => summarize(input),
- *   });
- *   agent.start();
+ * A2A sunucusunun varsayılan sınırları; `limits` ile değiştirilir. Akışsız `SendMessage` en fazla
+ * `blockingTimeoutMs` bekler (docs/design/a2a.md §10.4): uzun işlerde istemci akışa abone olur.
  */
-import { randomUUID } from 'node:crypto';
-import express from 'express';
-import type { Express } from 'express';
-import type { AgentOptions, AgentCard, CapabilityConfig, Pricing } from './types';
+export const DEFAULT_A2A_LIMITS: Readonly<A2aServerLimits> = Object.freeze({
+  maxBodyBytes: 256 * 1024,
+  maxStreams: 256,
+  maxStreamsPerCaller: 16,
+  heartbeatMs: 15_000,
+  streamMaxDurationMs: 30 * 60_000,
+  blockingTimeoutMs: 60_000,
+  maxHistory: 100,
+  maxMessagesPerTask: 50,
+  maxArtifactBytes: 1024 * 1024,
+});
 
-interface InternalTask {
-  id: string;
-  status: 'WORKING' | 'COMPLETED' | 'FAILED';
-  artifact?: string;
-  error?: string;
-}
+const isSquareApi = (api: NonNullable<AgentOptions['api']>): api is SquareApi =>
+  typeof (api as SquareApi).uploadDelivery === 'function';
 
-function jsonRpcOk(id: string | number, result: unknown) {
-  return { jsonrpc: '2.0', result, id };
-}
-
-function jsonRpcError(id: string | number | null, code: number, message: string) {
-  return { jsonrpc: '2.0', error: { code, message }, id };
-}
-
-/** Solana base58 pubkey: 32–44 chars from the Bitcoin alphabet (no 0OIl). */
-const SOLANA_PUBKEY_RE = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
-const AGENT_ID_RE = /^[a-z0-9_-]{1,32}$/;
-
-function sanitizeAgentId(name: string): string {
-  return name
-    .toLowerCase()
-    .replace(/[^a-z0-9_-]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 32);
-}
-
-/** Agent returned by createAgent (explicit so the emitted .d.ts is portable under pnpm). */
-export interface Agent {
-  capability(id: string, config: CapabilityConfig): Agent;
-  start(): AgentCard;
-  getCard(): AgentCard;
-  app: Express;
-}
-
-export function createAgent(options: AgentOptions): Agent {
-  if (!options.walletAddress || !SOLANA_PUBKEY_RE.test(options.walletAddress)) {
-    throw new Error(
-      `createAgent: walletAddress must be a base58 Solana public key (32–44 chars). ` +
-        `Got: ${JSON.stringify(options.walletAddress)}. ` +
-        `As of @aip/agent-sdk 0.2.0 this field is required so the agent's DID can be ` +
-        `derived from the canonical did:aip format (spec §3.2).`,
-    );
-  }
-
-  let publicUrl: URL;
-  try {
-    publicUrl = new URL(options.publicUrl);
-  } catch (err) {
-    throw new Error(`createAgent: publicUrl must be an absolute URL. Got: ${JSON.stringify(options.publicUrl)}.`, {
-      cause: err,
-    });
-  }
-  const a2aEndpoint = `${publicUrl.toString().replace(/\/+$/, '')}/a2a`;
-
-  const agentId = options.agentId ?? sanitizeAgentId(options.name);
-  if (!AGENT_ID_RE.test(agentId)) {
-    throw new Error(
-      `createAgent: agentId must match /^[a-z0-9_-]{1,32}$/. ` +
-        `Resolved agentId="${agentId}" from options.agentId=${JSON.stringify(options.agentId)} ` +
-        `or fallback from options.name=${JSON.stringify(options.name)}.`,
-    );
-  }
-
-  const app = express();
-  app.use(express.json());
-
-  const tasks = new Map<string, InternalTask>();
-  const capabilities = new Map<string, { config: CapabilityConfig; pricing: Pricing }>();
-
-  const walletAddress = options.walletAddress;
-  const did = options.did ?? `did:aip:${walletAddress}:${agentId}`;
-
-  /** Register a capability with its handler */
-  function capability(id: string, config: CapabilityConfig) {
-    const pricing: Pricing = { ...config.price };
-    capabilities.set(id, { config, pricing });
-    return api; // fluent chaining
-  }
-
-  /** Build Agent Card from registered capabilities */
-  function getCard(): AgentCard {
-    return {
-      did,
-      name: options.name,
-      version: options.version,
-      endpoint: a2aEndpoint,
-      type: options.type,
-      walletAddress,
-      capabilities: Array.from(capabilities.entries()).map(([id, { config, pricing }]) => ({
-        id,
-        description: config.description,
-        pricing,
-      })),
-    };
-  }
-
-  // ---- Agent Card endpoint ----
-  app.get('/.well-known/agent.json', (_req, res) => {
-    res.json(getCard());
-  });
-
-  // ---- JSON-RPC 2.0 endpoint ----
-  app.post('/a2a', async (req, res) => {
-    const { jsonrpc, method, params, id } = req.body ?? {};
-
-    if (jsonrpc !== '2.0' || !method || id === undefined) {
-      return res.json(jsonRpcError(id ?? null, -32600, 'Invalid JSON-RPC request'));
+/** CAIP-2 Solana referansı: genesis hash'in ilk 32 karakteri (did:aip Solana profili §3.3). */
+async function chainRefOf(options: AgentOptions): Promise<string> {
+  if (options.chainRef !== undefined) {
+    if (!/^[1-9A-HJ-NP-Za-km-z]{32}$/.test(options.chainRef)) {
+      throw new Error(`createAgent: chainRef 32 karakter base58 olmalı: ${options.chainRef}`);
     }
+    return options.chainRef;
+  }
+  return (await options.connection.getGenesisHash()).slice(0, 32);
+}
 
-    if (method === 'task/create') {
-      const { capability: capId, input, taskId } = params ?? {};
-      if (!capId || !input) {
-        return res.json(jsonRpcError(id, -32602, 'Missing capability or input'));
-      }
+function sendJson(response: ServerResponse, status: number, body: unknown, headers: Record<string, string> = {}) {
+  const text = JSON.stringify(body);
+  response.writeHead(status, {
+    'content-type': 'application/json',
+    'content-length': Buffer.byteLength(text),
+    ...headers,
+  });
+  response.end(text);
+}
 
-      const cap = capabilities.get(capId);
-      if (!cap) {
-        return res.json(jsonRpcError(id, -32602, `Unsupported capability: ${capId}`));
-      }
+export async function createAgent(options: AgentOptions): Promise<Agent> {
+  assertAgentId(options.agentId);
+  const urls = agentUrls(options.publicUrl);
+  if (options.autoListClaim) assertDiscountBps(options.autoListClaim.discountBps);
+  const retry = { ...DEFAULT_RETRY, ...options.retry };
+  assertRetryOptions(retry);
+  const commitment = options.commitment ?? options.connection.commitment;
+  if (!commitment) throw new Error('createAgent: commitment gerekli (options.commitment ya da bağlantının)');
 
-      const agentTaskId = taskId || `atask_${randomUUID()}`;
-      tasks.set(agentTaskId, { id: agentTaskId, status: 'WORKING' });
+  const api = options.api ? (isSquareApi(options.api) ? options.api : createApiClient(apiConfig(options.api))) : null;
+  const delivery = options.delivery ?? (api ? apiDeliveryUploader(api) : null);
+  if (!delivery) throw new Error('createAgent: teslimat için api ya da delivery verilmeli');
 
-      res.json(jsonRpcOk(id, { taskId: agentTaskId, status: 'WORKING' }));
+  const wallet = toWallet(options.signer);
+  const owner = options.owner ?? wallet.publicKey;
+  const client = createSquareClient({
+    connection: options.connection,
+    programIds: options.programIds,
+    commitment,
+  });
+  const [agentRecord] = client.pda.agentRecord(owner, options.agentId);
+  const config = await client.escrow.fetch('escrowConfig', client.pda.escrowConfig()[0]);
+  if (!config) throw new Error('createAgent: escrow config zincirde yok (programIds ve bağlantıyı denetleyin)');
+  const chainRef = await chainRefOf(options);
+  const did = squareIdentity.formatDidAip({ chainRef, registry: options.programIds.registry, agentRecord });
+  const card = buildAgentCard({
+    name: options.name,
+    description: options.description,
+    version: options.version,
+    ...(options.provider ? { provider: options.provider } : {}),
+    urls,
+    did,
+    capabilities: options.capabilities,
+    chainRef,
+    registry: options.programIds.registry,
+    agentRecord,
+    settlementMint: config.settlementMint,
+  });
+  const { bytes: cardBytes, hash: cardHash } = encodeCard(card);
 
-      // Execute handler in background
-      try {
-        const artifact = await cap.config.handler(input);
-        tasks.set(agentTaskId, { id: agentTaskId, status: 'COMPLETED', artifact });
-        options.logger?.info(`[${options.name}] Task ${agentTaskId} completed`);
-      } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        tasks.set(agentTaskId, { id: agentTaskId, status: 'FAILED', error: message });
-        options.logger?.error(`[${options.name}] Task ${agentTaskId} failed: ${message}`);
-      }
+  const report = (error: unknown) => {
+    try {
+      options.onError?.(error);
+      options.logger?.error(error instanceof Error ? error.message : String(error));
+    } catch {
       return;
     }
-
-    if (method === 'task/status') {
-      const { taskId } = params ?? {};
-      if (!taskId) return res.json(jsonRpcError(id, -32602, 'Missing taskId'));
-
-      const task = tasks.get(taskId);
-      if (!task) return res.json(jsonRpcError(id, -32001, `Task not found: ${taskId}`));
-
-      return res.json(
-        jsonRpcOk(id, {
-          taskId: task.id,
-          status: task.status,
-          ...(task.artifact ? { artifact: task.artifact } : {}),
-          ...(task.error ? { error: task.error } : {}),
-        }),
-      );
-    }
-
-    return res.json(jsonRpcError(id, -32601, `Unknown method: ${method}`));
+  };
+  const sender = createTxSender({ connection: options.connection, commitment, client });
+  const now = options.now ?? (() => Math.floor(Date.now() / 1000));
+  const tx = options.tx ?? {};
+  const a2a: A2aServer = createA2aServer({
+    agentRecord: agentRecord.toBase58(),
+    store: options.store,
+    jobSource: createChainJobSource(client),
+    authenticate: options.authenticate,
+    executor: createJobExecutor({
+      client,
+      sender,
+      wallet,
+      capabilities: options.capabilities,
+      handler: options.handler,
+      delivery,
+      ...(options.autoListClaim ? { autoListClaim: options.autoListClaim } : {}),
+      ...(options.onClaimListed ? { onClaimListed: options.onClaimListed } : {}),
+      ...(options.admit ? { admit: options.admit } : {}),
+      retry,
+      tx,
+      now,
+      ...(options.logger ? { logger: options.logger } : {}),
+      onError: report,
+    }),
+    limits: { ...DEFAULT_A2A_LIMITS, ...options.limits },
+    onError: report,
   });
 
-  /** Start the agent HTTP server */
-  function start() {
-    const card = getCard();
-    app.listen(options.port, () => {
-      options.logger?.info(
-        `[${options.name}] listening on port ${options.port}; DID ${did}; A2A ${a2aEndpoint}; ` +
-          `capabilities: ${Array.from(capabilities.keys()).join(', ')}`,
-      );
+  const cardPath = `${urls.basePath}${WELL_KNOWN_AGENT_CARD_PATH}`;
+  const a2aPath = `${urls.basePath}${A2A_PATH}`;
+  const cardBody = Buffer.from(cardBytes);
+  const etag = `"${cardHash}"`;
+  let server: Server | null = null;
+
+  async function handle(request: IncomingMessage, response: ServerResponse): Promise<void> {
+    const path = new URL(request.url ?? '/', 'http://agent.invalid').pathname;
+    if (path === a2aPath) return a2a.handle(request, response);
+    if (path !== cardPath) return sendJson(response, 404, { error: 'bulunamadı' });
+    if (request.method !== 'GET' && request.method !== 'HEAD') {
+      return sendJson(response, 405, { error: 'yalnızca GET' }, { allow: 'GET, HEAD' });
+    }
+    if (request.headers['if-none-match'] === etag) {
+      response.writeHead(304, { etag });
+      response.end();
+      return;
+    }
+    // Baytlar `agent_card_hash`'in hesaplandığı baytlardır; yeniden serileştirilmez.
+    response.writeHead(200, {
+      'content-type': 'application/json',
+      'content-length': cardBody.length,
+      'cache-control': 'public, max-age=300',
+      'access-control-allow-origin': '*',
+      etag,
     });
-    return card;
+    response.end(request.method === 'HEAD' ? undefined : cardBody);
   }
 
-  const api: Agent = { capability, start, getCard, app };
-  return api;
+  return {
+    card,
+    cardBytes,
+    cardHash,
+    cardUrl: urls.card,
+    a2aUrl: urls.a2a,
+    did,
+    agentRecord,
+    handle,
+    resume: () => a2a.resume(),
+    async listen({ port, host }) {
+      if (server) throw new Error('agent zaten dinliyor');
+      const resumed = await a2a.resume();
+      const created = createServer((request, response) => {
+        handle(request, response).catch((error: unknown) => {
+          report(error);
+          if (!response.headersSent) sendJson(response, 500, { error: 'iç hata' });
+          else response.destroy();
+        });
+      });
+      await new Promise<void>((resolve, reject) => {
+        created.once('error', reject);
+        created.listen(port, host, () => {
+          created.off('error', reject);
+          resolve();
+        });
+      });
+      server = created;
+      options.logger?.info(
+        `${options.name} dinliyor: ${urls.card} (${did}); ${resumed} görev sürdürüldü; ` +
+          `capability: ${options.capabilities.map((c) => c.id).join(', ')}`,
+      );
+      return created;
+    },
+    async close() {
+      await a2a.close();
+      const current = server;
+      server = null;
+      if (!current) return;
+      current.closeAllConnections();
+      await new Promise<void>((resolve) => current.close(() => resolve()));
+    },
+    register: (registerOptions) =>
+      registerAgent(
+        {
+          client,
+          sender,
+          wallet,
+          owner,
+          agentId: options.agentId,
+          agentRecord,
+          card,
+          cardHash,
+          cardUrl: urls.card,
+          api,
+          tx,
+        },
+        registerOptions,
+      ),
+  };
+}
+
+function apiConfig(api: { baseUrl: string; apiKey?: string; fetch?: typeof fetch }) {
+  return {
+    baseUrl: api.baseUrl,
+    ...(api.apiKey ? { auth: { apiKey: api.apiKey } } : {}),
+    ...(api.fetch ? { fetch: api.fetch } : {}),
+  };
 }

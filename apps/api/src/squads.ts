@@ -3,14 +3,16 @@
 // öneri açabilen (`Initiate`) üyeler yazar. Düzen Squads v4'ün `state/multisig.rs`'idir:
 //   discriminator · create_key · config_authority · threshold u16 · time_lock u32 · transaction_index u64 ·
 //   stale_transaction_index u64 · rent_collector Option<Pubkey> · bump u8 · members Vec<{ key, permissions u8 }>
-import { PublicKey } from '@solana/web3.js';
+// Program kimliği, discriminator ve yetki bitleri SDK'nın Squads yardımcılarındandır
+// (`@squaresdk/solana-sdk/squads`, crate'teki `square_common::squads` ile aynı).
+import { SQUADS_MULTISIG_DISCRIMINATOR, SQUADS_PROGRAM_ID, SquadsPermission } from '@squaresdk/solana-sdk/squads';
+import { PublicKey, type Connection } from '@solana/web3.js';
+import { HttpError, forbidden } from './http.js';
 
-/** Squads v4 programı (her kümede aynı adres; `square_common::squads::PROGRAM_ID`). */
-export const SQUADS_PROGRAM_ID = new PublicKey('SQDS4ep65T869zMMBKyuUq6aD6EgTu8psMjkvj52pCf');
-/** `sha256("account:Multisig")[..8]` (`square_common::squads::MULTISIG_DISCRIMINATOR`). */
-const MULTISIG_DISCRIMINATOR = Buffer.from([224, 116, 121, 186, 68, 161, 79, 236]);
+export { SQUADS_PROGRAM_ID };
+const MULTISIG_DISCRIMINATOR = Buffer.from(SQUADS_MULTISIG_DISCRIMINATOR);
 /** `Permission::Initiate`. */
-export const PERMISSION_INITIATE = 1;
+export const PERMISSION_INITIATE = SquadsPermission.initiate;
 
 const KEY = 32;
 /** discriminator + create_key + config_authority + threshold + time_lock + iki sayaç. */
@@ -41,4 +43,21 @@ export function multisigMembers(owner: PublicKey, data: Buffer): SquadsMember[] 
       permissions: data[start + KEY]!,
     };
   });
+}
+
+/**
+ * Cüzdan, multisig'te öneri açabilen (`Initiate`) bir üye mi; üyeler hesaptan o anda okunur. Hesap Squads v4
+ * multisig'i değilse yetkili doğrulanamaz (403), RPC düşerse 503.
+ */
+export async function isMultisigInitiator(connection: Connection, multisig: string, wallet: string): Promise<boolean> {
+  let info;
+  try {
+    info = await connection.getAccountInfo(new PublicKey(multisig), 'confirmed');
+  } catch (error) {
+    throw new HttpError(503, 'rpc_unavailable', 'Squads multisig hesabı okunamadı', null, null, error);
+  }
+  const members = info ? multisigMembers(info.owner, info.data) : null;
+  // Bağlama sırasında program hesabı Squads v4 multisig'i olarak denetledi; artık değilse yetkili doğrulanamaz.
+  if (!members) throw forbidden('kurumun multisig hesabı Squads v4 multisig değil; yetkili doğrulanamadı');
+  return members.some((member) => member.key === wallet && (member.permissions & PERMISSION_INITIATE) !== 0);
 }

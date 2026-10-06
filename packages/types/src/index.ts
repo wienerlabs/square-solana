@@ -10,6 +10,7 @@ export * from './events.js';
 export * from './operations.js';
 export * from './travel-rule.js';
 export * from './cctp.js';
+export * from './arbitration.js';
 
 /** BE-35 API / SDK sözleşme sürümü (docs/design/api-sdk-contract.md değişiklik kaydı). */
-export const API_CONTRACT_VERSION = '0.19.0';
+export const API_CONTRACT_VERSION = '0.22.0';

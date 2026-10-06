@@ -140,6 +140,79 @@ export class World {
     );
   }
 
+  /**
+   * Dispute'lu job (lapse crank'i): zincirdeki job ve job / dispute ayna satırları. `deadline` zincirdeki,
+   * `mirrorDeadline` (verilirse) aynadaki son tarihtir; `status` zincirdeki durum.
+   */
+  async disputed(options: { deadline: number; mirrorDeadline?: number; bond?: bigint; status?: string }) {
+    const db = this.db;
+    if (!db) throw new Error('dispute aynası için veritabanı gerekli');
+    const address = this.key();
+    const institution = this.key();
+    const status = options.status ?? 'disputed';
+    const dispute = this.sample('escrow', 'disputeInfo', {
+      raisedAt: new BN(options.deadline - 86_400),
+      deadline: new BN(options.deadline),
+      bond: new BN((options.bond ?? 0n).toString()),
+      lapsed: false,
+      resolution: { pending: {} },
+    });
+    const value = this.sample('escrow', 'job', {
+      institution,
+      mint: this.mint,
+      rentPayer: institution,
+      amount: new BN(AMOUNT.toString()),
+      status: { [status]: {} },
+      dispute,
+      policy: null,
+    });
+    await this.put('escrow', 'job', address, value);
+    const account = toIdlJson(this.programs.escrow.idl, { defined: { name: 'job' } }, value) as Record<string, unknown>;
+    const json = account.dispute as Record<string, number | string | boolean>;
+    await db.job.create({
+      data: {
+        address: address.toBase58(),
+        institution: institution.toBase58(),
+        agentRecord: account.agentRecord as string,
+        agentWallet: account.agentWallet as string,
+        policy: null,
+        mint: this.mint.toBase58(),
+        amount: AMOUNT.toString(),
+        specHash: account.specHash as string,
+        status: 'disputed',
+        createdAt: BigInt(account.createdAt as number),
+        deadline: BigInt(account.deadline as number),
+        challengeEnd: BigInt(account.challengeEnd as number),
+        account: account as object,
+        slot: 1n,
+        indexedAt: new Date(NOW * 1000 - 120_000),
+      },
+    });
+    await db.dispute.create({
+      data: {
+        job: address.toBase58(),
+        institution: institution.toBase58(),
+        agentRecord: account.agentRecord as string,
+        jobStatus: 'disputed',
+        challenger: institution.toBase58(),
+        bond: (options.bond ?? 0n).toString(),
+        reasonHash: json.reasonHash as string,
+        raisedAt: BigInt(options.deadline - 86_400),
+        deadline: BigInt(options.mirrorDeadline ?? options.deadline),
+        decidedAt: 0n,
+        closedAt: 0n,
+        resolution: 'pending',
+        lapsed: false,
+        approvalMask: 0,
+        approvalCount: 0,
+        arbitratorSetVersion: 1n,
+        slot: 1n,
+        indexedAt: new Date(NOW * 1000 - 120_000),
+      },
+    });
+    return { address, institution, value };
+  }
+
   /** Finalize'a hazır (ya da seçeneklerle bekleyen) job: zincir hesapları ve ayna satırı. */
   async job(options: JobOptions = {}) {
     const db = this.db;

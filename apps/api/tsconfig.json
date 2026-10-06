@@ -1,7 +1,7 @@
 {
   "extends": "@squaresdk/solana-config/tsconfig.base.json",
   "compilerOptions": {
-    "rootDir": ".",
+    "rootDir": "../..",
     "outDir": "dist"
   },
   "include": ["src", "test"]

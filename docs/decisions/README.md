@@ -22,6 +22,11 @@ Mimari karar kayıtları (ADR). Her karar ayrı bir dosyada, sıra numarasıyla 
 | [0015](0015-travel-rule-commitment-ve-esik.md) | Travel Rule commitment'ı: salt'lı ve job'a bağlı tanım, yalnızca `Open` işe bağlama, eşiğe eşit tutarda zorunluluk | BC-34 (#71) |
 | [0016](0016-dispute-m-of-n-zaman-asimi-ve-ispatsiz-bekleme.md) | Uyuşmazlık: M-of-N oy ve set değişiminde sayımın yeniden başlaması, son tarih ve lapse, işte tek dispute, ispatsız bekleme başvurusu, kararın ispat kapısından ödenmesi | BC-32 (#69), BC-33 (#70) |
 | [0017](0017-travel-rule-saklama-erisim-ve-paylasim.md) | Travel Rule kaydı: IVMS101 alt kümesi, sunucuda üretilen salt, zarf şifrelemesi ve anahtar döndürme, izinli okuma, erişim kaydı, yapılandırmadaki saklama süresi | BE-23 (#73) |
+| [0018](0018-x402-facilitator.md) | x402 facilitator'ı: varsayılan kendi facilitator'ımız (resmi `@x402/svm` şeması, süreç içi), harici facilitator yapılandırmayla; CAIP-2 ağlar ve Solana USDC | BE-24 (#79) |
+| [0019](0019-fee-payer-politikasi.md) | Fee payer: izinli program ve talimat listesi, sponsor anahtarının yalnızca ücret / rent yerlerinde durması, Squads vault mesajlarının denetimi, compute budget tavanı, tx başına tavan ve günlük bütçe, sponsor anahtarının saklanması | BE-27 (#82) |
+| [0020](0020-sanctions-screening-kaynaklari-ve-saglayici.md) | Sanctions screening: OFAC SDN listesi ve Chainalysis sanctions API birlikte, herhangi biri işaretlerse `Flagged`, kaynak hatasında karar yok, `source_hash` kanıt belgesinin hash'i | BE-16 (#49) |
+| [0022](0022-hosted-agent-calisma-zamani-izolasyonu.md) | Hosted agent çalışma zamanı izolasyonu: süreç içi, capability başına bağlam (ayrı MCP havuzu, tool allowlist'i, zaman / token / eşzamanlılık sınırları, hata yalıtımı); worker ve alt süreç seçilmedi | BE-29 (#88) |
+| [0023](0023-x402-ucretli-uc-nokta-tanimlari.md) | x402 ücretli uç nokta tanımları: tanım ve kullanım Square API'sinde, ödeme geliştiricinin sunucusunda (`paidRouteFromDefinition`, kendi facilitator'ı), uzlaştırılan ödeme `x402:serve` anahtarıyla bildirilir ve tekrar koruması kimliğiyle bir kez sayılır | FE-22 (#86) |
 
 ## §12 kararlarının karşılığı
 

@@ -8,6 +8,10 @@ import type {
   AgentStatus,
   AgentView,
   ApiEnvelope,
+  ArbitrationQueueItem,
+  ArbitrationWebhook,
+  ArbitrationWebhookCreate,
+  ArbitrationWebhookCreated,
   ApiKey,
   ApiKeyCreate,
   ApiKeyCreated,
@@ -21,7 +25,9 @@ import type {
   ClaimStatus,
   ClaimView,
   DeliveryReceipt,
+  DisputeEvidence,
   DisputeView,
+  DisputeVoteRequest,
   Health,
   IndexedEvent,
   InstitutionView,
@@ -44,6 +50,12 @@ import type {
   TravelRuleStatus,
   TxRequest,
   UnsignedTx,
+  X402Endpoint,
+  X402EndpointCreate,
+  X402EndpointUpdate,
+  X402EndpointUsage,
+  X402Payment,
+  X402PaymentReport,
 } from '@squaresdk/solana-types';
 
 /** Sayfalama: `page` 1'den, `limit` 1–200. */
@@ -68,6 +80,21 @@ export interface SquareApi {
   createApiKey(body: ApiKeyCreate): Promise<ApiEnvelope<ApiKeyCreated>>;
   /** `DELETE /v1/api-keys/{id}`: anahtarı iptal eder. */
   deleteApiKey(id: string): Promise<void>;
+
+  /** `GET /v1/x402/endpoints`: oturumdaki cüzdanın ücretli uç nokta tanımları. */
+  listX402Endpoints(): Promise<ApiEnvelope<X402Endpoint[]>>;
+  /** `POST /v1/x402/endpoints`: ücretli uç nokta tanımı; yol cüzdan başına tekildir (409). */
+  createX402Endpoint(body: X402EndpointCreate): Promise<ApiEnvelope<X402Endpoint>>;
+  /** `GET /v1/x402/endpoints/{id}`: tanım; oturum ya da `x402:serve` kapsamlı anahtarla. */
+  getX402Endpoint(id: string): Promise<ApiEnvelope<X402Endpoint>>;
+  /** `PATCH /v1/x402/endpoints/{id}`: kısmi güncelleme (fiyat, ağ, etkinlik, açıklama, yol). */
+  updateX402Endpoint(id: string, body: X402EndpointUpdate): Promise<ApiEnvelope<X402Endpoint>>;
+  /** `DELETE /v1/x402/endpoints/{id}`: tanımı kullanım kaydıyla birlikte siler. */
+  deleteX402Endpoint(id: string): Promise<void>;
+  /** `GET /v1/x402/endpoints/{id}/usage`: ödemeli çağrı sayısı, ağ ve mint başına toplam, son ödemeler. */
+  getX402EndpointUsage(id: string): Promise<ApiEnvelope<X402EndpointUsage>>;
+  /** Geliştiricinin sunucusunun uzlaştırdığı ödeme; aynı `fingerprint` ikinci kez bildirilirse ilk kayıt döner. */
+  recordX402Payment(id: string, body: X402PaymentReport): Promise<ApiEnvelope<X402Payment>>;
 
   /** `GET /v1/jobs`: job'lar (indexer), durum, kurum, agent kaydı ya da politikaya göre. */
   listJobs(
@@ -115,6 +142,22 @@ export interface SquareApi {
   listDisputes(query?: PageParams & { jobStatus?: JobStatus }): Promise<ApiEnvelope<DisputeView[]>>;
   /** `GET /v1/disputes/{job}`: job'un dispute'u. */
   getDispute(job: Address): Promise<ApiEnvelope<DisputeView>>;
+  /** `POST /v1/jobs/{job}/dispute/evidence`: dispute kanıtı; dönen `reasonHash` kurumun `raise_dispute` argümanıdır. */
+  uploadDisputeEvidence(job: Address, file: Blob): Promise<ApiEnvelope<DisputeEvidence>>;
+  /** `GET /v1/disputes/{job}/evidence`: job'un kanıtları; okuyan yalnızca taraflardır (kurum, agent, arbitrator). */
+  listDisputeEvidence(job: Address): Promise<ApiEnvelope<DisputeEvidence[]>>;
+  /** `GET /v1/disputes/{job}/evidence/{id}`: kanıtın baytları (zarfsız); içerik tipi `Blob.type`'tadır. */
+  getDisputeEvidenceContent(job: Address, id: string): Promise<Blob>;
+  /** `POST /v1/disputes/{job}/votes`: arbitrator oyu için imzasız `resolve_dispute` tx'i (ön denetimli). */
+  prepareDisputeVote(job: Address, body: DisputeVoteRequest): Promise<ApiEnvelope<UnsignedTx>>;
+  /** `GET /v1/arbitration/queue`: aktif arbitrator'ın açık dispute'ları, son tarihi en yakın önce. */
+  getArbitrationQueue(query?: PageParams): Promise<ApiEnvelope<ArbitrationQueueItem[]>>;
+  /** `GET /v1/arbitration/webhooks`: arbitrator'ın bildirim abonelikleri. */
+  listArbitrationWebhooks(): Promise<ApiEnvelope<ArbitrationWebhook[]>>;
+  /** `POST /v1/arbitration/webhooks`: bildirim aboneliği; imza sırrı (`whsec_…`) yalnızca bu yanıtta döner. */
+  createArbitrationWebhook(body: ArbitrationWebhookCreate): Promise<ApiEnvelope<ArbitrationWebhookCreated>>;
+  /** `DELETE /v1/arbitration/webhooks/{id}`: aboneliği ve bekleyen teslimatlarını siler. */
+  deleteArbitrationWebhook(id: string): Promise<void>;
   /** `GET /v1/screening/{wallet}`: cüzdanın screening kaydı. */
   getScreening(wallet: Address): Promise<ApiEnvelope<ScreeningView>>;
   /** `GET /v1/events`: indexlenmiş event'ler, job, program, ad ve slot'a göre. */
@@ -166,6 +209,13 @@ export const API_OPERATIONS = [
   'listApiKeys',
   'createApiKey',
   'deleteApiKey',
+  'listX402Endpoints',
+  'createX402Endpoint',
+  'getX402Endpoint',
+  'updateX402Endpoint',
+  'deleteX402Endpoint',
+  'getX402EndpointUsage',
+  'recordX402Payment',
   'listJobs',
   'getJob',
   'uploadDelivery',
@@ -181,6 +231,14 @@ export const API_OPERATIONS = [
   'getClaim',
   'listDisputes',
   'getDispute',
+  'uploadDisputeEvidence',
+  'listDisputeEvidence',
+  'getDisputeEvidenceContent',
+  'prepareDisputeVote',
+  'getArbitrationQueue',
+  'listArbitrationWebhooks',
+  'createArbitrationWebhook',
+  'deleteArbitrationWebhook',
   'getScreening',
   'listEvents',
   'listKeeperActions',

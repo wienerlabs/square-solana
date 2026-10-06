@@ -260,23 +260,36 @@ enum DisputeResolution {
 }
 
 /// `Job.dispute` izdüşümü: job başına en fazla bir dispute (program kuralı). Hesap verisi
-/// `jobs.account` içindedir; bu tablo `/v1/disputes` filtresi ve sıralaması içindir.
+/// `jobs.account` içindedir; bu tablo `/v1/disputes` filtresi ve sıralaması, arbitrator kuyruğu ve lapse
+/// crank'i (BE-22) içindir.
 model Dispute {
-  job         String            @id @db.VarChar(44)
-  institution String            @db.VarChar(44)
-  agentRecord String            @map("agent_record") @db.VarChar(44)
-  jobStatus   JobStatus         @map("job_status")
-  challenger  String            @db.VarChar(44)
-  bond        Decimal           @db.Decimal(20, 0)
-  reasonHash  String            @map("reason_hash") @db.Char(64)
-  raisedAt    BigInt            @map("raised_at")
-  deadline    BigInt
-  resolution  DisputeResolution
-  lapsed      Boolean
-  slot        BigInt
-  indexedAt   DateTime          @map("indexed_at") @db.Timestamptz(3)
+  job                  String            @id @db.VarChar(44)
+  institution          String            @db.VarChar(44)
+  agentRecord          String            @map("agent_record") @db.VarChar(44)
+  jobStatus            JobStatus         @map("job_status")
+  challenger           String            @db.VarChar(44)
+  bond                 Decimal           @db.Decimal(20, 0)
+  reasonHash           String            @map("reason_hash") @db.Char(64)
+  raisedAt             BigInt            @map("raised_at")
+  deadline             BigInt
+  /// Eşiğe ulaşıldığı zaman; karar yoksa 0.
+  decidedAt            BigInt            @map("decided_at")
+  /// `execute_resolution` ya da `lapse_dispute`'un kapattığı zaman; açıksa 0.
+  closedAt             BigInt            @map("closed_at")
+  resolution           DisputeResolution
+  lapsed               Boolean
+  /// Bit i: sayımın dayandığı setteki `arbitrators[i]` karara oy verdi.
+  approvalMask         Int               @map("approval_mask")
+  approvalCount        Int               @map("approval_count")
+  /// Sayımın dayandığı arbitrator seti (u32). Config'teki sürüm daha yeniyse sonraki oy sayımı sıfırlar
+  /// (ADR 0016).
+  arbitratorSetVersion BigInt            @map("arbitrator_set_version")
+  slot                 BigInt
+  indexedAt            DateTime          @map("indexed_at") @db.Timestamptz(3)
 
   @@index([jobStatus, raisedAt])
+  /// Lapse crank'i: son tarihi geçmiş açık dispute'lar.
+  @@index([jobStatus, deadline])
   @@index([institution])
   @@index([agentRecord])
   @@map("disputes")
@@ -390,6 +403,98 @@ model Delivery {
   @@map("deliveries")
 }
 
+enum EvidenceRole {
+  institution
+  agent
+  arbitrator
+}
+
+/// Dispute kanıtı (BE-22). İçerik özel nesne deposundadır (herkese açık değil); burada konumu ve SHA-256'sı
+/// tutulur. Kurumun yüklediği içeriğin hash'i `raise_dispute`'un `reason_hash`'idir. Okuyan: kurum, agent
+/// cüzdanı / sahibi ve aktif arbitrator'lar.
+model DisputeEvidence {
+  id          String       @id @default(uuid()) @db.Uuid
+  job         String       @db.VarChar(44)
+  contentHash String       @map("content_hash") @db.Char(64)
+  contentType String       @map("content_type") @db.VarChar(120)
+  byteSize    BigInt       @map("byte_size")
+  /// Nesne deposundaki anahtar.
+  storageKey  String       @map("storage_key") @db.Text
+  role        EvidenceRole
+  uploadedBy  String       @map("uploaded_by") @db.VarChar(44)
+  createdAt   DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@unique([job, contentHash])
+  @@index([job, createdAt])
+  @@map("dispute_evidence")
+}
+
+/// Arbitrator bildirim olayları; değerler Standard Webhooks `type` adlarıdır (API `ArbitrationEventType`).
+enum ArbitrationEvent {
+  disputeRaised    @map("dispute.raised")
+  disputeEscalated @map("dispute.escalated")
+  disputeVote      @map("dispute.vote")
+  disputeDecided   @map("dispute.decided")
+  disputeDeadline  @map("dispute.deadline")
+}
+
+/// Arbitrator'ın kaydettiği webhook ucu (BE-22). Sır, gönderimi imzalamak için gerekir; secret box'la
+/// (`@squaresdk/solana-hardening`) şifreli saklanır, AAD kaydın kimliğidir.
+model ArbitrationWebhook {
+  id         String                 @id @default(uuid()) @db.Uuid
+  wallet     String                 @db.VarChar(44)
+  url        String                 @db.VarChar(512)
+  events     ArbitrationEvent[]
+  secret     String                 @db.Text
+  createdAt  DateTime               @default(now()) @map("created_at") @db.Timestamptz(3)
+  deliveries NotificationDelivery[]
+
+  @@unique([wallet, url])
+  @@map("arbitration_webhooks")
+}
+
+enum DeliveryState {
+  pending
+  delivered
+  failed
+}
+
+/// Bildirim outbox'ı: bir olay bir uca bir kez kuyruğa girer (`event_key`), gönderici yeniden denemeyle
+/// teslim eder. Teslimat kimliği (`webhook-id`) satırın kimliğidir; denemeler arasında değişmez.
+model NotificationDelivery {
+  id            String             @id @default(uuid()) @db.Uuid
+  webhookId     String             @map("webhook_id") @db.Uuid
+  /// Olayın tekil anahtarı: `event:<chain_events.id>` ya da `deadline:<job>:<raised_at>`.
+  eventKey      String             @map("event_key") @db.Text
+  type          ArbitrationEvent
+  job           String             @db.VarChar(44)
+  /// Gönderilecek gövde (`ArbitrationNotification`).
+  payload       Json
+  state         DeliveryState      @default(pending)
+  attempts      Int                @default(0)
+  nextAttemptAt DateTime           @map("next_attempt_at") @db.Timestamptz(3)
+  /// Bir gönderici örneğinin kiralaması; süresi dolmadan başka örnek satırı almaz.
+  lockedUntil   DateTime?          @map("locked_until") @db.Timestamptz(3)
+  lastStatus    Int?               @map("last_status")
+  lastError     String?            @map("last_error") @db.Text
+  createdAt     DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
+  deliveredAt   DateTime?          @map("delivered_at") @db.Timestamptz(3)
+  webhook       ArbitrationWebhook @relation(fields: [webhookId], references: [id], onDelete: Cascade)
+
+  @@unique([webhookId, eventKey])
+  @@index([state, nextAttemptAt])
+  @@map("notification_outbox")
+}
+
+/// Bildirim kuyruğuna alınmış son `chain_events.id`.
+model NotificationCursor {
+  name        String   @id @db.Text
+  lastEventId BigInt   @map("last_event_id")
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@map("notification_cursors")
+}
+
 enum KeeperActionKind {
   finalizePayment
   executeResolution
@@ -431,6 +536,54 @@ model KeeperAction {
   @@map("keeper_actions")
 }
 
+// ---------------------------------------------------------------- screener (BE-16)
+
+enum ScreeningTrigger {
+  /// API'den gelen tarama isteği.
+  request
+  /// TTL yenileme döngüsü.
+  renewal
+}
+
+enum ScreeningOutcome {
+  /// Karar verildi ve `record_screening` tx'i onaylandı.
+  recorded
+  /// Bir kaynak yanıt vermedi; karar verilmedi, tx gönderilmedi.
+  sourceError
+  /// Karar verildi ama tx reddedildi, düştü ya da süresi doldu.
+  txFailed
+}
+
+/// Screener'ın denetim kaydı: her tarama kararı (kaynak sonuçları, kanıt, tx imzası, zaman). Zincir dışı
+/// tablodur; zincirdeki `ScreeningRecord`'un aynası `screenings`'tir (indexer). `evidence` kanonik JSON'unun
+/// (RFC 8785) SHA-256'sı zincire yazılan `source_hash`'tir: kayıt kanıttan yeniden hesaplanarak doğrulanır.
+model ScreeningDecision {
+  id         String           @id @default(uuid()) @db.Uuid
+  wallet     String           @db.VarChar(44)
+  trigger    ScreeningTrigger
+  outcome    ScreeningOutcome
+  /// Kaynakların birleşik kararı; kaynak hatasında null.
+  status     ScreeningStatus?
+  /// Kaynak başına sonuç ya da hata (`SourceOutcome[]` JSON'u).
+  sources    Json
+  evidence   Json?
+  sourceHash String?          @map("source_hash") @db.Char(64)
+  signature  String?          @db.VarChar(88)
+  /// Tx'in onaylandığı slot ve zincirden okunan kaydın zamanları (Unix saniyesi).
+  slot       BigInt?
+  screenedAt BigInt?          @map("screened_at")
+  expiresAt  BigInt?          @map("expires_at")
+  /// Başarısızlığın sebebi; başarılı kararda null.
+  error      String?
+  /// İsteği yapan API anahtarının SHA-256 önekidir; yenilemede null.
+  caller     String?          @db.VarChar(16)
+  at         DateTime         @default(now()) @db.Timestamptz(3)
+
+  @@index([wallet, at])
+  @@index([outcome, wallet])
+  @@map("screening_decisions")
+}
+
 // ---------------------------------------------------------------- kullanıcılar ve yetki
 
 /// Cüzdanla oturum açan kullanıcı. Kimlik cüzdan adresidir.
@@ -438,9 +591,10 @@ model User {
   wallet     String          @id @db.VarChar(44)
   createdAt  DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
   lastSeenAt DateTime?       @map("last_seen_at") @db.Timestamptz(3)
-  challenges AuthChallenge[]
-  sessions   Session[]
-  apiKeys    ApiKey[]
+  challenges    AuthChallenge[]
+  sessions      Session[]
+  apiKeys       ApiKey[]
+  x402Endpoints X402Endpoint[]
 
   @@map("users")
 }
@@ -481,6 +635,8 @@ enum ApiKeyScope {
   deliveriesWrite @map("deliveries:write")
   agentsWrite     @map("agents:write")
   prove
+  disputesWrite   @map("disputes:write")
+  x402Serve       @map("x402:serve")
 }
 
 /// API anahtarı (`ApiKey`). Gizli değer saklanmaz, yalnızca SHA-256'sı; `prefix` listelemede gösterilir.
@@ -498,6 +654,65 @@ model ApiKey {
 
   @@index([wallet])
   @@map("api_keys")
+}
+
+// ---------------------------------------------------------------- x402 ücretli uç noktalar (FE-22)
+
+/// x402 v2'nin Solana ağları; değerler CAIP-2 kimlikleridir (`@squaresdk/solana-types` X402NetworkSchema).
+enum X402Network {
+  mainnet @map("solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp")
+  devnet  @map("solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1")
+  testnet @map("solana:4uhcVJyU9pJkvQyS88uRDiswHXSCkY3z")
+}
+
+/// Geliştiricinin ücretli uç nokta tanımı (`X402Endpoint`, ADR 0023). Ödemeyi geliştiricinin sunucusu ister
+/// (`@squaresdk/solana-x402` `paidRouteFromDefinition`); yol cüzdan başına tekildir.
+model X402Endpoint {
+  id          String        @id @default(uuid()) @db.Uuid
+  wallet      String        @db.VarChar(44)
+  name        String        @db.VarChar(80)
+  /// Geliştiricinin sunucusundaki route yolu.
+  path        String        @db.VarChar(200)
+  description String?       @db.VarChar(500)
+  /// Çağrı başına fiyat, mint'in taban biriminde (> 0).
+  amount      Decimal       @db.Decimal(20, 0)
+  mint        String        @db.VarChar(44)
+  network     X402Network
+  payTo       String        @map("pay_to") @db.VarChar(44)
+  enabled     Boolean
+  createdAt   DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
+  user        User          @relation(fields: [wallet], references: [wallet], onDelete: Cascade)
+  payments    X402Payment[]
+
+  @@unique([wallet, path])
+  @@map("x402_endpoints")
+}
+
+/// Geliştiricinin sunucusunun bildirdiği uzlaştırılmış ödeme (`X402Payment`). `fingerprint` ödeme yükünün
+/// tekrar koruması kimliğidir (`ReplayStore`'daki `(x402:<ağ>, kimlik)`; Postgres deposunda `replay_guards`),
+/// `transaction` uzlaştırma makbuzunun (`PAYMENT-RESPONSE`) işlem imzası. İkisi de ağ başına tekildir: aynı ödeme
+/// iki kez sayılmaz. Tanım silinince ödemeleri de silinir.
+model X402Payment {
+  id          String       @id @default(uuid()) @db.Uuid
+  endpointId  String       @map("endpoint_id") @db.Uuid
+  /// `svm:<64 hex>` ya da `json:<64 hex>`.
+  fingerprint String       @db.VarChar(69)
+  transaction String       @db.VarChar(88)
+  network     X402Network
+  asset       String       @db.VarChar(44)
+  amount      Decimal      @db.Decimal(20, 0)
+  payer       String       @db.VarChar(44)
+  payTo       String       @map("pay_to") @db.VarChar(44)
+  /// Geliştiricinin sunucusunun bildirdiği uzlaştırma anı.
+  settledAt   DateTime     @map("settled_at") @db.Timestamptz(3)
+  reportedAt  DateTime     @default(now()) @map("reported_at") @db.Timestamptz(3)
+  endpoint    X402Endpoint @relation(fields: [endpointId], references: [id], onDelete: Cascade)
+
+  @@unique([network, fingerprint])
+  @@unique([network, transaction])
+  @@index([endpointId, settledAt])
+  @@map("x402_payments")
 }
 
 // ---------------------------------------------------------------- ödeme rayları
@@ -777,4 +992,46 @@ model A2aMessage {
   @@unique([taskId, messageId])
   @@index([taskId, id])
   @@map("a2a_messages")
+}
+
+// ---------------------------------------------------------------- fee payer (BE-27)
+
+enum SponsoredTxStatus {
+  /// İmzalandı ve kullanıcıya döndü (kullanıcı gönderir).
+  signed
+  /// Servis RPC'ye gönderdi.
+  submitted
+  /// Gönderim RPC'de reddedildi; bütçeye sayılmaz.
+  failed
+}
+
+/// Sponsorlanan tx'in maliyet günlüğü (apps/fee-payer, ADR 0019). Kullanıcının ve servisin günlük bütçesi bu
+/// tablodan denetlenir: UTC günü içinde, başarısız gönderimler hariç `fee_lamports + rent_lamports` toplamı.
+/// Maliyet imzadan önceki simülasyondandır: ücret `getFeeForMessage`, rent sponsor bakiyesindeki farktan ücret düşülerek.
+model SponsoredTx {
+  id               String            @id @default(uuid()) @db.Uuid
+  /// Tx'in ilk imzası (sponsorun imzası); tx kimliğidir.
+  signature        String            @unique @db.VarChar(88)
+  /// İstek sahibinin cüzdanı (oturum ya da API anahtarının sahibi); bütçe bu anahtarla sayılır.
+  wallet           String            @db.VarChar(44)
+  /// API anahtarıyla gelen istekte anahtarın kimliği.
+  apiKeyId         String?           @map("api_key_id") @db.Uuid
+  status           SponsoredTxStatus
+  feeLamports      Decimal           @map("fee_lamports") @db.Decimal(20, 0)
+  rentLamports     Decimal           @map("rent_lamports") @db.Decimal(20, 0)
+  /// Simülasyonda tüketilen compute unit.
+  computeUnits     Int?              @map("compute_units")
+  computeUnitLimit Int               @map("compute_unit_limit")
+  /// Mikro-lamport / CU.
+  computeUnitPrice Decimal           @map("compute_unit_price") @db.Decimal(20, 0)
+  /// Denetlenen talimatlar (`<program>:<talimat>`; vault tx'inin içindekiler `vault>` önekiyle).
+  instructions     String[]
+  /// Başarısız gönderimin RPC hatası.
+  error            String?           @db.Text
+  createdAt        DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime          @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@index([wallet, createdAt])
+  @@index([createdAt])
+  @@map("sponsored_txs")
 }

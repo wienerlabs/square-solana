@@ -1,246 +1,373 @@
-// Agent'lar için havuzlu MCP istemcisi (BE-28). Bir agent birden çok MCP sunucusunun (Square'in sunucusu, kendi
-// araç sunucuları) araçlarını çağırır; her sunucuya bağlantılar havuzdan verilir:
-// - Sunucu başına en fazla `maxConnectionsPerServer` bağlantı; dolunca çağrı sırada bekler (FIFO).
-// - Boşta kalan bağlantı yeniden kullanılır; `idleTimeoutMs` boyunca kullanılmayan kapatılır.
-// - Taşıması kopan bağlantı havuzdan atılır, sıradaki çağrı yenisini açar. Araç çağrısı kendiliğinden yeniden
-//   denenmez: yazma araçları idempotent değildir, tekrarı çağıran karar verir.
-// - Her istek `requestTimeoutMs` ile sınırlıdır.
-// Taşımalar: stdio (sunucuyu alt süreç olarak açar) ve Streamable HTTP.
+// Agent'lar için havuzlu MCP istemcisi: bir agent'ın birden çok MCP sunucusuna (Square MCP, başka agent'ların
+// sunucuları, araç sunucuları) bağlantıları tek yerden yönetilir.
+// - Bağlantı yeniden kullanımı: sunucu başına tek `Client`, ilk istekte tembel açılır; eşzamanlı açılış
+//   istekleri aynı bağlantıyı bekler.
+// - Eşzamanlılık sınırı: sunucu başına aynı anda yürüyen istek sayısı `maxConcurrency`; fazlası sırayla bekler.
+// - Yeniden bağlanma: bağlantı koparsa (`onclose`) bir sonraki istek yeniden bağlanır; açılış üstel bekleme
+//   ile `maxAttempts` kez denenir. Yolda kopan tool çağrısı yeniden denenmez (tool'lar idempotent olmayabilir,
+//   ör. tx gönderimi); `listTools` idempotent olduğu için bir kez yeniden denenir.
+// - Tool keşfi önbelleği: sunucu başına tool listesi `toolCacheTtlMs` boyunca tutulur; sunucunun
+//   `notifications/tools/list_changed` bildirimi ve yeniden bağlanma önbelleği düşürür.
+// - Kapatma: `close()` bütün bağlantıları kapatır, kuyruktaki istekleri reddeder; sonraki istekler hata alır.
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
-import type { CallToolResult, Tool } from '@modelcontextprotocol/sdk/types.js';
+import {
+  CallToolResultSchema,
+  ToolListChangedNotificationSchema,
+  type CallToolResult,
+  type Tool,
+} from '@modelcontextprotocol/sdk/types.js';
+import { packageInfo } from '../package-info.js';
 
-export type McpServerTransportSpec =
+export type McpServerTarget =
   | {
-      readonly kind: 'stdio';
-      readonly command: string;
-      readonly args?: readonly string[];
-      readonly env?: Readonly<Record<string, string>>;
-      readonly cwd?: string;
+      type: 'stdio';
+      command: string;
+      args?: string[];
+      /** Alt sürecin ortamı; verilmezse SDK'nın güvenli varsayılan değişkenleri. */
+      env?: Record<string, string>;
+      cwd?: string;
     }
-  | { readonly kind: 'http'; readonly url: string; readonly headers?: Readonly<Record<string, string>> };
+  | { type: 'http'; url: string; headers?: Record<string, string> }
+  /** Özel taşıma (ör. bellek içi); her bağlantı denemesinde yenisi üretilir. */
+  | { type: 'transport'; create: () => Transport | Promise<Transport> };
 
-export interface McpServerSpec {
-  readonly name: string;
-  readonly transport: McpServerTransportSpec;
-}
-
-export interface McpClientPoolOptions {
-  readonly servers: readonly McpServerSpec[];
-  readonly clientInfo: { readonly name: string; readonly version: string };
-  readonly maxConnectionsPerServer: number;
-  readonly idleTimeoutMs: number;
-  readonly requestTimeoutMs: number;
-  /** Taşıma fabrikası; verilmezse spec'teki taşıma kurulur (testler bellek içi taşıma verir). */
-  readonly transport?: (spec: McpServerSpec) => Transport | Promise<Transport>;
-}
-
-export interface McpPoolStats {
-  readonly server: string;
-  readonly open: number;
-  readonly busy: number;
-  readonly waiting: number;
-}
-
-export interface McpClientPool {
-  listTools(server: string): Promise<Tool[]>;
-  callTool(server: string, name: string, args?: Record<string, unknown>): Promise<CallToolResult>;
-  stats(): McpPoolStats[];
-  /** Bütün bağlantıları kapatır; bekleyen çağrılar reddedilir, sonraki çağrılar hata verir. */
-  close(): Promise<void>;
-}
-
-interface Connection {
-  readonly client: Client;
-  broken: boolean;
-  lastUsed: number;
-}
-
-interface ServerPool {
-  readonly spec: McpServerSpec;
-  readonly idle: Connection[];
-  readonly waiters: { resolve: (connection: Connection) => void; reject: (error: Error) => void }[];
-  open: number;
-  busy: number;
-}
-
-function defaultTransport(spec: McpServerSpec): Transport {
-  const { transport } = spec;
-  if (transport.kind === 'stdio') {
-    return new StdioClientTransport({
-      command: transport.command,
-      args: [...(transport.args ?? [])],
-      ...(transport.env && { env: { ...transport.env } }),
-      ...(transport.cwd && { cwd: transport.cwd }),
-      stderr: 'pipe',
-    });
-  }
-  return new StreamableHTTPClientTransport(new URL(transport.url), {
-    ...(transport.headers && { requestInit: { headers: { ...transport.headers } } }),
-  });
-}
-
-export function createMcpClientPool(options: McpClientPoolOptions): McpClientPool {
-  if (!Number.isInteger(options.maxConnectionsPerServer) || options.maxConnectionsPerServer < 1) {
-    throw new Error('maxConnectionsPerServer pozitif tamsayı olmalı');
-  }
-  if (!(options.idleTimeoutMs > 0) || !(options.requestTimeoutMs > 0)) {
-    throw new Error('idleTimeoutMs ve requestTimeoutMs pozitif olmalı');
-  }
-  const pools = new Map<string, ServerPool>();
-  for (const spec of options.servers) {
-    if (pools.has(spec.name)) throw new Error(`MCP sunucusu iki kez tanımlı: ${spec.name}`);
-    pools.set(spec.name, { spec, idle: [], waiters: [], open: 0, busy: 0 });
-  }
-  const makeTransport = options.transport ?? defaultTransport;
-  let closed = false;
-
-  const poolOf = (server: string): ServerPool => {
-    if (closed) throw new Error('MCP istemci havuzu kapatıldı');
-    const pool = pools.get(server);
-    if (!pool) throw new Error(`tanımsız MCP sunucusu: ${server}`);
-    return pool;
+export interface McpPoolOptions {
+  /** Sunucu adı → hedef. */
+  servers: Record<string, McpServerTarget>;
+  /** Sunucu başına aynı anda yürüyen istek sınırı. */
+  maxConcurrency: number;
+  /** Tool listesi önbelleğinin ömrü (ms). */
+  toolCacheTtlMs: number;
+  /** Tek isteğin (tool çağrısı, liste) zaman aşımı (ms). */
+  requestTimeoutMs: number;
+  reconnect: {
+    /** Bağlantı açılışında toplam deneme sayısı. */
+    maxAttempts: number;
+    /** İlk bekleme; her denemede iki katına çıkar. */
+    backoffMs: number;
+    /** Bekleme üst sınırı. */
+    maxBackoffMs: number;
   };
+  clientInfo?: { name: string; version: string };
+  /** Saat (test için). */
+  now?: () => number;
+}
 
-  async function connect(pool: ServerPool): Promise<Connection> {
-    const client = new Client({ name: options.clientInfo.name, version: options.clientInfo.version });
-    const connection: Connection = { client, broken: false, lastUsed: Date.now() };
-    client.onclose = () => {
-      connection.broken = true;
+export type McpPoolErrorCode = 'unknown_server' | 'closed' | 'connect_failed' | 'tool_not_found' | 'ambiguous_tool';
+
+export class McpPoolError extends Error {
+  constructor(
+    readonly code: McpPoolErrorCode,
+    message: string,
+    readonly server: string | null = null,
+    options?: { cause?: unknown },
+  ) {
+    super(message, options);
+    this.name = 'McpPoolError';
+  }
+}
+
+export interface PoolTool extends Tool {
+  /** Tool'u sunan sunucunun havuzdaki adı. */
+  server: string;
+}
+
+export interface ServerStats {
+  connected: boolean;
+  /** Şu an yürüyen istekler. */
+  active: number;
+  /** Sırada bekleyen istekler. */
+  queued: number;
+  /** Başarılı bağlantı açılışları (ilk bağlantı + yeniden bağlanmalar). */
+  connects: number;
+  toolsCached: boolean;
+}
+
+export interface CallOptions {
+  /** Bu çağrının zaman aşımı; verilmezse `requestTimeoutMs`. */
+  timeoutMs?: number;
+  signal?: AbortSignal;
+}
+
+const positive = (name: string, value: number, allowZero = false) => {
+  if (!Number.isInteger(value) || value < (allowZero ? 0 : 1)) throw new Error(`${name} pozitif tamsayı olmalı`);
+};
+
+/** Bağlantının koptuğunu gösteren SDK hataları. */
+const isDisconnect = (error: unknown) =>
+  error instanceof Error && /not connected|connection closed/i.test(error.message);
+
+class ServerConnection {
+  private client: Client | null = null;
+  private connecting: Promise<Client> | null = null;
+  private tools: { list: Tool[]; at: number } | null = null;
+  private listing: Promise<Tool[]> | null = null;
+  private active = 0;
+  private readonly waiters: { resolve: () => void; reject: (error: unknown) => void }[] = [];
+  private connects = 0;
+  private closed = false;
+
+  constructor(
+    readonly name: string,
+    private readonly target: McpServerTarget,
+    private readonly options: McpPoolOptions,
+  ) {}
+
+  stats(): ServerStats {
+    return {
+      connected: this.client !== null,
+      active: this.active,
+      queued: this.waiters.length,
+      connects: this.connects,
+      toolsCached: this.tools !== null,
     };
-    client.onerror = () => {
-      connection.broken = true;
-    };
-    await client.connect(await makeTransport(pool.spec), { timeout: options.requestTimeoutMs });
-    return connection;
   }
 
-  async function acquire(pool: ServerPool): Promise<Connection> {
-    for (let connection = pool.idle.pop(); connection; connection = pool.idle.pop()) {
-      if (!connection.broken) {
-        pool.busy += 1;
-        return connection;
-      }
-      pool.open -= 1;
-    }
-    if (pool.open < options.maxConnectionsPerServer) {
-      pool.open += 1;
-      pool.busy += 1;
-      try {
-        return await connect(pool);
-      } catch (error) {
-        pool.open -= 1;
-        pool.busy -= 1;
-        handOff(pool);
-        throw error;
-      }
-    }
-    return new Promise<Connection>((resolve, reject) => pool.waiters.push({ resolve, reject }));
+  private closedError() {
+    return new McpPoolError('closed', 'MCP havuzu kapatıldı', this.name);
   }
 
-  /** Bırakılan yer sıradakine geçer: sağlam bağlantı ya da (kopuksa) yeni bağlantı hakkı. */
-  function handOff(pool: ServerPool) {
-    const waiter = pool.waiters.shift();
-    if (!waiter) return;
-    acquire(pool).then(waiter.resolve, waiter.reject);
-  }
-
-  function release(pool: ServerPool, connection: Connection) {
-    pool.busy -= 1;
-    connection.lastUsed = Date.now();
-    if (connection.broken || closed) {
-      pool.open -= 1;
-      void connection.client.close().catch(() => undefined);
-      handOff(pool);
+  private async acquire(): Promise<void> {
+    if (this.closed) throw this.closedError();
+    if (this.active < this.options.maxConcurrency) {
+      this.active += 1;
       return;
     }
-    const waiter = pool.waiters.shift();
-    if (waiter) {
-      pool.busy += 1;
-      waiter.resolve(connection);
-      return;
-    }
-    pool.idle.push(connection);
+    await new Promise<void>((resolve, reject) => this.waiters.push({ resolve, reject }));
   }
 
-  async function use<T>(server: string, work: (client: Client) => Promise<T>): Promise<T> {
-    const pool = poolOf(server);
-    const connection = await acquire(pool);
+  private release(): void {
+    const next = this.waiters.shift();
+    // Sıradaki istek yuvayı devralır; `active` değişmez.
+    if (next) next.resolve();
+    else this.active -= 1;
+  }
+
+  /** Yuva alır, bağlantıyı (gerekirse yeniden) açar ve işi yürütür. */
+  async run<T>(work: (client: Client) => Promise<T>): Promise<T> {
+    await this.acquire();
     try {
-      return await work(connection.client);
-    } catch (error) {
-      // İstek zaman aşımı ya da taşıma hatası: bağlantının durumu belirsiz, yeniden kullanılmaz.
-      connection.broken = true;
-      throw error;
+      return await work(await this.connect());
     } finally {
-      release(pool, connection);
+      this.release();
     }
   }
 
-  const reaper = setInterval(
-    () => {
-      const now = Date.now();
-      for (const pool of pools.values()) {
-        for (let index = pool.idle.length - 1; index >= 0; index -= 1) {
-          const connection = pool.idle[index]!;
-          if (now - connection.lastUsed < options.idleTimeoutMs) continue;
-          pool.idle.splice(index, 1);
-          pool.open -= 1;
-          void connection.client.close().catch(() => undefined);
-        }
-      }
-    },
-    Math.max(1, Math.floor(options.idleTimeoutMs / 2)),
-  );
-  reaper.unref();
+  private async transport(): Promise<Transport> {
+    const target = this.target;
+    switch (target.type) {
+      case 'stdio':
+        return new StdioClientTransport({
+          command: target.command,
+          ...(target.args && { args: target.args }),
+          ...(target.env && { env: target.env }),
+          ...(target.cwd && { cwd: target.cwd }),
+          stderr: 'pipe',
+        });
+      case 'http':
+        return new StreamableHTTPClientTransport(new URL(target.url), {
+          ...(target.headers && { requestInit: { headers: target.headers } }),
+        });
+      case 'transport':
+        return target.create();
+    }
+  }
 
-  return {
-    async listTools(server) {
-      return use(server, async (client) => {
+  private connect(): Promise<Client> {
+    if (this.closed) return Promise.reject(this.closedError());
+    if (this.client) return Promise.resolve(this.client);
+    this.connecting ??= this.open().finally(() => {
+      this.connecting = null;
+    });
+    return this.connecting;
+  }
+
+  private async open(): Promise<Client> {
+    const { maxAttempts, backoffMs, maxBackoffMs } = this.options.reconnect;
+    let lastError: unknown = null;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      if (attempt > 1) {
+        await new Promise((resolve) => setTimeout(resolve, Math.min(maxBackoffMs, backoffMs * 2 ** (attempt - 2))));
+      }
+      if (this.closed) throw this.closedError();
+      const client = new Client(this.options.clientInfo ?? { name: packageInfo.name, version: packageInfo.version });
+      client.setNotificationHandler(ToolListChangedNotificationSchema, () => {
+        if (this.client === client) this.tools = null;
+      });
+      client.onclose = () => {
+        if (this.client === client) {
+          this.client = null;
+          this.tools = null;
+        }
+      };
+      try {
+        await client.connect(await this.transport(), { timeout: this.options.requestTimeoutMs });
+      } catch (error) {
+        lastError = error;
+        await client.close().catch(() => undefined);
+        continue;
+      }
+      if (this.closed) {
+        await client.close().catch(() => undefined);
+        throw this.closedError();
+      }
+      this.client = client;
+      this.tools = null;
+      this.connects += 1;
+      return client;
+    }
+    throw new McpPoolError(
+      'connect_failed',
+      `${this.name} sunucusuna ${maxAttempts} denemede bağlanılamadı: ${lastError instanceof Error ? lastError.message : String(lastError)}`,
+      this.name,
+      { cause: lastError },
+    );
+  }
+
+  async listTools(refresh: boolean): Promise<Tool[]> {
+    const now = this.options.now ?? Date.now;
+    if (!refresh && this.tools && now() - this.tools.at < this.options.toolCacheTtlMs) return this.tools.list;
+    this.listing ??= this.fetchTools(true).finally(() => {
+      this.listing = null;
+    });
+    return this.listing;
+  }
+
+  private async fetchTools(retry: boolean): Promise<Tool[]> {
+    const now = this.options.now ?? Date.now;
+    try {
+      const list = await this.run(async (client) => {
         const tools: Tool[] = [];
         let cursor: string | undefined;
         do {
-          const page = await client.listTools(cursor ? { cursor } : {}, { timeout: options.requestTimeoutMs });
+          const page = await client.listTools(cursor ? { cursor } : {}, { timeout: this.options.requestTimeoutMs });
           tools.push(...page.tools);
           cursor = page.nextCursor;
         } while (cursor);
         return tools;
       });
-    },
+      this.tools = { list, at: now() };
+      return list;
+    } catch (error) {
+      if (retry && isDisconnect(error)) return this.fetchTools(false);
+      throw error;
+    }
+  }
 
-    async callTool(server, name, args = {}) {
-      return use(server, async (client) => {
-        const result = await client.callTool({ name, arguments: args }, undefined, {
-          timeout: options.requestTimeoutMs,
-        });
-        return result as CallToolResult;
+  callTool(name: string, args: Record<string, unknown>, options: CallOptions): Promise<CallToolResult> {
+    return this.run(async (client) => {
+      const result = await client.callTool({ name, arguments: args }, CallToolResultSchema, {
+        timeout: options.timeoutMs ?? this.options.requestTimeoutMs,
+        ...(options.signal && { signal: options.signal }),
       });
-    },
+      return result as CallToolResult;
+    });
+  }
 
-    stats() {
-      return [...pools.values()].map((pool) => ({
-        server: pool.spec.name,
-        open: pool.open,
-        busy: pool.busy,
-        waiting: pool.waiters.length,
-      }));
-    },
+  async close(): Promise<void> {
+    this.closed = true;
+    for (const waiter of this.waiters.splice(0)) waiter.reject(this.closedError());
+    const pending = this.connecting;
+    const client = this.client;
+    this.client = null;
+    this.tools = null;
+    await pending?.catch(() => undefined);
+    await client?.close();
+  }
+}
 
-    async close() {
-      if (closed) return;
-      closed = true;
-      clearInterval(reaper);
-      const closing: Promise<void>[] = [];
-      for (const pool of pools.values()) {
-        for (const waiter of pool.waiters.splice(0)) waiter.reject(new Error('MCP istemci havuzu kapatıldı'));
-        for (const connection of pool.idle.splice(0)) {
-          pool.open -= 1;
-          closing.push(connection.client.close().catch(() => undefined));
-        }
-      }
-      await Promise.all(closing);
-    },
-  };
+export class McpClientPool {
+  private readonly connections = new Map<string, ServerConnection>();
+  private closed = false;
+
+  constructor(options: McpPoolOptions) {
+    positive('maxConcurrency', options.maxConcurrency);
+    positive('toolCacheTtlMs', options.toolCacheTtlMs, true);
+    positive('requestTimeoutMs', options.requestTimeoutMs);
+    positive('reconnect.maxAttempts', options.reconnect.maxAttempts);
+    positive('reconnect.backoffMs', options.reconnect.backoffMs, true);
+    positive('reconnect.maxBackoffMs', options.reconnect.maxBackoffMs, true);
+    const names = Object.keys(options.servers);
+    if (names.length === 0) throw new Error('en az bir MCP sunucusu gerekli');
+    for (const name of names) this.connections.set(name, new ServerConnection(name, options.servers[name]!, options));
+  }
+
+  /** Havuzdaki sunucu adları. */
+  servers(): string[] {
+    return [...this.connections.keys()];
+  }
+
+  private connection(server: string): ServerConnection {
+    if (this.closed) throw new McpPoolError('closed', 'MCP havuzu kapatıldı', server);
+    const connection = this.connections.get(server);
+    if (!connection) throw new McpPoolError('unknown_server', `havuzda ${server} sunucusu yok`, server);
+    return connection;
+  }
+
+  /** Sunucunun tool'ları (önbellekten; `refresh` önbelleği atlar). */
+  async listTools(server: string, options: { refresh?: boolean } = {}): Promise<Tool[]> {
+    return this.connection(server).listTools(options.refresh ?? false);
+  }
+
+  /**
+   * Bütün sunucuların tool'ları. Ulaşılamayan sunucu sonucu düşürmez; `errors`'ta sunucu adıyla döner.
+   */
+  async listAllTools(): Promise<{ tools: PoolTool[]; errors: { server: string; error: unknown }[] }> {
+    const names = this.servers();
+    const results = await Promise.allSettled(names.map((name) => this.listTools(name)));
+    const tools: PoolTool[] = [];
+    const errors: { server: string; error: unknown }[] = [];
+    results.forEach((result, i) => {
+      const server = names[i]!;
+      if (result.status === 'fulfilled') tools.push(...result.value.map((tool) => ({ ...tool, server })));
+      else errors.push({ server, error: result.reason });
+    });
+    return { tools, errors };
+  }
+
+  /** Adı verilen tool'u sunan sunucular. */
+  async findTool(name: string): Promise<PoolTool[]> {
+    return (await this.listAllTools()).tools.filter((tool) => tool.name === name);
+  }
+
+  async callTool(
+    server: string,
+    name: string,
+    args: Record<string, unknown> = {},
+    options: CallOptions = {},
+  ): Promise<CallToolResult> {
+    return this.connection(server).callTool(name, args, options);
+  }
+
+  /** Tool'u adıyla çağırır; tool tek bir sunucuda olmalı. */
+  async callToolByName(
+    name: string,
+    args: Record<string, unknown> = {},
+    options: CallOptions = {},
+  ): Promise<CallToolResult & { server: string }> {
+    const matches = await this.findTool(name);
+    if (matches.length === 0) throw new McpPoolError('tool_not_found', `${name} tool'u hiçbir sunucuda yok`);
+    if (matches.length > 1) {
+      throw new McpPoolError(
+        'ambiguous_tool',
+        `${name} tool'u birden çok sunucuda var: ${matches.map((tool) => tool.server).join(', ')}`,
+      );
+    }
+    const server = matches[0]!.server;
+    return { ...(await this.callTool(server, name, args, options)), server };
+  }
+
+  stats(server: string): ServerStats {
+    return this.connection(server).stats();
+  }
+
+  /** Bütün bağlantıları kapatır; idempotent. */
+  async close(): Promise<void> {
+    if (this.closed) return;
+    this.closed = true;
+    await Promise.allSettled([...this.connections.values()].map((connection) => connection.close()));
+  }
 }
