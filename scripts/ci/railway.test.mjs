@@ -17,7 +17,9 @@ test('workspace bağımlılıkları geçişli: keeper db ve sdk üzerinden types
   assert.ok(!deps.includes('apps/keeper'));
 });
 
-test('web: elle yazılmış eski tanımla aynı yollar ve /healthz; diğerleri /ready', () => {
+// FE-22: web'in geliştirici portalı örnekleri `@squaresdk/solana-x402`'ye karşı derlenir (devDependency); x402
+// ve onun geliştirme bağımlılıkları (db, hardening) web'in derleme girdisidir.
+test('web: elle yazılmış eski tanımın yolları, FE-22 örnek derlemesinin paketleri ve /healthz; diğerleri /ready', () => {
   const web = railwayConfig(ROOT, 'web');
   assert.equal(web.deploy.healthcheckPath, '/healthz');
   assert.deepEqual(
@@ -25,12 +27,15 @@ test('web: elle yazılmış eski tanımla aynı yollar ve /healthz; diğerleri /
     [
       '/apps/web/**',
       '/circuits/payment-compliance/artifacts/manifest.json',
+      '/db/**',
       '/package.json',
       '/packages/config/**',
+      '/packages/hardening/**',
       '/packages/identity/**',
       '/packages/policy/**',
       '/packages/sdk/**',
       '/packages/types/**',
+      '/packages/x402/**',
       '/pnpm-lock.yaml',
       '/pnpm-workspace.yaml',
     ].sort(),

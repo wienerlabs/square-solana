@@ -20,6 +20,7 @@ import {
   TaskStateSchema,
   TravelRuleAccessActionSchema,
   ValidationOutcomeSchema,
+  X402NetworkSchema,
 } from '@squaresdk/solana-types';
 import bs58 from 'bs58';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
@@ -116,6 +117,7 @@ describe('@squaresdk/solana-types ile hiza', () => {
       CctpTransferStatus: CctpTransferStatusSchema.options,
       EvidenceRole: DisputeEvidenceRoleSchema.options,
       ArbitrationEvent: ArbitrationEventTypeSchema.options,
+      X402Network: X402NetworkSchema.options,
     };
     for (const [type, values] of Object.entries(expected)) {
       expect(labels(type), type).toEqual([...values]);
@@ -198,6 +200,52 @@ describe('ilişkiler ve sorgular', () => {
     await db.client.user.delete({ where: { wallet } });
     expect(await db.client.session.count()).toBe(0);
     expect(await db.client.apiKey.count()).toBe(0);
+  });
+
+  it('x402 uç noktası: yol cüzdan başına tekil, ödeme ağ başına bir kez sayılır, silinince ödemeleri silinir', async () => {
+    const wallet = address();
+    const endpointData = {
+      name: 'Rapor',
+      path: '/v1/report',
+      amount: '250000',
+      mint: address(),
+      network: 'devnet' as const,
+      payTo: address(),
+      enabled: true,
+    };
+    await db.client.user.create({ data: { wallet } });
+    const endpoint = await db.client.x402Endpoint.create({ data: { wallet, ...endpointData } });
+    await expect(db.client.x402Endpoint.create({ data: { wallet, ...endpointData } })).rejects.toThrow();
+    await expect(
+      db.client.x402Endpoint.create({ data: { wallet, ...endpointData, path: '/v2', amount: '0' } }),
+    ).rejects.toThrow();
+    await expect(
+      db.client.x402Endpoint.create({ data: { wallet, ...endpointData, path: 'v1/no-slash' } }),
+    ).rejects.toThrow();
+    const [raw] = await db.client.$queryRaw<{ network: string }[]>`SELECT network::text AS network FROM x402_endpoints`;
+    expect(raw?.network).toBe('solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1');
+
+    const payment = (overrides: Record<string, unknown> = {}) => ({
+      endpointId: endpoint.id,
+      fingerprint: `svm:${hex32()}`,
+      transaction: signature(),
+      network: 'devnet' as const,
+      asset: endpointData.mint,
+      amount: '250000',
+      payer: address(),
+      payTo: endpointData.payTo,
+      settledAt: new Date(),
+      ...overrides,
+    });
+    const first = payment();
+    await db.client.x402Payment.create({ data: first });
+    await expect(db.client.x402Payment.create({ data: payment({ fingerprint: first.fingerprint }) })).rejects.toThrow();
+    await expect(db.client.x402Payment.create({ data: payment({ transaction: first.transaction }) })).rejects.toThrow();
+    await expect(db.client.x402Payment.create({ data: payment({ fingerprint: hex32() }) })).rejects.toThrow();
+    // Aynı kimlik başka ağda ayrı ödemedir (tekrar koruması kapsamı ağdır).
+    await db.client.x402Payment.create({ data: payment({ fingerprint: first.fingerprint, network: 'mainnet' }) });
+    await db.client.x402Endpoint.delete({ where: { id: endpoint.id } });
+    expect(await db.client.x402Payment.count()).toBe(0);
   });
 
   it('agent kartları yetenek dizisiyle süzülür', async () => {

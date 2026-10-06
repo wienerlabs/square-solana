@@ -65,3 +65,37 @@ test('IDL_PROGRAMS: hata kodları 6000 ile başlar ve ardışık', () => {
     p.errors.forEach((e, i) => assert.equal(e.code, 6000 + i));
   }
 });
+
+test('x402 uç nokta şemaları: yol, sıfırdan büyük tutar, kısmi güncelleme', () => {
+  const endpoint = {
+    name: 'Rapor',
+    path: '/v1/report',
+    description: null,
+    amount: '250000',
+    mint: ADDR,
+    network: 'solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1',
+    payTo: ADDR,
+    enabled: true,
+  };
+  assert.ok(t.X402EndpointCreateSchema.safeParse(endpoint).success);
+  assert.ok(!t.X402EndpointCreateSchema.safeParse({ ...endpoint, amount: '0' }).success);
+  assert.ok(!t.X402EndpointCreateSchema.safeParse({ ...endpoint, path: 'v1/report' }).success);
+  assert.ok(!t.X402EndpointCreateSchema.safeParse({ ...endpoint, path: '/v1/report?x=1' }).success);
+  assert.ok(!t.X402EndpointCreateSchema.safeParse({ ...endpoint, network: 'solana' }).success);
+  assert.ok(t.X402EndpointUpdateSchema.safeParse({ enabled: false }).success);
+  assert.ok(!t.X402EndpointUpdateSchema.safeParse({}).success);
+  assert.ok(!t.X402EndpointUpdateSchema.safeParse({ amount: '0' }).success);
+  assert.ok(t.ApiKeyScopeSchema.safeParse('x402:serve').success);
+  const report = {
+    fingerprint: `svm:${HASH}`,
+    transaction: '1'.repeat(64),
+    network: endpoint.network,
+    asset: ADDR,
+    amount: '1',
+    payer: ADDR,
+    payTo: ADDR,
+    settledAt: 1,
+  };
+  assert.ok(t.X402PaymentReportSchema.safeParse(report).success);
+  assert.ok(!t.X402PaymentReportSchema.safeParse({ ...report, fingerprint: HASH }).success);
+});
