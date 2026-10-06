@@ -14,6 +14,7 @@ Square'in web uygulaması: Next.js 16 (App Router), React 19, Tailwind CSS 4 ve 
 | `/app/jobs/new` | İş açma ve fonlama: agent, tutar, deadline, challenge süresi, politika bağlama, iş tanımı ve hash'i, iki tarafın screening'i, `create_job` + `fund_job` (FE-06) |
 | `/app/jobs/[job]` | İş detayı: zincirdeki job, event'lerden canlı zaman çizelgesi, zincir saatine göre challenge sayacı; agent cüzdanı için kabul ve teslim (FE-07); alacağın listelenmesi, geri çekilmesi ve onaylı alıcının alımı, payee (FE-08); uyum ispatının durumu, kurumun ispatı üretip bağlaması (FE-09); herkesin tetikleyebildiği finalize, ödeme, validation, itibar ve keeper günlüğü (FE-10) |
 | `/app/claims` | Alacak piyasası: satıştaki alacaklar, fiyat, iskonto, kimin alabileceği (FE-08) |
+| `/audit/[job]` | Denetim görünümü: job'un herkese açık uyum geçmişi; event'ler ve işlemleri, ispatın kararı ve geçmişi, validation kaydı. Politikanın içeriği yok (FE-12) |
 | `/design` | Bileşen kataloğu |
 | `/healthz` | Sağlık kontrolü (Railway) |
 
@@ -158,6 +159,16 @@ Politikaya bağlı işte escrow, kurumun bağladığı release ispatına (`Relea
 | Settlement | Ödenmiş ya da iade edilmiş işte: payee'ye ödenen net (`ReleaseVerified`) ya da kuruma iade ve sebebi (`ReleaseRefused`), finalize eden ve ücreti (`Finalized`), validation kaydı (`ValidationRecord`: Verified / Refused / NoGate / NoPayout), payee'nin ve kurumun güncel USDC bakiyesi (hesap değişikliğiyle canlı). Event satırları işlem geçmişinden gelir; RPC geçmişi tutmuyorsa sayfa bunu söyler, sonuç validation kaydındadır |
 | İtibar | Agent'ın `AgentReputation` hesabı: tamamlanan, başarısız ve uyuşmazlıklı işler, toplam kazanç, son settlement. İspatla reddedilen release sayılmaz (ADR 0013); sayfa bunu yazar |
 | Keeper günlüğü | `listKeeperActions` (API, `SQUARE_API_URL`): job için keeper'ın (`apps/keeper`) denemeleri, sonucu, bekleme sebebi, ücreti, imzası ve sonraki denemesi; son 20. Keeper'ın bekletme ve onay kayıtları zincirde işlem üretmediği için iş teslim edilmişken ya da son deneme onay beklerken 15 saniyede bir yeniden okunur (sekme görünürken) |
+
+## Denetim görünümü (FE-12)
+
+`/audit/[job]`, herkese açık; iş detayındaki zaman çizelgesinden "Audit trail" ile açılır. Uygulama gezinmesi yoktur: bağlantıyı alan biri (denetçi, karşı taraf) cüzdan bağlamadan okur. Yalnızca `SQUARE_PROGRAM_ID_ESCROW` gerekir; ağ doğrulanmadan hiçbir şey okunmaz.
+
+| Parça | Davranış |
+|---|---|
+| Job | Zincirden: durum, tutar, kurum, agent (profile bağlantı), açılış ve settlement zamanı; politika adresi, sürümü ve commitment'ı (hash). Politikanın kuralları zincirde yoktur, sayfada da yoktur: tarayıcıdaki politika taslağı (FE-04) okunmaz |
+| İspat kararı | Politikasız işte "no proof gate". Politikalı işte zincirdeki `ReleaseProof`: karar (uyumlu ya da ret ve ret kodunun sebepleri), ispat zamanı, payee, net, release'in kullanıp kullanmadığı; settlement'ta validation kaydı (`ValidationRecord`). Job'a bağlanan bütün ispatlar (verifier `ComplianceProofSet`), kararlarıyla ve işlemleriyle |
+| Event'ler | `SQUARE_API_URL` tanımlıysa indexer'dan (`listEvents({ job })`, eskiden yeniye, en fazla 1.000): escrow event'leri ve verifier'ın ispat bağlama ve release kayıtları, tam geçmiş. Tanımlı değilse RPC'nin job'a dokunan son 50 işlemindeki escrow event'leri; sayfa bunu söyler. Her event'in zamanı, slot'u, imzası ve Solana Explorer bağlantısı (localnet'te uygulamanın RPC'siyle) |
 
 ## Tasarım sistemi
 
