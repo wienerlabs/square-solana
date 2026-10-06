@@ -7,13 +7,62 @@
 import { PublicKey } from '@solana/web3.js';
 import type { TaskContext, TaskExecutor } from '@squaresdk/solana-a2a';
 import type { BuildOptions, SquareClient, WalletLike } from '@squaresdk/solana-sdk';
-import type { JobStatus } from '@squaresdk/solana-types';
-import { readJob, type JobState, type TxSender } from './chain.js';
-import { deliveryArtifact, normalizeDeliverable, verifyReceipt } from './delivery.js';
-import type { AgentCapability, AgentLogger, ClaimListing, DeliveryUploader, JobHandler, TxOptions } from './types.js';
+import type { DeliveryReceipt, JobStatus } from '@squaresdk/solana-types';
+import { AgentTxError, readJob, type JobState, type TxSender } from './chain.js';
+import {
+  DeliveryUploadError,
+  deliveryArtifact,
+  normalizeDeliverable,
+  verifyReceipt,
+  type NormalizedDelivery,
+} from './delivery.js';
+import type {
+  AgentCapability,
+  AgentLogger,
+  Admission,
+  ClaimListing,
+  DeliveryUploader,
+  JobHandler,
+  RetryOptions,
+  TxOptions,
+} from './types.js';
 
 const BPS = 10_000n;
 const DELIVERED: ReadonlySet<JobStatus> = new Set(['delivered', 'disputed', 'resolved', 'released', 'refunded']);
+const ACCEPTED_OR_LATER: ReadonlySet<JobStatus> = new Set(['accepted', ...DELIVERED]);
+
+export const DEFAULT_RETRY: RetryOptions = Object.freeze({
+  minDelayMs: 1_000,
+  maxDelayMs: 30_000,
+  submitMarginSeconds: 30,
+});
+
+export class JobFailure extends Error {
+  constructor(message: string, options?: { cause?: unknown }) {
+    super(message, options);
+    this.name = 'JobFailure';
+  }
+}
+
+const messageOf = (error: unknown) => (error instanceof Error ? error.message : String(error));
+
+const isPermanent = (error: unknown) =>
+  error instanceof JobFailure ||
+  (error instanceof AgentTxError && error.program !== null) ||
+  (error instanceof DeliveryUploadError && !error.retryable);
+
+function sleep(ms: number, signal: AbortSignal): Promise<void> {
+  return new Promise((resolve) => {
+    if (signal.aborted) return resolve();
+    const timer = setTimeout(done, ms);
+    function done() {
+      clearTimeout(timer);
+      signal.removeEventListener('abort', done);
+      resolve();
+    }
+    signal.addEventListener('abort', done, { once: true });
+  });
+}
 
 export interface JobExecutorDeps {
   client: SquareClient;
@@ -28,6 +77,8 @@ export interface JobExecutorDeps {
   logger?: AgentLogger;
   onError: (error: unknown) => void;
   onClaimListed?: (listing: ClaimListing) => void;
+  admit?: Admission;
+  retry?: RetryOptions;
 }
 
 /** Nominal değerin `discountBps` altı; `list_claim` 0 < fiyat < nominal ister. */
@@ -59,13 +110,30 @@ function capabilityOf(spec: unknown, capabilities: readonly AgentCapability[]): 
   return capabilities.find((c) => c.id === named) ?? `bilinmeyen capability: ${named}`;
 }
 
+export function assertRetryOptions(retry: RetryOptions): void {
+  const { minDelayMs, maxDelayMs, submitMarginSeconds } = retry;
+  if (!Number.isSafeInteger(minDelayMs) || minDelayMs < 1) throw new Error('retry.minDelayMs pozitif tamsayı olmalı');
+  if (!Number.isSafeInteger(maxDelayMs) || maxDelayMs < minDelayMs) {
+    throw new Error('retry.maxDelayMs, retry.minDelayMs’ten küçük olmayan bir tamsayı olmalı');
+  }
+  if (!Number.isSafeInteger(submitMarginSeconds) || submitMarginSeconds < 0) {
+    throw new Error('retry.submitMarginSeconds negatif olmayan tamsayı olmalı');
+  }
+}
+
 export function createJobExecutor(deps: JobExecutorDeps): TaskExecutor {
   const { client, sender, wallet } = deps;
+  const retry = deps.retry ?? DEFAULT_RETRY;
+  assertRetryOptions(retry);
   const options = (): BuildOptions => ({
     feePayer: wallet.publicKey,
     ...(deps.tx.computeUnitPrice !== undefined ? { computeUnitPrice: deps.tx.computeUnitPrice } : {}),
     ...(deps.tx.addressLookupTables ? { addressLookupTables: deps.tx.addressLookupTables } : {}),
   });
+  const backoff = (failures: number) => {
+    const base = Math.min(retry.minDelayMs * 2 ** Math.min(failures - 1, 30), retry.maxDelayMs);
+    return Math.max(1, Math.round(base * (0.5 + Math.random() / 2)));
+  };
 
   /** Kabulden önceki ret sebebi; kabul edilebilirse null. */
   function refusal(job: JobState, capability: AgentCapability): string | null {
@@ -75,7 +143,7 @@ export function createJobExecutor(deps: JobExecutorDeps): TaskExecutor {
     if (job.amount < capability.price) {
       return `job tutarı ${job.amount}, ${capability.id} fiyatının (${capability.price}) altında`;
     }
-    if (job.deadline <= deps.now()) return 'job deadline geçmiş';
+    if (job.deadline - retry.submitMarginSeconds <= deps.now()) return 'job deadline geçmiş';
     return null;
   }
 
@@ -96,88 +164,178 @@ export function createJobExecutor(deps: JobExecutorDeps): TaskExecutor {
     }
   }
 
-  /** Teslim edildiyse true; görev bu arada kesildiyse (iptal, kapanış) false. */
-  async function deliver(
+  async function work(
     context: TaskContext,
     job: JobState,
     capability: AgentCapability,
     spec: unknown,
-  ): Promise<boolean> {
-    const output = await deps.handler({
-      capability,
-      spec,
-      job,
-      taskId: context.taskId,
-      caller: context.caller,
-      message: context.message,
-      signal: context.signal,
-      progress: (text) => context.working(text),
+  ): Promise<NormalizedDelivery> {
+    let output;
+    try {
+      output = await deps.handler({
+        capability,
+        spec,
+        job,
+        taskId: context.taskId,
+        caller: context.caller,
+        message: context.message,
+        signal: context.signal,
+        progress: (text) => context.working(text),
+      });
+    } catch (error) {
+      if (context.signal.aborted) throw error;
+      throw new JobFailure(messageOf(error), { cause: error });
+    }
+    try {
+      return normalizeDeliverable(output);
+    } catch (error) {
+      throw new JobFailure(messageOf(error), { cause: error });
+    }
+  }
+
+  async function upload(job: JobState, delivery: NormalizedDelivery): Promise<DeliveryReceipt> {
+    const receipt = await deps.delivery.upload({
+      job: job.address,
+      content: delivery.content,
+      contentType: delivery.contentType,
     });
-    if (context.signal.aborted) return false;
-    const delivery = normalizeDeliverable(output);
-    const receipt = verifyReceipt(
-      await deps.delivery.upload({ job: job.address, content: delivery.content, contentType: delivery.contentType }),
-      delivery,
-    );
-    await context.addArtifact(deliveryArtifact(delivery, receipt), { lastChunk: true });
-    const built = await client.flow.submitWork(
-      {
-        agent: wallet.publicKey,
-        job: job.address,
-        workHash: Buffer.from(receipt.workHash, 'hex'),
-        deliveryUri: receipt.deliveryUri,
-      },
-      options(),
-    );
-    const signature = await sender.send('submit_work', built, [wallet]);
-    deps.logger?.info(`teslim edildi: ${job.address.toBase58()} (${signature})`);
-    await context.complete(`teslim edildi: submit_work ${signature}`);
-    return true;
+    try {
+      return verifyReceipt(receipt, delivery);
+    } catch (error) {
+      throw new JobFailure(messageOf(error), { cause: error });
+    }
   }
 
   return {
     async onTask(context) {
       const address = new PublicKey(context.job.address);
-      const job = await readJob(client, address);
-      if (!job) throw new Error(`job zincirde yok: ${context.job.address}`);
-      if (DELIVERED.has(job.status)) {
-        await context.complete(`job zincirde teslim edilmiş (${job.status})`);
-        if (job.status === 'delivered') await listClaim(job);
-        return;
-      }
       const spec = specOf(context);
-      if (spec === undefined) {
-        await context.reject('görevi açan mesaj job spec’ini (data parçası) taşımalı');
-        return;
-      }
-      const capability = capabilityOf(spec, deps.capabilities);
-      if (typeof capability === 'string') {
-        if (job.status === 'accepted') throw new Error(capability);
-        await context.reject(capability);
-        return;
-      }
-      if (job.status === 'open') {
-        await context.reject('job fonlanmamış: kurum fund_job’dan sonra görevi yeniden açmalı');
-        return;
-      }
-      if (job.status === 'funded') {
-        const reason = refusal(job, capability);
-        if (reason) {
-          await context.reject(reason);
-          return;
-        }
+      let decided = false;
+      let capability: AgentCapability | null = null;
+      let output: NormalizedDelivery | null = null;
+      let receipt: DeliveryReceipt | null = null;
+      let resumed = false;
+      let sending: JobStatus | null = null;
+      let failures = 0;
+      let deadline: number | null = null;
+
+      let floor: JobStatus | null = null;
+
+      const capabilityFor = (): AgentCapability => {
+        if (capability) return capability;
+        const found = capabilityOf(spec, deps.capabilities);
+        if (typeof found === 'string') throw new JobFailure(found);
+        capability = found;
+        return found;
+      };
+
+      for (;;) {
         if (context.signal.aborted) return;
-        const built = await client.flow.acceptJob({ agent: wallet.publicKey, job: address }, options());
-        const signature = await sender.send('accept_job', built, [wallet]);
-        deps.logger?.info(`job kabul edildi: ${address.toBase58()} (${signature})`);
-        await context.working(`kabul edildi: accept_job ${signature}`);
-      } else if (job.status === 'accepted') {
-        if (!job.agentWallet.equals(wallet.publicKey)) throw new Error('job başka bir agent cüzdanına bağlı');
-        await context.working('kabul edilmiş job sürdürülüyor');
-      } else {
-        throw new Error(`job durumu ${job.status}: iş yapılamaz`);
+        try {
+          const job = await readJob(client, address);
+          if (!job) {
+            if (deadline === null) throw new JobFailure(`job zincirde yok: ${context.job.address}`);
+            throw new Error(`job zincirde okunamadı: ${context.job.address}`);
+          }
+          deadline = job.deadline;
+          if (floor === 'accepted' && !ACCEPTED_OR_LATER.has(job.status) && job.status !== 'cancelled') {
+            throw new Error(`zincir okuması geride: job ${job.status}, kabul onaylandı`);
+          }
+          if (sending === 'funded' && ACCEPTED_OR_LATER.has(job.status)) sending = null;
+          if (sending === 'accepted' && DELIVERED.has(job.status)) sending = null;
+
+          if (DELIVERED.has(job.status)) {
+            if (output && receipt) await context.addArtifact(deliveryArtifact(output, receipt), { lastChunk: true });
+            await context.complete(`job zincirde teslim edilmiş (${job.status})`);
+            if (job.status === 'delivered') await listClaim(job);
+            return;
+          }
+          if (job.status === 'open') {
+            await context.reject('job fonlanmamış: kurum fund_job’dan sonra görevi yeniden açmalı');
+            return;
+          }
+          if (job.status === 'funded') {
+            if (!decided) {
+              if (spec === undefined) {
+                await context.reject('görevi açan mesaj job spec’ini (data parçası) taşımalı');
+                return;
+              }
+              const found = capabilityOf(spec, deps.capabilities);
+              if (typeof found === 'string') {
+                await context.reject(found);
+                return;
+              }
+              const reason =
+                refusal(job, found) ?? (await deps.admit?.({ capability: found, job, spec, taskId: context.taskId }));
+              if (reason) {
+                await context.reject(reason);
+                return;
+              }
+              capability = found;
+              decided = true;
+            }
+            if (context.signal.aborted) return;
+            sending = 'funded';
+            const built = await client.flow.acceptJob({ agent: wallet.publicKey, job: address }, options());
+            const signature = await sender.send('accept_job', built, [wallet]);
+            sending = null;
+            floor = 'accepted';
+            failures = 0;
+            deps.logger?.info(`job kabul edildi: ${address.toBase58()} (${signature})`);
+            await context.working(`kabul edildi: accept_job ${signature}`);
+            continue;
+          }
+          if (job.status !== 'accepted') throw new JobFailure(`job durumu ${job.status}: iş yapılamaz`);
+          if (!job.agentWallet.equals(wallet.publicKey)) throw new JobFailure('job başka bir agent cüzdanına bağlı');
+          const current = capabilityFor();
+          if (!decided && !resumed) {
+            resumed = true;
+            await context.working('kabul edilmiş job sürdürülüyor');
+          }
+          if (job.deadline - retry.submitMarginSeconds <= deps.now()) {
+            throw new JobFailure('job süresi doldu: teslim için zaman kalmadı');
+          }
+          output ??= await work(context, job, current, spec);
+          if (context.signal.aborted) return;
+          receipt ??= await upload(job, output);
+          sending = 'accepted';
+          const built = await client.flow.submitWork(
+            {
+              agent: wallet.publicKey,
+              job: job.address,
+              workHash: Buffer.from(receipt.workHash, 'hex'),
+              deliveryUri: receipt.deliveryUri,
+            },
+            options(),
+          );
+          const signature = await sender.send('submit_work', built, [wallet]);
+          sending = null;
+          deps.logger?.info(`teslim edildi: ${job.address.toBase58()} (${signature})`);
+          await context.addArtifact(deliveryArtifact(output, receipt), { lastChunk: true });
+          await context.complete(`teslim edildi: submit_work ${signature}`);
+          await listClaim(job);
+          return;
+        } catch (error) {
+          if (context.signal.aborted) return;
+          if (error instanceof AgentTxError && error.program !== null && sending !== null) {
+            const fresh = await readJob(client, address).catch(() => null);
+            const landed =
+              fresh !== null &&
+              ((sending === 'funded' && ACCEPTED_OR_LATER.has(fresh.status)) ||
+                (sending === 'accepted' && DELIVERED.has(fresh.status)));
+            if (!landed) throw error;
+            deps.onError(error);
+            continue;
+          }
+          if (isPermanent(error)) throw error;
+          if (deadline !== null && deadline - retry.submitMarginSeconds <= deps.now()) {
+            throw new JobFailure(`job süresi doldu: ${messageOf(error)}`, { cause: error });
+          }
+          deps.onError(error);
+          failures += 1;
+          await sleep(backoff(failures), context.signal);
+        }
       }
-      if (await deliver(context, job, capability, spec)) await listClaim(job);
     },
   };
 }

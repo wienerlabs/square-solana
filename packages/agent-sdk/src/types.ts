@@ -65,6 +65,19 @@ export interface DeliveryUploader {
   upload(input: { job: PublicKey; content: Uint8Array; contentType: string }): Promise<DeliveryReceipt>;
 }
 
+export type Admission = (input: {
+  capability: AgentCapability;
+  job: JobInfo;
+  spec: unknown;
+  taskId: string;
+}) => string | null | undefined | Promise<string | null | undefined>;
+
+export interface RetryOptions {
+  minDelayMs: number;
+  maxDelayMs: number;
+  submitMarginSeconds: number;
+}
+
 export interface AgentLogger {
   info(message: string): void;
   error(message: string): void;
@@ -114,6 +127,8 @@ export interface AgentOptions {
   autoListClaim?: { discountBps: number };
   /** `autoListClaim` bir alacağı listeleyince çağrılır. */
   onClaimListed?: (listing: ClaimListing) => void;
+  admit?: Admission;
+  retry?: Partial<RetryOptions>;
   limits?: Partial<A2aServerLimits>;
   tx?: TxOptions;
   /** Agent, zincir ve depo hataları; tel üzerinden ayrıntı gönderilmez. */
