@@ -16,6 +16,7 @@ Square'in web uygulaması: Next.js 16 (App Router), React 19, Tailwind CSS 4 ve 
 | `/app/arbitration` | Arbitrator konsolu: açık dispute'lar, kanıtlar, oylar, oy ve webhook abonelikleri; navigasyonda arbitrator rolünde görünür (FE-17) |
 | `/app/claims` | Alacak piyasası: satıştaki alacaklar, fiyat, iskonto, kimin alabileceği (FE-08) |
 | `/app/developers` | Geliştirici portalı: API oturumu, API anahtarları, x402 ücretli uç noktalar ve kullanımı, SDK örnekleri (FE-22) |
+| `/audit/[job]` | Denetim görünümü: job'un herkese açık uyum geçmişi; event'ler ve işlemleri, ispatın kararı ve geçmişi, validation kaydı. Politikanın içeriği yok (FE-12) |
 | `/design` | Bileşen kataloğu |
 | `/healthz` | Sağlık kontrolü (Railway) |
 
@@ -79,6 +80,7 @@ kimliğinden türetilir. did:aip v1 programının kimliği (`CgchXu…Vbc`) redd
 | DID | `did:aip:solana:{chain-ref}:{registry}:{agent_record}`; `chain-ref` doğrulanmış RPC'nin genesis hash'inden. Ağ doğrulanmadan türetilmez. Tx onaylanmadan DID var sayılmaz (§7.1) |
 | Kayıt | `AgentRecord` (`["agent", creator, agent_id]`) zincirden okunur: aynı cüzdan aynı kimliği ikinci kez kaydedemez |
 | Kart | Önce yayımlanır, sonra kaydedilir (§7.1). Tarayıcı kartı kendi adresinden indirir (https, yönlendirme yok, 256 KiB, 10 s; sunucusu cross-origin isteğe izin vermeli), `AgentCardSchema` ile doğrular ve kartın `registrations` listesinde bu kaydın girdisini arar. Girdi sayfada hazır verilir. Hash, indirilen baytların SHA-256'sıdır. URI boşsa kartsız kayıt (sıfır hash) |
+| Kartı Square API'de barındırma | `SQUARE_API_URL` tanımlıysa kartın JSON'u yapıştırılır ya da dosyadan yüklenir; şema ve kayıt girdisi yazarken denetlenir. "Host the card" cüzdan oturumuyla (FE-03) `putAgentCard`'ı kayıttan önce, `agentId` ile çağırır. API şemadan geçmiş kartın RFC 8785 kanonik JSON'unu saklar ve A2A keşif yolunu (`/a/{agentRecord}/.well-known/agent-card.json`) döner. Tarayıcı aynı baytların SHA-256'sını kendisi hesaplar: API'nin hash'i farklıysa URI kayda yazılmaz. Girdi şemanın okuduğu biçimden farklıysa (şemada olmayan alan, eksik varsayılan) sayfa bunu söyler. Barındırılan kart dizinde becerileri ve fiyatlarıyla görünür |
 | Cüzdan | Varsayılan olarak bağlı cüzdan; kabul, teslim ve alacak listelemeyi imzalar, ödemeyi alır |
 | Tx | `register_agent` registry IDL'iyle kurulur, `useSendTransaction()` ile imzalanır; ücreti ve rent'i sahibi öder. Registry hata kodu IDL'deki mesajıyla gösterilir |
 | Çözüm | `@squaresdk/solana-identity`'nin `resolveDid`'i uygulamanın bağlantısıyla: başka bir ağın DID'i `unsupportedChain`. Kart durumu (doğrulandı, yok, ulaşılamadı, hash uyuşmuyor, geçersiz), sahip, agent cüzdanı, kayıt ve güncelleme zamanı, okunan slot, servisler ve DID belgesi |
@@ -208,6 +210,16 @@ kararı: [ADR 0023](../../docs/decisions/0023-x402-ucretli-uc-nokta-tanimlari.md
 | API anahtarları | Liste: etiket, ön ek, kapsamlar, oluşturma ve son kullanım zamanı. Oluşturma etiket ve kapsamlarla; sır yalnızca oluşturma yanıtında gelir, bir kez gösterilir ve kopyalanır, kapatılınca sayfadan silinir. İptal hemen geçerlidir |
 | Ücretli uç noktalar | Tanım: ad, yol (geliştiricinin sunucusundaki route), fiyat, mint, ağ, alıcı (`payTo`, varsayılan bağlı cüzdan), açıklama, etkin / pasif. Ağ uygulamanın kümesinden gelir (localnet'te devnet), mint ağın USDC'si; USDC'de fiyat USDC olarak girilir ve tam sayı aritmetiğiyle taban birime çevrilir, başka mint'te taban birimdir. Düzenleme, pasifleştirme ve silme. Kullanım: ödemeli çağrı sayısı, tahsil edilen toplam, son ödeme ve son ödemeler (ödeyen, tutar, işlem) |
 | SDK örnekleri | Seçilen anahtar ve uç noktayla doldurulur, kopyalanır: `createApiClient` (anahtarın kapsamına göre), geliştiricinin sunucusu (`paidRouteFromDefinition` → `paidRoute`, kendi facilitator'ı, ödemenin bildirimi) ve ödeyen istemci (`createPayingFetch`). Sırlar ortam değişkenlerindedir. `test/developer-snippets.test.ts` her örneği doldurulmuş hâliyle gerçek paketlere karşı TypeScript derleyicisinden geçirir |
+
+## Denetim görünümü (FE-12)
+
+`/audit/[job]`, herkese açık; iş detayındaki zaman çizelgesinden "Audit trail" ile açılır. Uygulama gezinmesi yoktur: bağlantıyı alan biri (denetçi, karşı taraf) cüzdan bağlamadan okur. Yalnızca `SQUARE_PROGRAM_ID_ESCROW` gerekir; ağ doğrulanmadan hiçbir şey okunmaz.
+
+| Parça | Davranış |
+|---|---|
+| Job | Zincirden: durum, tutar, kurum, agent (profile bağlantı), açılış ve settlement zamanı; politika adresi, sürümü ve commitment'ı (hash). Politikanın kuralları zincirde yoktur, sayfada da yoktur: tarayıcıdaki politika taslağı (FE-04) okunmaz |
+| İspat kararı | Politikasız işte "no proof gate". Politikalı işte zincirdeki `ReleaseProof`: karar (uyumlu ya da ret ve ret kodunun sebepleri), ispat zamanı, payee, net, release'in kullanıp kullanmadığı; settlement'ta validation kaydı (`ValidationRecord`). Job'a bağlanan bütün ispatlar (verifier `ComplianceProofSet`), kararlarıyla ve işlemleriyle |
+| Event'ler | `SQUARE_API_URL` tanımlıysa indexer'dan (`listEvents({ job })`, eskiden yeniye, en fazla 1.000): escrow event'leri ve verifier'ın ispat bağlama ve release kayıtları, tam geçmiş. Tanımlı değilse RPC'nin job'a dokunan son 50 işlemindeki escrow event'leri; sayfa bunu söyler. Her event'in zamanı, slot'u, imzası ve Solana Explorer bağlantısı (localnet'te uygulamanın RPC'siyle) |
 
 ## Tasarım sistemi
 
