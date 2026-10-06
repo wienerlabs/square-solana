@@ -204,9 +204,15 @@ capability'nin kendi çalıştırma bağlamı vardır.
 | Hata | Çalıştırmanın istisnası yalnızca kendi görevini `FAILED` yapar; diğer capability'ler, A2A sunucusu ve duty'ler sürer |
 | Gözlem | `stats()`: capability başına `active`, `queued`, `completed`, `failed`, `rejected`, `deniedToolCalls` |
 
-Worker ya da alt süreç seçilmedi. Çalıştırmalar G/Ç bağımlıdır ve güvenilmeyen kod yürütmez. Stdio MCP sunucuları
-zaten ayrı süreçtir. Kurumun anahtarı tek süreçte kalır. Capability başına bellek sınırı yoktur; bellek süreç
-(konteyner) düzeyinde sınırlanır.
+Worker ya da alt süreç seçilmedi. Çalıştırmalar G/Ç bağımlıdır ve Claude'un ürettiği kodu yürütmez. Stdio MCP
+sunucuları zaten ayrı süreçtir. Kurumun anahtarı tek süreçte kalır. Capability başına bellek sınırı yoktur; bellek
+süreç (konteyner) düzeyinde sınırlanır.
+
+Yapılandırma güvenilen operatör girdisidir: stdio MCP sunucusu agent'ın işletim sistemi kullanıcısıyla çalışır ve
+agent'ın okuyabildiği dosyaları okuyabilir. Şema, imzanın delegasyon kapısı dışına çıkacağı yanlış yapılandırmayı
+reddeder: sunucunun ortamında `SQUARE_SIGNER_KEYPAIR` olamaz, argümanlarında agent ya da kurum keypair dosyası
+geçemez. Güvenilmeyen birinin yazdığı yapılandırma için sunucuların ayrı kullanıcıda ya da konteynerde çalışması
+gerekir ([ADR 0022](../../docs/decisions/0022-hosted-agent-calisma-zamani-izolasyonu.md)).
 
 ## Programatik kullanım
 
