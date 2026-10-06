@@ -11,6 +11,7 @@
 // Saklama: kayıt son yazmadan `retentionSeconds` sonra silinir (şifreli alanlar ve sarılmış anahtar; commitment,
 // özet ve erişim kaydı kalır). Bakım aynı zamanda eski ana anahtarla sarılmış veri anahtarlarını yeniden sarar.
 import type { PrismaClient, TravelRuleRecordModel as Row } from '@squaresdk/solana-db';
+import type { SecretBox } from '@squaresdk/solana-hardening';
 import type { SquareClient } from '@squaresdk/solana-sdk';
 import { travelRule } from '@squaresdk/solana-sdk';
 import {
@@ -26,7 +27,7 @@ import { PublicKey } from '@solana/web3.js';
 import { z } from 'zod';
 import { HttpError, badRequest, forbidden, notFound, parse } from '../http.js';
 import type { InstitutionAuthority, InstitutionKeys } from '../institution-authority.js';
-import { open, rewrap, seal, type Keyring, type Sealed } from './crypto.js';
+import { open, rewrap, seal, type Sealed } from './crypto.js';
 
 export interface TravelRuleActor {
   readonly wallet: string;
@@ -58,8 +59,6 @@ const ZERO_COMMITMENT = '0'.repeat(64);
 
 const seconds = (date: Date) => Math.floor(date.getTime() / 1000);
 const hex = (bytes: Uint8Array) => Buffer.from(bytes).toString('hex');
-/** Prisma `Bytes` sütunu kendi `ArrayBuffer`'ı olan bir `Uint8Array` ister. */
-const column = (bytes: Buffer) => new Uint8Array(bytes);
 
 /** Şifreli yükün biçimi: kayıt ve commitment'ın salt'ı. */
 const PayloadSchema = z.object({ record: TravelRuleRecordSchema, salt: z.string().regex(/^[0-9a-f]{64}$/) }).strict();
@@ -77,11 +76,12 @@ export function createTravelRuleService(deps: {
   db: PrismaClient;
   client: SquareClient;
   authority: InstitutionAuthority;
-  keyring: Keyring;
+  /** Ana anahtar halkası (`API_TRAVEL_RULE_KEYS`); veri anahtarlarını sarar. */
+  box: SecretBox;
   retentionSeconds: number;
   clock?: () => number;
 }): TravelRuleService {
-  const { db, client, authority, keyring } = deps;
+  const { db, client, authority, box } = deps;
   const clock = deps.clock ?? Date.now;
 
   async function chainJob(job: string): Promise<ChainJob> {
@@ -127,16 +127,10 @@ export function createTravelRuleService(deps: {
   });
 
   const sealedOf = (row: Row): Sealed => {
-    if (!row.ciphertext || !row.iv || !row.keyId || !row.wrappedKey || row.algorithm !== 'aes-256-gcm') {
+    if (!row.ciphertext || !row.keyId || !row.wrappedKey) {
       throw new Error(`travel_rule_records ${row.id}: şifreli alanlar eksik`);
     }
-    return {
-      algorithm: row.algorithm,
-      ciphertext: Buffer.from(row.ciphertext),
-      iv: Buffer.from(row.iv),
-      keyId: row.keyId,
-      wrappedKey: Buffer.from(row.wrappedKey),
-    };
+    return { ciphertext: row.ciphertext, keyId: row.keyId, wrappedKey: row.wrappedKey };
   };
 
   async function activeGrant(job: string, wallet: string, now: Date): Promise<boolean> {
@@ -182,16 +176,12 @@ export function createTravelRuleService(deps: {
       const salt = travelRule.generateSalt();
       const commitment = hex(travelRule.commitment({ job: new PublicKey(job), salt, record }));
       const recordDigest = hex(travelRule.recordDigest(record));
-      const sealed = seal(keyring, Buffer.from(JSON.stringify({ record, salt: hex(salt) })), { job, commitment });
+      const sealed = seal(box, Buffer.from(JSON.stringify({ record, salt: hex(salt) })), { job, commitment });
       const now = new Date(clock());
       const data = {
         commitment,
         recordDigest,
-        algorithm: sealed.algorithm,
-        ciphertext: column(sealed.ciphertext),
-        iv: column(sealed.iv),
-        keyId: sealed.keyId,
-        wrappedKey: column(sealed.wrappedKey),
+        ...sealed,
         storedBy: actor.wallet,
         storedAt: now,
         retainUntil: new Date(now.getTime() + deps.retentionSeconds * 1000),
@@ -218,7 +208,7 @@ export function createTravelRuleService(deps: {
         data: { job, action: 'read', actor: actor.wallet, requestId: actor.requestId, at: now },
       });
       const payload = PayloadSchema.parse(
-        JSON.parse(open(keyring, sealedOf(row), { job, commitment: row.commitment }).toString()),
+        JSON.parse(Buffer.from(open(box, sealedOf(row), { job, commitment: row.commitment })).toString()),
       );
       const salt = Buffer.from(payload.salt, 'hex');
       const recomputed = hex(travelRule.commitment({ job: new PublicKey(job), salt, record: payload.record }));
@@ -314,22 +304,22 @@ export function createTravelRuleService(deps: {
         await db.$transaction([
           db.travelRuleRecord.update({
             where: { id },
-            data: { purgedAt: now, ciphertext: null, algorithm: null, iv: null, keyId: null, wrappedKey: null },
+            data: { purgedAt: now, ciphertext: null, keyId: null, wrappedKey: null },
           }),
           db.travelRuleAccess.create({ data: { job, action: 'purge', at: now } }),
         ]);
       }
       const stale = await db.travelRuleRecord.findMany({
-        where: { purgedAt: null, keyId: { not: keyring.activeKeyId } },
+        where: { purgedAt: null, keyId: { not: box.activeKeyId } },
         select: { id: true, job: true, keyId: true, wrappedKey: true },
         take: MAINTENANCE_BATCH,
       });
       for (const row of stale) {
-        const wrapped = rewrap(keyring, { keyId: row.keyId!, wrappedKey: Buffer.from(row.wrappedKey!) }, row.job);
+        const wrapped = rewrap(box, row.wrappedKey!, row.job);
         // Arada yeniden yazılan kayıt ezilmez: yalnızca okunan sarılmış anahtar hâlâ duruyorsa güncellenir.
         await db.travelRuleRecord.updateMany({
           where: { id: row.id, keyId: row.keyId },
-          data: { keyId: wrapped.keyId, wrappedKey: column(wrapped.wrappedKey) },
+          data: wrapped,
         });
       }
       return { purged: expired.length, rewrapped: stale.length };

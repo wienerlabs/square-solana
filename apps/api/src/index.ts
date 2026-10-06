@@ -2,7 +2,7 @@
 // açılmaz. Log, metrik, health ve alarmlar `@squaresdk/solana-observability`'dendir.
 import type { Server } from 'node:http';
 import { createDatabaseClient } from '@squaresdk/solana-db';
-import { createFailoverFetch, createRateLimiter } from '@squaresdk/solana-hardening';
+import { createFailoverFetch, createRateLimiter, createSecretBox } from '@squaresdk/solana-hardening';
 import { createPrismaRateLimitStore } from '@squaresdk/solana-hardening/prisma';
 import { createReadApi } from '@squaresdk/solana-indexer/read';
 import {
@@ -27,7 +27,6 @@ import { createPolicyMetaService } from './policy-meta.js';
 import { loadProgramIds } from './programs.js';
 import { createProverProxy } from './prover.js';
 import { createDeliveryStore } from './storage.js';
-import { createKeyring } from './travel-rule/crypto.js';
 import { startTravelRuleMaintenance } from './travel-rule/maintenance.js';
 import { createTravelRuleService } from './travel-rule/service.js';
 import { createTxBuilder } from './tx.js';
@@ -64,7 +63,7 @@ async function main(): Promise<void> {
     db,
     client,
     authority,
-    keyring: createKeyring(config.travelRule.keys, config.travelRule.activeKeyId),
+    box: createSecretBox({ keys: config.travelRule.keys, activeKeyId: config.travelRule.activeKeyId }),
     retentionSeconds: config.travelRule.retentionSeconds,
   });
   const rateStore = createPrismaRateLimitStore(db);

@@ -5,10 +5,10 @@ import { PublicKey, VersionedTransaction } from '@solana/web3.js';
 import { travelRule } from '@squaresdk/solana-sdk';
 import type { TravelRuleRecord } from '@squaresdk/solana-types';
 import { afterAll, beforeAll, beforeEach, describe, expect, inject, it } from 'vitest';
+import { createSecretBox } from '@squaresdk/solana-hardening';
 import { createInstitutionAuthority } from '../src/institution-authority.js';
 import { loadOpenApi } from '../src/openapi.js';
 import { PERMISSION_INITIATE } from '../src/squads.js';
-import { createKeyring } from '../src/travel-rule/crypto.js';
 import { createTravelRuleService } from '../src/travel-rule/service.js';
 import { apiKey, login } from './fixtures/login.js';
 import { PUBLIC_BASE_URL, startStack, truncate, type Stack } from './fixtures/stack.js';
@@ -16,10 +16,7 @@ import { World, wallet, type Wallet } from './fixtures/world.js';
 
 const DAY = 86_400;
 const RETENTION = 30 * DAY;
-const KEYS = new Map([
-  ['k1', randomBytes(32)],
-  ['k2', randomBytes(32)],
-]);
+const KEYS = { k1: randomBytes(32), k2: randomBytes(32) };
 const PASSPORT = 'U12345678';
 const hex = (bytes: Uint8Array) => Buffer.from(bytes).toString('hex');
 
@@ -31,7 +28,7 @@ beforeAll(async () => {
   stack = await startStack({
     openapi: loadOpenApi(inject('openapiPath'), PUBLIC_BASE_URL),
     clock: () => now,
-    travelRule: { keyring: createKeyring(KEYS, 'k1'), retentionSeconds: RETENTION },
+    travelRule: { box: createSecretBox({ keys: KEYS, activeKeyId: 'k1' }), retentionSeconds: RETENTION },
   });
   world = new World(stack.db, stack.rpc, stack.client);
 });
@@ -302,7 +299,7 @@ describe('saklama süresi ve anahtar döndürme', () => {
     await (await as(owner)).putTravelRule(job.address, { record });
     expect((await stack.db.travelRuleRecord.findFirstOrThrow()).keyId).toBe('k1');
 
-    const service = (keys: Map<string, Buffer>, active: string) =>
+    const service = (keys: Record<string, Uint8Array>, active: string) =>
       createTravelRuleService({
         db: stack.db,
         client: stack.client,
@@ -310,7 +307,7 @@ describe('saklama süresi ve anahtar döndürme', () => {
           db: stack.db,
           connection: stack.client.escrow.program.provider.connection,
         }),
-        keyring: createKeyring(keys, active),
+        box: createSecretBox({ keys, activeKeyId: active }),
         retentionSeconds: RETENTION,
         clock: () => now,
       });
@@ -321,8 +318,8 @@ describe('saklama süresi ve anahtar döndürme', () => {
     expect((await stack.db.travelRuleRecord.findFirstOrThrow()).keyId).toBe('k2');
     expect((await rotated.disclose(actor, job.address)).record).toEqual(record);
 
-    const retired = service(new Map([['k1', KEYS.get('k1')!]]), 'k1');
-    await expect(retired.disclose(actor, job.address)).rejects.toThrow(/k2 halkada yok/);
+    const retired = service({ k1: KEYS.k1 }, 'k1');
+    await expect(retired.disclose(actor, job.address)).rejects.toThrow(/anahtar halkada yok: k2/);
     // Açılamayan okuma da erişim kaydındadır.
     expect(await stack.db.travelRuleAccess.count({ where: { action: 'read' } })).toBe(2);
   });

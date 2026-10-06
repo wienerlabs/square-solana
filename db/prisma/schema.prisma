@@ -569,8 +569,8 @@ model CctpTransfer {
 
 // ---------------------------------------------------------------- Travel Rule (BE-23, ADR 0017)
 
-/// Job'un Travel Rule kaydı. Kayıt ve salt zarf şifrelemesiyle saklanır: kaydı şifreleyen veri anahtarı
-/// `key_id`'li ana anahtarla sarılıdır; düz metin sütunu yoktur. Zincirde yalnızca commitment vardır
+/// Job'un Travel Rule kaydı. Kayıt ve salt zarf şifrelemesiyle saklanır (`@squaresdk/solana-hardening`
+/// `SecretBox`): kaydı şifreleyen veri anahtarı `key_id`'li ana anahtarla sarılıdır; düz metin sütunu yoktur. Zincirde yalnızca commitment vardır
 /// (`TravelRuleCommitted`). Saklama süresi dolunca şifreli alanlar silinir (`purged_at`); commitment ve özet kalır.
 model TravelRuleRecord {
   id           String    @id @default(uuid()) @db.Uuid
@@ -579,16 +579,12 @@ model TravelRuleRecord {
   commitment   String    @db.Char(64)
   /// Kaydın RFC 8785 kanonik JSON'unun SHA-256'sı.
   recordDigest String    @map("record_digest") @db.Char(64)
-  /// Şifreli `{ record, salt }` ve GCM etiketi (son 16 bayt).
-  ciphertext   Bytes?
-  /// AEAD adı (`aes-256-gcm`).
-  algorithm    String?   @db.Text
-  /// `ciphertext`'in IV'si.
-  iv           Bytes?
-  /// Veri anahtarını saran ana anahtarın kimliği (`TRAVEL_RULE_KEYS`).
+  /// Şifreli `{ record, salt }`: kayda özgü veri anahtarıyla `SecretBox` değeri (`sq1.record.<iv>.<veri>`).
+  ciphertext   String?   @db.Text
+  /// Veri anahtarını saran ana anahtarın kimliği (`API_TRAVEL_RULE_KEYS`); yeniden sarma bununla seçilir.
   keyId        String?   @map("key_id") @db.VarChar(32)
-  /// Sarılmış veri anahtarı: IV (12) ‖ şifreli anahtar ‖ GCM etiketi (16).
-  wrappedKey   Bytes?    @map("wrapped_key")
+  /// Ana anahtar halkasıyla sarılmış veri anahtarı (`SecretBox` değeri, `sq1.<key_id>.<iv>.<veri>`).
+  wrappedKey   String?   @map("wrapped_key") @db.Text
   storedBy     String    @map("stored_by") @db.VarChar(44)
   createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
   /// Son yazma; saklama süresi buradan sayılır.
