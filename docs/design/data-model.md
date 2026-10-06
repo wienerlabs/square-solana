@@ -79,6 +79,7 @@ Notlar:
 | `replay_guards` | Tek kullanımlık kimlikler: webhook teslimat kimliği, imzalı eylem nonce'u, x402 ödeme yükü (`x402:<ağ>` kapsamı); `(scope, id)` tekil | servisler | BE-13, BE-24 |
 | `a2a_tasks` | A2A görevi: agent, çağıran, bağlı job ve spec hash'i (görevin A2A bağlamı job adresidir), görev durumu, durum mesajı, artefaktlar, iyimser `version`. `job_status` ve `job_slot` sunucunun zincirde son gördüğü değerlerdir, ayna veri değildir. `(agent_record, caller, create_message_id)` tekil; kısmi tekil indeks job başına tek terminal olmayan görev | agent'ın A2A sunucusu ([a2a.md](a2a.md) §7) | BE-17 |
 | `a2a_messages` | Görev geçmişi: istemci ve agent mesajları, ekleme sırasıyla; `pending` istemcinin devam mesajı agent'a iletilip işlenene kadar true. `(task_id, message_id)` tekil, görev silinince silinir | agent'ın A2A sunucusu | BE-17 |
+| `sponsored_txs` | Sponsorlu tx'in maliyet günlüğü: imza (tekil), cüzdan, API anahtarı, durum (`signed` / `submitted` / `failed`), ücret ve rent (lamport), simülasyondaki compute unit, sınır ve fiyat, denetlenen talimatlar. Kullanıcının ve servisin günlük bütçesi bu tablodan, advisory kilitle sayılır; başarısız gönderim sayılmaz | fee payer ([ADR 0019](../decisions/0019-fee-payer-politikasi.md)) | BE-27 |
 
 A2A tablolarındaki mesaj ve artefakt içerikleri JSONB olarak düz metindir. Travel Rule ya da kişisel veri bu tablolara yazılmamalıdır; bunu agent kodu sağlar, depo zorlamaz. Saklama ve silme kuralı henüz yoktur ([a2a.md](a2a.md) §10).
 

@@ -72,4 +72,19 @@ mod tests {
         assert_eq!(vault_address(&multisig, 0), expected);
         assert_ne!(vault_address(&multisig, 0), vault_address(&multisig, 1));
     }
+
+    /// TS SDK'sıyla ortak vektör (`@squaresdk/solana-sdk/squads`, packages/sdk/test/squads.test.ts): iki taraf
+    /// aynı multisig için aynı vault adreslerini türetir.
+    #[test]
+    fn vault_matches_the_sdk_vector() {
+        let multisig = Pubkey::new_from_array([4; 32]);
+        assert_eq!(
+            vault_address(&multisig, 0),
+            pubkey!("8FK3WhBAFh5oiURQV9v4NtDU2wjBjo1wigY38MADYqrX")
+        );
+        assert_eq!(
+            vault_address(&multisig, 1),
+            pubkey!("HcMaKiGnhtDjJLz3Zc3SGJrqHyQ6xKvqwnJcKgbpCYpM")
+        );
+    }
 }
