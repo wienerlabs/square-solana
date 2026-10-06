@@ -33,6 +33,15 @@ const CARD_PATH_MAX = '/a/'.length + 44 + '/.well-known/agent-card.json'.length;
 const AGENT_CARD_URI_MAX = 200;
 /** `submit_work`'ün `delivery_uri` sınırı (escrow 6007): `<taban>/<64 hex workHash>`. */
 const DELIVERY_URI_MAX = 128;
+const SECONDS_PER_DAY = 86_400;
+/** Travel Rule ana anahtarı: `kimlik:base64`, anahtar 32 bayt (base64'te 44 karakter). */
+const TRAVEL_RULE_KEY = z
+  .string()
+  .regex(
+    /^[a-z0-9][a-z0-9-]{0,31}:[A-Za-z0-9+/]{43}=$/,
+    '`kimlik:base64` bekleniyor (kimlik küçük harf, anahtar 32 bayt)',
+  );
+const TRAVEL_RULE_KEY_ID = z.string().regex(/^[a-z0-9][a-z0-9-]{0,31}$/, 'anahtar kimliği bekleniyor');
 
 const EnvSchema = z.object({
   DATABASE_URL: nonEmpty,
@@ -84,6 +93,18 @@ const EnvSchema = z.object({
   API_PROVER_API_KEY: nonEmpty,
   API_PROVER_TIMEOUT_MS: int(1),
 
+  /**
+   * Travel Rule kayıtlarının ana anahtar halkası (virgülle `kimlik:base64`). Döndürmede yeni anahtar eklenir ve
+   * etkin yapılır; eskisi, bakım bütün veri anahtarlarını yeniden sarana kadar halkada kalır (ADR 0017).
+   */
+  API_TRAVEL_RULE_KEYS: commaList(TRAVEL_RULE_KEY),
+  /** Yeni kayıtların ve yeniden sarmanın kullandığı anahtar. */
+  API_TRAVEL_RULE_ACTIVE_KEY_ID: TRAVEL_RULE_KEY_ID,
+  /** Kaydın son yazmadan sonra saklandığı gün sayısı; hukuki karar, kurulumda verilir. */
+  API_TRAVEL_RULE_RETENTION_DAYS: int(1),
+  /** Saklama süresi dolan kayıtların silinmesi ve anahtarların yeniden sarılması aralığı. */
+  API_TRAVEL_RULE_MAINTENANCE_INTERVAL_SECONDS: int(1),
+
   /** `api_errors` alarmı: iç hata sayısı bu değerin üstüne ... */
   API_ALERT_ERRORS: int(0),
   /** ... bu kadar saniyelik pencerede çıkarsa çalar. */
@@ -114,6 +135,12 @@ export interface ApiConfig {
   readonly deliveries: { readonly store: DeliveryStoreConfig; readonly maxBytes: number };
   readonly tx: { readonly lookupTable: string | null; readonly computeUnitPrice: bigint };
   readonly prover: { readonly url: string; readonly apiKey: string; readonly timeoutMs: number };
+  readonly travelRule: {
+    readonly keys: ReadonlyMap<string, Buffer>;
+    readonly activeKeyId: string;
+    readonly retentionSeconds: number;
+    readonly maintenanceIntervalSeconds: number;
+  };
   readonly alerts: { readonly errors: number; readonly errorWindowSeconds: number };
   readonly observability: ObservabilityConfig;
 }
@@ -133,6 +160,11 @@ export function loadConfig(env: Readonly<Record<string, string | undefined>>): A
     }
     if (e.API_DELIVERY_PUBLIC_BASE_URL.length + 1 + 64 > DELIVERY_URI_MAX) {
       problems.push(`API_DELIVERY_PUBLIC_BASE_URL: deliveryUri ${DELIVERY_URI_MAX} karakteri aşar`);
+    }
+    const ids = e.API_TRAVEL_RULE_KEYS.map((entry) => entry.split(':')[0]!);
+    if (new Set(ids).size !== ids.length) problems.push('API_TRAVEL_RULE_KEYS: aynı kimlik iki kez verilmiş');
+    if (!ids.includes(e.API_TRAVEL_RULE_ACTIVE_KEY_ID)) {
+      problems.push('API_TRAVEL_RULE_ACTIVE_KEY_ID: API_TRAVEL_RULE_KEYS içinde yok');
     }
   }
   if (!parsed.success || !observability.ok || problems.length > 0) {
@@ -176,6 +208,17 @@ export function loadConfig(env: Readonly<Record<string, string | undefined>>): A
     }),
     tx: Object.freeze({ lookupTable: e.API_LOOKUP_TABLE ?? null, computeUnitPrice: e.API_COMPUTE_UNIT_PRICE }),
     prover: Object.freeze({ url: e.API_PROVER_URL, apiKey: e.API_PROVER_API_KEY, timeoutMs: e.API_PROVER_TIMEOUT_MS }),
+    travelRule: Object.freeze({
+      keys: new Map(
+        e.API_TRAVEL_RULE_KEYS.map((entry) => {
+          const [id, key] = entry.split(':') as [string, string];
+          return [id, Buffer.from(key, 'base64')] as const;
+        }),
+      ),
+      activeKeyId: e.API_TRAVEL_RULE_ACTIVE_KEY_ID,
+      retentionSeconds: e.API_TRAVEL_RULE_RETENTION_DAYS * SECONDS_PER_DAY,
+      maintenanceIntervalSeconds: e.API_TRAVEL_RULE_MAINTENANCE_INTERVAL_SECONDS,
+    }),
     alerts: Object.freeze({ errors: e.API_ALERT_ERRORS, errorWindowSeconds: e.API_ALERT_ERROR_WINDOW_SECONDS }),
     observability: observability.config,
   });

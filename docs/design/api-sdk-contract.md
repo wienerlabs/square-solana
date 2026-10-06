@@ -1,6 +1,6 @@
 # API ve SDK sözleşmesi
 
-**Sözleşme sürümü:** v0.14.0 (taslak) · **Issue:** BE-35 (#102), BC-47 (#119), BE-07 (#39), BE-08 (#40), BE-09 (#41), BE-10 (#42), BE-11 (#44), BC-02 (#2), BE-17 (#50), BC-08 (#8), BC-17 (#25), BC-15 (#24), BC-21 (#29), BC-28 (#36), BC-34 (#71), BE-14 (#47), BE-18 (#51), FE-09 (#59) · **Dayandığı program sözleşmesi:** BC-44 v0.4.2 ([program-interface.md](program-interface.md))
+**Sözleşme sürümü:** v0.15.0 (taslak) · **Issue:** BE-35 (#102), BC-47 (#119), BE-07 (#39), BE-08 (#40), BE-09 (#41), BE-10 (#42), BE-11 (#44), BC-02 (#2), BE-17 (#50), BC-08 (#8), BC-17 (#25), BC-15 (#24), BC-21 (#29), BC-28 (#36), BC-34 (#71), BE-14 (#47), BE-18 (#51), FE-09 (#59), BE-23 (#73) · **Dayandığı program sözleşmesi:** BC-44 v0.4.2 ([program-interface.md](program-interface.md))
 
 Bu doküman Square'in HTTP API'sini ve TypeScript paketlerinin dış yüzeyini sabitler. Frontend (FE-24 veri katmanı) ve servisler (BE-18 API, BE-14 indexer, BE-15 keeper, BE-11 prover) bu sözleşmeye göre geliştirir. `@squaresdk/solana-sdk`'nin zincir tarafı BE-08, `@squaresdk/solana-identity` BE-09, `@squaresdk/solana-policy` BE-10 ile uygulandı; REST client'ın uygulaması BE-18'de. Paketlerde mock, placeholder gövde ya da sabit adres yoktur (proje kuralı).
 
@@ -8,7 +8,7 @@ Bu doküman Square'in HTTP API'sini ve TypeScript paketlerinin dış yüzeyini s
 
 | Yol | İçerik | Uygulayan issue |
 |---|---|---|
-| [`docs/api/openapi.yaml`](../api/openapi.yaml) | OpenAPI 3.1 spec (28 operasyon) | BE-18 |
+| [`docs/api/openapi.yaml`](../api/openapi.yaml) | OpenAPI 3.1 spec (33 operasyon) | BE-18, BE-23 |
 | [`docs/api/schemas/idl.json`](../api/schemas/idl.json) | IDL'den **üretilen** JSON Schema'lar (hesaplar, event'ler, instruction argümanları) | — |
 | `packages/types` → `@squaresdk/solana-types` | zod şemaları: zarf, görünümler, agent card, policy dokümanı, A2A görevi, event, tx, auth, prover, keeper | BE-07 |
 | `packages/sdk` → `@squaresdk/solana-sdk` | 4 program için client, PDA'lar, tx builder'lar, 8 adım akışı, event / hata yardımcıları, REST API client | BE-08, BE-18 |
@@ -74,6 +74,7 @@ Tüm `/v1` yanıtları `{ success, data, error, meta }` biçimindedir. `meta.req
 | agents | `listAgents`, `getAgent`, `putAgentCard`, `getWellKnownAgentCard` | Kart barındırma kayıt sahibi |
 | claims / disputes | `listClaims`, `getClaim`, `listDisputes`, `getDispute` | Açık |
 | screening / events / keeper | `getScreening`, `listEvents`, `listKeeperActions` | Açık |
+| travel-rule | `putTravelRule`, `getTravelRule`, `createTravelRuleGrant`, `deleteTravelRuleGrant`, `listTravelRuleAccess` | Yalnızca oturum: yazma, izin ve erişim kaydı kurumun güncel yetkilisi; okuma yetkili ya da izinli cüzdan ([ADR 0017](../decisions/0017-travel-rule-saklama-erisim-ve-paylasim.md)) |
 | tx | `prepareTx` | Oturum ya da anahtar (`tx:prepare`) |
 | prover | `prove` | Anahtar (`prove`) |
 | health | `getHealth`, `getReady` | Açık |
@@ -88,7 +89,7 @@ Tüm `/v1` yanıtları `{ success, data, error, meta }` biçimindedir. `meta.req
 |---|---|---|---|
 | 1 | Politika commitment'ı | policy: `generatePolicySecret`, `derivePolicySalts`, `computePolicyCommitment`; sdk: `policy.instructions.setPolicy` | `prepareTx` (`setPolicy`), `putPolicyMeta` |
 | 2 | Agent kaydı | sdk: `flow.registerAgent`; identity: `formatDidAip` | `putAgentCard`, `prepareTx` (`registerAgent`) |
-| 3 | Screening + iş açma + Travel Rule + fonlama | sdk: `flow.createJob`, `travelRule.commitment`, `flow.commitTravelRule`, `flow.fundJob`, `specHash` | `getScreening`, `prepareTx` (`createJob`, `commitTravelRule`, `fundJob`) |
+| 3 | Screening + iş açma + Travel Rule + fonlama | sdk: `flow.createJob`, `travelRule.commitment`, `flow.commitTravelRule`, `flow.fundJob`, `specHash` | `getScreening`, `putTravelRule`, `prepareTx` (`createJob`, `commitTravelRule`, `fundJob`) |
 | 4 | Kabul ve teslim | sdk: `flow.acceptJob`, `flow.submitWork` | `uploadDelivery`, `prepareTx` (`acceptJob`, `submitWork`) |
 | 5 | Alacak satışı | policy: `buildBuyerTree`, `getBuyerProof`; sdk: `flow.listClaim`, `flow.buyClaim` | `listClaims`, `prepareTx` (`setBuyerRoot`, `listClaim`, `buyClaim`) |
 | 6 | Permissionless finalize | sdk: `flow.finalizePayment` | `listKeeperActions`, `prepareTx` (`finalizePayment`) |
@@ -131,6 +132,7 @@ Tüm `/v1` yanıtları `{ success, data, error, meta }` biçimindedir. `meta.req
 | Sürüm | Değişiklik | Issue / PR |
 |---|---|---|
 | v0.1.0 | İlk taslak: 28 operasyonluk OpenAPI 3.1 spec; IDL'den üretilen zod ve JSON Schema'lar; 4 paketin gövdesiz imzaları; hizalama testleri ve CI | BE-35 (#102) |
+| v0.15.0 | Travel Rule kaydı (BE-23, [ADR 0017](../decisions/0017-travel-rule-saklama-erisim-ve-paylasim.md)). OpenAPI: `travel-rule` etiketi ve beş operasyon. `PUT /v1/jobs/{job}/travel-rule` (`putTravelRule`) kaydı şifreli saklar ve `commitTravelRule`'un commitment'ını döner. `GET` (`getTravelRule`) kaydı ve salt'ı döner; okuma erişim kaydına yazılır. `POST …/grants` (`createTravelRuleGrant`) ve `DELETE …/grants/{grantee}` (`deleteTravelRuleGrant`) izin verir ve geri alır. `GET …/access` (`listTravelRuleAccess`) erişim kaydını döner. Uçlar yalnızca oturumla çağrılır. Şemalar: `TravelRuleRecord` (IVMS101 alt kümesi; `TravelRulePerson`, `TravelRuleAddress`, `TravelRuleNationalId`, `TravelRuleVasp`, `TravelRuleIdentifierType`, `TravelRulePersonKind`), `TravelRulePut`, `TravelRuleStatus`, `TravelRuleDisclosure`, `TravelRuleGrantCreate`, `TravelRuleGrant`, `TravelRuleAccess`, `TravelRuleAccessAction`. SDK: `SquareApi`'ye beş metot | BE-23 (#73) |
 | v0.14.0 | `@squaresdk/solana-policy`: release kuralları dışa aktarılır, `square_common::release` ve `square_common::time` ile aynı adlar ve sırayla: `REFUSAL`, `PERMANENT_REFUSALS`, `DAILY_REFUSALS`, `refusalRules`, `isFinalRefusal`, `SECONDS_PER_DAY`, `CLOCK_TOLERANCE_SECS`, `dayStart`, `dailySpentAt`, `releaseNetAmount`, `checkFresh`; tipler `RefusalRule`, `Staleness`, `BoundProof`, `ReleaseTarget`, `OperatorCounter`. İki uygulamanın uyumu ortak vektörlerle denetlenir (`crates/square-common/tests/fixtures/release-rule-vectors.json`, `scripts/release-vectors.mjs`). Geriye uyumsuz: `watchJobProof`'tan `refreshBeforeSecs` çıktı; izleyici ispatı escrow'un `check_fresh` kuralıyla değerlendirir ve UTC günü değişince yeniler (ADR 0012 §4). `EscrowParams.proof_timeout_secs` ispatın süresi değil, `escalate_missing_proof`'un beklemesidir; izleyici onu kullanmaz. `buildReleaseWitness`, kurumun sayacı ispat anından yeni bir güne aitse fırlatır (verifier `StaleProof`). HTTP yüzeyi değişmedi | FE-09 (#59) |
 | v0.13.0 | API uygulandı (BE-18, `apps/api`). OpenAPI: `putAgentCard`'a isteğe bağlı `agentId` sorgusu (kayıttan önce barındırmada PDA'nın çağıranın cüzdanıyla türetildiği denetlenir) ve açıklaması; hız sınırlı her uca `429`, RPC'ye bağlı uçlara (`putPolicyMeta`, `prepareTx`) `503`. SDK: `createApiClient` (`SquareApi`'nin uygulaması), `ApiClientError`; `putAgentCard(agentRecord, card, { agentId })`; `fromIdlJson` ve `IdlJsonError` (IDL JSON → Anchor değeri, `toIdlJson`'un tersi). Auth mesajı ve belirteç biçimi, prover vekilliği kesinleşti (§8). Zincir hatalarının `programError.name`'i IDL'deki addır (`IDL_PROGRAMS[program].errors`) | BE-18 (#51) |
 | v0.12.0 | SDK: `toIdlJson` (§3 kodlaması: Anchor'ın çözdüğü değer → API / indexer JSON'u; üretilen şemalarla aynı kural) ve `client.decodeTransactionEvents` (event'ler program, üst düzey talimat sırası `instructionIndex` ve talimattaki sıra `eventIndex` ile; `Log truncated` ile kesilen log `truncated`), tipler `LocatedEvent`, `TransactionEvents`. `decodeEvents`'in çıktısı değişmedi. HTTP yüzeyi değişmedi | BE-14 (#47) |

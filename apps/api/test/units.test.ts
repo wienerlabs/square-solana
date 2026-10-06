@@ -1,12 +1,16 @@
 // Yapılandırma, Squads multisig çözümleyicisi ve OpenAPI yükleyicisi.
+import { randomBytes } from 'node:crypto';
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { createLogger } from '@squaresdk/solana-observability';
 import { Keypair, PublicKey } from '@solana/web3.js';
 import { describe, expect, it } from 'vitest';
 import { loadConfig } from '../src/config.js';
 import { loadOpenApi } from '../src/openapi.js';
 import { PERMISSION_INITIATE, SQUADS_PROGRAM_ID, multisigMembers } from '../src/squads.js';
+import { createKeyring, open, rewrap, seal } from '../src/travel-rule/crypto.js';
+import { startTravelRuleMaintenance } from '../src/travel-rule/maintenance.js';
 
 const ENV = {
   DATABASE_URL: 'postgres://api@db.internal:5432/square',
@@ -38,6 +42,10 @@ const ENV = {
   API_PROVER_URL: 'http://prover.internal:8080',
   API_PROVER_API_KEY: 'service-key',
   API_PROVER_TIMEOUT_MS: '60000',
+  API_TRAVEL_RULE_KEYS: `k2:${randomBytes(32).toString('base64')}, k1:${randomBytes(32).toString('base64')}`,
+  API_TRAVEL_RULE_ACTIVE_KEY_ID: 'k2',
+  API_TRAVEL_RULE_RETENTION_DAYS: '1825',
+  API_TRAVEL_RULE_MAINTENANCE_INTERVAL_SECONDS: '3600',
   API_ALERT_ERRORS: '10',
   API_ALERT_ERROR_WINDOW_SECONDS: '60',
   LOG_LEVEL: 'info',
@@ -56,6 +64,20 @@ describe('yapılandırma', () => {
     });
     const table = Keypair.generate().publicKey.toBase58();
     expect(loadConfig({ ...ENV, API_LOOKUP_TABLE: table }).tx.lookupTable).toBe(table);
+    expect([...config.travelRule.keys.keys()]).toEqual(['k2', 'k1']);
+    expect(config.travelRule.keys.get('k1')).toHaveLength(32);
+    expect(config.travelRule).toMatchObject({ activeKeyId: 'k2', retentionSeconds: 1825 * 86_400 });
+  });
+
+  it('Travel Rule anahtar halkası: biçim, tekrar eden kimlik, halkada olmayan etkin anahtar', () => {
+    const key = randomBytes(32).toString('base64');
+    expect(() => loadConfig({ ...ENV, API_TRAVEL_RULE_KEYS: `k1:${randomBytes(16).toString('base64')}` })).toThrow(
+      /API_TRAVEL_RULE_KEYS/,
+    );
+    expect(() => loadConfig({ ...ENV, API_TRAVEL_RULE_KEYS: `K1:${key}` })).toThrow(/API_TRAVEL_RULE_KEYS/);
+    expect(() => loadConfig({ ...ENV, API_TRAVEL_RULE_KEYS: `k2:${key},k2:${key}` })).toThrow(/aynı kimlik/);
+    expect(() => loadConfig({ ...ENV, API_TRAVEL_RULE_ACTIVE_KEY_ID: 'k3' })).toThrow(/içinde yok/);
+    expect(() => loadConfig({ ...ENV, API_TRAVEL_RULE_RETENTION_DAYS: '0' })).toThrow(/RETENTION_DAYS/);
   });
 
   it('eksik ve geçersiz değerler, port çakışması ve zincirdeki uzunluk sınırları', () => {
@@ -131,5 +153,83 @@ describe('OpenAPI yükleyicisi', () => {
         'https://x',
       ),
     ).toThrow(/dış \$ref/);
+  });
+});
+
+describe('Travel Rule zarf şifrelemesi', () => {
+  const keys = new Map([
+    ['k1', randomBytes(32)],
+    ['k2', randomBytes(32)],
+  ]);
+  const keyring = createKeyring(keys, 'k1');
+  const context = { job: Keypair.generate().publicKey.toBase58(), commitment: 'ab'.repeat(32) };
+  const plaintext = Buffer.from('{"record":{},"salt":"00"}');
+
+  it('açılır; başka job ya da commitment, değiştirilmiş veri ve başka anahtar açmaz', () => {
+    const sealed = seal(keyring, plaintext, context);
+    expect(sealed).toMatchObject({ algorithm: 'aes-256-gcm', keyId: 'k1' });
+    expect(sealed.iv).toHaveLength(12);
+    expect(sealed.wrappedKey).toHaveLength(12 + 32 + 16);
+    expect(sealed.ciphertext.includes(plaintext)).toBe(false);
+    expect(open(keyring, sealed, context)).toEqual(plaintext);
+    expect(() => open(keyring, sealed, { ...context, commitment: 'cd'.repeat(32) })).toThrow();
+    expect(() => open(keyring, sealed, { ...context, job: Keypair.generate().publicKey.toBase58() })).toThrow();
+    const tampered = Buffer.from(sealed.ciphertext);
+    tampered[0]! ^= 1;
+    expect(() => open(keyring, { ...sealed, ciphertext: tampered }, context)).toThrow();
+    expect(() => open(keyring, { ...sealed, keyId: 'k2' }, context)).toThrow();
+  });
+
+  it('yeniden sarma etkin anahtarı kullanır; halkada olmayan anahtar hata', () => {
+    const sealed = seal(keyring, plaintext, context);
+    const rotated = createKeyring(keys, 'k2');
+    const wrapped = rewrap(rotated, sealed, context.job);
+    expect(wrapped.keyId).toBe('k2');
+    expect(open(rotated, { ...sealed, ...wrapped }, context)).toEqual(plaintext);
+    expect(() =>
+      open(createKeyring(new Map([['k1', keys.get('k1')!]]), 'k1'), { ...sealed, ...wrapped }, context),
+    ).toThrow(/k2 halkada yok/);
+    expect(() => createKeyring(keys, 'k3')).toThrow(/halkada yok/);
+    expect(() => createKeyring(new Map([['k1', randomBytes(16)]]), 'k1')).toThrow(/32 bayt/);
+  });
+});
+
+describe('Travel Rule bakımı', () => {
+  it('açılışta ve aralıkla koşar; sonuç ve hata log’a, hata alarm penceresine; durdurma süren koşuyu bekler', async () => {
+    const entries: { level: string; msg: string }[] = [];
+    const log = createLogger({
+      service: 'api-test',
+      level: 'debug',
+      observers: [(entry) => entries.push({ level: entry.level, msg: entry.msg })],
+    });
+    const results = [{ purged: 2, rewrapped: 1 }, new Error('veritabanı yok'), { purged: 0, rewrapped: 0 }];
+    let runs = 0;
+    let errors = 0;
+    const stop = startTravelRuleMaintenance({
+      intervalMs: 5,
+      log,
+      onError: () => {
+        errors += 1;
+      },
+      run: async () => {
+        const next = results[Math.min(runs, results.length - 1)]!;
+        runs += 1;
+        if (next instanceof Error) throw next;
+        return next;
+      },
+    });
+    while (runs < 3) await new Promise((resolve) => setTimeout(resolve, 5));
+    await stop();
+    const settled = runs;
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(runs).toBe(settled);
+    expect(errors).toBe(1);
+    expect(entries.filter((entry) => entry.msg.startsWith('travel_rule_maintenance'))).toEqual([
+      { level: 'info', msg: 'travel_rule_maintenance' },
+      { level: 'error', msg: 'travel_rule_maintenance_failed' },
+    ]);
+    expect(() =>
+      startTravelRuleMaintenance({ intervalMs: 0, log, onError: () => {}, run: async () => results[2] as never }),
+    ).toThrow();
   });
 });

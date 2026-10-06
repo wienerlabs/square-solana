@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Square Solana API
-  version: 0.14.0
+  version: 0.15.0
   summary: Square HTTP API sözleşmesi (BE-35), uygulaması apps/api (BE-18).
   description: |
     Contract-first API sözleşmesi. Zincirdeki hesaplar, event'ler ve instruction argümanları
@@ -33,6 +33,11 @@ tags:
     description: İndexlenmiş zincir event'leri.
   - name: keeper
     description: Keeper günlüğü (finalize crank kararları).
+  - name: travel-rule
+    description: |
+      Travel Rule kaydı (adım 3, BE-23, ADR 0017). Kayıt API'de zarf şifrelemesiyle saklanır; zincire yalnızca
+      salt'lı commitment'ı gider (`commitTravelRule`). Kaydı kurumun güncel yetkilisi yazar ve izin verdiği
+      cüzdanlar (karşı VASP, denetçi) okur. Kişisel veriye dokunan her işlem erişim kaydına yazılır.
   - name: tx
     description: 8 adımın imzasız tx hazırlığı.
   - name: prover
@@ -657,6 +662,153 @@ paths:
                         items: { $ref: '#/components/schemas/KeeperAction' }
         '400': { $ref: '#/components/responses/BadRequest' }
         '429': { $ref: '#/components/responses/RateLimited' }
+
+  /v1/jobs/{job}/travel-rule:
+    put:
+      tags: [travel-rule]
+      operationId: putTravelRule
+      summary: Job'un Travel Rule kaydını şifreli saklar; `commitTravelRule` için commitment döner.
+      description: |
+        Yalnızca job'u açan kurumun güncel yetkilisi (anahtar ya da Squads multisig'inde öneri açabilen üye) ve
+        job zincirde `Open` iken. Her yazma yeni bir salt üretir; önceki kayıt değişir. Kaydın `amount` ve
+        `mint`'i job'unkiyle aynı olmalı. Fonlanan işin kaydı değişmez (409).
+      security:
+        - session: []
+      parameters:
+        - $ref: '#/components/parameters/JobPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TravelRulePut' }
+      responses:
+        '200':
+          description: Saklanan kaydın durumu.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessBase'
+                  - properties:
+                      data: { $ref: '#/components/schemas/TravelRuleStatus' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+    get:
+      tags: [travel-rule]
+      operationId: getTravelRule
+      summary: Kaydı, salt'ı ve commitment'ın zincirle eşleşmesini döner (kişisel veri; erişim kaydına yazılır).
+      description: |
+        Kurumun güncel yetkilisi ya da süresi dolmamış, geri alınmamış izni olan cüzdan. Sunucu commitment'ı
+        kayıttan yeniden hesaplar ve zincirdeki `Job.travel_rule_commitment` ile karşılaştırır. Saklama süresi
+        dolup silinen kayıt 404 döner.
+      security:
+        - session: []
+      parameters:
+        - $ref: '#/components/parameters/JobPath'
+      responses:
+        '200':
+          description: Kayıt.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessBase'
+                  - properties:
+                      data: { $ref: '#/components/schemas/TravelRuleDisclosure' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+
+  /v1/jobs/{job}/travel-rule/grants:
+    post:
+      tags: [travel-rule]
+      operationId: createTravelRuleGrant
+      summary: Bir cüzdana kaydı okuma izni verir (karşı VASP, denetçi); aynı cüzdana yeniden verilirse yenilenir.
+      security:
+        - session: []
+      parameters:
+        - $ref: '#/components/parameters/JobPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TravelRuleGrantCreate' }
+      responses:
+        '201':
+          description: İzin.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessBase'
+                  - properties:
+                      data: { $ref: '#/components/schemas/TravelRuleGrant' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+
+  /v1/jobs/{job}/travel-rule/grants/{grantee}:
+    delete:
+      tags: [travel-rule]
+      operationId: deleteTravelRuleGrant
+      summary: Okuma iznini geri alır.
+      security:
+        - session: []
+      parameters:
+        - $ref: '#/components/parameters/JobPath'
+        - name: grantee
+          in: path
+          required: true
+          schema: { $ref: './schemas/idl.json#/Address' }
+      responses:
+        '204':
+          description: Geri alındı.
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+
+  /v1/jobs/{job}/travel-rule/access:
+    get:
+      tags: [travel-rule]
+      operationId: listTravelRuleAccess
+      summary: Kaydın erişim kaydı (yazma, okuma, izin, geri alma, silme), yeniden eskiye; kurumun yetkilisi.
+      security:
+        - session: []
+      parameters:
+        - $ref: '#/components/parameters/JobPath'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Sayfalı erişim kaydı.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessBase'
+                  - properties:
+                      data:
+                        type: array
+                        items: { $ref: '#/components/schemas/TravelRuleAccess' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '503': { $ref: '#/components/responses/Unavailable' }
 
   /v1/tx:
     post:
@@ -1345,3 +1497,171 @@ components:
         checks:
           type: object
           additionalProperties: { type: string, enum: [ok, fail] }
+
+    # ------------------------------------------------------------ Travel Rule (BE-23, ADR 0017)
+    TravelRuleAddress:
+      type: object
+      required: [street, city, postcode, country]
+      additionalProperties: false
+      properties:
+        street: { type: [string, 'null'], minLength: 1, maxLength: 140 }
+        city: { type: string, minLength: 1, maxLength: 70 }
+        postcode: { type: [string, 'null'], minLength: 1, maxLength: 16 }
+        country: { $ref: '#/components/schemas/CountryCode' }
+    CountryCode:
+      type: string
+      description: ISO 3166-1 alpha-2.
+      pattern: '^[A-Z]{2}$'
+    TravelRuleIdentifierType:
+      type: string
+      description: IVMS101 `NationalIdentifierTypeCode`.
+      enum: [ARNU, CCPT, RAID, DRLC, FIIN, TXID, SOCS, IDCD, LEIX, MISC]
+    TravelRuleNationalId:
+      type: object
+      required: [type, value, country]
+      additionalProperties: false
+      properties:
+        type: { $ref: '#/components/schemas/TravelRuleIdentifierType' }
+        value: { type: string, minLength: 1, maxLength: 35 }
+        country:
+          oneOf:
+            - $ref: '#/components/schemas/CountryCode'
+            - type: 'null'
+    TravelRulePersonKind:
+      type: string
+      enum: [natural, legal]
+    TravelRulePerson:
+      type: object
+      description: |
+        Originator ya da beneficiary (IVMS101 alan adları). Gerçek kişide `primaryIdentifier` soyad,
+        `secondaryIdentifier` ad; tüzel kişide `primaryIdentifier` unvandır, `secondaryIdentifier`,
+        `dateOfBirth` ve `placeOfBirth` null'dır.
+      required:
+        [
+          kind,
+          primaryIdentifier,
+          secondaryIdentifier,
+          accountNumber,
+          address,
+          nationalIdentification,
+          dateOfBirth,
+          placeOfBirth,
+          countryOfResidence,
+        ]
+      additionalProperties: false
+      properties:
+        kind: { $ref: '#/components/schemas/TravelRulePersonKind' }
+        primaryIdentifier: { type: string, minLength: 1, maxLength: 100 }
+        secondaryIdentifier: { type: [string, 'null'], minLength: 1, maxLength: 100 }
+        accountNumber: { type: string, minLength: 1, maxLength: 100 }
+        address:
+          oneOf:
+            - $ref: '#/components/schemas/TravelRuleAddress'
+            - type: 'null'
+        nationalIdentification:
+          oneOf:
+            - $ref: '#/components/schemas/TravelRuleNationalId'
+            - type: 'null'
+        dateOfBirth: { type: [string, 'null'], format: date }
+        placeOfBirth: { type: [string, 'null'], minLength: 1, maxLength: 70 }
+        countryOfResidence:
+          oneOf:
+            - $ref: '#/components/schemas/CountryCode'
+            - type: 'null'
+    TravelRuleVasp:
+      type: object
+      required: [name, lei]
+      additionalProperties: false
+      properties:
+        name: { type: string, minLength: 1, maxLength: 100 }
+        lei: { type: [string, 'null'], pattern: '^[A-Z0-9]{18}[0-9]{2}$' }
+    TravelRuleRecord:
+      type: object
+      description: Commitment'ın girdisi; RFC 8785 kanonik JSON'unun SHA-256'sı `recordDigest`'tir.
+      required: [originator, beneficiary, originatingVasp, beneficiaryVasp, amount, mint]
+      additionalProperties: false
+      properties:
+        originator: { $ref: '#/components/schemas/TravelRulePerson' }
+        beneficiary: { $ref: '#/components/schemas/TravelRulePerson' }
+        originatingVasp:
+          oneOf:
+            - $ref: '#/components/schemas/TravelRuleVasp'
+            - type: 'null'
+        beneficiaryVasp:
+          oneOf:
+            - $ref: '#/components/schemas/TravelRuleVasp'
+            - type: 'null'
+        amount: { $ref: './schemas/idl.json#/U64' }
+        mint: { $ref: './schemas/idl.json#/Address' }
+    TravelRulePut:
+      type: object
+      required: [record]
+      additionalProperties: false
+      properties:
+        record: { $ref: '#/components/schemas/TravelRuleRecord' }
+    TravelRuleStatus:
+      type: object
+      required: [job, commitment, recordDigest, storedBy, storedAt, retainUntil, purgedAt, chainCommitment, committed]
+      additionalProperties: false
+      properties:
+        job: { $ref: './schemas/idl.json#/Address' }
+        commitment: { $ref: './schemas/idl.json#/Hex32' }
+        recordDigest: { $ref: './schemas/idl.json#/Hex32' }
+        storedBy: { $ref: './schemas/idl.json#/Address' }
+        storedAt: { type: integer, format: int64 }
+        retainUntil: { type: integer, format: int64 }
+        purgedAt: { type: [integer, 'null'], format: int64 }
+        chainCommitment:
+          oneOf:
+            - $ref: './schemas/idl.json#/Hex32'
+            - type: 'null'
+        committed: { type: boolean }
+    TravelRuleDisclosure:
+      type: object
+      required: [status, record, salt]
+      additionalProperties: false
+      properties:
+        status: { $ref: '#/components/schemas/TravelRuleStatus' }
+        record: { $ref: '#/components/schemas/TravelRuleRecord' }
+        salt: { $ref: './schemas/idl.json#/Hex32' }
+    TravelRuleGrantCreate:
+      type: object
+      required: [grantee, purpose, expiresAt]
+      additionalProperties: false
+      properties:
+        grantee: { $ref: './schemas/idl.json#/Address' }
+        purpose: { type: string, minLength: 1, maxLength: 200 }
+        expiresAt: { type: integer, format: int64 }
+    TravelRuleGrant:
+      type: object
+      required: [job, grantee, purpose, grantedBy, grantedAt, expiresAt, revokedAt]
+      additionalProperties: false
+      properties:
+        job: { $ref: './schemas/idl.json#/Address' }
+        grantee: { $ref: './schemas/idl.json#/Address' }
+        purpose: { type: string, minLength: 1, maxLength: 200 }
+        grantedBy: { $ref: './schemas/idl.json#/Address' }
+        grantedAt: { type: integer, format: int64 }
+        expiresAt: { type: integer, format: int64 }
+        revokedAt: { type: [integer, 'null'], format: int64 }
+    TravelRuleAccessAction:
+      type: string
+      enum: [store, read, grant, revoke, purge]
+    TravelRuleAccess:
+      type: object
+      required: [id, job, action, actor, grantee, requestId, at]
+      additionalProperties: false
+      properties:
+        id: { type: string, minLength: 1 }
+        job: { $ref: './schemas/idl.json#/Address' }
+        action: { $ref: '#/components/schemas/TravelRuleAccessAction' }
+        actor:
+          oneOf:
+            - $ref: './schemas/idl.json#/Address'
+            - type: 'null'
+        grantee:
+          oneOf:
+            - $ref: './schemas/idl.json#/Address'
+            - type: 'null'
+        requestId: { type: [string, 'null'] }
+        at: { type: integer, format: int64 }

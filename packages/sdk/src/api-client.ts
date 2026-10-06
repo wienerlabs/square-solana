@@ -130,6 +130,15 @@ export const createApiClient: CreateApiClient = (config: ApiClientConfig): Squar
     listEvents: (query = {}) => envelope('GET', '/v1/events', { query }),
     listKeeperActions: (query = {}) => envelope('GET', '/v1/keeper/actions', { query }),
 
+    putTravelRule: (job, body) => envelope('PUT', `/v1/jobs/${segment(job)}/travel-rule`, { json: body }),
+    getTravelRule: (job) => envelope('GET', `/v1/jobs/${segment(job)}/travel-rule`),
+    createTravelRuleGrant: (job, body) =>
+      envelope('POST', `/v1/jobs/${segment(job)}/travel-rule/grants`, { json: body }),
+    deleteTravelRuleGrant: (job, grantee) =>
+      empty('DELETE', `/v1/jobs/${segment(job)}/travel-rule/grants/${segment(grantee)}`),
+    listTravelRuleAccess: (job, query = {}) =>
+      envelope('GET', `/v1/jobs/${segment(job)}/travel-rule/access`, { query }),
+
     prepareTx: (body) => envelope('POST', '/v1/tx', { json: body }),
     prove: (body) => envelope('POST', '/v1/prove', { json: body }),
     // 503 de sözleşmedeki `Health` gövdesidir.

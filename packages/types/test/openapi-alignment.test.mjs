@@ -44,6 +44,17 @@ const OBJECTS = {
   ProveResponse: t.ProveResponseSchema,
   KeeperAction: t.KeeperActionSchema,
   Health: t.HealthSchema,
+  TravelRuleAddress: t.TravelRuleAddressSchema,
+  TravelRuleNationalId: t.TravelRuleNationalIdSchema,
+  TravelRulePerson: t.TravelRulePersonSchema,
+  TravelRuleVasp: t.TravelRuleVaspSchema,
+  TravelRuleRecord: t.TravelRuleRecordSchema,
+  TravelRulePut: t.TravelRulePutSchema,
+  TravelRuleStatus: t.TravelRuleStatusSchema,
+  TravelRuleDisclosure: t.TravelRuleDisclosureSchema,
+  TravelRuleGrantCreate: t.TravelRuleGrantCreateSchema,
+  TravelRuleGrant: t.TravelRuleGrantSchema,
+  TravelRuleAccess: t.TravelRuleAccessSchema,
 };
 
 const ENUMS = {
@@ -52,6 +63,9 @@ const ENUMS = {
   KeeperActionKind: t.KeeperActionKindSchema,
   KeeperOutcome: t.KeeperOutcomeSchema,
   KeeperReason: t.KeeperReasonSchema,
+  TravelRuleIdentifierType: t.TravelRuleIdentifierTypeSchema,
+  TravelRulePersonKind: t.TravelRulePersonKindSchema,
+  TravelRuleAccessAction: t.TravelRuleAccessActionSchema,
 };
 
 const acceptsUndefined = (schema) => schema.safeParse(undefined).success;

@@ -20,12 +20,16 @@ import { createAuthService } from './auth/service.js';
 import { createCardService } from './cards.js';
 import { loadConfig } from './config.js';
 import { createDeliveryService } from './deliveries.js';
+import { createInstitutionAuthority } from './institution-authority.js';
 import { loadOpenApi } from './openapi.js';
 import { packageInfo } from './package-info.js';
 import { createPolicyMetaService } from './policy-meta.js';
 import { loadProgramIds } from './programs.js';
 import { createProverProxy } from './prover.js';
 import { createDeliveryStore } from './storage.js';
+import { createKeyring } from './travel-rule/crypto.js';
+import { startTravelRuleMaintenance } from './travel-rule/maintenance.js';
+import { createTravelRuleService } from './travel-rule/service.js';
 import { createTxBuilder } from './tx.js';
 
 const MS_PER_SECOND = 1000;
@@ -55,6 +59,14 @@ async function main(): Promise<void> {
   const chainRef = (await connection.getGenesisHash()).slice(0, CHAIN_REF_LENGTH);
   const client = createSquareClient({ connection, programIds, commitment: 'confirmed' });
   const store = createDeliveryStore(config.deliveries.store);
+  const authority = createInstitutionAuthority({ db, connection });
+  const travelRule = createTravelRuleService({
+    db,
+    client,
+    authority,
+    keyring: createKeyring(config.travelRule.keys, config.travelRule.activeKeyId),
+    retentionSeconds: config.travelRule.retentionSeconds,
+  });
   const rateStore = createPrismaRateLimitStore(db);
   const window = (limit: number) =>
     createRateLimiter({ store: rateStore, rule: { limit, windowSeconds: config.rateLimit.windowSeconds } });
@@ -107,7 +119,7 @@ async function main(): Promise<void> {
       chainRef,
       publicBaseUrl: config.publicBaseUrl,
     }),
-    policyMeta: createPolicyMetaService({ db, connection }),
+    policyMeta: createPolicyMetaService({ db, authority }),
     tx: createTxBuilder({
       client,
       connection,
@@ -115,6 +127,7 @@ async function main(): Promise<void> {
       computeUnitPrice: config.tx.computeUnitPrice,
     }),
     prover: createProverProxy(config.prover),
+    travelRule,
     limiters: { read: window(config.rateLimit.read), write: window(config.rateLimit.write) },
     openapi,
     health,
@@ -132,6 +145,12 @@ async function main(): Promise<void> {
     listen(createMetricsApp(metrics.registry, log), config.metricsPort),
   ]);
   const stopAlarms = alarms.start(config.observability.alertEvaluationSeconds * MS_PER_SECOND);
+  const stopMaintenance = startTravelRuleMaintenance({
+    run: () => travelRule.maintain(),
+    intervalMs: config.travelRule.maintenanceIntervalSeconds * MS_PER_SECOND,
+    log,
+    onError: () => errors.record(),
+  });
   log.info('listening', {
     version: packageInfo.version,
     contractVersion: openapi.info.version,
@@ -144,6 +163,7 @@ async function main(): Promise<void> {
   const shutdown = async (signal: string) => {
     log.info('shutdown', { signal });
     stopAlarms();
+    await stopMaintenance();
     await Promise.all(servers.map(close));
     await db.$disconnect();
     process.exit(0);

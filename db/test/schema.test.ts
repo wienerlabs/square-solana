@@ -15,6 +15,7 @@ import {
   RoleSchema,
   ScreeningStatusSchema,
   TaskStateSchema,
+  TravelRuleAccessActionSchema,
   ValidationOutcomeSchema,
 } from '@squaresdk/solana-types';
 import bs58 from 'bs58';
@@ -108,6 +109,7 @@ describe('@squaresdk/solana-types ile hiza', () => {
       KeeperOutcome: KeeperOutcomeSchema.options,
       KeeperReason: KeeperReasonSchema.options,
       ApiKeyScope: ApiKeyScopeSchema.options,
+      TravelRuleAccessAction: TravelRuleAccessActionSchema.options,
     };
     for (const [type, values] of Object.entries(expected)) {
       expect(labels(type), type).toEqual([...values]);
@@ -127,6 +129,36 @@ describe('biçim kısıtları', () => {
     await expect(db.client.job.create({ data: jobData({ specHash: hex32().toUpperCase() }) })).rejects.toThrow();
     await expect(
       db.client.job.create({ data: jobData({ institution: '0OIl0OIl0OIl0OIl0OIl0OIl0OIl0OIl' }) }),
+    ).rejects.toThrow();
+  });
+
+  it('Travel Rule kaydı: silinmemişin şifreli alanları dolu, silinmişin hepsi boş; izin süresi verilişten sonra', async () => {
+    const stored = {
+      job: address(),
+      commitment: hex32(),
+      recordDigest: hex32(),
+      storedBy: address(),
+      storedAt: new Date(),
+      retainUntil: new Date(Date.now() + 1_000),
+    };
+    const sealed = {
+      ciphertext: randomBytes(48),
+      algorithm: 'aes-256-gcm',
+      iv: randomBytes(12),
+      keyId: 'k1',
+      wrappedKey: randomBytes(60),
+    };
+    await expect(db.client.travelRuleRecord.create({ data: stored })).rejects.toThrow();
+    const row = await db.client.travelRuleRecord.create({ data: { ...stored, ...sealed } });
+    await expect(
+      db.client.travelRuleRecord.update({ where: { id: row.id }, data: { purgedAt: new Date() } }),
+    ).rejects.toThrow();
+    const cleared = { ciphertext: null, algorithm: null, iv: null, keyId: null, wrappedKey: null };
+    await db.client.travelRuleRecord.update({ where: { id: row.id }, data: { purgedAt: new Date(), ...cleared } });
+    const grant = { job: stored.job, grantee: address(), purpose: 'karşı VASP', grantedBy: stored.storedBy };
+    const now = new Date();
+    await expect(
+      db.client.travelRuleGrant.create({ data: { ...grant, grantedAt: now, expiresAt: now } }),
     ).rejects.toThrow();
   });
 

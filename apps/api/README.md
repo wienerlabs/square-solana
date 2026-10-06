@@ -1,7 +1,7 @@
 # @squaresdk/solana-api
 
 Square'in REST API servisi (BE-18). Sözleşme [`docs/api/openapi.yaml`](../../docs/api/openapi.yaml)'dır
-(28 operasyon); servis `GET /openapi.json`'da sözleşmenin derlenmiş halini yayımlar. Web uygulaması ve
+(33 operasyon); servis `GET /openapi.json`'da sözleşmenin derlenmiş halini yayımlar. Web uygulaması ve
 entegrasyonlar SDK'nın `createApiClient`'ıyla bağlanır.
 
 | Etiket | Uygulama |
@@ -12,6 +12,7 @@ entegrasyonlar SDK'nın `createApiClient`'ıyla bağlanır.
 | teslimat | Dosya S3 uyumlu depoya yüklenir; `submit_work`'ün `workHash` ve `deliveryUri`'si döner ([Teslimat](#teslimat)) |
 | agent card | Barındırma ve A2A keşif yolu `/a/{agentRecord}/.well-known/agent-card.json` ([Agent card](#agent-card)) |
 | politika meta | Herkese açık ad, açıklama ve etiketler; yazan kurumun güncel yetkilisi |
+| travel rule | Kaydın şifreli saklanması, commitment'ı, izinli okuma ve erişim kaydı ([Travel Rule](#travel-rule)) |
 | prover | `POST /v1/prove`, prover servisine (apps/prover) vekil |
 
 Tüm `/v1` yanıtları `{ success, data, error, meta }` zarfıyla döner; `meta.requestId` yanıtın `X-Request-Id`
@@ -105,6 +106,35 @@ Yazan, kurumun güncel yetkilisidir (program arayüzü §2):
 
 İstekteki `updatedAt` sözleşmedeki şemanın alanıdır; yazma zamanı sunucunundur.
 
+## Travel Rule
+
+Eşiği aşan fonlamada kurum, Travel Rule kaydının salt'lı commitment'ını job'a bağlar (`commitTravelRule`,
+[ADR 0015](../../docs/decisions/0015-travel-rule-commitment-ve-esik.md)). Kayıt zincire çıkmaz; API'de şifreli
+saklanır ([ADR 0017](../../docs/decisions/0017-travel-rule-saklama-erisim-ve-paylasim.md)). Uçlar yalnızca cüzdan
+oturumuyla çağrılır; API anahtarı kabul edilmez.
+
+| Uç | Kim | Ne yapar |
+|---|---|---|
+| `PUT /v1/jobs/{job}/travel-rule` | Job'u açan kurumun güncel yetkilisi ([Politika meta verisi](#politika-meta-verisi) ile aynı kural) | Kaydı doğrular, yeni salt üretir, commitment'ı hesaplar ve şifreli saklar. Job zincirde `Open` olmalı (fonlanmış işte 409); kaydın `amount` ve `mint`'i job'unki olmalı |
+| `GET /v1/jobs/{job}/travel-rule` | Kurumun yetkilisi ya da süresi dolmamış izni olan cüzdan | Kaydı ve salt'ı döner. Sunucu commitment'ı kayıttan yeniden hesaplar ve zincirdekiyle karşılaştırır (`committed`) |
+| `POST /v1/jobs/{job}/travel-rule/grants`, `DELETE …/grants/{grantee}` | Kurumun yetkilisi | Karşı VASP'a ya da denetçiye süreli okuma izni verir, geri alır |
+| `GET /v1/jobs/{job}/travel-rule/access` | Kurumun yetkilisi | Erişim kaydı: yazma, okuma, izin, geri alma, silme; işlemi yapan cüzdan ve istek kimliği |
+
+- **Şifreleme:** Zarf şifrelemesi, AES-256-GCM.
+  - Her kayıt kendi rastgele veri anahtarıyla şifrelenir; veri anahtarı `API_TRAVEL_RULE_KEYS` halkasındaki
+    etkin ana anahtarla sarılır.
+  - Ek doğrulanan veri, şifreli kaydı job'a ve commitment'a bağlar. Başka bir satıra kopyalanan veri açılmaz.
+- **Anahtar döndürme:**
+  1. Yeni anahtar halkaya eklenir ve `API_TRAVEL_RULE_ACTIVE_KEY_ID` yapılır.
+  2. Bakım eski anahtarla sarılmış veri anahtarlarını yeniden sarar. Kayıtlar yeniden şifrelenmez.
+  3. Eski anahtar, `key_id`'si onu gösteren kayıt kalmayınca halkadan çıkarılır.
+- **Erişim kaydı:** Kişisel veriye dokunan her işlem, işlemle aynı transaction'da `travel_rule_accesses`'a
+  yazılır. Okumada kayıt, erişim kaydı yazıldıktan sonra açılır.
+- **Saklama:** Kayıt son yazmadan `API_TRAVEL_RULE_RETENTION_DAYS` gün sonra silinir. Silinenler şifreli kayıt,
+  IV ve sarılmış anahtardır; commitment, özet ve erişim kaydı kalır. Süre hukuki karardır ve kurulumda verilir.
+- **Bakım:** Silme ve yeniden sarma her `API_TRAVEL_RULE_MAINTENANCE_INTERVAL_SECONDS`'ta bir koşar. Hatası
+  `api_errors` alarmına sayılır.
+
 ## Çalıştırma
 
 Migration'lar ve `programs` tablosunun seed'i API'den önce uygulanır (indexer'la aynı; [apps/indexer](../indexer/README.md#çalıştırma)).
@@ -123,7 +153,7 @@ Ortam değişkenleri [`.env.example`](.env.example)'dadır; varsayılan değer y
 
 `pnpm --filter @squaresdk/solana-api test`. Testler Postgres ve S3 uyumlu depo (SeaweedFS) konteynerleri açar
 (Docker gerekir). Zincir ve prover yerel fixture sunucularıdır. Uçlar SDK'nın `createApiClient`'ıyla denenir.
-Sözleşmedeki 28 operasyonun hepsi ve yetkisiz erişim yolları test edilir. Gerçek programlarla uçtan uca
+Sözleşmedeki 33 operasyonun hepsi ve yetkisiz erişim yolları test edilir. Gerçek programlarla uçtan uca
 deneme BE-36'dadır.
 
 ## Kaynak
