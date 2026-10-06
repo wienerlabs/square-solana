@@ -7,10 +7,17 @@ use anchor_lang::prelude::*;
 use square_common::constants::BPS_DENOMINATOR;
 
 use crate::errors::EscrowError;
-use crate::state::{DisputeInfo, DisputeResolution, EscrowConfig, EscrowParams, Job, JobStatus};
+use crate::state::{
+    DisputeInfo, DisputeResolution, EscrowConfig, EscrowParams, Job, JobStatus, SettlementRail,
+};
 
 /// Dispute yalnızca teslim edilmiş işte açılır; açık ya da karara bağlanmış dispute'un üstüne açılmaz.
 pub fn require_can_open(job: &Job) -> Result<()> {
+    // Fiat işte escrow'da tutulan bir ödeme yoktur, dispute ödeme taşıyamaz (ADR 0024).
+    require!(
+        job.rail == SettlementRail::Escrow,
+        EscrowError::RailMismatch
+    );
     match job.status {
         JobStatus::Delivered => Ok(()),
         JobStatus::Disputed | JobStatus::Resolved => err!(EscrowError::DisputeAlreadyActive),

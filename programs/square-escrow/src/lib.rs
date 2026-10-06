@@ -2,7 +2,7 @@
 //! ve sözleşmeye göre yeniden yazılıyor. BC-22: config, iş yaşam döngüsü ve agent bağlama. BC-23, BC-24,
 //! BC-26: permissionless finalize, keeper ücreti, ispat kapısı, itibar ve validation kaydı. BC-25: alacak
 //! piyasası ve alıcı uygunluğu. BC-34: Travel Rule commitment'ı. BC-32: M-of-N arbitration. BC-33:
-//! dispute zaman aşımı ve ispatsız bekleme başvurusu (ADR 0016).
+//! dispute zaman aşımı ve ispatsız bekleme başvurusu (ADR 0016). BC-37: Stripe MPP fiat rayı (ADR 0024).
 //!
 //!   Open (-(commit_travel_rule)) -(fund_job)-> Funded -(accept_job)-> Accepted -(submit_work)-> Delivered
 //!   Delivered -(finalize_payment)-> Released | Refunded
@@ -10,6 +10,10 @@
 //!   Resolved -(execute_resolution)-> Released | Refunded
 //!   Disputed (deadline sonrası) -(lapse_dispute)-> Delivered
 //!   Open | Funded | Accepted (deadline sonrası) -(cancel_job)-> Cancelled
+//!
+//!   Fiat rayı (BC-37, ADR 0024): Open -(accept_job)-> Accepted -(submit_work)-> Delivered
+//!   Delivered -(verifier verify_mpp_payment_proof, finalize_fiat_payment)-> Released
+//!   Open | Accepted (deadline sonrası) -(cancel_fiat_job)-> Cancelled
 //!
 //!   Alacak (Delivered iş): -(list_claim)-> Listed -(buy_claim)-> Bought
 //!   Listed -(cancel_claim)-> kapanır; finalize: Listed | Bought -> Settled (ödeme) | Defaulted (iade)
@@ -58,7 +62,8 @@ pub const ESCROW_AUTHORITY_SEED: &[u8] = square_common::seeds::ESCROW_AUTHORITY_
 pub mod square_escrow {
     use super::*;
 
-    /// The job's agent wallet accepts a funded job; the agent record must be Active. `spec_hash`
+    /// The job's agent wallet accepts a funded job (a fiat job while Open); the agent record must be
+    /// Active. `spec_hash`
     /// guards against a swapped spec.
     pub fn accept_job(ctx: Context<AgentJob>, spec_hash: [u8; 32]) -> Result<()> {
         instructions::accept_job::handler(ctx, spec_hash)
@@ -81,6 +86,12 @@ pub mod square_escrow {
         instructions::cancel_claim::handler(ctx)
     }
 
+    /// Fiat rail (ADR 0024): the institution cancels an Open job, or an Accepted job after `deadline`.
+    /// There is no vault and nothing to refund.
+    pub fn cancel_fiat_job(ctx: Context<InstitutionJob>) -> Result<()> {
+        instructions::cancel_fiat_job::handler(ctx)
+    }
+
     /// The institution cancels an Open / Funded job, or an Accepted job after `deadline`; the vault
     /// balance is refunded and the vault closed (rent to `job.rent_payer`).
     pub fn cancel_job(ctx: Context<CancelJob>) -> Result<()> {
@@ -92,6 +103,19 @@ pub mod square_escrow {
     /// (threshold 0 = disabled).
     pub fn commit_travel_rule(ctx: Context<InstitutionJob>, commitment: [u8; 32]) -> Result<()> {
         instructions::commit_travel_rule::handler(ctx, commitment)
+    }
+
+    /// Fiat rail (ADR 0024): the institution opens a job it pays off-chain through Stripe (MPP). The
+    /// job has no vault, no funding step, no challenge window, dispute or claim; it is always
+    /// proof-gated by `policy` (snapshotted like `create_job`). Both parties need a fresh, clear
+    /// screening record. The agent accepts it while Open.
+    pub fn create_fiat_job(
+        ctx: Context<CreateFiatJob>,
+        spec_hash: [u8; 32],
+        amount: u64,
+        deadline: i64,
+    ) -> Result<()> {
+        instructions::create_fiat_job::handler(ctx, spec_hash, amount, deadline)
     }
 
     /// Flow step 3a: the institution opens a job for an active registered agent and creates its empty
@@ -119,6 +143,14 @@ pub mod square_escrow {
     /// the agent side (FavorAgent) or returned to the institution. Closes the vaults.
     pub fn execute_resolution(ctx: Context<ExecuteResolution>) -> Result<()> {
         instructions::execute_resolution::handler(ctx)
+    }
+
+    /// Fiat rail (ADR 0024), permissionless: records a delivered fiat job as paid once the verifier's
+    /// `verify_mpp_payment_proof` bound a compliant `ReleaseProof` (payee = agent wallet, net = full
+    /// `amount`, fresh daily counter). CPIs `record_release`, writes reputation and a `Verified`
+    /// `ValidationRecord`, moves the job to `Released`. No funds move and no keeper fee is paid.
+    pub fn finalize_fiat_payment(ctx: Context<FinalizeFiatPayment>) -> Result<()> {
+        instructions::finalize_fiat_payment::handler(ctx)
     }
 
     /// Flow steps 6-8, permissionless crank. After `challenge_end` with no dispute:

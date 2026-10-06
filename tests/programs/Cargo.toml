@@ -14,7 +14,8 @@ description = "Square programlarının LiteSVM test altyapısı: harness, fikst�
 [dependencies]
 anchor-lang = "1.2.0"
 base64 = "0.22"
-litesvm = "0.16.0"
+# `precompiles`: MPP yolunun Ed25519 precompile talimatı (BC-37).
+litesvm = { version = "0.16.0", features = ["precompiles"] }
 solana-account = "4"
 # İşlem bütçesi ölçümü (BC-28): address lookup table'ı ALT programının kendi talimatlarıyla kurmak için.
 solana-address-lookup-table-interface = { version = "3", features = ["bincode"] }

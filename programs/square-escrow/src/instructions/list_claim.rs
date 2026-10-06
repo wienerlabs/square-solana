@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 use square_common::seeds::{CLAIM_SEED, JOB_SEED};
 
 use crate::errors::EscrowError;
-use crate::state::{ClaimListing, ClaimStatus, Job, JobStatus};
+use crate::state::{ClaimListing, ClaimStatus, Job, JobStatus, SettlementRail};
 use crate::ClaimListed;
 
 #[derive(Accounts)]
@@ -32,6 +32,11 @@ pub struct ListClaim<'info> {
 pub fn handler(ctx: Context<ListClaim>, price: u64) -> Result<()> {
     let now = Clock::get()?.unix_timestamp;
     let job = &ctx.accounts.job;
+    // Fiat işin alacağı escrow'dan ödenmez, satılamaz (ADR 0024).
+    require!(
+        job.rail == SettlementRail::Escrow,
+        EscrowError::RailMismatch
+    );
     // Teslim edilmiş, dispute'u olmayan iş; challenge penceresi açık ya da kapanmış olabilir.
     require!(
         job.status == JobStatus::Delivered,

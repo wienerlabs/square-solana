@@ -1,13 +1,17 @@
 //! Release devresinin 13 public sinyali (release-circuit.md §2), groth16-solana'nın girdi biçiminde:
 //! her sinyal 32 baytlık big-endian BN254 alan elemanı. Sinyallerin 10'unu program hesaplardan kurar
 //! (yol A, §6); `refusal_code`, `net_amount` ve `proof_timestamp` ispatı yapanın beyanıdır ve ispat
-//! yalnızca bunlar doğruysa doğrulanır.
+//! yalnızca bunlar doğruysa doğrulanır. MPP yolunda (BC-37) `refusal_code` 0, `net_amount` işin tutarıdır;
+//! `stripe_receipt_hash` MPP authority'nin imzaladığı makbuz commitment'ıdır.
 
 use anchor_lang::prelude::Pubkey;
 
 use crate::release_vk::RELEASE_NR_INPUTS;
 
 pub type Signal = [u8; 32];
+
+/// Escrow release yolunda `stripe_receipt_hash` (sinyal 12).
+pub const NO_STRIPE_RECEIPT: Signal = [0; 32];
 
 /// Sinyallerin kaynağı: hesaplardan okunanlar ve ispatı yapanın beyanı.
 pub struct ReleaseSignals {
@@ -20,6 +24,7 @@ pub struct ReleaseSignals {
     pub daily_spent_before: u64,
     pub proof_timestamp: u64,
     pub job: Pubkey,
+    pub stripe_receipt_hash: Signal,
 }
 
 fn integer(value: u64) -> Signal {
@@ -39,7 +44,7 @@ fn halves(address: &Pubkey) -> (Signal, Signal) {
 }
 
 impl ReleaseSignals {
-    /// `PUBLIC_SIGNALS` sırasıyla; release yolunda `stripe_receipt_hash` 0'dır (MPP yolu BC-37).
+    /// `PUBLIC_SIGNALS` sırasıyla.
     pub fn public_inputs(&self) -> [Signal; RELEASE_NR_INPUTS] {
         let (payee_high, payee_low) = halves(&self.payee);
         let (mint_high, mint_low) = halves(&self.mint);
@@ -57,7 +62,7 @@ impl ReleaseSignals {
             integer(self.proof_timestamp),
             job_high,
             job_low,
-            [0; 32],
+            self.stripe_receipt_hash,
         ]
     }
 }
@@ -99,6 +104,7 @@ mod tests {
             daily_spent_before: int(&inputs[8]),
             proof_timestamp: int(&inputs[9]),
             job: address(&inputs[10], &inputs[11]),
+            stripe_receipt_hash: inputs[12],
         }
         .public_inputs();
         assert_eq!(rebuilt, inputs);

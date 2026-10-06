@@ -10,6 +10,7 @@
 //! - [`screening`]: sanctions screening kaydının temiz ve taze olması (escrow fonlama, alacak, release).
 //! - [`squads`]: Squads v4 multisig hesabının doğrulanması ve vault PDA'sı.
 //! - [`merkle`]: onaylı alıcı listesinin yaprağı ve Merkle kanıtı doğrulaması (escrow `buy_claim`).
+//! - [`mpp`]: Stripe MPP fiat rayının attestation mesajı ve Ed25519 precompile talimatı (ADR 0024).
 //! - [`release`]: release ispatının tazeliği ve günlük sayacın gün dönümü (ADR 0012).
 //! - [`travel_rule`]: Travel Rule commitment'ı ve fonlama eşiği (ADR 0015).
 //! - [`events`]: sözleşme event'leri ve programların bunları `#[event]` olarak tanımlayan makroları.
@@ -19,6 +20,7 @@ pub mod constants;
 pub mod contract;
 pub mod events;
 pub mod merkle;
+pub mod mpp;
 pub mod release;
 pub mod roles;
 pub mod screening;

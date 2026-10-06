@@ -4,9 +4,12 @@
 //! program hesaplardan kurar (release-circuit.md §6, yol A). Tek CPI, escrow'un `record_release`'idir:
 //! günlük sayaç (`OperatorState`) verifier'ındır ve yalnızca release'te ilerler (ADR 0012).
 //!
-//! Stripe MPP yolu (`verify_mpp_payment_proof`, `update_mpp_authority`) BC-37'de.
+//! Stripe MPP fiat rayı (BC-37, ADR 0024): `verify_mpp_payment_proof` fiat işin Stripe ödemesini MPP
+//! authority'nin Ed25519 attestation'ı ve aynı devrenin ispatıyla (`stripe_receipt_hash` ≠ 0) job'a
+//! bağlar; authority config'tedir ve `update_mpp_authority` ile program upgrade'i olmadan değişir.
 use anchor_lang::prelude::*;
 
+pub mod binding;
 pub mod errors;
 pub mod instructions;
 pub mod linked;
@@ -97,6 +100,41 @@ pub mod square_verifier {
             proof_c,
             refusal_code,
             net_amount,
+            proof_timestamp,
+        )
+    }
+
+    /// The config admin (Squads vault) rotates the MPP attestation key without a program upgrade. A
+    /// zero key disables the fiat rail: no attestation can verify.
+    pub fn update_mpp_authority(
+        ctx: Context<UpdateMppAuthority>,
+        mpp_authority: Pubkey,
+    ) -> Result<()> {
+        instructions::update_mpp_authority::handler(ctx, mpp_authority)
+    }
+
+    /// Fiat rail (ADR 0024): binds a Stripe (MPP) payment to a delivered fiat job. The instruction
+    /// right before it must be the Ed25519 precompile verifying `config.mpp_authority`'s signature on
+    /// `"square/mpp-attestation/v1" || job || stripe_receipt_hash || amount (u64 LE)`, `amount` being
+    /// the job amount. The Groth16 proof is checked against the same 13 signals as
+    /// `set_compliance_proof` with `refusal_code` 0, `net_amount` = job amount, payee = agent wallet
+    /// and the non-zero `stripe_receipt_hash` (public signal 12). Writes a `Compliant` `ReleaseProof`
+    /// that `finalize_fiat_payment` consumes. Arguments: `stripe_receipt_hash` is the Poseidon
+    /// commitment of the Stripe receipt; `proof_timestamp` is public signal 9 (Unix seconds).
+    pub fn verify_mpp_payment_proof(
+        ctx: Context<VerifyMppPaymentProof>,
+        proof_a: [u8; 64],
+        proof_b: [u8; 128],
+        proof_c: [u8; 64],
+        stripe_receipt_hash: [u8; 32],
+        proof_timestamp: i64,
+    ) -> Result<()> {
+        instructions::verify_mpp_payment_proof::handler(
+            ctx,
+            proof_a,
+            proof_b,
+            proof_c,
+            stripe_receipt_hash,
             proof_timestamp,
         )
     }
