@@ -81,8 +81,9 @@ export function agentView(
     account: row.account,
     did: related.did,
     card: card?.success ? card.data : null,
-    // Kart, son denetimde zincirdeki hash'le eşleşmiş ve o hash hâlâ zincirdeki değer olmalı.
-    cardVerified: related.card !== null && related.card.verified && related.card.contentHash === row.agentCardHash,
+    // `contentHash` saklanan ham baytların SHA-256'sıdır; eşleşme zincirdeki güncel hash'le denetlenir. Kayıttan
+    // önce barındırılan kart (`putAgentCard`), kayıt indexlenince doğrulanmış olur.
+    cardVerified: related.card !== null && related.card.contentHash === row.agentCardHash,
     reputation: related.reputation?.account ?? null,
     ...freshness(row),
   });

@@ -143,7 +143,7 @@ describe('agent', () => {
         contentHash,
         content: CARD,
         skills: ['literature-review'],
-        verified: true,
+        verified: false,
         verifiedAt: new Date(NOW_MS),
       },
     });

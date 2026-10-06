@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Square Solana API
-  version: 0.12.0
+  version: 0.13.0
   summary: Square HTTP API sözleşmesi (BE-35), uygulaması apps/api (BE-18).
   description: |
     Contract-first API sözleşmesi. Zincirdeki hesaplar, event'ler ve instruction argümanları
@@ -99,6 +99,7 @@ paths:
         '204':
           description: Oturum kapatıldı.
         '401': { $ref: '#/components/responses/Unauthorized' }
+        '429': { $ref: '#/components/responses/RateLimited' }
 
   /v1/api-keys:
     get:
@@ -120,6 +121,7 @@ paths:
                         type: array
                         items: { $ref: '#/components/schemas/ApiKey' }
         '401': { $ref: '#/components/responses/Unauthorized' }
+        '429': { $ref: '#/components/responses/RateLimited' }
     post:
       tags: [auth]
       operationId: createApiKey
@@ -143,6 +145,7 @@ paths:
                       data: { $ref: '#/components/schemas/ApiKeyCreated' }
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
+        '429': { $ref: '#/components/responses/RateLimited' }
 
   /v1/api-keys/{id}:
     delete:
@@ -161,6 +164,7 @@ paths:
           description: İptal edildi.
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/RateLimited' }
 
   /v1/jobs:
     get:
@@ -195,6 +199,7 @@ paths:
                         type: array
                         items: { $ref: '#/components/schemas/JobView' }
         '400': { $ref: '#/components/responses/BadRequest' }
+        '429': { $ref: '#/components/responses/RateLimited' }
 
   /v1/jobs/{job}:
     get:
@@ -214,6 +219,7 @@ paths:
                   - properties:
                       data: { $ref: '#/components/schemas/JobView' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/RateLimited' }
 
   /v1/jobs/{job}/deliveries:
     post:
@@ -250,6 +256,7 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/RateLimited' }
 
   /v1/institutions/{institution}:
     get:
@@ -272,6 +279,7 @@ paths:
                   - properties:
                       data: { $ref: '#/components/schemas/InstitutionView' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/RateLimited' }
 
   /v1/policies:
     get:
@@ -300,6 +308,7 @@ paths:
                         type: array
                         items: { $ref: '#/components/schemas/PolicyView' }
         '400': { $ref: '#/components/responses/BadRequest' }
+        '429': { $ref: '#/components/responses/RateLimited' }
 
   /v1/policies/{policy}:
     get:
@@ -319,6 +328,7 @@ paths:
                   - properties:
                       data: { $ref: '#/components/schemas/PolicyView' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/RateLimited' }
 
   /v1/policies/{policy}/meta:
     put:
@@ -348,6 +358,8 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+        '429': { $ref: '#/components/responses/RateLimited' }
 
   /v1/agents:
     get:
@@ -380,6 +392,7 @@ paths:
                         type: array
                         items: { $ref: '#/components/schemas/AgentView' }
         '400': { $ref: '#/components/responses/BadRequest' }
+        '429': { $ref: '#/components/responses/RateLimited' }
 
   /v1/agents/{agentRecord}:
     get:
@@ -399,6 +412,7 @@ paths:
                   - properties:
                       data: { $ref: '#/components/schemas/AgentView' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/RateLimited' }
 
   /v1/agents/{agentRecord}/card:
     put:
@@ -408,8 +422,17 @@ paths:
       security:
         - session: []
         - apiKey: []
+      description: |
+        Kayıt zincirde (indexlenmiş) ise çağıran `AgentRecord.owner`'dır. Kart kayıttan önce yüklenirken
+        (8 adımın 2.si) `agentId` verilir: `agentRecord`, çağıranın cüzdanı ve bu kimlikle türetilen PDA
+        (`["agent", owner, agent_id]`) olmalıdır. Kartın `registrations`'ı bu kaydı içermelidir. Saklanan
+        baytlar kartın RFC 8785 kanonik JSON'udur; `agentCardHash` bu baytların SHA-256'sıdır.
       parameters:
         - $ref: '#/components/parameters/AgentRecordPath'
+        - name: agentId
+          in: query
+          description: "`register_agent`'ın `agent_id`'si; yalnızca kayıt henüz yokken gerekir."
+          schema: { type: string, minLength: 1, maxLength: 64 }
       requestBody:
         required: true
         content:
@@ -429,6 +452,7 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/RateLimited' }
 
   /a/{agentRecord}/.well-known/agent-card.json:
     get:
@@ -444,6 +468,7 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/AgentCard' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/RateLimited' }
 
   /v1/claims:
     get:
@@ -475,6 +500,7 @@ paths:
                         type: array
                         items: { $ref: '#/components/schemas/ClaimView' }
         '400': { $ref: '#/components/responses/BadRequest' }
+        '429': { $ref: '#/components/responses/RateLimited' }
 
   /v1/claims/{job}:
     get:
@@ -494,6 +520,7 @@ paths:
                   - properties:
                       data: { $ref: '#/components/schemas/ClaimView' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/RateLimited' }
 
   /v1/disputes:
     get:
@@ -519,6 +546,7 @@ paths:
                         type: array
                         items: { $ref: '#/components/schemas/DisputeView' }
         '400': { $ref: '#/components/responses/BadRequest' }
+        '429': { $ref: '#/components/responses/RateLimited' }
 
   /v1/disputes/{job}:
     get:
@@ -538,6 +566,7 @@ paths:
                   - properties:
                       data: { $ref: '#/components/schemas/DisputeView' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/RateLimited' }
 
   /v1/screening/{wallet}:
     get:
@@ -560,6 +589,7 @@ paths:
                   - properties:
                       data: { $ref: '#/components/schemas/ScreeningView' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/RateLimited' }
 
   /v1/events:
     get:
@@ -597,6 +627,7 @@ paths:
                         type: array
                         items: { $ref: '#/components/schemas/IndexedEvent' }
         '400': { $ref: '#/components/responses/BadRequest' }
+        '429': { $ref: '#/components/responses/RateLimited' }
 
   /v1/keeper/actions:
     get:
@@ -625,6 +656,7 @@ paths:
                         type: array
                         items: { $ref: '#/components/schemas/KeeperAction' }
         '400': { $ref: '#/components/responses/BadRequest' }
+        '429': { $ref: '#/components/responses/RateLimited' }
 
   /v1/tx:
     post:
@@ -657,6 +689,7 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '422': { $ref: '#/components/responses/SimulationFailed' }
         '429': { $ref: '#/components/responses/RateLimited' }
+        '503': { $ref: '#/components/responses/Unavailable' }
 
   /v1/prove:
     post:

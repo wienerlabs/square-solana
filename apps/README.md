@@ -8,7 +8,7 @@ Uygulama ve servisler (pnpm workspace). `package.json` adları `@squaresdk/solan
 | Dizin | Görev | Issue |
 |---|---|---|
 | [`web/`](web/) | Next.js web uygulaması (`@solana/wallet-adapter-react`); iskelet hazır, 8 adımlı akış ve demo M4'te | [FE-01] |
-| `api/` | REST API: auth, okuma uçları, tx hazırlama, teslimat yükleme | [BE-18] |
+| [`api/`](api/) | REST API: cüzdan oturumu ve API anahtarları, okuma uçları, 8 adımın tx hazırlığı, teslimat yükleme, agent card barındırma, prover vekili, `GET /openapi.json` | [BE-18] |
 | [`indexer/`](indexer/) | Event tabanlı indexer: kesinleşmiş tx'lerden event'ler ve ayna tablolar, Helius webhook ve RPC backfill, uzlaştırma, okuma API'si (`@squaresdk/solana-indexer/read`) | [BE-14] |
 | `keeper/` | finalize crank (kârlılık, `ProofRequired` ve screening farkındalığı) | [BE-15] |
 | [`prover/`](prover/) | Release devresi için Groth16 prover servisi (snarkjs, `POST /v1/prove`); Aperture `prover-service`'ten geçmişiyle taşındı [BE-02], yeni devreye uyarlandı | [BE-11] |

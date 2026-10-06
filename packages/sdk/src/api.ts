@@ -1,5 +1,6 @@
 // REST API client sözleşmesi. Metot adları docs/api/openapi.yaml `operationId`'leriyle birebir aynıdır
-// (test: packages/sdk/test). Uygulaması BE-18 ile birlikte; web app veri katmanı (FE-24) bu arayüzü kullanır.
+// (test: packages/sdk/test). Uygulaması `createApiClient` (api-client.ts, BE-18); web app veri katmanı (FE-24)
+// bu arayüzü kullanır.
 import type {
   Address,
   AgentCard,
@@ -62,7 +63,15 @@ export interface SquareApi {
     query?: PageParams & { owner?: Address; status?: AgentStatus; skill?: string },
   ): Promise<ApiEnvelope<AgentView[]>>;
   getAgent(agentRecord: Address): Promise<ApiEnvelope<AgentView>>;
-  putAgentCard(agentRecord: Address, card: AgentCard): Promise<ApiEnvelope<AgentCardHosting>>;
+  /**
+   * Kartı barındırır. Kayıt henüz zincirde yoksa `agentId` (`register_agent`'ın `agent_id`'si) verilir: sunucu
+   * `agentRecord`'ın çağıranın cüzdanı ve bu kimlikle türetildiğini denetler.
+   */
+  putAgentCard(
+    agentRecord: Address,
+    card: AgentCard,
+    options?: { agentId?: string },
+  ): Promise<ApiEnvelope<AgentCardHosting>>;
   getWellKnownAgentCard(agentRecord: Address): Promise<AgentCard>;
 
   listClaims(
@@ -129,5 +138,5 @@ export interface ApiClientConfig {
   fetch?: typeof fetch;
 }
 
-/** `SquareApi` fabrikası; uygulama BE-18 ile birlikte. */
+/** `SquareApi` fabrikası (`createApiClient`). */
 export type CreateApiClient = (config: ApiClientConfig) => SquareApi;
