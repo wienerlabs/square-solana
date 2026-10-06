@@ -1,5 +1,5 @@
 {
-  "address": "AzKirEv7h5PstLNYNqLj7fCXU9EFA6nSnuoed3QkmUfU",
+  "address": "8yLdDR5zoAzeEWzkNX19DKy4HfVYXb7VcU3wWStwTFPh",
   "metadata": {
     "name": "square_verifier_contract",
     "version": "0.1.0",
@@ -62,7 +62,7 @@
         },
         {
           "name": "program",
-          "address": "AzKirEv7h5PstLNYNqLj7fCXU9EFA6nSnuoed3QkmUfU"
+          "address": "8yLdDR5zoAzeEWzkNX19DKy4HfVYXb7VcU3wWStwTFPh"
         },
         {
           "name": "program_data"

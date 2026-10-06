@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import * as t from '../dist/index.js';
 
 const MINT = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
-const WALLET = '5hstj5grBUL1BeSaPLYpgkD6n3ALasmbseRvKRFfCVNT';
+const WALLET = 'A8osQqNBGBFB2j1PdLwhANRNzjCYjJKsYVKbbrR75FbZ';
 
 const natural = {
   kind: 'natural',
