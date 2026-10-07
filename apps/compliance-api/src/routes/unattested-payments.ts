@@ -8,7 +8,6 @@ import {
   type UnattestedStatus,
 } from '../models/unattested-payment.js';
 import { runWatcherTick } from '../watchers/solana-watcher.js';
-import { runStripeReconcileTick } from '../watchers/stripe-watcher.js';
 
 const router = Router();
 
@@ -143,16 +142,15 @@ router.patch('/:id/resolve', async (req: Request, res: Response, next) => {
 
 /**
  * Manual reconcile trigger used by the dashboard "Run scan now" action and
- * by smoke tests. Always runs both watchers in sequence and returns the
- * raw summaries; the caller decides whether to surface them.
+ * by smoke tests. Runs the Solana watcher and returns its raw summary. Stripe
+ * payments are attested by the Square API (BE-25, ADR 0026), not here.
  */
 router.post('/reconcile', async (_req: Request, res: Response, next) => {
   try {
     const solana = await runWatcherTick();
-    const stripe = await runStripeReconcileTick();
     res.json({
       success: true,
-      data: { solana, stripe },
+      data: { solana },
       error: null,
     });
   } catch (err) {

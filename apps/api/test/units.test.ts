@@ -14,61 +14,7 @@ import { loadOpenApi } from '../src/openapi.js';
 import { PERMISSION_INITIATE, SQUADS_PROGRAM_ID, multisigMembers } from '../src/squads.js';
 import { open, rewrap, seal } from '../src/travel-rule/crypto.js';
 import { startTravelRuleMaintenance } from '../src/travel-rule/maintenance.js';
-
-const ENV = {
-  DATABASE_URL: 'postgres://api@db.internal:5432/square',
-  API_PORT: '8080',
-  API_METRICS_PORT: '9464',
-  API_PUBLIC_BASE_URL: 'https://api.square.example/',
-  CORS_ORIGINS: 'https://app.square.example, http://localhost:3000',
-  API_TRUST_PROXY_HOPS: '1',
-  API_JSON_MAX_BYTES: '65536',
-  API_RPC_URLS: 'https://rpc-a.example.com,https://rpc-b.example.com',
-  API_RPC_TIMEOUT_MS: '5000',
-  API_RPC_COOLDOWN_MS: '30000',
-  API_AUTH_DOMAIN: 'app.square.example',
-  API_AUTH_CHALLENGE_TTL_SECONDS: '300',
-  API_SESSION_TTL_SECONDS: '86400',
-  API_RATE_LIMIT_WINDOW_SECONDS: '60',
-  API_RATE_LIMIT_READ: '600',
-  API_RATE_LIMIT_WRITE: '60',
-  API_DELIVERY_S3_ENDPOINT: 'https://storage.example.com',
-  API_DELIVERY_S3_REGION: 'auto',
-  API_DELIVERY_S3_BUCKET: 'deliveries',
-  API_DELIVERY_S3_ACCESS_KEY_ID: 'access-key-id',
-  API_DELIVERY_S3_SECRET_ACCESS_KEY: 'access-key-secret',
-  API_DELIVERY_S3_FORCE_PATH_STYLE: 'false',
-  API_DELIVERY_PUBLIC_BASE_URL: 'https://files.square.example/deliveries/',
-  API_DELIVERY_MAX_BYTES: '10485760',
-  API_EVIDENCE_S3_BUCKET: 'evidence',
-  API_EVIDENCE_MAX_BYTES: '5242880',
-  API_ARBITRATOR_CACHE_SECONDS: '30',
-  // Anahtar çalışma anında üretilir (repoda sır yok).
-  API_WEBHOOK_SECRET_KEYS: `k1:${randomBytes(32).toString('base64')},k2:${randomBytes(32).toString('base64')}`,
-  API_WEBHOOK_SECRET_ACTIVE_KEY_ID: 'k2',
-  API_NOTIFY_INTERVAL_MS: '5000',
-  API_NOTIFY_BATCH_SIZE: '100',
-  API_NOTIFY_TIMEOUT_MS: '5000',
-  API_NOTIFY_MAX_ATTEMPTS: '8',
-  API_NOTIFY_BACKOFF_BASE_SECONDS: '30',
-  API_NOTIFY_BACKOFF_MAX_SECONDS: '3600',
-  API_NOTIFY_DEADLINE_WARNING_SECONDS: '43200',
-  API_NOTIFY_ALLOW_INSECURE: 'false',
-  API_LOOKUP_TABLE: '',
-  API_COMPUTE_UNIT_PRICE: '1000',
-  API_PROVER_URL: 'http://prover.internal:8080',
-  API_PROVER_API_KEY: 'service-key',
-  API_PROVER_TIMEOUT_MS: '60000',
-  API_TRAVEL_RULE_KEYS: `k2:${randomBytes(32).toString('base64')}, k1:${randomBytes(32).toString('base64')}`,
-  API_TRAVEL_RULE_ACTIVE_KEY_ID: 'k2',
-  API_TRAVEL_RULE_RETENTION_DAYS: '1825',
-  API_TRAVEL_RULE_MAINTENANCE_INTERVAL_SECONDS: '3600',
-  API_ALERT_ERRORS: '10',
-  API_ALERT_ERROR_WINDOW_SECONDS: '60',
-  LOG_LEVEL: 'info',
-  HEALTH_CHECK_TIMEOUT_MS: '2000',
-  ALERT_EVALUATION_SECONDS: '15',
-};
+import { ENV } from './fixtures/env.js';
 
 describe('yapılandırma', () => {
   it('geçerli ortam', () => {

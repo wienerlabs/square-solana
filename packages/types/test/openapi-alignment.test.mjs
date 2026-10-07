@@ -75,6 +75,15 @@ const OBJECTS = {
   CctpTransfer: t.CctpTransferSchema,
   CctpFundTxRequest: t.CctpFundTxRequestSchema,
   CctpFundTx: t.CctpFundTxSchema,
+  FiatConfig: t.FiatConfigSchema,
+  FiatSetupIntentCreate: t.FiatSetupIntentCreateSchema,
+  FiatSetupIntent: t.FiatSetupIntentSchema,
+  FiatCard: t.FiatCardSchema,
+  FiatCustomer: t.FiatCustomerSchema,
+  FiatPaymentCreate: t.FiatPaymentCreateSchema,
+  FiatAttestation: t.FiatAttestationSchema,
+  FiatPayment: t.FiatPaymentSchema,
+  StripeWebhookReceipt: t.StripeWebhookReceiptSchema,
 };
 
 const ENUMS = {
@@ -90,6 +99,10 @@ const ENUMS = {
   CctpTransferStatus: t.CctpTransferStatusSchema,
   DisputeEvidenceRole: t.DisputeEvidenceRoleSchema,
   ArbitrationEventType: t.ArbitrationEventTypeSchema,
+  FiatCurrency: t.FiatCurrencySchema,
+  FiatPaymentStatus: t.FiatPaymentStatusSchema,
+  FiatPaymentVia: t.FiatPaymentViaSchema,
+  FiatAttestationSource: t.FiatAttestationSourceSchema,
 };
 
 const acceptsUndefined = (schema) => schema.safeParse(undefined).success;

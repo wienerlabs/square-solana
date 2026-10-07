@@ -74,6 +74,9 @@ importers:
       '@noble/curves':
         specifier: 2.4.0
         version: 2.4.0
+      '@solana/spl-token':
+        specifier: ^0.4.15
+        version: 0.4.15(@solana/web3.js@1.99.0(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@6.0.6))(bufferutil@4.1.0)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)(utf-8-validate@6.0.6)
       '@solana/web3.js':
         specifier: ^1.99.0
         version: 1.99.0(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@6.0.6)
@@ -95,6 +98,9 @@ importers:
       '@squaresdk/solana-observability':
         specifier: workspace:*
         version: link:../../packages/observability
+      '@squaresdk/solana-policy':
+        specifier: workspace:*
+        version: link:../../packages/policy
       '@squaresdk/solana-sdk':
         specifier: workspace:*
         version: link:../../packages/sdk
@@ -116,6 +122,15 @@ importers:
       helmet:
         specifier: ^8.0.0
         version: 8.3.0
+      mppx:
+        specifier: 0.13.1
+        version: 0.13.1(@modelcontextprotocol/sdk@1.32.1(zod@4.6.5))(@x402/core@2.28.0)(@x402/express@2.28.0(bufferutil@4.1.0)(express@4.22.3)(typescript@5.9.3)(utf-8-validate@6.0.6))(express@4.22.3)(hono@4.13.12)(next@16.3.8(@opentelemetry/api@1.9.1)(@types/node@24.19.1)(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(typescript@5.9.3)(viem@2.57.3(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@6.0.6)(zod@4.6.5))
+      stripe:
+        specifier: ^22.6.2
+        version: 22.6.2(@types/node@24.19.1)
+      viem:
+        specifier: ^2.57.3
+        version: 2.57.3(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@6.0.6)(zod@4.6.5)
       zod:
         specifier: ^4.6.5
         version: 4.6.5
@@ -123,9 +138,6 @@ importers:
       '@solana/kit':
         specifier: ^5.5.1
         version: 5.5.1(bufferutil@4.1.0)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)(utf-8-validate@6.0.6)
-      '@solana/spl-token':
-        specifier: ^0.4.15
-        version: 0.4.15(@solana/web3.js@1.99.0(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@6.0.6))(bufferutil@4.1.0)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)(utf-8-validate@6.0.6)
       '@squaresdk/solana-config':
         specifier: workspace:*
         version: link:../../packages/config
@@ -186,9 +198,6 @@ importers:
       bs58:
         specifier: ^6.0.0
         version: 6.0.0
-      circomlibjs:
-        specifier: ^0.1.7
-        version: 0.1.7(bufferutil@4.1.0)(utf-8-validate@6.0.6)
       cors:
         specifier: ^2.8.5
         version: 2.8.6
@@ -201,24 +210,15 @@ importers:
       helmet:
         specifier: ^8.0.0
         version: 8.3.0
-      node-cache:
-        specifier: ^5.1.2
-        version: 5.1.2
       pg:
         specifier: ^8.13.1
         version: 8.23.1
-      stripe:
-        specifier: ^22.0.0
-        version: 22.6.2(@types/node@24.19.1)
       swagger-jsdoc:
         specifier: ^6.2.8
         version: 6.3.0(openapi-types@12.1.3)
       swagger-ui-express:
         specifier: ^5.0.1
         version: 5.0.1(express@4.22.3)
-      tweetnacl:
-        specifier: ^1.0.3
-        version: 1.0.3
       uuid:
         specifier: ^11.0.5
         version: 11.1.1
@@ -3997,6 +3997,10 @@ packages:
   '@standard-schema/spec@1.1.0':
     resolution: {integrity: sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==}
 
+  '@stripe/stripe-js@9.17.0':
+    resolution: {integrity: sha512-uidL4OJum5kivsOAQnVfQmYLJ2zdgirtmT0zWgskASZ4TPXxpXQ0MNrzW4NsXB90uEqmPHpSEtciLFbF1QQvNA==}
+    engines: {node: '>=12.16'}
+
   '@swc/helpers@0.5.23':
     resolution: {integrity: sha512-5lSsMOTXURePglDfvuAQUqkGek9Hg2kksOYay2m0+XR++b2NWYL/4sWyuvVBIs8oKnJaxkdi9whaL/sqN13afw==}
 
@@ -4746,16 +4750,6 @@ packages:
   bl@4.1.0:
     resolution: {integrity: sha512-1W07cM9gS6DcLperZfFSj+bWLtaPGSOHWhPiGzXmvVJbRLdG82sH/Kn8EtW1VqWVA54AKf2h5k5BbnIbwF3h6w==}
 
-  blake-hash@2.0.0:
-    resolution: {integrity: sha512-Igj8YowDu1PRkRsxZA7NVkdFNxH5rKv5cpLxQ0CVXSIA77pVYwCPRQJ2sMew/oneUpfuYRyjG6r8SmmmnbZb1w==}
-    engines: {node: '>= 10'}
-
-  blake2b-wasm@2.4.0:
-    resolution: {integrity: sha512-S1kwmW2ZhZFFFOghcx73+ZajEfKBqhP82JMssxtLVMxlaPea1p9uoLiUZ5WYyHn0KddwbLc+0vh4wR0KBNoT5w==}
-
-  blake2b@2.1.4:
-    resolution: {integrity: sha512-AyBuuJNI64gIvwx13qiICz6H6hpmjvYS5DGkG6jbXMOT8Z3WUJ3V1X0FlhIoT1b/5JtHE3ki+xjtMvu1nn+t9A==}
-
   bluebird@3.7.2:
     resolution: {integrity: sha512-XpNj6GDQzdfW+r2Wnn7xiSAd7TM3jzkxGXBGTtWKuSXv1xUV+azxAm8jdWZN06QTQk+2N2XB9jRDkvbmQmcRtg==}
 
@@ -4926,9 +4920,6 @@ packages:
     resolution: {integrity: sha512-ACagpQ7zBRLKDl5xRZ4KpmYIcZDUjOiNRuxvXLqhnnlLSVY1Dbvh73TI853nqoR0oEbihtWmMSjgc5f+pXf/jQ==}
     hasBin: true
 
-  circomlibjs@0.1.7:
-    resolution: {integrity: sha512-GRAUoAlKAsiiTa+PA725G9RmEmJJRc8tRFxw/zKktUxlQISGznT4hH4ESvW8FNTsrGg/nNd06sGP/Wlx0LUHVg==}
-
   classnames@2.5.1:
     resolution: {integrity: sha512-saHYOzhIQs6wy2sVxTM6bUDsQO4F50V9RQ22qBpEdCW+I+/Wmke2HOl6lS6dTpdxVhb88/I6+Hs+438c3lfUow==}
 
@@ -4941,10 +4932,6 @@ packages:
   cliui@8.0.1:
     resolution: {integrity: sha512-BSeNnyus75C4//NQ9gQt1/csTXyo/8Sb+afLAkzAptFuMsod9HFokGNudZpi/oQV73hnVK+sR+5PVRMd+Dr7YQ==}
     engines: {node: '>=12'}
-
-  clone@2.1.2:
-    resolution: {integrity: sha512-3Pe/CF1Nn94hyhIYpjtiLhdCoEoz0DqQ+988E9gmeEdQZlojxnOb74wctFyuwWQHzqyf9X7C7MG8juUpqBJT8w==}
-    engines: {node: '>=0.8'}
 
   color-convert@2.0.1:
     resolution: {integrity: sha512-RRECPsj7iu/xb5oKYcsFHSppFNnsj/52OVTRKb4zP5onXwVF3zVmmToNcOfGC+CRDpfK/U584fMg38ZHCaElKQ==}
@@ -5406,6 +5393,10 @@ packages:
     resolution: {integrity: sha512-EKN1vKAMcZ8MlYMpaNuxN6R9yakzH6uajHcHVTqWJzvu5pWw9DyhbP35HH8MVBQ+dZjAfDxk+A8NiR9KWaXiyQ==}
     engines: {node: '>=18.0.0'}
 
+  eventsource-parser@4.1.1:
+    resolution: {integrity: sha512-zaWNqeSLeyzEAAt2Q6aDBRDRk/VnPmsKqvToyGvv6aahvLv71A4Jw7jG93Hckf11zXurbqgsffvpSgKPoeU1Qw==}
+    engines: {node: '>=22.12'}
+
   eventsource@3.0.7:
     resolution: {integrity: sha512-CRT1WTyuQoD771GW56XEZFQ/ZoSfWid1alKGDYMmkt2yl8UXrVR4pspqWNEcqKvVIzg6PAltWjxcSSPrboA4iA==}
     engines: {node: '>=18.0.0'}
@@ -5500,9 +5491,6 @@ packages:
     peerDependenciesMeta:
       picomatch:
         optional: true
-
-  ffjavascript@0.2.63:
-    resolution: {integrity: sha512-dBgdsfGks58b66JnUZeZpGxdMIDQ4QsD3VYlRJyFVrKQHb2kJy4R2gufx5oetrTxXPT+aEjg0dOvOLg1N0on4A==}
 
   ffjavascript@0.3.0:
     resolution: {integrity: sha512-l7sR5kmU3gRwDy8g0Z2tYBXy5ttmafRPFOqY7S6af5cq51JqJWt5eQ/lSR/rs2wQNbDYaYlQr5O+OSUf/oMLoQ==}
@@ -6364,6 +6352,43 @@ packages:
     engines: {node: '>=10'}
     hasBin: true
 
+  mppx@0.13.1:
+    resolution: {integrity: sha512-PKz2U3l74aqPbvhzLcPzntHWGCncC6czeH0k0aN/f8f9V60E5/nQq9msyoG425njU+UU/jhOh4Ug8gVv62rJQA==}
+    hasBin: true
+    peerDependencies:
+      '@modelcontextprotocol/sdk': '>=1.25.0'
+      '@x402/core': '>=2.22.0'
+      '@x402/express': '>=2.22.0'
+      '@x402/hono': '>=2.22.0'
+      '@x402/mcp': '>=2.22.0'
+      '@x402/next': '>=2.22.0'
+      elysia: '>=1.2.0'
+      express: '>=5'
+      hono: '>=4.12.25'
+      next: '>=16.2.6'
+      viem: '>=2.57.1'
+    peerDependenciesMeta:
+      '@modelcontextprotocol/sdk':
+        optional: true
+      '@x402/core':
+        optional: true
+      '@x402/express':
+        optional: true
+      '@x402/hono':
+        optional: true
+      '@x402/mcp':
+        optional: true
+      '@x402/next':
+        optional: true
+      elysia:
+        optional: true
+      express:
+        optional: true
+      hono:
+        optional: true
+      next:
+        optional: true
+
   ms@2.0.0:
     resolution: {integrity: sha512-Tpp60P6IUJDTuOq/5Z8cdskzJujfwqfOTkrwIwj7IRISpnkJnT6SyJ4PCPnGMoFjC9ddhal5KVIYtAt97ix05A==}
 
@@ -6380,9 +6405,6 @@ packages:
 
   nan@2.29.0:
     resolution: {integrity: sha512-GlGk3HIvitbvs+LT3g6XUP1kpirKNvmDFwF/bmo6XNWSb/eYEs/O4bfgIEIXCZ+lIOTS5xNwDvSGMw6FJdAhtA==}
-
-  nanoassert@2.0.0:
-    resolution: {integrity: sha512-7vO7n28+aYO4J+8w96AzhmU8G+Y/xpPDJz/se19ICsqj/momRbb9mh9ZUtkoJ5X3nTnPdhEJyc0qnM6yAsHBaA==}
 
   nanoid@3.3.19:
     resolution: {integrity: sha512-Y2tUNy4ouw6tq5oDSKeQYGOyhkUBhNOcGV/02KC+6kd9eDGqdZd++mjMiIDilrBYvjEnCYvVtsuHCuP+okSfug==}
@@ -6426,13 +6448,6 @@ packages:
         optional: true
       sass:
         optional: true
-
-  node-addon-api@3.2.1:
-    resolution: {integrity: sha512-mmcei9JghVNDYydghQmeDX8KoAm0FAiYyIcUt/N4nhyAipB17pllZQDOJD2fotxABnt4Mdz+dKTO7eftLg4d0A==}
-
-  node-cache@5.1.2:
-    resolution: {integrity: sha512-t1QzWwnk4sjLWaQAS8CHgOJ+RAfmHpxFWmc36IWTiWHQfs0w5JDMBS1b1ZxQteo0vVVuWJvIUKHDkkeK7vIGCg==}
-    engines: {node: '>= 8.0.0'}
 
   node-fetch@2.7.0:
     resolution: {integrity: sha512-c4FRfUm/dbcWZ7U+1Wq0AwCyFL+3nt2bEw05wfxSz+DWpWsitgmSgYmy2dQdWyKC1694ELPqMs/YzUSNozLt8A==}
@@ -7107,6 +7122,10 @@ packages:
     peerDependenciesMeta:
       '@types/node':
         optional: true
+
+  structured-headers@2.1.0:
+    resolution: {integrity: sha512-ClzykN+XQVaSW5UfpOdEWfDplZ1Th7mISdaFvaC2+GjLTeBhGMJw83D/Rw9jPkHOml4oYd3EXaZhbz3gnE5nBQ==}
+    engines: {node: '>=18', npm: '>=6'}
 
   styled-jsx@5.1.6:
     resolution: {integrity: sha512-qSVyDTeMotdvQYoHWLNGwRFJHC+i+ZvdBRYosOFgC+Wg1vx4frN2/RG/NA7SYqqvKNLf39P2LSRA2pu6n0XYZA==}
@@ -8317,6 +8336,7 @@ snapshots:
       '@ethersproject/logger': 5.8.0
       '@ethersproject/properties': 5.8.0
       '@ethersproject/strings': 5.8.0
+    optional: true
 
   '@ethersproject/abstract-provider@5.8.0':
     dependencies:
@@ -8327,6 +8347,7 @@ snapshots:
       '@ethersproject/properties': 5.8.0
       '@ethersproject/transactions': 5.8.0
       '@ethersproject/web': 5.8.0
+    optional: true
 
   '@ethersproject/abstract-signer@5.8.0':
     dependencies:
@@ -8335,6 +8356,7 @@ snapshots:
       '@ethersproject/bytes': 5.8.0
       '@ethersproject/logger': 5.8.0
       '@ethersproject/properties': 5.8.0
+    optional: true
 
   '@ethersproject/address@5.8.0':
     dependencies:
@@ -8343,29 +8365,35 @@ snapshots:
       '@ethersproject/keccak256': 5.8.0
       '@ethersproject/logger': 5.8.0
       '@ethersproject/rlp': 5.8.0
+    optional: true
 
   '@ethersproject/base64@5.8.0':
     dependencies:
       '@ethersproject/bytes': 5.8.0
+    optional: true
 
   '@ethersproject/basex@5.8.0':
     dependencies:
       '@ethersproject/bytes': 5.8.0
       '@ethersproject/properties': 5.8.0
+    optional: true
 
   '@ethersproject/bignumber@5.8.0':
     dependencies:
       '@ethersproject/bytes': 5.8.0
       '@ethersproject/logger': 5.8.0
       bn.js: 5.2.5
+    optional: true
 
   '@ethersproject/bytes@5.8.0':
     dependencies:
       '@ethersproject/logger': 5.8.0
+    optional: true
 
   '@ethersproject/constants@5.8.0':
     dependencies:
       '@ethersproject/bignumber': 5.8.0
+    optional: true
 
   '@ethersproject/contracts@5.8.0':
     dependencies:
@@ -8379,6 +8407,7 @@ snapshots:
       '@ethersproject/logger': 5.8.0
       '@ethersproject/properties': 5.8.0
       '@ethersproject/transactions': 5.8.0
+    optional: true
 
   '@ethersproject/hash@5.8.0':
     dependencies:
@@ -8391,6 +8420,7 @@ snapshots:
       '@ethersproject/logger': 5.8.0
       '@ethersproject/properties': 5.8.0
       '@ethersproject/strings': 5.8.0
+    optional: true
 
   '@ethersproject/hdnode@5.8.0':
     dependencies:
@@ -8406,6 +8436,7 @@ snapshots:
       '@ethersproject/strings': 5.8.0
       '@ethersproject/transactions': 5.8.0
       '@ethersproject/wordlists': 5.8.0
+    optional: true
 
   '@ethersproject/json-wallets@5.8.0':
     dependencies:
@@ -8422,26 +8453,32 @@ snapshots:
       '@ethersproject/transactions': 5.8.0
       aes-js: 3.0.0
       scrypt-js: 3.0.1
+    optional: true
 
   '@ethersproject/keccak256@5.8.0':
     dependencies:
       '@ethersproject/bytes': 5.8.0
       js-sha3: 0.8.0
+    optional: true
 
-  '@ethersproject/logger@5.8.0': {}
+  '@ethersproject/logger@5.8.0':
+    optional: true
 
   '@ethersproject/networks@5.8.0':
     dependencies:
       '@ethersproject/logger': 5.8.0
+    optional: true
 
   '@ethersproject/pbkdf2@5.8.0':
     dependencies:
       '@ethersproject/bytes': 5.8.0
       '@ethersproject/sha2': 5.8.0
+    optional: true
 
   '@ethersproject/properties@5.8.0':
     dependencies:
       '@ethersproject/logger': 5.8.0
+    optional: true
 
   '@ethersproject/providers@5.8.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)':
     dependencies:
@@ -8468,22 +8505,26 @@ snapshots:
     transitivePeerDependencies:
       - bufferutil
       - utf-8-validate
+    optional: true
 
   '@ethersproject/random@5.8.0':
     dependencies:
       '@ethersproject/bytes': 5.8.0
       '@ethersproject/logger': 5.8.0
+    optional: true
 
   '@ethersproject/rlp@5.8.0':
     dependencies:
       '@ethersproject/bytes': 5.8.0
       '@ethersproject/logger': 5.8.0
+    optional: true
 
   '@ethersproject/sha2@5.8.0':
     dependencies:
       '@ethersproject/bytes': 5.8.0
       '@ethersproject/logger': 5.8.0
       hash.js: 1.1.7
+    optional: true
 
   '@ethersproject/signing-key@5.8.0':
     dependencies:
@@ -8493,6 +8534,7 @@ snapshots:
       bn.js: 5.2.5
       elliptic: 6.6.1
       hash.js: 1.1.7
+    optional: true
 
   '@ethersproject/solidity@5.8.0':
     dependencies:
@@ -8502,12 +8544,14 @@ snapshots:
       '@ethersproject/logger': 5.8.0
       '@ethersproject/sha2': 5.8.0
       '@ethersproject/strings': 5.8.0
+    optional: true
 
   '@ethersproject/strings@5.8.0':
     dependencies:
       '@ethersproject/bytes': 5.8.0
       '@ethersproject/constants': 5.8.0
       '@ethersproject/logger': 5.8.0
+    optional: true
 
   '@ethersproject/transactions@5.8.0':
     dependencies:
@@ -8520,12 +8564,14 @@ snapshots:
       '@ethersproject/properties': 5.8.0
       '@ethersproject/rlp': 5.8.0
       '@ethersproject/signing-key': 5.8.0
+    optional: true
 
   '@ethersproject/units@5.8.0':
     dependencies:
       '@ethersproject/bignumber': 5.8.0
       '@ethersproject/constants': 5.8.0
       '@ethersproject/logger': 5.8.0
+    optional: true
 
   '@ethersproject/wallet@5.8.0':
     dependencies:
@@ -8544,6 +8590,7 @@ snapshots:
       '@ethersproject/signing-key': 5.8.0
       '@ethersproject/transactions': 5.8.0
       '@ethersproject/wordlists': 5.8.0
+    optional: true
 
   '@ethersproject/web@5.8.0':
     dependencies:
@@ -8552,6 +8599,7 @@ snapshots:
       '@ethersproject/logger': 5.8.0
       '@ethersproject/properties': 5.8.0
       '@ethersproject/strings': 5.8.0
+    optional: true
 
   '@ethersproject/wordlists@5.8.0':
     dependencies:
@@ -8560,6 +8608,7 @@ snapshots:
       '@ethersproject/logger': 5.8.0
       '@ethersproject/properties': 5.8.0
       '@ethersproject/strings': 5.8.0
+    optional: true
 
   '@exodus/bytes@1.16.0(@noble/hashes@1.8.0)':
     optionalDependencies:
@@ -10914,6 +10963,8 @@ snapshots:
 
   '@standard-schema/spec@1.1.0': {}
 
+  '@stripe/stripe-js@9.17.0': {}
+
   '@swc/helpers@0.5.23':
     dependencies:
       tslib: 2.8.1
@@ -11565,7 +11616,8 @@ snapshots:
 
   acorn@8.18.0: {}
 
-  aes-js@3.0.0: {}
+  aes-js@3.0.0:
+    optional: true
 
   agent-base@7.1.4: {}
 
@@ -11734,7 +11786,8 @@ snapshots:
     dependencies:
       tweetnacl: 0.14.5
 
-  bech32@1.1.4: {}
+  bech32@1.1.4:
+    optional: true
 
   better-result@2.10.0: {}
 
@@ -11768,29 +11821,10 @@ snapshots:
       inherits: 2.0.4
       readable-stream: 3.6.2
 
-  blake-hash@2.0.0:
-    dependencies:
-      node-addon-api: 3.2.1
-      node-gyp-build: 4.8.4
-      readable-stream: 3.6.2
-
-  blake2b-wasm@2.4.0:
-    dependencies:
-      b4a: 1.9.0
-      nanoassert: 2.0.0
-    transitivePeerDependencies:
-      - react-native-b4a
-
-  blake2b@2.1.4:
-    dependencies:
-      blake2b-wasm: 2.4.0
-      nanoassert: 2.0.0
-    transitivePeerDependencies:
-      - react-native-b4a
-
   bluebird@3.7.2: {}
 
-  bn.js@4.12.5: {}
+  bn.js@4.12.5:
+    optional: true
 
   bn.js@5.2.5: {}
 
@@ -11845,7 +11879,8 @@ snapshots:
     dependencies:
       fill-range: 7.1.1
 
-  brorand@1.1.0: {}
+  brorand@1.1.0:
+    optional: true
 
   browserslist@4.29.3:
     dependencies:
@@ -11997,17 +12032,6 @@ snapshots:
     dependencies:
       ffjavascript: 0.3.1
 
-  circomlibjs@0.1.7(bufferutil@4.1.0)(utf-8-validate@6.0.6):
-    dependencies:
-      blake-hash: 2.0.0
-      blake2b: 2.1.4
-      ethers: 5.8.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)
-      ffjavascript: 0.2.63
-    transitivePeerDependencies:
-      - bufferutil
-      - react-native-b4a
-      - utf-8-validate
-
   classnames@2.5.1: {}
 
   client-only@0.0.1: {}
@@ -12023,8 +12047,6 @@ snapshots:
       string-width: 4.2.3
       strip-ansi: 6.0.1
       wrap-ansi: 7.0.0
-
-  clone@2.1.2: {}
 
   color-convert@2.0.1:
     dependencies:
@@ -12293,6 +12315,7 @@ snapshots:
       inherits: 2.0.4
       minimalistic-assert: 1.0.1
       minimalistic-crypto-utils: 1.0.1
+    optional: true
 
   emoji-regex@8.0.0: {}
 
@@ -12497,6 +12520,7 @@ snapshots:
     transitivePeerDependencies:
       - bufferutil
       - utf-8-validate
+    optional: true
 
   event-target-shim@5.0.1: {}
 
@@ -12515,6 +12539,8 @@ snapshots:
   events@3.3.0: {}
 
   eventsource-parser@3.1.1: {}
+
+  eventsource-parser@4.1.1: {}
 
   eventsource@3.0.7:
     dependencies:
@@ -12652,12 +12678,6 @@ snapshots:
   fdir@6.5.0(picomatch@4.0.7):
     optionalDependencies:
       picomatch: 4.0.7
-
-  ffjavascript@0.2.63:
-    dependencies:
-      wasmbuilder: 0.0.16
-      wasmcurves: 0.2.2
-      web-worker: 1.2.0
 
   ffjavascript@0.3.0:
     dependencies:
@@ -12856,6 +12876,7 @@ snapshots:
     dependencies:
       inherits: 2.0.4
       minimalistic-assert: 1.0.1
+    optional: true
 
   hashery@1.5.1:
     dependencies:
@@ -12880,6 +12901,7 @@ snapshots:
       hash.js: 1.1.7
       minimalistic-assert: 1.0.1
       minimalistic-crypto-utils: 1.0.1
+    optional: true
 
   hono@4.13.12: {}
 
@@ -13092,7 +13114,8 @@ snapshots:
 
   jose@6.2.12: {}
 
-  js-sha3@0.8.0: {}
+  js-sha3@0.8.0:
+    optional: true
 
   js-tokens@10.0.0: {}
 
@@ -13588,9 +13611,11 @@ snapshots:
 
   mime@1.6.0: {}
 
-  minimalistic-assert@1.0.1: {}
+  minimalistic-assert@1.0.1:
+    optional: true
 
-  minimalistic-crypto-utils@1.0.1: {}
+  minimalistic-crypto-utils@1.0.1:
+    optional: true
 
   minimatch@10.2.6:
     dependencies:
@@ -13611,6 +13636,24 @@ snapshots:
   mkdirp@1.0.4: {}
 
   mkdirp@3.0.1: {}
+
+  mppx@0.13.1(@modelcontextprotocol/sdk@1.32.1(zod@4.6.5))(@x402/core@2.28.0)(@x402/express@2.28.0(bufferutil@4.1.0)(express@4.22.3)(typescript@5.9.3)(utf-8-validate@6.0.6))(express@4.22.3)(hono@4.13.12)(next@16.3.8(@opentelemetry/api@1.9.1)(@types/node@24.19.1)(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(typescript@5.9.3)(viem@2.57.3(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@6.0.6)(zod@4.6.5)):
+    dependencies:
+      '@stripe/stripe-js': 9.17.0
+      eventsource-parser: 4.1.1
+      ox: 0.14.45(typescript@5.9.3)(zod@4.6.5)
+      structured-headers: 2.1.0
+      viem: 2.57.3(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@6.0.6)(zod@4.6.5)
+      zod: 4.6.5
+    optionalDependencies:
+      '@modelcontextprotocol/sdk': 1.32.1(zod@4.6.5)
+      '@x402/core': 2.28.0
+      '@x402/express': 2.28.0(bufferutil@4.1.0)(ethers@5.8.0(bufferutil@4.1.0)(utf-8-validate@6.0.6))(express@4.22.3)(typescript@5.9.3)(utf-8-validate@6.0.6)
+      express: 4.22.3
+      hono: 4.13.12
+      next: 16.3.8(@babel/core@7.29.7)(@opentelemetry/api@1.9.1)(@types/node@24.19.1)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+    transitivePeerDependencies:
+      - typescript
 
   ms@2.0.0: {}
 
@@ -13634,8 +13677,6 @@ snapshots:
 
   nan@2.29.0:
     optional: true
-
-  nanoassert@2.0.0: {}
 
   nanoid@3.3.19: {}
 
@@ -13678,17 +13719,12 @@ snapshots:
       - '@types/node'
       - babel-plugin-macros
 
-  node-addon-api@3.2.1: {}
-
-  node-cache@5.1.2:
-    dependencies:
-      clone: 2.1.2
-
   node-fetch@2.7.0:
     dependencies:
       whatwg-url: 5.0.0
 
-  node-gyp-build@4.8.4: {}
+  node-gyp-build@4.8.4:
+    optional: true
 
   node-int64@0.4.0: {}
 
@@ -14226,7 +14262,8 @@ snapshots:
 
   scheduler@0.28.0: {}
 
-  scrypt-js@3.0.1: {}
+  scrypt-js@3.0.1:
+    optional: true
 
   semver@6.3.1: {}
 
@@ -14490,6 +14527,8 @@ snapshots:
   stripe@22.6.2(@types/node@24.19.1):
     optionalDependencies:
       '@types/node': 24.19.1
+
+  structured-headers@2.1.0: {}
 
   styled-jsx@5.1.6(@babel/core@7.29.7)(react@19.3.0):
     dependencies:
@@ -14991,6 +15030,7 @@ snapshots:
     optionalDependencies:
       bufferutil: 4.1.0
       utf-8-validate: 6.0.6
+    optional: true
 
   ws@8.21.0(bufferutil@4.1.0)(utf-8-validate@6.0.6):
     optionalDependencies:
