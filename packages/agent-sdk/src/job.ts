@@ -28,6 +28,7 @@ import type {
 } from './types.js';
 
 const BPS = 10_000n;
+const GATE_LAG_GRACE_SECONDS = 60;
 const DELIVERED: ReadonlySet<JobStatus> = new Set(['delivered', 'disputed', 'resolved', 'released', 'refunded']);
 const ACCEPTED_OR_LATER: ReadonlySet<JobStatus> = new Set(['accepted', ...DELIVERED]);
 
@@ -222,6 +223,9 @@ export function createJobExecutor(deps: JobExecutorDeps): TaskExecutor {
       let deadline: number | null = null;
 
       let floor: JobStatus | null = null;
+      let known: JobState | null = null;
+      const admittedAt = deps.now();
+      const gateAhead = () => context.job.status === 'funded' && deps.now() - admittedAt < GATE_LAG_GRACE_SECONDS;
 
       const capabilityFor = (): AgentCapability => {
         if (capability) return capability;
@@ -234,9 +238,10 @@ export function createJobExecutor(deps: JobExecutorDeps): TaskExecutor {
       for (;;) {
         if (context.signal.aborted) return;
         try {
-          const job = await readJob(client, address, readCommitment);
+          const job = known ?? (await readJob(client, address, readCommitment));
+          known = null;
           if (!job) {
-            if (deadline === null) throw new JobFailure(`job zincirde yok: ${context.job.address}`);
+            if (deadline === null && !gateAhead()) throw new JobFailure(`job zincirde yok: ${context.job.address}`);
             throw new Error(`job zincirde okunamadı: ${context.job.address}`);
           }
           deadline = job.deadline;
@@ -253,7 +258,7 @@ export function createJobExecutor(deps: JobExecutorDeps): TaskExecutor {
             } else if (output && receipt) {
               deps.onError(
                 new JobFailure(
-                  `job zincirde başka bir teslimle (${job.workHash}) teslim edilmiş, yerel çıktı (${receipt.workHash}) sunulmadı`,
+                  `job zincirde başka bir teslimle (${job.workHash}) teslim edilmiş, yerel çıktı sunulmadı`,
                 ),
               );
             }
@@ -264,6 +269,7 @@ export function createJobExecutor(deps: JobExecutorDeps): TaskExecutor {
             return;
           }
           if (job.status === 'open') {
+            if (gateAhead()) throw new Error('zincir okuması geride: job open, görev kapısı fonlanmış gördü');
             await context.reject('job fonlanmamış: kurum fund_job’dan sonra görevi yeniden açmalı');
             return;
           }
@@ -338,6 +344,7 @@ export function createJobExecutor(deps: JobExecutorDeps): TaskExecutor {
                 (sending === 'accepted' && DELIVERED.has(fresh.status)));
             if (landed) {
               floor = 'accepted';
+              known = fresh;
               deps.onError(error);
               continue;
             }

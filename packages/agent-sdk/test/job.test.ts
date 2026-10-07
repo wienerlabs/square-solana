@@ -159,9 +159,9 @@ describe('job yürütücüsü', () => {
     await expect(executor().onTask(fakeContext(await job('accepted'), unknown).context)).rejects.toThrow(
       'bilinmeyen capability',
     );
-    await expect(executor().onTask(fakeContext(Keypair.generate().publicKey, specParts).context)).rejects.toThrow(
-      'job zincirde yok',
-    );
+    let clock = Math.floor(Date.now() / 1000);
+    const missing = fakeContext(Keypair.generate().publicKey, specParts).context;
+    await expect(executor({ now: () => (clock += 61) }).onTask(missing)).rejects.toThrow('job zincirde yok');
   });
 
   it('kabul edilmiş job başka cüzdana bağlıysa hata verir', async () => {
@@ -301,7 +301,64 @@ describe('geçici hatalar ve kabul kapısı', () => {
     await executor().onTask(recorded.context);
     expect(recorded.calls.some((call) => call.startsWith('addArtifact'))).toBe(false);
     expect(recorded.calls.at(-1)).toBe(completedOnChain('delivered', '09'.repeat(32), 'ipfs://onceki-teslimat'));
-    expect(errors.some((error) => error instanceof JobFailure && /yerel çıktı/.test(error.message))).toBe(true);
+    const withheld = errors.find((error) => error instanceof JobFailure && /yerel çıktı/.test(error.message));
+    expect((withheld as Error).message.match(/[0-9a-f]{64}/g)).toEqual(['09'.repeat(32)]);
+  });
+
+  it('kapı fonlanmış gördüyse geride kalan onaylı okuma görevi reddetmez ya da düşürmez', async () => {
+    const address = await job('funded');
+    const key = address.toBase58();
+    const funded = sim.accounts.get(key)!;
+    await sim.patchJob(address, { status: { open: {} } });
+    const open = sim.accounts.get(key)!;
+    sim.accounts.set(key, funded);
+    const lagging = [open, null];
+    sim.readHook = (seen, info, commitment) =>
+      seen === key && commitment === 'confirmed' && lagging.length > 0 ? lagging.shift()! : info;
+    const recorded = fakeContext(address, specParts);
+    await executor().onTask(recorded.context);
+    expect(lagging).toEqual([]);
+    expect(kinds()).toEqual(['acceptJob', 'submitWork']);
+    expect(recorded.calls.at(-1)).toMatch(/^complete:teslim edildi: submit_work /);
+  });
+
+  it('kapının gördüğü fonlama süre içinde görünmezse görev fonlanmamış diye reddedilir', async () => {
+    const address = await job('funded');
+    await sim.patchJob(address, { status: { open: {} } });
+    let clock = Math.floor(Date.now() / 1000);
+    sim.readHook = (_seen, info) => {
+      clock += 61;
+      return info;
+    };
+    const recorded = fakeContext(address, specParts);
+    await executor({ now: () => clock }).onTask(recorded.context);
+    expect(recorded.calls).toEqual(['reject:job fonlanmamış: kurum fund_job’dan sonra görevi yeniden açmalı']);
+    expect(kinds()).toEqual([]);
+  });
+
+  it('teslim indikten sonra okumalar dönüşümlü geride kalsa da submit_work bir kez yeniden gönderilir', async () => {
+    const address = await job('accepted');
+    const key = address.toBase58();
+    let accepted: AccountInfo<Buffer> | null = null;
+    let submits = 0;
+    let confirms = 0;
+    let settledReads = 0;
+    sim.before = async (name) => {
+      if (name !== 'submitWork') return;
+      submits += 1;
+      accepted ??= sim.accounts.get(key)!;
+    };
+    sim.confirmFailure = () => (++confirms === 1 ? new Error('confirm zaman aşımı') : null);
+    sim.readHook = (seen, info, commitment) => {
+      if (seen !== key || commitment !== 'confirmed' || sim.jobStatus(address) !== 'delivered') return info;
+      settledReads += 1;
+      return settledReads % 2 === 1 && settledReads <= 5 ? accepted : info;
+    };
+    const recorded = fakeContext(address, specParts);
+    await executor().onTask(recorded.context);
+    expect(submits).toBe(2);
+    expect(recorded.calls).toContain('addArtifact');
+    expect(recorded.calls.at(-1)).toMatch(/^complete:job zincirde teslim edilmiş \(delivered\)/);
   });
 
   it('kabul indikten sonra okumalar hep fonlanmış gösterse de InvalidStatus görevi düşürmez', async () => {
