@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Square Solana API
-  version: 0.24.0
+  version: 0.25.0
   summary: Square HTTP API sözleşmesi (BE-35), uygulaması apps/api (BE-18).
   description: |
     Contract-first API sözleşmesi. Zincirdeki hesaplar, event'ler ve instruction argümanları
@@ -1519,6 +1519,8 @@ paths:
       security:
         - session: []
         - apiKey: []
+      parameters:
+        - $ref: '#/components/parameters/SmartAccount'
       requestBody:
         required: true
         content:
@@ -1556,6 +1558,7 @@ paths:
           required: true
           description: Job'ları açan kurum anahtarı (`Job.institution`).
           schema: { $ref: './schemas/idl.json#/Address' }
+        - $ref: '#/components/parameters/SmartAccount'
       responses:
         '200':
           description: Müşteri ve kart.
@@ -1566,6 +1569,7 @@ paths:
                   - $ref: '#/components/schemas/SuccessBase'
                   - properties:
                       data: { $ref: '#/components/schemas/FiatCustomer' }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
@@ -1593,6 +1597,7 @@ paths:
         - apiKey: []
       parameters:
         - $ref: '#/components/parameters/JobPath'
+        - $ref: '#/components/parameters/SmartAccount'
       requestBody:
         required: true
         content:
@@ -1633,6 +1638,7 @@ paths:
         - apiKey: []
       parameters:
         - $ref: '#/components/parameters/JobPath'
+        - $ref: '#/components/parameters/SmartAccount'
       responses:
         '200':
           description: Ödeme alındı; attestation.
@@ -1670,6 +1676,7 @@ paths:
         - apiKey: []
       parameters:
         - $ref: '#/components/parameters/JobPath'
+        - $ref: '#/components/parameters/SmartAccount'
       responses:
         '200':
           description: Attestation.
@@ -1680,6 +1687,7 @@ paths:
                   - $ref: '#/components/schemas/SuccessBase'
                   - properties:
                       data: { $ref: '#/components/schemas/FiatAttestation' }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
@@ -1697,6 +1705,7 @@ paths:
         - apiKey: []
       parameters:
         - $ref: '#/components/parameters/JobPath'
+        - $ref: '#/components/parameters/SmartAccount'
       responses:
         '200':
           description: Attestation.
@@ -1707,6 +1716,7 @@ paths:
                   - $ref: '#/components/schemas/SuccessBase'
                   - properties:
                       data: { $ref: '#/components/schemas/FiatAttestation' }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }

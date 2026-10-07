@@ -1,13 +1,16 @@
 // fiat etiketi: Stripe MPP fiat rayı (BE-25, ADR 0026). Kurumun oturumu ya da `fiat:pay` kapsamlı anahtarı ödemeyi
-// açar, kartı kaydeder ve attestation'ı okur. İki uç genel kimlik ara katmanından ve `express.json`'dan önce
-// bağlanır (`fiatPreAuthRoutes`):
+// açar, kartı kaydeder ve attestation'ı okur. Kurum anahtarı bir smart account'un vault'uysa üye
+// `X-Square-Smart-Account` başlığıyla gelir (caller.ts). İki uç genel kimlik ara katmanından ve `express.json`'dan
+// önce bağlanır (`fiatPreAuthRoutes`):
 // - Stripe webhook'u: imza ham gövde üzerindedir; kimliği Stripe'ın imzasıdır.
-// - MPP: `Authorization` MPP credential'ını taşır; kimlik yalnızca `X-API-Key`'dir.
+// - MPP: `Authorization` MPP credential'ını taşır; kimlik yalnızca `X-API-Key`'dir. Principal'ı `apiKeyOnly` kurar,
+//   başlık onunla okunur.
 // Fiat rayı yapılandırılmamışsa uçlar 503 `payment_unavailable` döner.
 import { FiatPaymentCreateSchema, FiatSetupIntentCreateSchema } from '@squaresdk/solana-types';
 import express, { Router, type Request, type RequestHandler, type Response } from 'express';
 import { requireActor } from '../auth/middleware.js';
 import type { AuthService } from '../auth/service.js';
+import { callerOf } from '../caller.js';
 import type { MppCharger } from '../fiat/mpp.js';
 import type { FiatService } from '../fiat/service.js';
 import { HttpError, badRequest, conflict, parse, route, sendError, sendOk, unauthorized } from '../http.js';
@@ -21,7 +24,7 @@ export interface FiatDeps {
 }
 
 const unavailable = () => new HttpError(503, 'payment_unavailable', 'fiat rayı yapılandırılmamış');
-const paying = (res: Response) => requireActor(res, 'fiat:pay').wallet;
+const paying = (res: Response) => callerOf(res, requireActor(res, 'fiat:pay'));
 const param = (req: Request, name: string) => String(req.params[name]);
 /** MPP challenge'ından istemciye geçen başlıklar. */
 const CHALLENGE_HEADERS = ['www-authenticate', 'cache-control'];
@@ -78,9 +81,9 @@ export function fiatPreAuthRoutes(deps: {
     deps.writeLimit,
     route(async (req, res) => {
       if (!fiat) throw unavailable();
-      const wallet = paying(res);
+      const caller = paying(res);
       if (!fiat.mpp) throw new HttpError(503, 'payment_unavailable', 'MPP yapılandırılmamış (Stripe profili)');
-      const job = await fiat.service.payableJob(param(req, 'job'), wallet);
+      const job = await fiat.service.payableJob(param(req, 'job'), caller);
       const authorization = req.get('authorization');
       const request = new Request(new URL(req.originalUrl, `${fiat.publicBaseUrl}/`), {
         method: 'POST',
@@ -131,9 +134,9 @@ export function fiatRoutes(deps: {
     writeLimit,
     route(async (req, res) => {
       const fiatService = service();
-      const wallet = paying(res);
+      const caller = paying(res);
       const body = parse(FiatSetupIntentCreateSchema, req.body, 'istek');
-      sendOk(res, await fiatService.setupIntent(body.institution, wallet), 201);
+      sendOk(res, await fiatService.setupIntent(body.institution, caller), 201);
     }),
   );
   router.get(
@@ -149,9 +152,9 @@ export function fiatRoutes(deps: {
     writeLimit,
     route(async (req, res) => {
       const fiatService = service();
-      const wallet = paying(res);
+      const caller = paying(res);
       const body = parse(FiatPaymentCreateSchema, req.body, 'istek');
-      sendOk(res, await fiatService.createPayment(param(req, 'job'), wallet, body.offSession), 201);
+      sendOk(res, await fiatService.createPayment(param(req, 'job'), caller, body.offSession), 201);
     }),
   );
   router.get(

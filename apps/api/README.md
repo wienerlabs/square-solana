@@ -70,8 +70,10 @@ başlığıyla aynıdır. Zamanlar Unix saniyesidir.
   - Hesap Squads v4 multisig'i değilse ya da cüzdan Initiate yetkili değilse 403, multisig okunamazsa 503,
     geçersiz adres 400 döner.
   - Başlığı kabul eden uçlar: `uploadDelivery`, `putAgentCard` (kayıttan önce yol vault ve `agentId` ile
-    türetilir), `putPolicyMeta`, Travel Rule uçları, `uploadDisputeEvidence`, `listDisputeEvidence` ve
-    `getDisputeEvidenceContent`. Diğer uçlarda başlık okunmaz. Arbitrator uçları cüzdanla çalışır.
+    türetilir), `putPolicyMeta`, Travel Rule uçları, `uploadDisputeEvidence`, `listDisputeEvidence`,
+    `getDisputeEvidenceContent` ve fiat ödemesi uçları (`createFiatSetupIntent`, `getFiatCustomer`,
+    `createFiatPayment`, `payFiatJobMpp`, `getFiatAttestation`, `reconcileFiatPayment`). Diğer uçlarda başlık
+    okunmaz. Arbitrator uçları cüzdanla çalışır.
   - Kayıtlara (yükleyen, erişim kaydı, `updatedBy`) vault değil, üyenin cüzdanı yazılır.
   - Kurum multisig'i `set_institution_multisig` ile bağlamışsa başlık gerekmez: Initiate yetkili üyeler zaten
     kurumun yetkilisidir.
@@ -259,7 +261,9 @@ zincir tarafı [ADR 0024](../../docs/decisions/0024-stripe-mpp-fiat-rayi.md). Ko
   biriminden sente çevrilir (1 sent = 10^(decimals − 2)). Tam sent olmayan ya da 50 sentin altındaki iş ödenmez.
 - **Ön koşul (her yol):**
   - job fiat rayında ve `Delivered`;
-  - çağıran job'un kurumunun güncel yetkilisi;
+  - çağıran job'un kurumunun güncel yetkilisi; kurum anahtarı bir smart account'un vault'uysa
+    `X-Square-Smart-Account` başlığıyla gelen `Initiate` yetkili üye (vault'la açılmış kurum `create_fiat_job` ile
+    fiat iş açar);
   - işin attestation'ı yok (409);
   - ödeme kurumun public günlük tavanını bugünkü sayaçla aşmıyor (400, `details.dailyCeiling`).
 - **Yollar:**

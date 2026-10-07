@@ -141,7 +141,8 @@ export const SPONSOR_REJECTION_TEXT: Readonly<Record<string, string>> = {
   daily_budget_exceeded: "Today's sponsored budget for this wallet is used up.",
   global_budget_exceeded: "The sponsor's budget for today is used up.",
   rate_limited: 'Too many sponsored requests; wait a moment and try again.',
-  send_failed: 'The RPC rejected the sponsored transaction.',
+  // Sponsor imzaladı; tx blockhash süresince yine de zincire girebilir (BE-27, `send_failed`).
+  send_failed: 'Sending the sponsored transaction failed at the RPC. It may still land until its blockhash expires.',
 };
 
 /**
