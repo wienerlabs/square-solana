@@ -29,6 +29,12 @@ const optional = <T extends z.ZodType>(schema: T) =>
   z.preprocess((value) => (typeof value === 'string' && value.trim() === '' ? undefined : value), schema.optional());
 /** Sondaki eğik çizgi olmadan. */
 const baseUrl = (schema: z.ZodType<string, string>) => schema.transform((value) => value.replace(/\/+$/, ''));
+const isDevelopmentHost = (host: string) =>
+  host === 'localhost' ||
+  host === '127.0.0.1' ||
+  host === '[::1]' ||
+  host.endsWith('.localhost') ||
+  host.endsWith('.test');
 
 /** `agentCardUri`'nin yol kısmı: `/a/<AgentRecord>/.well-known/agent-card.json` (adres en çok 44 karakter). */
 const CARD_PATH_MAX = '/a/'.length + 44 + '/.well-known/agent-card.json'.length;
@@ -82,7 +88,7 @@ const EnvSchema = z.object({
   API_EVIDENCE_S3_BUCKET: nonEmpty,
   API_EVIDENCE_MAX_BYTES: int(1),
   /** Escrow config'inden okunan arbitrator setinin önbellek süresi. */
-  API_ARBITRATOR_CACHE_SECONDS: int(0),
+  API_ARBITRATOR_CACHE_SECONDS: int(0, 300),
 
   /**
    * Arbitrator webhook sırlarının anahtar halkası (`kimlik:base64,…`, her anahtar 32 bayt) ve etkin anahtar. Travel
@@ -325,6 +331,11 @@ export function loadConfig(env: Readonly<Record<string, string | undefined>>): A
     }
     if (e.API_EVIDENCE_S3_BUCKET === e.API_DELIVERY_S3_BUCKET) {
       problems.push('API_EVIDENCE_S3_BUCKET: teslimat kovası herkese açık okunur; kanıt kovası ondan ayrı olmalı');
+    }
+    if (e.API_NOTIFY_ALLOW_INSECURE && !isDevelopmentHost(new URL(e.API_PUBLIC_BASE_URL).hostname)) {
+      problems.push(
+        'API_NOTIFY_ALLOW_INSECURE: yalnızca yerel geliştirmede açılır (API_PUBLIC_BASE_URL localhost, *.localhost ya da *.test)',
+      );
     }
     if (e.API_NOTIFY_BACKOFF_MAX_SECONDS < e.API_NOTIFY_BACKOFF_BASE_SECONDS) {
       problems.push('API_NOTIFY_BACKOFF_MAX_SECONDS: API_NOTIFY_BACKOFF_BASE_SECONDS’tan küçük olamaz');

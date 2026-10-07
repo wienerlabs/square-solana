@@ -33,6 +33,7 @@ const SCOPE_TO_DB: Readonly<Record<ApiKeyScope, DbScope>> = {
   'agents:write': 'agentsWrite',
   prove: 'prove',
   'disputes:write': 'disputesWrite',
+  'disputes:read': 'disputesRead',
   'x402:serve': 'x402Serve',
   'fiat:pay': 'fiatPay',
 };

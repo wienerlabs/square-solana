@@ -67,7 +67,7 @@ Her servis bir Railway servisidir; derleme ve sağlık denetimi `apps/<servis>/r
 | `API_DELIVERY_MAX_BYTES` | Teslimat deposu, S3 uyumlu (zorunlu) |  |  |
 | `API_EVIDENCE_S3_BUCKET` | Dispute kanıtı (zorunlu, BE-22) |  | Kanıtların kovası: teslimat deposuyla aynı uç nokta ve kimlik; herkese açık OKUNMAZ (kanıt API'den indirilir) |
 | `API_EVIDENCE_MAX_BYTES` | Dispute kanıtı (zorunlu, BE-22) |  |  |
-| `API_ARBITRATOR_CACHE_SECONDS` | Dispute kanıtı (zorunlu, BE-22) |  | Escrow config'inden okunan arbitrator setinin önbellek süresi |
+| `API_ARBITRATOR_CACHE_SECONDS` | Dispute kanıtı (zorunlu, BE-22) |  | Escrow config'inden okunan arbitrator setinin önbellek süresi (saniye, en çok 300) |
 | `API_WEBHOOK_SECRET_KEYS` | Arbitrator bildirimleri (zorunlu, BE-22) | **secret** | Webhook sırlarının şifreleme anahtar halkası: kimlik:base64,kimlik:base64 (her anahtar 32 bayt; openssl rand -base64 32) ve yeni değerleri şifreleyen anahtarın kimliği. Travel Rule'un halkasından ayrıdır. |
 | `API_WEBHOOK_SECRET_ACTIVE_KEY_ID` | Arbitrator bildirimleri (zorunlu, BE-22) |  |  |
 | `API_NOTIFY_INTERVAL_MS` | Arbitrator bildirimleri (zorunlu, BE-22) |  | Outbox turu aralığı ve tur başına en fazla teslimat |
@@ -77,7 +77,7 @@ Her servis bir Railway servisidir; derleme ve sağlık denetimi `apps/<servis>/r
 | `API_NOTIFY_BACKOFF_BASE_SECONDS` | Arbitrator bildirimleri (zorunlu, BE-22) |  | Yeniden deneme: ilk bekleme, her denemede ikiye katlanır, üst sınır |
 | `API_NOTIFY_BACKOFF_MAX_SECONDS` | Arbitrator bildirimleri (zorunlu, BE-22) |  |  |
 | `API_NOTIFY_DEADLINE_WARNING_SECONDS` | Arbitrator bildirimleri (zorunlu, BE-22) |  | Son tarihe bu kadar saniye kala oy vermemiş arbitrator'lara dispute.deadline gönderilir |
-| `API_NOTIFY_ALLOW_INSECURE` | Arbitrator bildirimleri (zorunlu, BE-22) |  | true yalnızca geliştirmede: webhook ucu http ve özel ağ adresi olabilir |
+| `API_NOTIFY_ALLOW_INSECURE` | Arbitrator bildirimleri (zorunlu, BE-22) |  | true yalnızca geliştirmede (API_PUBLIC_BASE_URL localhost, *.localhost ya da *.test): webhook ucu http ve özel ağ adresi olabilir |
 | `API_LOOKUP_TABLE` | Tx hazırlama |  | İsteğe bağlı: Square address lookup table'ı (BC-28); verilirse her tx'e eklenir |
 | `API_COMPUTE_UNIT_PRICE` | Tx hazırlama |  | Zorunlu: computeUnitPrice verilmeyen tx'lerin priority fee'si (mikro-lamport / CU) |
 | `API_CCTP_MESSAGE_TRANSMITTER` | CCTP ile fonlama (BE-26; isteğe bağlı, üçü birlikte) |  | Circle'ın Solana programları (MessageTransmitterV2, TokenMessengerMinterV2) ve kaynak domain başına CCTP ALT'ı: virgülle domain:adres (scripts/deploy/networks/<ağ>.json, cctp). Verilmezse CCTP kaydı ve tx'i reddedilir. |

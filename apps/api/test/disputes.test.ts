@@ -129,7 +129,7 @@ describe('dispute kanıtı', () => {
     const first = await byInstitution.uploadDisputeEvidence(job.address, new Blob([reason], { type: 'text/plain' }));
     expect(first.success && first.data.isDisputeReason).toBe(true);
 
-    const ownerKey = await apiKey(stack, agentOwner, ['disputes:write', 'read']);
+    const ownerKey = await apiKey(stack, agentOwner, ['disputes:write', 'disputes:read']);
     const byOwner = stack.api({ apiKey: ownerKey });
     const reply = await byOwner.uploadDisputeEvidence(job.address, new Blob(['yanıt: tamamı teslim edildi']));
     expect(reply).toMatchObject({ success: true, data: { role: 'agent', uploadedBy: agentOwner.address } });
@@ -175,6 +175,65 @@ describe('dispute kanıtı', () => {
     expect(uploaded).toMatchObject({ success: true, data: { role: 'institution' } });
   });
 
+  it('Squads vault’lu kurumun multisig’i okunamasa da agent ve arbitrator kanıtı okur ve yükler', async () => {
+    const member = wallet();
+    const multisig = world.squadsMultisig([{ key: member.address, permissions: PERMISSION_INITIATE }]);
+    const institutionPda = await world.institution(wallet().address, { multisig });
+    const vault = (await stack.db.institution.findUniqueOrThrow({ where: { address: institutionPda } })).multisigVault!;
+    const job = await world.job({
+      institution: vault,
+      agentRecord,
+      agentWallet: agentWallet.address,
+      disputed: true,
+      status: 'disputed',
+      amount: AMOUNT,
+      dispute: { deadline: new BN(DEADLINE), arbitratorSetVersion: 4, approvalMask: 0, approvalCount: 0 },
+    });
+    const byMember = await session(member);
+    const uploaded = await byMember.uploadDisputeEvidence(job.address, new Blob(['kurumun gerekçesi']));
+    if (!uploaded.success) throw new Error(uploaded.error.message);
+    expect(uploaded.data.role).toBe('institution');
+    stack.rpc.accounts.delete(multisig.toBase58());
+
+    const byArbitrator = await session(panel[0]!);
+    const content = await byArbitrator.getDisputeEvidenceContent(job.address, uploaded.data.id);
+    expect(await content.text()).toBe('kurumun gerekçesi');
+    expect(await byArbitrator.uploadDisputeEvidence(job.address, new Blob(['arbitrator notu']))).toMatchObject({
+      success: true,
+      data: { role: 'arbitrator' },
+    });
+    const listed = await (await session(agentWallet)).listDisputeEvidence(job.address);
+    if (!listed.success) throw new Error(listed.error.message);
+    expect(listed.data.map((e) => e.role)).toEqual(['institution', 'arbitrator']);
+    expect(await byMember.listDisputeEvidence(job.address)).toMatchObject({ error: { code: 'forbidden' } });
+  });
+
+  it('multisig okunamazken (503) okuma alttaki rolle sürer, yükleme yeniden denenmek üzere 503 alır', async () => {
+    const multisig = world.squadsMultisig([{ key: wallet().address, permissions: PERMISSION_INITIATE }]);
+    const institutionPda = await world.institution(wallet().address, { multisig });
+    const vault = (await stack.db.institution.findUniqueOrThrow({ where: { address: institutionPda } })).multisigVault!;
+    const job = await world.job({
+      institution: vault,
+      agentRecord,
+      agentWallet: agentWallet.address,
+      disputed: true,
+      status: 'disputed',
+      amount: AMOUNT,
+      dispute: { deadline: new BN(DEADLINE), arbitratorSetVersion: 4, approvalMask: 0, approvalCount: 0 },
+    });
+    const byAgent = await session(agentWallet);
+    expect(await byAgent.uploadDisputeEvidence(job.address, new Blob(['agent yanıtı']))).toMatchObject({
+      success: true,
+      data: { role: 'agent' },
+    });
+    stack.rpc.failWith = 503;
+    const listed = await byAgent.listDisputeEvidence(job.address);
+    expect(listed.success && listed.data.map((e) => e.role)).toEqual(['agent']);
+    expect(await byAgent.uploadDisputeEvidence(job.address, new Blob(['ikinci yanıt']))).toMatchObject({
+      error: { code: 'rpc_unavailable' },
+    });
+  });
+
   it('yetki, kapsam, boyut ve bilinmeyen job', async () => {
     const job = await disputedJob();
     expect(await stack.api().uploadDisputeEvidence(job.address, new Blob(['x']))).toMatchObject({
@@ -184,6 +243,9 @@ describe('dispute kanıtı', () => {
     const readOnly = stack.api({ apiKey: await apiKey(stack, institution, ['read']) });
     expect(await readOnly.uploadDisputeEvidence(job.address, new Blob(['x']))).toMatchObject({
       error: { code: 'forbidden', message: 'API anahtarının disputes:write kapsamı yok' },
+    });
+    expect(await readOnly.listDisputeEvidence(job.address)).toMatchObject({
+      error: { code: 'forbidden', message: 'API anahtarının disputes:read kapsamı yok' },
     });
     const byInstitution = await session(institution);
     expect(await byInstitution.uploadDisputeEvidence(job.address, new Blob(['x'.repeat(65)]))).toMatchObject({
@@ -241,6 +303,31 @@ describe('arbitrator kuyruğu', () => {
     ]);
     expect(await (await session(wallet())).getArbitrationQueue()).toMatchObject({ error: { code: 'forbidden' } });
     expect(await stack.api().getArbitrationQueue()).toMatchObject({ error: { code: 'unauthorized' } });
+    const readKey = stack.api({ apiKey: await apiKey(stack, panel[1]!, ['read']) });
+    expect(await readKey.getArbitrationQueue()).toMatchObject({
+      error: { code: 'forbidden', message: 'API anahtarının disputes:read kapsamı yok' },
+    });
+    const disputesKey = stack.api({ apiKey: await apiKey(stack, panel[1]!, ['disputes:read']) });
+    expect((await disputesKey.getArbitrationQueue({ limit: 2, page: 1 })).success).toBe(true);
+  });
+
+  it('kuyruk, Squads vault’lu kurumun multisig’i okunamasa da açılır', async () => {
+    const multisig = world.squadsMultisig([{ key: wallet().address, permissions: PERMISSION_INITIATE }]);
+    const institutionPda = await world.institution(wallet().address, { multisig });
+    const vault = (await stack.db.institution.findUniqueOrThrow({ where: { address: institutionPda } })).multisigVault!;
+    const job = await world.job({
+      institution: vault,
+      agentRecord,
+      agentWallet: agentWallet.address,
+      disputed: true,
+      status: 'disputed',
+      amount: AMOUNT,
+      dispute: { deadline: new BN(DEADLINE), arbitratorSetVersion: 4, approvalMask: 0, approvalCount: 0 },
+    });
+    stack.rpc.accounts.delete(multisig.toBase58());
+    const queue = await (await session(panel[0]!)).getArbitrationQueue();
+    if (!queue.success) throw new Error(queue.error.message);
+    expect(queue.data.map((item) => item.dispute.job)).toContain(job.address);
   });
 
   it('escrow config okunamazsa 503', async () => {

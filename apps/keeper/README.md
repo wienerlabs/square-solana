@@ -151,8 +151,13 @@ Teslim ve servis hataları `keeper_errors` alarmına sayılır.
 - **Lapse** (`test/lapse.test.ts`): aday seçimi, bond'lu ve bond'suz dispute, zincirde yeniden açılmış dispute'un
   beklemesi, simülasyon hataları, onay ve RPC hataları, iki crank'in günlüklerinin ayrılığı.
 - **Gerçek programlarla lapse:** apps/api'nin localnet uçtan uca testi keeper'ı süreç olarak açar ve
-  `lapse_dispute`'un onaylandığını denetler ([apps/api](../api/README.md#testler)). Gerçek programlarla
-  finalize BE-36'dadır.
+  `lapse_dispute`'un onaylandığını denetler ([apps/api](../api/README.md#testler)).
+- **Gerçek programlarla finalize** ([`tests/services`](../../tests/services/), BE-36, localnet): keeper süreç olarak
+  açılır ve finalize'ları smoke'un akışı yerine o yapar.
+  - Ana işi (alacağı satılmış, payee alıcı) keeper ücretiyle finalize eder.
+  - İspatsız işte `proofRequired` ile bekler; ispat API ve prover servisinden gelince öder.
+  - Kesin retle (`ReleaseRefused`) net tutarı kuruma iade eder.
+  - Fiat işe dokunmaz.
 
 ## Kaynak
 

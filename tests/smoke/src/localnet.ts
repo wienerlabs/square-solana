@@ -9,6 +9,7 @@
 //     [--faucet-port 9900] [--gossip-port 8001] [--dynamic-port-range 8100-8200] [--report <rapor.md>]
 import { spawn, spawnSync, type ChildProcess } from 'node:child_process';
 import { createWriteStream, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { connect } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
@@ -21,7 +22,7 @@ import { createContext } from './context.js';
 import { runInit } from './init.js';
 import { loadRoleKeys, REPO_ROOT } from './keys.js';
 import { loadCircuitArtifacts, localProver, releaseProverWorkers } from './prover.js';
-import { smokeReportMarkdown } from './render.js';
+import { smokeReportMarkdown, type InitRecord } from './render.js';
 import { runSmoke } from './smoke.js';
 
 const PROGRAMS = [
@@ -44,6 +45,8 @@ export function localnetProgramIds(anchorToml: string): Record<(typeof PROGRAMS)
   );
   return ids as Record<(typeof PROGRAMS)[number][0], string>;
 }
+
+export type LocalnetProgramIds = ReturnType<typeof localnetProgramIds>;
 
 export interface LocalnetArgs {
   deployDir: string;
@@ -172,25 +175,46 @@ function stop(validator: ChildProcess): Promise<void> {
   });
 }
 
-async function main(): Promise<void> {
-  const args = parseLocalnetArgs(process.argv.slice(2));
-  const programIds = localnetProgramIds(readFileSync(join(REPO_ROOT, 'Anchor.toml'), 'utf8'));
-  const artifacts = loadCircuitArtifacts();
-  const keysDir = mkdtempSync(join(tmpdir(), 'square-smoke-keys-'));
-  const key = Object.fromEntries(
-    ['admin', 'payer', 'screener', 'institution', 'agent', 'buyer', 'keeper', 'mintAuthority', 'mppAuthority'].map(
-      (role) => {
-        const keypair = Keypair.generate();
-        writeFileSync(join(keysDir, `${role}.json`), JSON.stringify(Array.from(keypair.secretKey)), { mode: 0o600 });
-        return [role, keypair];
-      },
-    ),
-  ) as Record<string, Keypair>;
+export const LOCALNET_ROLES = [
+  'admin',
+  'payer',
+  'screener',
+  'institution',
+  'agent',
+  'buyer',
+  'keeper',
+  'mintAuthority',
+  'mppAuthority',
+] as const;
+export type LocalnetRole = (typeof LOCALNET_ROLES)[number];
+export type LocalnetKeys = Record<LocalnetRole, Keypair>;
 
-  const version = spawnSync('solana-test-validator', ['--version'], { encoding: 'utf8' });
-  if (version.status !== 0) throw new Error("solana-test-validator bulunamadı (Agave CLI PATH'te olmalı)");
-  const agave = /^solana-test-validator\s+(\S+)/.exec(version.stdout.trim())?.[1] ?? version.stdout.trim();
-  const validatorArgs = [
+export function writeRoleKeys(dir: string): LocalnetKeys {
+  return Object.fromEntries(
+    LOCALNET_ROLES.map((role) => {
+      const keypair = Keypair.generate();
+      writeFileSync(join(dir, `${role}.json`), JSON.stringify(Array.from(keypair.secretKey)), { mode: 0o600 });
+      return [role, keypair];
+    }),
+  ) as LocalnetKeys;
+}
+
+export type ValidatorArgs = Omit<LocalnetArgs, 'report'>;
+
+export interface LocalValidator {
+  readonly rpcUrl: string;
+  readonly connection: Connection;
+  readonly agave: string;
+  readonly logPath: string;
+  stop(): Promise<void>;
+}
+
+export function validatorArgs(
+  args: ValidatorArgs,
+  programIds: LocalnetProgramIds,
+  upgradeAuthority: PublicKey,
+): string[] {
+  return [
     '--reset',
     '--quiet',
     '--ledger',
@@ -207,44 +231,130 @@ async function main(): Promise<void> {
       '--upgradeable-program',
       programIds[name],
       join(args.deployDir, `${crate}.so`),
-      key.admin!.publicKey.toBase58(),
+      upgradeAuthority.toBase58(),
     ]),
   ];
-  const log = createWriteStream(join(keysDir, 'validator.log'));
-  const validator = spawn('solana-test-validator', validatorArgs, { stdio: ['ignore', 'pipe', 'pipe'] });
-  validator.stdout?.pipe(log);
-  validator.stderr?.pipe(log);
-  try {
-    const rpcUrl = `http://127.0.0.1:${args.rpcPort}`;
-    const connection = new Connection(rpcUrl, 'confirmed');
-    await waitForRpc(connection, validator);
-    stderr(`localnet: ${agave} · ${rpcUrl}`);
-    for (const [role, sol] of [
-      ['payer', 100],
-      ['admin', 10],
-      ['keeper', 10],
-    ] as const) {
-      await airdrop(connection, key[role]!.publicKey, sol);
-    }
+}
 
-    const payer = key.payer!;
-    const mint = await createMint(connection, payer, key.mintAuthority!.publicKey, null, 6);
-    const arbitrators = [Keypair.generate(), Keypair.generate(), Keypair.generate()].map((k) => k.publicKey);
-    const config = localnetConfig({
-      rpcUrl,
-      programIds,
-      mint,
-      arbitrators,
-      screener: key.screener!.publicKey,
-      mppAuthority: key.mppAuthority!.publicKey,
-    });
-    for (const [role, amount] of [
-      ['institution', BigInt(config.smoke.jobAmount) * 10n],
-      ['buyer', BigInt(config.smoke.claimPrice) * 10n],
-    ] as const) {
-      const account = await getOrCreateAssociatedTokenAccount(connection, payer, mint, key[role]!.publicKey);
-      await mintTo(connection, payer, mint, account.address, key.mintAuthority!, amount);
+const PORT_PROBE_TIMEOUT_MS = 1_000;
+
+export function acceptsConnections(port: number, host = '127.0.0.1'): Promise<boolean> {
+  return new Promise((resolve) => {
+    const socket = connect({ port, host });
+    const settle = (accepted: boolean) => {
+      socket.destroy();
+      resolve(accepted);
+    };
+    socket.setTimeout(PORT_PROBE_TIMEOUT_MS, () => settle(false));
+    socket.once('connect', () => settle(true));
+    socket.once('error', () => settle(false));
+  });
+}
+
+export async function assertValidatorPortsFree(
+  args: Pick<ValidatorArgs, 'rpcPort' | 'faucetPort' | 'gossipPort'>,
+): Promise<void> {
+  for (const [name, port] of [
+    ['RPC', args.rpcPort],
+    ['faucet', args.faucetPort],
+    ['gossip', args.gossipPort],
+  ] as const) {
+    if (await acceptsConnections(port)) {
+      throw new Error(
+        `validator başlatılmadı: ${name} portu ${port} zaten bağlantı kabul ediyor (127.0.0.1:${port}); ` +
+          'o portta başka bir validator ya da servis çalışıyor olabilir',
+      );
     }
+  }
+}
+
+export async function startValidator(params: {
+  args: ValidatorArgs;
+  programIds: LocalnetProgramIds;
+  upgradeAuthority: PublicKey;
+  logPath: string;
+}): Promise<LocalValidator> {
+  await assertValidatorPortsFree(params.args);
+  const version = spawnSync('solana-test-validator', ['--version'], { encoding: 'utf8' });
+  if (version.status !== 0) throw new Error("solana-test-validator bulunamadı (Agave CLI PATH'te olmalı)");
+  const agave = /^solana-test-validator\s+(\S+)/.exec(version.stdout.trim())?.[1] ?? version.stdout.trim();
+  const log = createWriteStream(params.logPath);
+  const child = spawn('solana-test-validator', validatorArgs(params.args, params.programIds, params.upgradeAuthority), {
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  child.stdout?.pipe(log);
+  child.stderr?.pipe(log);
+  const rpcUrl = `http://127.0.0.1:${params.args.rpcPort}`;
+  const connection = new Connection(rpcUrl, 'confirmed');
+  const validator: LocalValidator = { rpcUrl, connection, agave, logPath: params.logPath, stop: () => stop(child) };
+  try {
+    await waitForRpc(connection, child);
+  } catch (error) {
+    await validator.stop();
+    throw error;
+  }
+  return validator;
+}
+
+export const LOCALNET_AIRDROPS: readonly (readonly [LocalnetRole, number])[] = [
+  ['payer', 100],
+  ['admin', 10],
+  ['keeper', 10],
+];
+
+export async function fundLocalnet(params: {
+  connection: Connection;
+  rpcUrl: string;
+  programIds: LocalnetProgramIds;
+  key: LocalnetKeys;
+  airdrops?: readonly (readonly [LocalnetRole, number])[];
+}): Promise<ReturnType<typeof localnetConfig>> {
+  const { connection, key } = params;
+  for (const [role, sol] of params.airdrops ?? LOCALNET_AIRDROPS) {
+    await airdrop(connection, key[role].publicKey, sol);
+  }
+  const mint = await createMint(connection, key.payer, key.mintAuthority.publicKey, null, 6);
+  const arbitrators = [Keypair.generate(), Keypair.generate(), Keypair.generate()].map((k) => k.publicKey);
+  const config = localnetConfig({
+    rpcUrl: params.rpcUrl,
+    programIds: params.programIds,
+    mint,
+    arbitrators,
+    screener: key.screener.publicKey,
+    mppAuthority: key.mppAuthority.publicKey,
+  });
+  for (const [role, amount] of [
+    ['institution', BigInt(config.smoke.jobAmount) * 10n],
+    ['buyer', BigInt(config.smoke.claimPrice) * 10n],
+  ] as const) {
+    const account = await getOrCreateAssociatedTokenAccount(connection, key.payer, mint, key[role].publicKey);
+    await mintTo(connection, key.payer, mint, account.address, key.mintAuthority, amount);
+  }
+  return config;
+}
+
+export function assertDeployedPrograms(record: InitRecord, deployDir: string): void {
+  for (const program of record.programs) {
+    const local = executableHash(readFileSync(join(deployDir, `${program.name}.so`)));
+    if (local !== program.executableHash) {
+      throw new Error(`${program.name}: zincirdeki executable hash ${program.executableHash}, .so ${local}`);
+    }
+  }
+}
+
+async function main(): Promise<void> {
+  const args = parseLocalnetArgs(process.argv.slice(2));
+  const programIds = localnetProgramIds(readFileSync(join(REPO_ROOT, 'Anchor.toml'), 'utf8'));
+  const artifacts = loadCircuitArtifacts();
+  const keysDir = mkdtempSync(join(tmpdir(), 'square-smoke-keys-'));
+  const key = writeRoleKeys(keysDir);
+  const logPath = join(keysDir, 'validator.log');
+  let validator: LocalValidator | null = null;
+  try {
+    validator = await startValidator({ args, programIds, upgradeAuthority: key.admin.publicKey, logPath });
+    const { connection, rpcUrl, agave } = validator;
+    stderr(`localnet: ${agave} · ${rpcUrl}`);
+    const config = await fundLocalnet({ connection, rpcUrl, programIds, key });
     const configPath = join(keysDir, 'localnet.json');
     writeFileSync(configPath, JSON.stringify(config, null, 2));
 
@@ -253,12 +363,7 @@ async function main(): Promise<void> {
     const logLine = stderr;
     stderr('init:');
     const init = await runInit(createContext(loaded, keys, logLine));
-    for (const program of init.record.programs) {
-      const local = executableHash(readFileSync(join(args.deployDir, `${program.name}.so`)));
-      if (local !== program.executableHash) {
-        throw new Error(`${program.name}: zincirdeki executable hash ${program.executableHash}, .so ${local}`);
-      }
-    }
+    assertDeployedPrograms(init.record, args.deployDir);
     stderr('smoke:');
     const smokeConfig = { ...loaded, lookupTable: init.lookupTable ?? undefined };
     const report = await runSmoke(createContext(smokeConfig, keys, logLine), {
@@ -276,10 +381,10 @@ async function main(): Promise<void> {
     writeText(args.report, smokeReportMarkdown(report));
     stderr(`rapor: ${args.report}`);
   } catch (error) {
-    stderr(`validator günlüğü: ${join(keysDir, 'validator.log')} (hata durumunda silinmez)`);
+    stderr(`validator günlüğü: ${logPath} (hata durumunda silinmez)`);
     throw error;
   } finally {
-    await stop(validator);
+    await validator?.stop();
     await releaseProverWorkers();
   }
   rmSync(keysDir, { recursive: true, force: true });

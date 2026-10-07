@@ -15,6 +15,7 @@ export const SCOPE_INFO: Readonly<Record<ApiKeyScope, string>> = {
   'disputes:write': 'Upload dispute evidence and prepare arbitrator votes',
   'x402:serve': 'Your server: read paid endpoint definitions and report settled payments',
   'fiat:pay': 'Your payment agent: pay fiat jobs with the saved card or MPP and read their attestations',
+  'disputes:read': 'Read dispute evidence and the arbitration queue',
 };
 export const API_KEY_SCOPES: readonly ApiKeyScope[] = ApiKeyScopeSchema.options;
 

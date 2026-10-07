@@ -238,10 +238,16 @@ export function createNotifier(deps: {
     const set = candidates.length > 0 ? await deps.arbitrators.get() : null;
     for (const row of candidates) {
       // Kiralama: başka bir örnek aynı satırı aldıysa atlanır.
-      const lease = new Date(now.getTime() + deps.leaseSeconds * 1000);
+      const leasedAt = clock();
       const { count } = await db.notificationDelivery.updateMany({
-        where: { id: row.id, state: 'pending', ...free },
-        data: { lockedUntil: lease },
+        where: {
+          id: row.id,
+          state: 'pending',
+          attempts: row.attempts,
+          nextAttemptAt: { lte: new Date(leasedAt) },
+          OR: [{ lockedUntil: null }, { lockedUntil: { lt: new Date(leasedAt) } }],
+        },
+        data: { lockedUntil: new Date(leasedAt + deps.leaseSeconds * 1000) },
       });
       if (count === 0) continue;
       const attempts = row.attempts + 1;

@@ -16,7 +16,7 @@ import {
   parseHostedConfig,
   requiredEnv,
 } from '../src/config.js';
-import { LIMITS, policyDocument, rawConfig } from './helpers/config.js';
+import { legalPerson, LIMITS, policyDocument, rawConfig } from './helpers/config.js';
 
 let dir: string;
 const mint = Keypair.generate().publicKey.toBase58();
@@ -51,6 +51,7 @@ const delegation = {
   allowedAgents: [{ agentRecord: Keypair.generate().publicKey.toBase58() }],
   deadlineSecs: 3_600,
   challengePeriodSecs: 3_600,
+  maxJobsPerDay: 20,
   ledgerPath: './state/ledger.json',
 };
 
@@ -232,6 +233,22 @@ describe('geçersiz yapılandırma açılışta reddedilir', () => {
         }),
       ),
     ).toEqual(['duties: en az bir duty (policyWatch, crank) açılmalı']);
+  });
+
+  it('Travel Rule oturumu API_AUTH_DOMAIN ister', () => {
+    const signers = {
+      agent: { type: 'keypair', keypairPath: 'a.json' },
+      institution: { type: 'keypair', keypairPath: 'k.json' },
+    };
+    const withTravelRule = {
+      ...delegation,
+      travelRule: { originator: legalPerson('Kurum A.Ş.', mint), originatingVasp: null },
+    };
+    expect(issues(rawConfig({ signers, delegation: withTravelRule }))).toEqual([
+      "api.authDomain: Travel Rule oturumu API'nin API_AUTH_DOMAIN'ini ister",
+    ]);
+    const api = { baseUrl: 'https://api.square.test', apiKeyEnv: 'SQUARE_API_KEY', authDomain: 'app.square.test' };
+    expect(() => parseHostedConfig(rawConfig({ signers, delegation: withTravelRule, api }))).not.toThrow();
   });
 
   it('https olmayan public URL, A2A http adresi, bozuk kayıt kimliği ve fiyat', () => {

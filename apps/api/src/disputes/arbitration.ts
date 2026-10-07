@@ -22,7 +22,7 @@ import { PublicKey } from '@solana/web3.js';
 import { HttpError, badRequest, conflict, forbidden, notFound } from '../http.js';
 import type { TxBuilder } from '../tx.js';
 import type { Arbitrators } from './arbitrators.js';
-import type { EvidenceService } from './evidence.js';
+import { evidenceOf } from './evidence.js';
 
 export interface ArbitrationService {
   queue(
@@ -48,7 +48,6 @@ export function createArbitrationService(deps: {
   client: SquareClient;
   tx: TxBuilder;
   arbitrators: Arbitrators;
-  evidence: EvidenceService;
   clock?: () => number;
 }): ArbitrationService {
   const { db, read, client, arbitrators } = deps;
@@ -106,7 +105,7 @@ export function createArbitrationService(deps: {
           const [dispute, votes, evidence] = await Promise.all([
             read.getDispute(row.job),
             votesOf(row.job),
-            deps.evidence.list({ wallet, job: row.job }),
+            evidenceOf(db, row.job),
           ]);
           const voted = hasVoted(
             { approvalMask: row.approvalMask, arbitratorSetVersion: Number(row.arbitratorSetVersion) },
