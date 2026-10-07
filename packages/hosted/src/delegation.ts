@@ -33,7 +33,7 @@ export interface DelegationRequest {
 }
 
 /** Politika kuralları ve hosted agent'ın ek kuralları. */
-export type DelegationRule = RefusalRule | 'agentNotAllowed' | 'travelRuleUnavailable';
+export type DelegationRule = RefusalRule | 'agentNotAllowed' | 'travelRuleUnavailable' | 'dailyJobLimit';
 
 export type DelegationStep = 'createJob' | 'commitTravelRule' | 'fundJob';
 
@@ -161,10 +161,10 @@ export function createDelegator(options: DelegatorOptions): Delegator {
       const built = await client.flow.createJob(
         {
           institution,
-          agentRecord: new PublicKey(request.agentRecord),
+          agentRecord: new PublicKey(entry.agentRecord),
           ...(config.policyAccount && { policy: new PublicKey(config.policyAccount) }),
           spec: request.spec,
-          amount: request.amount,
+          amount: BigInt(entry.amount),
           deadline,
           challengePeriod: BigInt(config.challengePeriodSecs),
         },
@@ -261,7 +261,19 @@ export function createDelegator(options: DelegatorOptions): Delegator {
 
       const reservation = await serial(async (): Promise<{ entry: LedgerEntry } | DelegationOutcome> => {
         const existing = ledger.get(jobKey);
-        if (existing) return { entry: existing };
+        if (existing) {
+          if (
+            existing.agentRecord !== request.agentRecord ||
+            existing.amount !== request.amount.toString() ||
+            existing.category !== category
+          ) {
+            throw new DelegationError(
+              `bu spec'le job ${jobKey} farklı koşullarla ayrılmış (agent ${existing.agentRecord}, tutar ${existing.amount}, kategori ${existing.category}); başka iş için spec'i değiştirin`,
+            );
+          }
+          return { entry: existing };
+        }
+        if (ledger.jobsOn(now) >= config.maxJobsPerDay) return refused(jobKey, 0, ['dailyJobLimit']);
         const record = await client.registry.fetch('agentRecord', new PublicKey(request.agentRecord));
         if (!record) throw new DelegationError(`agent kaydı bulunamadı: ${request.agentRecord}`);
         const decision = evaluateDelegation(options.policy, {

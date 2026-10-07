@@ -21,7 +21,27 @@ const record: TravelRuleRecord = {
   mint: Keypair.generate().publicKey.toBase58(),
 };
 
-function fakeApi(options: { rejectFirstPut?: boolean; failChallenge?: boolean; failPut?: boolean } = {}) {
+const squareMessage = (wallet: string, nonce: string) =>
+  [
+    'app.square.test wants you to sign in with your Solana account:',
+    wallet,
+    '',
+    'Sign in to Square.',
+    '',
+    `Nonce: ${nonce}`,
+    'Issued At: 2026-10-07T08:00:00.000Z',
+    'Expiration Time: 2026-10-07T08:05:00.000Z',
+  ].join('\n');
+
+function fakeApi(
+  options: {
+    rejectFirstPut?: boolean;
+    failChallenge?: boolean;
+    failPut?: boolean;
+    message?: (wallet: string, nonce: string) => string;
+  } = {},
+) {
+  let challenged = '';
   const log: string[] = [];
   let sessions = 0;
   let puts = 0;
@@ -38,16 +58,14 @@ function fakeApi(options: { rejectFirstPut?: boolean; failChallenge?: boolean; f
     const error = (code: string) => ({ code, message: code, programError: null, details: null });
     if (url.pathname === '/v1/auth/challenge') {
       if (options.failChallenge) return envelope(429, null, error('rate_limited'));
-      return envelope(200, {
-        nonce: 'n'.repeat(16),
-        message: `square giriş ${body!.wallet as string}`,
-        expiresAt: 2_000,
-      });
+      const nonce = 'n'.repeat(16);
+      challenged = (options.message ?? squareMessage)(body!.wallet as string, nonce);
+      return envelope(200, { nonce, message: challenged, expiresAt: 2_000 });
     }
     if (url.pathname === '/v1/auth/session') {
       const ok = ed25519.verify(
         bs58.decode(body!.signature as string),
-        new TextEncoder().encode(`square giriş ${body!.wallet as string}`),
+        new TextEncoder().encode(challenged),
         keypair.publicKey.toBytes(),
       );
       if (!ok) return envelope(401, null, error('unauthorized'));
@@ -93,6 +111,22 @@ describe('createApiTravelRuleStore', () => {
     now = 1_000 + 3_600 - 10;
     await store.put(job, record);
     expect(api.log.at(-1)).toBe(`PUT /v1/jobs/${job.toBase58()}/travel-rule Bearer oturum-2`);
+  });
+
+  it('Square oturum mesajı olmayan ya da başka cüzdanı ve nonce’u anan meydan okuma imzalanmaz', async () => {
+    const other = Keypair.generate().publicKey.toBase58();
+    const messages = [
+      () => 'square giriş',
+      (_wallet: string, nonce: string) => squareMessage(other, nonce),
+      (wallet: string) => squareMessage(wallet, 'baska-nonce'),
+      (wallet: string, nonce: string) => `${squareMessage(wallet, nonce)}\nek satır`,
+    ];
+    for (const message of messages) {
+      const api = fakeApi({ message });
+      const store = createApiTravelRuleStore({ baseUrl: API, keypair, fetch: api.fetch, now: () => 1_000 });
+      await expect(store.put(job, record)).rejects.toThrow(/Square oturum mesajı göndermedi/);
+      expect(api.log).toEqual(['POST /v1/auth/challenge']);
+    }
   });
 
   it('sunucuda düşen oturum bir kez yenilenir; diğer hatalar kodlarıyla', async () => {

@@ -227,6 +227,50 @@ describe('politika limitine uyma', () => {
     expect(failingBuild).toHaveBeenCalledOnce();
     expect(ledger.get(jobOf(spec(21)).toBase58())).toBeNull();
   });
+
+  it('aynı spec’le ikinci çağrı ayrılan koşullardan başkasıyla job açamaz', async () => {
+    sim.failure = (name) => (name === 'createJob' ? new Error('rpc kapalı') : null);
+    const d = delegator();
+    const request = { agentRecord: agentRecord.toBase58(), spec: spec(22), amount: 1_000n };
+    await expect(d.delegate(request)).rejects.toThrow(/rpc kapalı/);
+    sim.failure = null;
+    const built = vi.spyOn(sim.client.flow, 'createJob');
+    await expect(d.delegate({ ...request, amount: 900_000_000_000n })).rejects.toThrow(/farklı koşullarla/);
+    await expect(
+      d.delegate({ ...request, agentRecord: otherRecord.toBase58(), category: 'translation' }),
+    ).rejects.toThrow(/farklı koşullarla/);
+    expect(built).not.toHaveBeenCalled();
+    expect(sim.jobStatus(jobOf(spec(22)))).toBeNull();
+    expect((await d.delegate(request)).status).toBe('funded');
+    expect(built.mock.calls.map(([params]) => params.amount)).toEqual([1_000n]);
+    expect(ledger.spentOn(NOW)).toBe(1_000n);
+  });
+
+  it('aynı spec’le eşzamanlı küçük ve büyük çağrıdan yalnızca politikaya uyan fonlanır', async () => {
+    const d = delegator();
+    const small = { agentRecord: agentRecord.toBase58(), spec: spec(23), amount: 1_000n };
+    const [first, second] = await Promise.allSettled([
+      d.delegate(small),
+      d.delegate({ ...small, amount: 900_000_000_000n }),
+    ]);
+    expect(first).toMatchObject({ status: 'fulfilled', value: { status: 'funded' } });
+    expect(second).toMatchObject({ status: 'rejected' });
+    expect(ledger.spentOn(NOW)).toBe(1_000n);
+  });
+
+  it('günlük job sayısı sınırı: sınırdaki çağrı tx kurulmadan reddedilir', async () => {
+    const d = delegator({ config: config({ maxJobsPerDay: 2 }) });
+    for (const n of [24, 25]) {
+      expect((await d.delegate({ agentRecord: agentRecord.toBase58(), spec: spec(n), amount: 1n })).status).toBe(
+        'funded',
+      );
+    }
+    const built = vi.spyOn(sim.client.flow, 'createJob');
+    const outcome = await d.delegate({ agentRecord: agentRecord.toBase58(), spec: spec(26), amount: 1n });
+    expect(outcome).toMatchObject({ status: 'refused', rules: ['dailyJobLimit'] });
+    expect(built).not.toHaveBeenCalled();
+    expect(DelegationConfigSchema.parse({ ...config(), maxJobsPerDay: undefined }).maxJobsPerDay).toBe(20);
+  });
 });
 
 describe('Travel Rule, imzasız kip ve A2A', () => {

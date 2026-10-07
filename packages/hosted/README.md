@@ -73,7 +73,7 @@ Göreli yollar yapılandırma dosyasının dizinine göre çözülür. Dağıtı
 | `signers` | `agent`: job'ların agent cüzdanı (keypair dosyası). `institution`: `keypair` ya da `unsigned` (`publicKey`, `outboxDir?`) |
 | `mcp` | `servers` (`stdio`: `command`, `args`, `env`, `cwd`; `http`: `url`, `headers`), havuz ayarları (`maxConcurrency`, `toolCacheTtlMs`, `requestTimeoutMs`, `reconnect`) |
 | `capabilities[]` | `id`, `name`, `description`, `tags`, `price` (u64 dize), `instructions` (sistem talimatı), `model`, `effort?`, `contentType?`, `tools` (`{ server, allow: [...] }`), `delegation?`, `limits` |
-| `delegation?` | `policyFile`, `policyAccount?`, `defaultCategory`, `allowedAgents` (`agentRecord`, `categories?`, `a2a?`, `travelRule?`: `beneficiary`, `beneficiaryVasp`), `deadlineSecs` (job'un son tarihi: varsayılan ve en geç şimdi + bu süre), `challengePeriodSecs`, `ledgerPath`, `travelRule?` (`originator`, `originatingVasp`) |
+| `delegation?` | `policyFile`, `policyAccount?`, `defaultCategory`, `allowedAgents` (`agentRecord`, `categories?`, `a2a?`, `travelRule?`: `beneficiary`, `beneficiaryVasp`), `deadlineSecs` (job'un son tarihi: varsayılan ve en geç şimdi + bu süre), `challengePeriodSecs`, `maxJobsPerDay` (UTC gününde açılabilecek en çok job, varsayılan 20), `ledgerPath`, `travelRule?` (`originator`, `originatingVasp`) |
 | `duties?` | `intervalMs`, `discovery.api`, `policyWatch?` (`policySecretPath`, `paymentCategory`, `intervalMs`, `prover`), `crank?` (`executeResolution`, `lapseDispute`) |
 
 **Sırlar dosyaya yazılmaz.**
@@ -137,6 +137,7 @@ ret bitleri ve adlarıyla (`REFUSAL`, `refusalRules`) döner.
 | An zaman penceresinin dışında (UTC, iki uç saat dahil) | `outsideTimeWindow` |
 | Agent `allowedAgents`'ta değil | `agentNotAllowed` |
 | Eşik üstü ama kaydın kurum ya da agent tarafı yapılandırılmamış, ya da kurum imzacısı `unsigned` | `travelRuleUnavailable` |
+| Bugün açılan job sayısı `maxJobsPerDay`'e ulaştı | `dailyJobLimit` |
 
 - **Sınırlar:** Sınırdaki değer izinlidir (`≤`), bir birim fazlası reddedilir. Reddedilen istekte ne tx kurulur ne de
   defter değişir.
@@ -146,7 +147,10 @@ ret bitleri ve adlarıyla (`REFUSAL`, `refusalRules`) döner.
 - **Eşzamanlılık:** Kapı ve tutarın ayrılması tek sırada yürür. Eşzamanlı iki istek aynı günlük boşluğu iki kez
   harcayamaz.
 - **Aynı spec:** Job adresi kurum ve spec hash'inden türer. Aynı spec'le yeniden çağrı aynı job'dur; sayaca bir kez
-  yazılır ve sıradaki adımdan devam eder.
+  yazılır ve sıradaki adımdan devam eder. Koşullar ilk ayırmanınkidir: agent, tutar ya da kategori farklıysa çağrı
+  `DelegationError` ile düşer ve tx kurulmaz. `create_job` defterdeki koşullarla kurulur.
+- **Job sayısı:** Her job'un hesabı kurumun ödediği ve kapanmayan bir rent'tir. Tutar sınırları küçük tutarlı çok
+  sayıda delegasyonu durdurmadığı için UTC gününde en çok `maxJobsPerDay` job açılır.
 
 **İmza** (MCP paketindeki ilkeyle aynı):
 
@@ -168,7 +172,8 @@ ret bitleri ve adlarıyla (`REFUSAL`, `refusalRules`) döner.
   (`PUT /v1/jobs/{job}/travel-rule`). API kaydı zarf şifrelemesiyle saklar, salt'ı kendisi üretir ve commitment'ı döner;
   bu commitment `commit_travel_rule` ile job'a bağlanır. Defterde yalnızca commitment durur.
 - **Oturum:** Uç kurumun güncel yetkilisinin oturumunu ister. Hosted agent oturumu kurumun keypair'iyle imzaladığı meydan
-  okumayla açar (`/v1/auth/challenge` → `/v1/auth/session`) ve süresi dolana kadar yeniden kullanır. İmzasız kipte
+  okumayla açar (`/v1/auth/challenge` → `/v1/auth/session`) ve süresi dolana kadar yeniden kullanır. Yalnızca bu cüzdan
+  ve nonce için Square oturum mesajı (Sign-In With Solana biçimi) imzalanır; başka bir metin imzalanmaz. İmzasız kipte
   oturum açılamaz; eşik üstü delegasyon tx'siz reddedilir.
 
 ## Duty'ler
@@ -283,3 +288,6 @@ talimatları IDL ile çözer ve şu talimatları programların durum kurallarıy
   dispute penceresi beklemesi gerekir.
 - **Dağıtım:** Devnet / mainnet'te ve Railway'de çalıştırılmadı. Servis tanımı (Dockerfile, `railway.json`) yoktur.
 - **Travel Rule ve gerçek API:** Kayıt ucu sahte API'yle denendi; localnet testinde eşik 0'dır ve `apps/api` çalıştırılmaz.
+- **Yeniden başlatma:** Capability'nin çıktısı yalnızca bellekte durur. Süreç kabul edilmiş bir işte yeniden başlarsa
+  işleyici yeniden çalışır; Claude alt işi başka sözcüklerle yeniden delegasyon yapabilir. Defter yalnızca aynı spec'i
+  tekilleştirir, farklı spec yeni bir job'dur (günlük sınırlar içinde).
