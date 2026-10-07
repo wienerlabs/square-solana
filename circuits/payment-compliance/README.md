@@ -83,7 +83,7 @@ Plan, adımlar ve doğrulama [`docs/ceremony/`](../../docs/ceremony/)'dedir; ara
 
 ### Disclosure
 
-**Phase-2 yalnızca geliştirme içindir.** Tek bir katkıdan oluşur, kamusal bir tören değildir ve **hiçbir güvence iddiası yoktur.** Katkıyı yapan taraf toksik atığı saklamış olsaydı sahte ispat üretebilirdi. Entropi saklanmadı, ama bu bir iddiadan öteye geçmez. Bu anahtar devnet ve test içindir; mainnet'e kamusal phase-2 töreninin (BC-38) anahtarıyla çıkılır. Phase 1 ise gerçek, çok katılımcılı bir törendir (PPoT, 80 katkı).
+**Phase-2 yalnızca geliştirme içindir.** Tek bir katkıdan oluşur, kamusal bir tören değildir ve **hiçbir güvence iddiası yoktur.** Katkıyı yapan taraf toksik atığı saklamış olsaydı sahte ispat üretebilirdi. Entropi saklanmadı, ama bu bir iddiadan öteye geçmez. Bu anahtar devnet ve test içindir; kamusal phase-2 töreninin (BC-38) anahtarı devnet verifier'ına onun yerine konur. Phase 1 ise gerçek, çok katılımcılı bir törendir (PPoT, 80 katkı).
 
 ### Test anahtarı
 

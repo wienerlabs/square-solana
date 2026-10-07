@@ -138,7 +138,12 @@ export function createApp(deps: AppDeps): express.Express {
     if (error instanceof HttpError) {
       if (error.status >= 500) {
         deps.errors.record();
-        log.warn('dependency_error', { requestId: requestIdOf(res), code: error.code, cause: error.cause });
+        log.warn('dependency_error', {
+          requestId: requestIdOf(res),
+          code: error.code,
+          details: error.details,
+          cause: error.cause,
+        });
       } else if (error.details?.['reason'] !== undefined) {
         log.info('sponsor_rejected', { requestId: requestIdOf(res), reason: error.details['reason'] });
       }

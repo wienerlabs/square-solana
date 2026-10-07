@@ -82,7 +82,7 @@ node scripts/deploy/squads-multisig.mjs show --rpc <url> --multisig <adres>   # 
 | Üyeler | MuhammedAkinci, mehmethayirli, kh0ra (her biri kendi donanım cüzdanı ya da kişisel anahtarı) |
 | Eşik | 2 |
 | İzinler | üç üye de Initiate + Vote + Execute |
-| Time lock | devnet 0; mainnet kararı BC-42'de |
+| Time lock | 0 (yalnızca devnet, [ADR 0027](../decisions/0027-yalnizca-devnet.md)) |
 
 Kurulumdan sonra doğrulanır ve deploy kaydına yazılır:
 
@@ -204,8 +204,10 @@ node scripts/deploy/rotate-mpp-authority.mjs --network <ağ> --mpp-authority <ye
 Betik config'in admin'inin vault, yeni anahtarın sıfırdan ve mevcut anahtardan farklı olduğunu denetler, işlemi
 iki üyeyle onaylayıp yürütür ve verifier'ın son deploy slot'unun değişmediğini doğrular. Sonra:
 
-- MPP authority servisi (BE-25) yeni anahtarla imzalar. Eski anahtarla imzalanmış attestation'lar artık bağlanmaz;
-  bağlanmamış ödemelerin attestation'ı yeni anahtarla yeniden imzalanır.
+- API'nin `API_MPP_AUTHORITY_KEYPAIR` secret'ı yeni keypair'le değiştirilir ve API yeniden başlatılır (BE-25,
+  [ADR 0026](../decisions/0026-stripe-mpp-fiat-odemesi.md)). Eski anahtarla imzalanmış attestation'lar artık
+  bağlanmaz; API bağlanmamış ödemelerin attestation'ını okunurken (`getFiatAttestation`) yeni anahtarla yeniden
+  imzalar. `GET /v1/fiat/config`'in `mppAuthority`'si zincirdeki `VerifierConfig.mpp_authority` ile aynı olmalıdır.
 - `scripts/deploy/networks/<ağ>.json`'daki `verifier.mppAuthority` ve deploy kaydı güncellenir.
 
 ## 8. Olağan dışı durumlar

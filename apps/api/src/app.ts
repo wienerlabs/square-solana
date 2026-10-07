@@ -1,4 +1,4 @@
-// HTTP yüzeyi: sözleşmedeki 52 operasyon (docs/api/openapi.yaml), `GET /openapi.json`. Metrikler ayrı
+// HTTP yüzeyi: sözleşmedeki 60 operasyon (docs/api/openapi.yaml), `GET /openapi.json`. Metrikler ayrı
 // uygulamada (`createMetricsApp`), iç ağdaki portta. Hız sınırı paylaşılan Postgres sayacıyla
 // (`@squaresdk/solana-hardening`): okuma ve yazma uçları ayrı kurallarla, kimliği olan istekte cüzdan, olmayanda
 // istemci IP'si başına.
@@ -25,6 +25,7 @@ import type { CctpService } from './cctp.js';
 import type { DeliveryService } from './deliveries.js';
 import type { ArbitrationService } from './disputes/arbitration.js';
 import type { EvidenceService } from './disputes/evidence.js';
+import { fiatPreAuthRoutes, fiatRoutes, type FiatDeps } from './routes/fiat.js';
 import type { WebhookService } from './disputes/webhooks.js';
 import { HttpError, requestId, requestIdOf, sendError } from './http.js';
 import type { OpenApiDocument } from './openapi.js';
@@ -53,6 +54,8 @@ export interface AppDeps {
   readonly x402: X402EndpointService;
   readonly travelRule: TravelRuleService;
   readonly cctp: CctpService;
+  /** Stripe MPP fiat rayı; yapılandırılmamışsa null (uçlar 503). */
+  readonly fiat: FiatDeps | null;
   readonly limiters: { readonly read: RateLimiter; readonly write: RateLimiter };
   readonly openapi: OpenApiDocument;
   readonly health: HealthProbe;
@@ -109,20 +112,19 @@ export function createApp(deps: AppDeps): express.Express {
     cors({
       origin: [...deps.corsOrigins],
       allowedHeaders: ['authorization', 'content-type', 'x-api-key'],
-      exposedHeaders: ['X-Request-Id', 'RateLimit-Limit', 'RateLimit-Remaining', 'RateLimit-Reset', 'Retry-After'],
+      exposedHeaders: [
+        'X-Request-Id',
+        'RateLimit-Limit',
+        'RateLimit-Remaining',
+        'RateLimit-Reset',
+        'Retry-After',
+        'WWW-Authenticate',
+        'Payment-Receipt',
+      ],
     }),
   );
   app.use(requestId);
   app.use(httpMetricsMiddleware(deps.metrics, routeLabel));
-  app.use(express.json({ limit: deps.jsonMaxBytes }));
-
-  app.get('/health', (_req, res) => sendHealth(res, deps.health.live()));
-  app.get('/ready', async (_req, res) => sendHealth(res, await deps.health.ready()));
-  app.get('/openapi.json', (_req, res) => {
-    res.json(deps.openapi);
-  });
-
-  app.use(authenticate(deps.auth));
   const limit = (kind: 'read' | 'write') =>
     rateLimitMiddleware<Request, Response>({
       limiter: deps.limiters[kind],
@@ -134,11 +136,23 @@ export function createApp(deps: AppDeps): express.Express {
     });
   const readLimit = limit('read');
   const writeLimit = limit('write');
+  // Ham gövdeli Stripe webhook'u ve kimliği yalnızca X-API-Key olan MPP ucu (routes/fiat.ts).
+  app.use(fiatPreAuthRoutes({ fiat: deps.fiat, auth: deps.auth, writeLimit, webhookMaxBytes: deps.jsonMaxBytes }));
+  app.use(express.json({ limit: deps.jsonMaxBytes }));
+
+  app.get('/health', (_req, res) => sendHealth(res, deps.health.live()));
+  app.get('/ready', async (_req, res) => sendHealth(res, await deps.health.ready()));
+  app.get('/openapi.json', (_req, res) => {
+    res.json(deps.openapi);
+  });
+
+  app.use(authenticate(deps.auth));
   app.use(authRoutes({ auth: deps.auth, readLimit, writeLimit }));
   app.use(x402Routes({ x402: deps.x402, readLimit, writeLimit }));
   app.use(readRoutes({ db: deps.db, read: deps.read, readLimit }));
   app.use(travelRuleRoutes({ travelRule: deps.travelRule, readLimit, writeLimit }));
   app.use(cctpRoutes({ cctp: deps.cctp, readLimit, writeLimit }));
+  app.use(fiatRoutes({ fiat: deps.fiat, readLimit, writeLimit }));
   app.use(
     writeRoutes({
       deliveries: deps.deliveries,

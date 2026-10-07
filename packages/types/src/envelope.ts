@@ -17,6 +17,12 @@ export const ApiErrorCodeSchema = z.enum([
   'rpc_unavailable',
   'db_unavailable',
   'prover_unavailable',
+  /** MPP: ödeme gerekli; challenge `WWW-Authenticate` başlığında (402). */
+  'payment_required',
+  /** Stripe ödemeyi reddetti ya da müşterinin onayını istiyor (402). */
+  'payment_failed',
+  /** Stripe'a ulaşılamadı (503). */
+  'payment_unavailable',
   'internal_error',
 ]);
 export type ApiErrorCode = z.infer<typeof ApiErrorCodeSchema>;
