@@ -245,7 +245,9 @@ export function createJobExecutor(deps: JobExecutorDeps): TaskExecutor {
           if (sending === 'accepted' && DELIVERED.has(job.status)) sending = null;
 
           if (DELIVERED.has(job.status)) {
-            if (output && receipt) await context.addArtifact(deliveryArtifact(output, receipt), { lastChunk: true });
+            if (output && receipt && receipt.workHash.toLowerCase() === job.workHash) {
+              await context.addArtifact(deliveryArtifact(output, receipt), { lastChunk: true });
+            }
             await context.complete(`job zincirde teslim edilmiş (${job.status})`);
             if (job.status === 'delivered') await listClaim(job);
             return;
@@ -323,11 +325,18 @@ export function createJobExecutor(deps: JobExecutorDeps): TaskExecutor {
               fresh !== null &&
               ((sending === 'funded' && ACCEPTED_OR_LATER.has(fresh.status)) ||
                 (sending === 'accepted' && DELIVERED.has(fresh.status)));
-            if (!landed) throw error;
-            deps.onError(error);
-            continue;
+            if (landed) {
+              deps.onError(error);
+              continue;
+            }
+            const unconfirmed =
+              error.program === 'escrow' &&
+              error.errorName?.toLowerCase() === 'invalidstatus' &&
+              (fresh === null || fresh.status === sending);
+            if (!unconfirmed) throw error;
+          } else if (isPermanent(error)) {
+            throw error;
           }
-          if (isPermanent(error)) throw error;
           if (deadline !== null && deadline - retry.submitMarginSeconds <= deps.now()) {
             throw new JobFailure(`job süresi doldu: ${messageOf(error)}`, { cause: error });
           }

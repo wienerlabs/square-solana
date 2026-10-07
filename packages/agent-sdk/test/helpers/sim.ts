@@ -65,6 +65,8 @@ export class SimChain {
   failure: ((name: string) => Error | null) | null = null;
   /** Verilirse adı eşleşen talimattan önce beklenir (ör. zincirdeki durumu değiştirmek için). */
   before: ((name: string) => Promise<void>) | null = null;
+  readHook: ((address: string, info: AccountInfo<Buffer> | null) => AccountInfo<Buffer> | null | Error) | null = null;
+  confirmFailure: (() => Error | null) | null = null;
   private slot = 0;
   private signatures = 0;
 
@@ -303,6 +305,12 @@ export class SimChain {
   connection(): Connection {
     const nextSlot = () => (this.slot += 1);
     const accounts = this.accounts;
+    const read = (address: PublicKey) => {
+      const info = accounts.get(address.toBase58()) ?? null;
+      const seen = this.readHook ? this.readHook(address.toBase58(), info) : info;
+      if (seen instanceof Error) throw seen;
+      return seen;
+    };
     return {
       commitment: 'confirmed',
       rpcEndpoint: 'sim-chain',
@@ -311,19 +319,22 @@ export class SimChain {
         blockhash: new PublicKey(Uint8Array.from({ length: 32 }, (_, i) => i + 1)).toBase58(),
         lastValidBlockHeight: 4242,
       }),
-      getAccountInfo: async (address: PublicKey) => accounts.get(address.toBase58()) ?? null,
+      getAccountInfo: async (address: PublicKey) => read(address),
       getAccountInfoAndContext: async (address: PublicKey) => ({
         context: { slot: nextSlot() },
-        value: accounts.get(address.toBase58()) ?? null,
+        value: read(address),
       }),
-      getMultipleAccountsInfo: async (addresses: PublicKey[]) =>
-        addresses.map((address) => accounts.get(address.toBase58()) ?? null),
+      getMultipleAccountsInfo: async (addresses: PublicKey[]) => addresses.map((address) => read(address)),
       sendRawTransaction: async (raw: Uint8Array) => {
         await this.execute(VersionedTransaction.deserialize(raw));
         this.signatures += 1;
         return `sim${this.signatures.toString().padStart(60, '1')}`;
       },
-      confirmTransaction: async () => ({ context: { slot: nextSlot() }, value: { err: null } }),
+      confirmTransaction: async () => {
+        const failure = this.confirmFailure?.();
+        if (failure) throw failure;
+        return { context: { slot: nextSlot() }, value: { err: null } };
+      },
     } as unknown as Connection;
   }
 }

@@ -25,6 +25,7 @@ export class AgentTxError extends Error {
     readonly program: string | null = null,
     readonly code: number | null = null,
     options?: { cause?: unknown },
+    readonly errorName: string | null = null,
   ) {
     super(message, options);
     this.name = 'AgentTxError';
@@ -41,6 +42,7 @@ export function createTxSender(deps: {
   client: SquareClient;
 }): TxSender {
   const { connection, commitment, client } = deps;
+  const confirmation: Commitment = commitment === 'finalized' ? 'finalized' : 'confirmed';
   const mapError = (error: unknown) => {
     try {
       return client.mapError(error);
@@ -52,7 +54,7 @@ export function createTxSender(deps: {
     const mapped = mapError(error);
     if (mapped) {
       const message = `${label}: ${mapped.program} ${mapped.name} (${mapped.code})`;
-      return new AgentTxError(message, mapped.program, mapped.code, { cause: error });
+      return new AgentTxError(message, mapped.program, mapped.code, { cause: error }, mapped.name);
     }
     const detail = error instanceof Error ? error.message : JSON.stringify(error);
     return new AgentTxError(`${label}: ${detail}`, null, null, { cause: error });
@@ -72,7 +74,7 @@ export function createTxSender(deps: {
       }
       const { value } = await connection.confirmTransaction(
         { signature, blockhash: built.blockhash, lastValidBlockHeight: built.lastValidBlockHeight },
-        commitment,
+        confirmation,
       );
       if (value.err) throw failure(label, { err: value.err, signature });
       return signature;

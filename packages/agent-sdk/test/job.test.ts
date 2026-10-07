@@ -257,6 +257,44 @@ describe('geçici hatalar ve kabul kapısı', () => {
     expect(recorded.calls.some((call) => call.startsWith('complete'))).toBe(false);
   });
 
+  it('kabul indikten sonra geride kalan okuma ve InvalidStatus görevi düşürmez', async () => {
+    const address = await job('funded');
+    const key = address.toBase58();
+    const stale = sim.accounts.get(key)!;
+    let lagging = 0;
+    let confirms = 0;
+    sim.confirmFailure = () => (++confirms === 1 ? new Error('confirm zaman aşımı') : null);
+    sim.readHook = (seen, info) => {
+      if (seen !== key || sim.jobStatus(address) !== 'accepted' || lagging >= 3) return info;
+      lagging += 1;
+      return lagging === 3 ? new Error('429 Too Many Requests') : stale;
+    };
+    const recorded = fakeContext(address, specParts);
+    await executor().onTask(recorded.context);
+    expect(lagging).toBe(3);
+    expect(kinds()).toEqual(['acceptJob', 'submitWork']);
+    expect(recorded.calls.at(-1)).toMatch(/^complete:teslim edildi/);
+    expect(errors.some((error) => /invalidStatus/i.test(String(error)))).toBe(true);
+  });
+
+  it('zincirdeki teslim yerel çıktıyla aynı değilse yerel çıktı sunulmaz', async () => {
+    const address = await job('accepted');
+    let patched = false;
+    sim.before = async (name) => {
+      if (name !== 'submitWork' || patched) return;
+      patched = true;
+      await sim.patchJob(address, {
+        status: { delivered: {} },
+        workHash: new Array(32).fill(9),
+        deliveryUri: 'ipfs://onceki-teslimat',
+      });
+    };
+    const recorded = fakeContext(address, specParts);
+    await executor().onTask(recorded.context);
+    expect(recorded.calls.some((call) => call.startsWith('addArtifact'))).toBe(false);
+    expect(recorded.calls.at(-1)).toMatch(/^complete:job zincirde teslim edilmiş/);
+  });
+
   it('depo kalıcı olarak reddederse ya da süre dolarsa yeniden denenmez', async () => {
     const forbidden = fakeContext(await job('funded'), specParts);
     await expect(
@@ -305,5 +343,27 @@ describe('claimPrice ve discountBps', () => {
     expect(() => assertDiscountBps(1)).not.toThrow();
     expect(() => assertDiscountBps(9_999)).not.toThrow();
     for (const bad of [0, 10_000, 1.5, -1, Number.NaN]) expect(() => assertDiscountBps(bad)).toThrow();
+  });
+});
+
+describe('createTxSender', () => {
+  it('processed yapılandırmasında gönderim en az confirmed ile onaylanır', async () => {
+    const seen: unknown[] = [];
+    const connection = sim.connection();
+    const confirm = connection.confirmTransaction.bind(connection);
+    Object.assign(connection, {
+      confirmTransaction: async (...args: Parameters<typeof connection.confirmTransaction>) => {
+        seen.push(args[1]);
+        return confirm(...args);
+      },
+    });
+    const address = await job('funded');
+    const sender = createTxSender({ connection, commitment: 'processed', client: sim.client });
+    const built = await sim.client.flow.acceptJob(
+      { agent: signer.publicKey, job: address },
+      { feePayer: signer.publicKey },
+    );
+    await sender.send('accept_job', built, [toWallet(signer)]);
+    expect(seen).toEqual(['confirmed']);
   });
 });

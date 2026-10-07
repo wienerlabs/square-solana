@@ -46,12 +46,16 @@ sequenceDiagram
 - **Teslim:** İşleyicinin çıktısı yüklenir, makbuz yerelde doğrulanır (`workHash` içeriğin SHA-256'sı,
   `deliveryUri` en fazla 128 bayt), `submit_work` gönderilir; zincirdeki taahhütten sonra makbuz görevin
   `delivery` artefaktına yazılır ve görev `COMPLETED` olur. İçerik `submit_work`'ten önce çağırana gösterilmez.
+  Tx'ler `commitment` `processed` olsa da en az `confirmed` ile onaylanır. Job zincirde başka bir `workHash`'le
+  teslim edilmişse (ör. önceki bir sürecin teslimi) yerel çıktı sunulmaz; teslimat zincirdeki `deliveryUri`'dedir.
 - **Geçici ve kalıcı hata:** Her tur job zincirden okunur ve duruma göre sıradaki adım seçilir. Geçici hatada
   (RPC, ağ, onay zaman aşımı, deponun `rate_limited` / `*_unavailable` / `internal_error` yanıtı) aynı yerden,
   `retry.minDelayMs`'ten `retry.maxDelayMs`'e iki katına çıkan beklemelerle yeniden denenir; işin sonucu ve
   makbuz saklanır, iş yeniden yapılmaz. Gönderilen tx program hatası verse de zincirde job ilerlemişse (önceki
-  deneme düşmüş sanılmışsa) akış sürer. Kalıcı hatada (program reddi, işleyicinin hatası ya da geçersiz çıktısı,
-  makbuzun içerikle tutmaması, deponun diğer retleri) ya da deadline'a teslim payı kalmayınca görev `FAILED`
+  deneme düşmüş sanılmışsa) akış sürer. `InvalidStatus` reddinden sonraki okuma düşerse ya da hâlâ gönderimden
+  önceki durumu gösterirse (geride kalan RPC) ret geçici sayılır. Kalıcı hatada (program reddi, işleyicinin hatası
+  ya da geçersiz çıktısı, makbuzun içerikle tutmaması, deponun diğer retleri) ya da deadline'a teslim payı
+  kalmayınca görev `FAILED`
   olur; job zincirde `accepted` kalır (kurum deadline'dan sonra `cancel_job` ile parasını geri alır).
   Onaylanmış kabulün gerisinde kalan okuma geçici sayılır.
 - **Alacak satışı:** `autoListClaim: { discountBps }` teslimden sonra alacağı nominal değerin
