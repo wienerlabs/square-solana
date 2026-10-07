@@ -33,6 +33,7 @@ Proje belgeleri. Mevcut olanlar bağlantılı; diğerleri ilgili issue ile eklen
 | `legal/relicensing/` | Covenant LGPL kodu için yazılı yeniden lisanslama onayları | [BC-03] |
 | [`deploy/`](deploy/) | ağ bazında deploy kayıtları ([`devnet.md`](deploy/devnet.md)) ve smoke raporları ([`smoke-localnet.md`](deploy/smoke-localnet.md), [`smoke-devnet.md`](deploy/smoke-devnet.md); üreten [`tests/smoke`](../tests/smoke/)), CLI'nin devnet kabul koşusu ([`cli-devnet.md`](deploy/cli-devnet.md)) | [BC-30], [BC-31], [BE-30] |
 | [`runbooks/`](runbooks/README.md) | operasyon runbook'ları: [program deploy ve upgrade](runbooks/upgrade.md), [servisler](runbooks/services.md), [keeper](runbooks/keeper.md), [screener](runbooks/screener.md) | [BC-09], [BE-31] |
+| [`security/`](security/) | off-chain güvenlik: [threat model](security/threat-model.md), [iç inceleme ve bulgular](security/review-be-32.md), [pen-test listesi](security/pentest-checklist.md) | [BE-32] |
 
 [BC-02]: https://github.com/wienerlabs/square-solana/issues/2
 [BC-03]: https://github.com/wienerlabs/square-solana/issues/3
@@ -60,3 +61,4 @@ Proje belgeleri. Mevcut olanlar bağlantılı; diğerleri ilgili issue ile eklen
 [BE-31]: https://github.com/wienerlabs/square-solana/issues/90
 [BE-05]: https://github.com/wienerlabs/square-solana/issues/19
 [BE-30]: https://github.com/wienerlabs/square-solana/issues/89
+[BE-32]: https://github.com/wienerlabs/square-solana/issues/94

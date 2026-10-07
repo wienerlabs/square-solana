@@ -106,7 +106,7 @@ Her servis bir Railway servisidir; derleme ve sağlık denetimi `apps/<servis>/r
 
 ### compliance-api
 
-`apps/compliance-api/.env.example` · 32 değişken, 7 secret
+`apps/compliance-api/.env.example` · 35 değişken, 7 secret
 
 | Değişken | Bölüm | Secret | Not |
 |---|---|---|---|
@@ -115,6 +115,9 @@ Her servis bir Railway servisidir; derleme ve sağlık denetimi `apps/<servis>/r
 | `NODE_ENV` | Sunucu (zorunlu) |  | development \| test \| production |
 | `LOG_LEVEL` | Sunucu (zorunlu) |  | debug \| info \| warn \| error |
 | `CORS_ORIGINS` | Sunucu (zorunlu) |  | Virgülle ayrılmış izinli origin URL'leri (en az bir tane) |
+| `COMPLIANCE_API_KEY_SHA256` | Kayıt uçlarının erişimi (zorunlu, BE-32) |  | Proof, attestation ve imzasız ödeme uçlarının X-API-Key'lerinin SHA-256'sı (küçük harf hex, virgülle) |
+| `COMPLIANCE_RATE_LIMIT` | Kayıt uçlarının erişimi (zorunlu, BE-32) |  | Anahtar başına istek sınırı ve penceresi (saniye); sayaç Square'in veritabanında (rate_limit_windows) |
+| `COMPLIANCE_RATE_LIMIT_WINDOW_SECONDS` | Kayıt uçlarının erişimi (zorunlu, BE-32) |  |  |
 | `POSTGRES_HOST` | PostgreSQL (zorunlu) |  |  |
 | `POSTGRES_PORT` | PostgreSQL (zorunlu) |  |  |
 | `POSTGRES_USER` | PostgreSQL (zorunlu) |  |  |

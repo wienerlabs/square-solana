@@ -9,6 +9,12 @@ the verifier no longer accepts (ADR 0024 §3).
 
 ## Endpoints
 
+**Access (BE-32):** `/api/v1/proofs`, `/api/v1/attestations` and `/api/v1/unattested-payments` require an
+`X-API-Key` whose SHA-256 is listed in `COMPLIANCE_API_KEY_SHA256`; without it they answer 401. Each key is
+rate-limited (`COMPLIANCE_RATE_LIMIT` per `COMPLIANCE_RATE_LIMIT_WINDOW_SECONDS`, 429 with `Retry-After`); the
+counter is the shared `rate_limit_windows` table in Square's database. The paid report is gated by the x402 payment, the
+health endpoints are open.
+
 | Method | Path | Description |
 |--------|------|-------------|
 | POST | `/api/v1/proofs` | Submit a proof record |

@@ -14,7 +14,10 @@ import { startSolanaWatcher, stopSolanaWatcher } from './watchers/solana-watcher
 import { swaggerSpec } from './swagger.js';
 import { httpMetricsMiddleware } from '@squaresdk/solana-observability';
 import { alarms, createMetricsApp, metrics, routeLabel } from './observability.js';
-import { purgeExpiredReplayGuards, x402Paywall, x402Ready } from './x402.js';
+import { createRateLimiter } from '@squaresdk/solana-hardening';
+import { createPrismaRateLimitStore } from '@squaresdk/solana-hardening/prisma';
+import { apiKeyCheck, requireApiKey } from './middleware/access.js';
+import { databaseReady, purgeExpiredReplayGuards, x402Paywall, x402Ready } from './x402.js';
 
 const app = express();
 
@@ -25,7 +28,7 @@ app.use(
   cors({
     origin: [...config.corsOrigins],
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'PAYMENT-SIGNATURE'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'PAYMENT-SIGNATURE', 'X-API-Key'],
     exposedHeaders: ['PAYMENT-REQUIRED', 'PAYMENT-RESPONSE'],
     credentials: true,
   }),
@@ -37,14 +40,22 @@ app.get('/api-docs.json', (_req, res) => {
   res.json(swaggerSpec);
 });
 
+// Kayıt uçları anahtarla ve anahtar başına hız sınırıyla (BE-32, middleware/access.ts).
+const recordAccess = requireApiKey({
+  check: apiKeyCheck(config.access.apiKeySha256),
+  limiter: databaseReady.then((db) =>
+    createRateLimiter({ store: createPrismaRateLimitStore(db), rule: config.access.rateLimit }),
+  ),
+});
+
 app.use(healthRouter);
-app.use('/api/v1/proofs', proofRouter);
-app.use('/api/v1/attestations', attestationRouter);
+app.use('/api/v1/proofs', recordAccess, proofRouter);
+app.use('/api/v1/attestations', recordAccess, attestationRouter);
 app.use(
   '/api/v1/compliance',
   createComplianceReportRouter(x402Paywall(config.x402.reportPrice, 'Aperture Compliance Report')),
 );
-app.use('/api/v1/unattested-payments', unattestedPaymentsRouter);
+app.use('/api/v1/unattested-payments', recordAccess, unattestedPaymentsRouter);
 
 app.use(errorHandler);
 
