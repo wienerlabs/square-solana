@@ -76,6 +76,8 @@ fikstürdeki her ispatı doğrulama anahtarına ve yeniden hesaplanan sinyallere
 | `squads.rs` | Squads smart account ve sponsorlu ücret (BC-35): akışın sekiz adımı, kurum, agent ve alıcı rollerinde Squads v4 vault PDA'larıyla; ücreti ve rent'i rolü olmayan sponsor öder, vault'lar SOL harcamaz; gerçek Groth16 ispatıyla alıcı vault'una ödeme (`fixtures/squads-proofs.json`). Sponsor kurumun politikasını yazamaz, işi fonlayamaz, kabul edemez; vault rent'i başka hesaba yönlendirilemez. Yükseltme yetkilisi vault olan üç programın config'i vault imzasıyla ve vault'un SOL'üyle kurulur |
 | `tx_budget.rs` | İşlem bütçesi (BC-28): 8 adımın her tx'i SDK'nın biçiminde ve en kötü durumuyla (en uzun alanlar, 16 kardeşli kanıt, açılacak ATA'lar, gerçek ispat ve `record_release` CPI'ı) ALT'sız ve Square ALT'ıyla ölçülür. Square ALT'ıyla her tx pakete sığar, ölçülen CU profil sınırının %75'ini aşmaz; sınırlar ve ALT içeriği `packages/sdk/src/tx-profile.json`'dan. `-- --nocapture` tabloyu yazar ([tx-budget.md](../../docs/design/tx-budget.md)) |
 | `escrow_lifecycle.rs` | `fund_job`: iki tarafın temiz ve taze screening'i (kayıt yok / işaretli / bayat), başkasının token hesabı, başka mint, Travel Rule eşiği, deadline; fonlanmamış işin kabul edilememesi; kabulü ve teslimi yalnızca job'a bağlı agent cüzdanı yapar (başka imzacı, başka agent'ın kaydı, farklı spec, `Inactive` kabul edemez ama teslim eder, silinmiş kayıt teslim edemez, deadline, URI sınırı), challenge penceresi; `cancel_job`: iade, vault'un kapanıp rent'inin `rent_payer`'a dönmesi, yetkisiz kurum, sahte vault, kabul edilmiş işte deadline, teslim edilmiş işte ret; `sync_agent_wallet`: cüzdan rotasyonunda job'u yalnızca kayıt sahibi taşır |
+| `constraints.rs` | Hesap kısıtı denetiminin kapattığı negatif testler (BC-39, [program-constraints.md](../../docs/security/program-constraints.md)): üç config'in açılışında başka programın ProgramData'sı; `sync_agent_wallet`'ta başka kaydın sahibi; başka kurumun politikası; başka cüzdanın screening kaydı; `cancel_job`'da başkasının ya da başka mint'in hesabı; ikinci kabul; başka işin listelemesi; karara bağlanmış dispute'un lapse'ı; fiat işin fonlanması ve agent'ın kendi screening kaydı |
+| `invariants.rs` | Escrow'un durum makinesinde tohumlu fuzz (BC-39, [review-bc-39.md §4](../../docs/security/review-bc-39.md#4-fuzz-ve-invariant-testi)): rastgele işlem dizileri, yetkisiz ve sınır dışı denemeler, vault'a bağış; her adımdan sonra bakiye modeli, korunum, escrow ve bond'un ödeme gücü, durum makinesi ve saldırganın bakiyesi. `SQUARE_FUZZ_SEEDS` (varsayılan 16), `SQUARE_FUZZ_STEPS` (120); düşen tohum `SQUARE_FUZZ_SEED` ile yeniden koşar |
 
 ## Kapsam ve CU raporu (BC-29)
 
@@ -94,10 +96,10 @@ düşürür. Diğer programlar raporlanır. Bugünkü durum:
 
 | Program | Talimat | Ret dalı | Hata kodu |
 |---|---|---|---|
-| square_escrow (kapı) | 19/19 | 100% | 47/47 ulaşılabilir (2 savunma kodu) |
+| square_escrow (kapı) | 22/22 | 100% | 48/48 ulaşılabilir (2 savunma kodu) |
 | square_policy | 6/6 | 100% | 5/5 |
-| square_registry | 8/8 | 100% | 7/8 |
-| square_verifier | 3/3 (MPP talimatları BC-37'de) | 100% | 7/11 |
+| square_registry | 8/8 | 100% | 7/8 (`AgentInactive`) |
+| square_verifier | 5/5 | 100% | 9/12 (`SnapshotMismatch`, `PayeeMismatch`, `MintMismatch`) |
 
 CU raporu: `cargo test --manifest-path tests/programs/Cargo.toml -- --nocapture | tee cu.log` ve
 `node scripts/ci/cu-report.mjs cu.log`. CI raporu iş özetine yazar. Escrow'un 2026-10-06 ölçümü
