@@ -335,11 +335,14 @@ kullanır, yeniden kurmaz. Bir anahtar sahibi şu adımlarla koşar:
    ```bash
    export SQUARE_DEMO_A2A_KEY=$(openssl rand -hex 32)
    pnpm --filter @squaresdk/solana-demo agent --config ~/agent/agent.json --host 0.0.0.0 --port 8787   # sunucu
-   pnpm --filter @squaresdk/solana-demo scenario --config ~/square-devnet/demo.json --agent-url https://<agent'ın adresi>
+   pnpm --filter @squaresdk/solana-demo scenario --config ~/square-devnet/demo.json --agent-url https://<agent'ın adresi> \
+     --scenario approved --scenario refused
    ```
 
-   `approved-claim` senaryosu için agent `--list-claims` ile başlatılır; diğer senaryolarda listeleme kapalı tutulur
-   (yukarıdaki risk). Her senaryo challenge penceresini (60 sn) bekler. Devnet'te keeper servisi (BE-15) çalışıyorsa
+   Ayrı agent'ın listeleme kipi açılışta sabittir, bu yüzden senaryolar iki koşuya bölünür: önce listeleme kapalıyken
+   `approved` ve `refused`, sonra agent `--list-claims` ile yeniden başlatılıp yalnızca `--scenario approved-claim`
+   (yukarıdaki risk). Listeleme beklenirken koşu düşerse job `delivered` kalır; koşucu job'u ve çözüm yolunu günlüğe
+   yazar. Her senaryo challenge penceresini (60 sn) bekler. Devnet'te keeper servisi (BE-15) çalışıyorsa
    finalize'ı o yapabilir; koşucu bunu görür ve yalnızca sonucu doğrular.
 8. **Kayıt:** Seed çıktısı ve senaryo sonucu (job'lar, imzalar, teslimat hash'leri) devnet kaydına işlenir.
 

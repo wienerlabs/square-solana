@@ -218,7 +218,13 @@ export async function runScenario(params: {
   if (!record.wallet.equals(agentWallet)) {
     throw new Error(`agent kaydının cüzdanı ${record.wallet.toBase58()}, yapılandırmadaki ${agentWallet.toBase58()}`);
   }
-  const card = new Uint8Array(await (await fetch(`${baseUrl}/.well-known/agent-card.json`)).arrayBuffer());
+  const card = new Uint8Array(
+    await (
+      await fetch(`${baseUrl}/.well-known/agent-card.json`, {
+        signal: AbortSignal.timeout(timing.a2aRequestTimeoutSecs * 1_000),
+      })
+    ).arrayBuffer(),
+  );
   check(
     sha256Hex(card) === hex(record.agentCardHash),
     `agent kartı sunuluyor; SHA-256'sı zincirdeki agent_card_hash ile aynı (${hex(record.agentCardHash).slice(0, 16)}…)`,
@@ -295,6 +301,10 @@ export async function runScenario(params: {
     } else if (status === 'accepted' && job) {
       context.log(
         `  job ${jobAddress.toBase58()} accepted kaldı: deadline (${utc(job.deadline.toNumber())}) geçince kurum cancel_job ile tutarı geri alır`,
+      );
+    } else if (status === 'delivered') {
+      context.log(
+        `  job ${jobAddress.toBase58()} delivered kaldı: kurum ispatı bağlarsa challenge süresinden sonra finalize edilir; bağlamazsa agent proof_timeout_secs sonra escalate_missing_proof ile dispute açar`,
       );
     }
   }
@@ -377,7 +387,9 @@ export async function runScenario(params: {
     const deliveryPrefix = `${demo.agent.publicUrl}${DELIVERIES_PATH}/`;
     let servedByAgent = false;
     if (delivered.deliveryUri.startsWith(deliveryPrefix)) {
-      const served = await fetch(`${baseUrl}${DELIVERIES_PATH}/${workHash}`);
+      const served = await fetch(`${baseUrl}${DELIVERIES_PATH}/${workHash}`, {
+        signal: AbortSignal.timeout(timing.a2aRequestTimeoutSecs * 1_000),
+      });
       servedByAgent = served.ok && sha256Hex(new Uint8Array(await served.arrayBuffer())) === workHash;
       check(
         servedByAgent,
