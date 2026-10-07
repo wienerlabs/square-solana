@@ -227,6 +227,7 @@ describe('ilişkiler ve sorgular', () => {
 
     const payment = (overrides: Record<string, unknown> = {}) => ({
       endpointId: endpoint.id,
+      wallet,
       fingerprint: `svm:${hex32()}`,
       transaction: signature(),
       network: 'devnet' as const,
@@ -244,7 +245,14 @@ describe('ilişkiler ve sorgular', () => {
     await expect(db.client.x402Payment.create({ data: payment({ fingerprint: hex32() }) })).rejects.toThrow();
     // Aynı kimlik başka ağda ayrı ödemedir (tekrar koruması kapsamı ağdır).
     await db.client.x402Payment.create({ data: payment({ fingerprint: first.fingerprint, network: 'mainnet' }) });
+    const otherWallet = address();
+    await db.client.user.create({ data: { wallet: otherWallet } });
+    const copied = await db.client.x402Endpoint.create({ data: { wallet: otherWallet, ...endpointData } });
+    await db.client.x402Payment.create({ data: payment({ ...first, endpointId: copied.id, wallet: otherWallet }) });
+    await expect(db.client.x402Payment.create({ data: payment({ wallet: 'kisa' }) })).rejects.toThrow();
     await db.client.x402Endpoint.delete({ where: { id: endpoint.id } });
+    expect(await db.client.x402Payment.count()).toBe(1);
+    await db.client.x402Endpoint.delete({ where: { id: copied.id } });
     expect(await db.client.x402Payment.count()).toBe(0);
   });
 

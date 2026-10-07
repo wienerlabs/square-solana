@@ -42,6 +42,7 @@ const received: Received[] = [];
 /** Alıcının sonraki yanıt durumları (sırayla); boşsa 204. */
 const statuses: number[] = [];
 let clock = NOW * 1000;
+let onDelivery: ((id: string) => Promise<void>) | null = null;
 let panel: Wallet[];
 let agentRecord: string;
 
@@ -52,8 +53,11 @@ beforeAll(async () => {
     const chunks: Buffer[] = [];
     req.on('data', (chunk: Buffer) => chunks.push(chunk));
     req.on('end', () => {
-      received.push({ path: req.url!, headers: req.headers, body: Buffer.concat(chunks).toString() });
-      res.writeHead(statuses.shift() ?? 204).end();
+      void (async () => {
+        await onDelivery?.(String(req.headers['webhook-id']));
+        received.push({ path: req.url!, headers: req.headers, body: Buffer.concat(chunks).toString() });
+        res.writeHead(statuses.shift() ?? 204).end();
+      })();
     });
   });
   receiver.listen(0, '127.0.0.1');
@@ -71,6 +75,7 @@ beforeEach(async () => {
   received.length = 0;
   statuses.length = 0;
   clock = NOW * 1000;
+  onDelivery = null;
   panel = [wallet(), wallet(), wallet()];
   agentRecord = await world.agent(wallet().address, wallet().address);
   await setPanel(panel);
@@ -289,6 +294,23 @@ describe('bildirim', () => {
     expect(await run.runOnce()).toMatchObject({ enqueued: 1, delivered: 1 });
     expect(jobsOf(received)).toEqual([third.address]);
     expect(await run.runOnce()).toMatchObject({ enqueued: 0, delivered: 0 });
+  });
+
+  it('kiralama satır alınırken başlar: yavaş gönderimden sonraki satırın kiralaması dolmuş başlamaz', async () => {
+    await subscribe(panel[0]!, '/a');
+    await subscribe(panel[1]!, '/b');
+    await notifier().runOnce();
+    const job = await disputedJob();
+    await world.chainEvent(job.address, 'DisputeDecided', { resolution: { favorAgent: {} } });
+    const remaining: number[] = [];
+    onDelivery = async (id) => {
+      const row = await stack.db.notificationDelivery.findUniqueOrThrow({ where: { id } });
+      remaining.push(row.lockedUntil!.getTime() - clock);
+      clock += 10_000;
+    };
+    expect(await notifier().runOnce()).toMatchObject({ delivered: 2 });
+    expect(remaining).toHaveLength(2);
+    expect(remaining.every((ms) => ms > 0)).toBe(true);
   });
 
   it('iki gönderici aynı satırı bir kez teslim eder (kiralama)', async () => {

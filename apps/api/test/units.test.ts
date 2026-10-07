@@ -82,6 +82,13 @@ describe('yapılandırma', () => {
     expect(message).toMatch(/API_WEBHOOK_SECRET_KEYS \/ API_WEBHOOK_SECRET_ACTIVE_KEY_ID: k1: anahtar 32 bayt/);
     expect(message).not.toContain(leaked);
     expect(() => loadConfig({ ...ENV, API_NOTIFY_BACKOFF_MAX_SECONDS: '10' })).toThrow(/küçük olamaz/);
+    expect(() => loadConfig({ ...ENV, API_ARBITRATOR_CACHE_SECONDS: '301' })).toThrow(/API_ARBITRATOR_CACHE_SECONDS/);
+    expect(() => loadConfig({ ...ENV, API_NOTIFY_ALLOW_INSECURE: 'true' })).toThrow(/yalnızca yerel geliştirmede/);
+    for (const local of ['https://localhost:8443', 'https://api.square.test', 'https://api.localhost']) {
+      expect(
+        loadConfig({ ...ENV, API_NOTIFY_ALLOW_INSECURE: 'true', API_PUBLIC_BASE_URL: local }).notify.allowInsecure,
+      ).toBe(true);
+    }
   });
 });
 

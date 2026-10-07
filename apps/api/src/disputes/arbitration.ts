@@ -106,7 +106,7 @@ export function createArbitrationService(deps: {
           const [dispute, votes, evidence] = await Promise.all([
             read.getDispute(row.job),
             votesOf(row.job),
-            deps.evidence.list({ wallet, job: row.job }),
+            deps.evidence.listForArbitrator(row.job),
           ]);
           const voted = hasVoted(
             { approvalMask: row.approvalMask, arbitratorSetVersion: Number(row.arbitratorSetVersion) },
