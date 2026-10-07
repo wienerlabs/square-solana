@@ -40,6 +40,7 @@ function config(overrides: Partial<DelegationConfig> = {}): DelegationConfig {
     ],
     deadlineSecs: 3_600,
     challengePeriodSecs: 600,
+    maxJobsPerDay: 20,
     ledgerPath: '/dev/null',
     ...overrides,
   });
@@ -318,7 +319,7 @@ describe('politika limitine uyma', () => {
     const outcome = await d.delegate({ agentRecord: agentRecord.toBase58(), spec: spec(26), amount: 1n });
     expect(outcome).toMatchObject({ status: 'refused', rules: ['dailyJobLimit'] });
     expect(built).not.toHaveBeenCalled();
-    expect(DelegationConfigSchema.parse({ ...config(), maxJobsPerDay: undefined }).maxJobsPerDay).toBe(20);
+    expect(DelegationConfigSchema.safeParse({ ...config(), maxJobsPerDay: undefined }).success).toBe(false);
   });
 });
 

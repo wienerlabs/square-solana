@@ -51,6 +51,7 @@ const delegation = {
   allowedAgents: [{ agentRecord: Keypair.generate().publicKey.toBase58() }],
   deadlineSecs: 3_600,
   challengePeriodSecs: 3_600,
+  maxJobsPerDay: 20,
   ledgerPath: './state/ledger.json',
 };
 

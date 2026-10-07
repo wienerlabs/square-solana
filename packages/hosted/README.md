@@ -73,7 +73,7 @@ Göreli yollar yapılandırma dosyasının dizinine göre çözülür. Dağıtı
 | `signers` | `agent`: job'ların agent cüzdanı (keypair dosyası). `institution`: `keypair` ya da `unsigned` (`publicKey`, `outboxDir?`) |
 | `mcp` | `servers` (`stdio`: `command`, `args`, `env`, `cwd`; `http`: `url`, `headers`), havuz ayarları (`maxConcurrency`, `toolCacheTtlMs`, `requestTimeoutMs`, `reconnect`) |
 | `capabilities[]` | `id`, `name`, `description`, `tags`, `price` (u64 dize), `instructions` (sistem talimatı), `model`, `effort?`, `contentType?`, `tools` (`{ server, allow: [...] }`), `delegation?`, `limits` |
-| `delegation?` | `policyFile`, `policyAccount?`, `defaultCategory`, `allowedAgents` (`agentRecord`, `categories?`, `a2a?`, `travelRule?`: `beneficiary`, `beneficiaryVasp`), `deadlineSecs` (job'un son tarihi: varsayılan ve en geç şimdi + bu süre), `challengePeriodSecs`, `maxJobsPerDay` (UTC gününde açılabilecek en çok job, varsayılan 20), `ledgerPath`, `travelRule?` (`originator`, `originatingVasp`) |
+| `delegation?` | `policyFile`, `policyAccount?`, `defaultCategory`, `allowedAgents` (`agentRecord`, `categories?`, `a2a?`, `travelRule?`: `beneficiary`, `beneficiaryVasp`), `deadlineSecs` (job'un son tarihi: varsayılan ve en geç şimdi + bu süre), `challengePeriodSecs`, `maxJobsPerDay` (UTC gününde açılabilecek en çok job; zorunlu, kurumun job rent'ini sınırlar), `ledgerPath`, `travelRule?` (`originator`, `originatingVasp`) |
 | `duties?` | `intervalMs`, `discovery.api`, `policyWatch?` (`policySecretPath`, `paymentCategory`, `intervalMs`, `prover`), `crank?` (`executeResolution`, `lapseDispute`) |
 
 **Sırlar dosyaya yazılmaz.**

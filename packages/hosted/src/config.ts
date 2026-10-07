@@ -188,7 +188,7 @@ export const DelegationConfigSchema = z
     /** İstekte deadline yoksa şimdiden bu kadar saniye sonrası. */
     deadlineSecs: PositiveInt,
     challengePeriodSecs: PositiveInt,
-    maxJobsPerDay: PositiveInt.default(20),
+    maxJobsPerDay: PositiveInt,
     /** Günlük harcama ve açılan job'ların defteri (dosya, 0600). */
     ledgerPath: FilePath,
     /**
