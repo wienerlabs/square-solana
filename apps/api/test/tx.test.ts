@@ -83,7 +83,7 @@ describe('tx hazırlama', () => {
       feePayer: payer.address,
       signers: [payer.address, owner.address],
       addressLookupTables: [],
-      computeUnitLimit: 40_000,
+      computeUnitLimit: 50_000,
       simulatedUnits: 12_345,
     });
     expect(tx.tx.signatures.every((signature) => signature.every((byte) => byte === 0))).toBe(true);

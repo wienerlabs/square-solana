@@ -15,7 +15,7 @@ Kabul öncesi uyum ön-ispatı (BC-39 P-01, ADR 0028; program sözleşmesi v0.8.
 - SDK: `pda.preflightProof(job)`; `flow.acceptJob` iki hesabı kendisi çözer. İşlem profili: `setPreflightProof` 340 000; `acceptJob` 50 000, `registerAgent` 50 000, `createJob` 110 000 (iki katı kuralı).
 - Policy: `PREFLIGHT_BLOCKING`, `preflightAccepts`, `buildPreflightWitness`, `buildSetPreflightProofTx`.
 - Agent SDK: `JobState.policy` ve `JobState.preflight`; ön-ispatı bağlanmamış policy'li iş kabul edilmez.
-- CLI: `square proof preflight`.
+- CLI: `proof preflight`.
 - Fee payer: varsayılan izin listesine `verifier:set_preflight_proof`.
 - Web: iş sayfasında "Pre-acceptance proof" bölümü (kurum üretir ve bağlar; agent'ın kabulü o zamana kadar kapalı), zaman çizelgesinde `PreflightProofSet`; iş açmada public tavanı aşan tutar reddedilir.
 - Smoke: her policy'li işte ön-ispat; ispat-ret varyantı onaylı alıcının gizli engelli listede olduğu alacak satışıyla.
