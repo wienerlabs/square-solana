@@ -62,6 +62,10 @@ the amount, the mint nor the recipient. The same signature could also be reused.
 - **Facilitator ([ADR 0018](../../docs/decisions/0018-x402-facilitator.md)):**
   - By default it is our own: `X402_FEE_PAYER_KEYPAIR` (SOL only, never the payee) signs as fee payer and
     `SOLANA_RPC_URL` verifies and submits.
+  - Its fee limits are required and have no defaults: `X402_FACILITATOR_MAX_COMPUTE_UNITS`,
+    `X402_FACILITATOR_MAX_PRIORITY_FEE_MICRO_LAMPORTS` and `X402_FACILITATOR_MAX_SIGNATURES` cap the fee the fee
+    payer pays per settlement (the operator's risk decision). A payment over them is rejected during verification,
+    before the facilitator signs.
   - With `X402_FACILITATOR_URL` (and optionally `X402_FACILITATOR_TOKEN`) a remote x402 facilitator is used.
 - **Tests:** `pnpm --filter @squaresdk/solana-compliance-api test` runs them against a fake Solana RPC and a
   Postgres container (Docker required).

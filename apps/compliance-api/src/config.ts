@@ -19,6 +19,8 @@ const base58Pubkey = z
   .string()
   .trim()
   .regex(/^[1-9A-HJ-NP-Za-km-z]{32,44}$/, 'must be a base58 Solana public key');
+const optionalInt = (min: number) =>
+  z.preprocess((v) => (v === '' ? undefined : v), z.coerce.number().int().min(min).optional());
 const optionalSecret = z
   .string()
   .trim()
@@ -81,6 +83,9 @@ const EnvSchema = z
     X402_FACILITATOR_TOKEN: optionalSecret,
     /// 64-byte Solana keypair (base58 or JSON array) of the fee payer; holds SOL only, never the payee.
     X402_FEE_PAYER_KEYPAIR: optionalSecret,
+    X402_FACILITATOR_MAX_COMPUTE_UNITS: optionalInt(1),
+    X402_FACILITATOR_MAX_PRIORITY_FEE_MICRO_LAMPORTS: optionalInt(1),
+    X402_FACILITATOR_MAX_SIGNATURES: optionalInt(1),
     /// Square's single Postgres (db/); x402 payment replay guards live in its `replay_guards` table.
     DATABASE_URL: nonEmpty,
     /// How long a settled report is kept for a retry with the same payment identifier (`idempotency_records`).
@@ -115,6 +120,19 @@ const EnvSchema = z
         path: ['X402_FEE_PAYER_KEYPAIR'],
         message: 'required when X402_FACILITATOR_URL is not set (own facilitator, ADR 0018)',
       });
+    }
+    for (const key of [
+      'X402_FACILITATOR_MAX_COMPUTE_UNITS',
+      'X402_FACILITATOR_MAX_PRIORITY_FEE_MICRO_LAMPORTS',
+      'X402_FACILITATOR_MAX_SIGNATURES',
+    ] as const) {
+      if (!env.X402_FACILITATOR_URL && env[key] === undefined) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: [key],
+          message: 'required when X402_FACILITATOR_URL is not set (own facilitator fee limits, ADR 0018)',
+        });
+      }
     }
     if (env.HELIUS_API_KEY && !env.HELIUS_API_URL) {
       ctx.addIssue({
@@ -168,7 +186,15 @@ export const config = {
     reportPrice: env.X402_REPORT_PRICE,
     facilitator: env.X402_FACILITATOR_URL
       ? ({ mode: 'remote', url: env.X402_FACILITATOR_URL, token: env.X402_FACILITATOR_TOKEN } as const)
-      : ({ mode: 'self', feePayerKeypair: env.X402_FEE_PAYER_KEYPAIR! } as const),
+      : ({
+          mode: 'self',
+          feePayerKeypair: env.X402_FEE_PAYER_KEYPAIR!,
+          limits: {
+            maxComputeUnits: env.X402_FACILITATOR_MAX_COMPUTE_UNITS!,
+            maxPriorityFeeMicroLamports: env.X402_FACILITATOR_MAX_PRIORITY_FEE_MICRO_LAMPORTS!,
+            maxRequiredSignatures: env.X402_FACILITATOR_MAX_SIGNATURES!,
+          },
+        } as const),
     databaseUrl: env.DATABASE_URL,
     idempotencyTtlSeconds: env.X402_IDEMPOTENCY_TTL_SECONDS,
   },

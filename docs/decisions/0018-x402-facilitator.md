@@ -41,6 +41,10 @@ facilitator'ımız bu yüzden kendi doğrulama kodu gerektirmez.
 2. Ücret ödeyen cüzdan:
    - yalnızca SOL tutar ve ödeme alıcısından (`payTo`) ayrıdır;
    - anahtarı servisin gizli ortam değişkenidir (compliance-api: `X402_FEE_PAYER_KEYPAIR`).
+   - ödeyeceği ücretin üst sınırları (hesaplama birimi, micro-lamport/CU priority fee, imza sayısı) operatörün
+     kararıdır ve yapılandırmada zorunludur, kütüphanede varsayılanı yoktur (`limits`; compliance-api:
+     `X402_FACILITATOR_MAX_*`). Sınırı aşan ödeme doğrulamada, facilitator imzalamadan önce reddedilir
+     (2026-10-07, #230).
    - Resmi şema ücret ödeyenin işlemde token aktarmasını reddeder.
 3. RPC adresi ağ başına açıkça verilir (`rpcUrls`). Herkese açık yerleşik RPC kullanılmaz.
 4. Harici facilitator yapılandırmayla seçilir: `mode: 'remote'`, facilitator adresi ve isteğe bağlı bearer

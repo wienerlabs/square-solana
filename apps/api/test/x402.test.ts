@@ -243,7 +243,11 @@ describe('kabul: tanım → 402 → ödeme → 200 → kullanım sayacı', () =>
     const square = stack.api({ apiKey: await apiKey(stack, owner, ['x402:serve']) });
     const errors: unknown[] = [];
     const gateway = createX402Gateway({
-      facilitator: createFacilitatorClient({ feePayer: keys.feePayer, rpcUrls: { [SOLANA_DEVNET]: rpc.url } }),
+      facilitator: createFacilitatorClient({
+        feePayer: keys.feePayer,
+        rpcUrls: { [SOLANA_DEVNET]: rpc.url },
+        limits: { maxComputeUnits: 100_000, maxPriorityFeeMicroLamports: 50_000, maxRequiredSignatures: 2 },
+      }),
       replay: createMemoryReplayStore(),
       networks: [SOLANA_DEVNET],
     });
