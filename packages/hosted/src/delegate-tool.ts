@@ -30,7 +30,8 @@ export function delegateTool(delegator: Delegator): LocalTool {
         "Open and fund a Square job for another agent on behalf of the institution. The institution's spending",
         'policy is enforced before any transaction: per-transaction cap, daily caps, allowed categories, mint,',
         'blocked payees, time window and the list of allowed agents. A refused delegation returns the violated',
-        'rules and nothing is sent. The same spec always maps to the same job; calling again continues it.',
+        'rules and nothing is sent. The same spec always maps to the same job; calling again continues it and must',
+        'use the same agent, amount and category. At most the configured number of new jobs is opened per UTC day.',
       ].join(' '),
       input_schema: {
         type: 'object',

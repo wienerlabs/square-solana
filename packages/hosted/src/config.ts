@@ -34,6 +34,7 @@ const PositiveInt = z.number().int().positive();
 const EnvName = z.string().regex(/^[A-Z_][A-Z0-9_]*$/, 'ortam değişkeni adı bekleniyor (A-Z, 0-9, _)');
 const FilePath = z.string().min(1);
 const HttpUrl = z.url({ protocol: /^https?$/ });
+const AuthDomain = z.string().regex(/^[a-z0-9.-]+(:\d+)?$/, 'alan adı bekleniyor (ör. app.example.com)');
 const HttpsUrl = z.url({ protocol: /^https$/, error: 'https adresi bekleniyor' });
 
 /**
@@ -187,6 +188,7 @@ export const DelegationConfigSchema = z
     /** İstekte deadline yoksa şimdiden bu kadar saniye sonrası. */
     deadlineSecs: PositiveInt,
     challengePeriodSecs: PositiveInt,
+    maxJobsPerDay: PositiveInt,
     /** Günlük harcama ve açılan job'ların defteri (dosya, 0600). */
     ledgerPath: FilePath,
     /**
@@ -268,7 +270,7 @@ export const HostedConfigSchema = z
       })
       .strict(),
     /** Square API'si: teslimat yükleme, kart barındırma ve job keşfi. */
-    api: z.object({ baseUrl: HttpUrl, apiKeyEnv: EnvName }).strict(),
+    api: z.object({ baseUrl: HttpUrl, apiKeyEnv: EnvName, authDomain: AuthDomain.optional() }).strict(),
     /** A2A görev deposu (Postgres; `@squaresdk/solana-a2a/prisma`). */
     store: z.object({ type: z.literal('postgres'), urlEnv: EnvName }).strict(),
     signers: z
@@ -315,6 +317,9 @@ export const HostedConfigSchema = z
         issue(['capabilities', i, 'delegation'], 'delegasyon açık ama delegation bölümü yok');
       }
     });
+    if (config.delegation?.travelRule && !config.api.authDomain) {
+      issue(['api', 'authDomain'], "Travel Rule oturumu API'nin API_AUTH_DOMAIN'ini ister");
+    }
     const keyFiles = [config.signers.agent, config.signers.institution].flatMap((signer) =>
       signer?.type === 'keypair' ? [signer.keypairPath] : [],
     );

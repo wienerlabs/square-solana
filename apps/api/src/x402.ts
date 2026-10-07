@@ -3,9 +3,9 @@
 // (`recordX402Payment`). Square ödeme yolunda değildir: kayıt geliştiricinin bildirimidir, ödeme işlemi
 // (`transaction`) zincirde doğrulanabilir.
 // - Yol cüzdan başına tekildir; aynı yolda ikinci tanım 409.
-// - Ödeme ödeme yükünün kimliğiyle (`fingerprint`, tekrar korumasının kimliği) ve işlem imzasıyla ağ başına bir
-//   kez sayılır. Aynı ödemenin aynı tanıma yeniden bildirimi ilk kaydı döner; başka bir tanıma ya da farklı
-//   işlemle bildirimi 409.
+// - Ödeme ödeme yükünün kimliğiyle (`fingerprint`, tekrar korumasının kimliği) ve işlem imzasıyla cüzdan ve ağ
+//   başına bir kez sayılır. Aynı ödemenin aynı tanıma yeniden bildirimi ilk kaydı döner; aynı cüzdanın başka bir
+//   tanımına ya da farklı işlemle bildirimi 409.
 // - Bildirilen ödemenin ağı, mint'i ve alıcısı tanımınkiyle aynı olmalıdır; tutar bildirildiği gibidir (fiyat
 //   sonradan değişmiş olabilir).
 import type { Prisma, PrismaClient, X402Network as DbNetwork } from '@squaresdk/solana-db';
@@ -103,10 +103,14 @@ export function createX402EndpointService(deps: { db: PrismaClient }): X402Endpo
   };
 
   /** Aynı ödemenin önceki kaydı: aynı tanım ve işlemse ilk kayıt, değilse 409. */
-  const previous = async (endpointId: string, report: X402PaymentReport): Promise<X402Payment | null> => {
+  const previous = async (
+    wallet: string,
+    endpointId: string,
+    report: X402PaymentReport,
+  ): Promise<X402Payment | null> => {
     const network = NETWORK_TO_DB[report.network];
     const row = await db.x402Payment.findFirst({
-      where: { network, OR: [{ fingerprint: report.fingerprint }, { transaction: report.transaction }] },
+      where: { wallet, network, OR: [{ fingerprint: report.fingerprint }, { transaction: report.transaction }] },
     });
     if (!row) return null;
     if (
@@ -202,12 +206,13 @@ export function createX402EndpointService(deps: { db: PrismaClient }): X402Endpo
       if (mismatched.length > 0) {
         throw badRequest('ödeme tanımın ağı, mint’i ya da alıcısıyla uyuşmuyor', { fields: mismatched });
       }
-      const existing = await previous(id, report);
+      const existing = await previous(wallet, id, report);
       if (existing) return { payment: existing, created: false };
       try {
         const row = await db.x402Payment.create({
           data: {
             endpointId: id,
+            wallet,
             fingerprint: report.fingerprint,
             transaction: report.transaction,
             network: NETWORK_TO_DB[report.network],
@@ -222,7 +227,7 @@ export function createX402EndpointService(deps: { db: PrismaClient }): X402Endpo
       } catch (error) {
         // Eşzamanlı aynı bildirim: kazanan kayıt döner.
         if (!isUniqueViolation(error)) throw error;
-        const raced = await previous(id, report);
+        const raced = await previous(wallet, id, report);
         if (!raced) throw error;
         return { payment: raced, created: false };
       }

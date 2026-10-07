@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Square Solana API
-  version: 0.24.0
+  version: 0.25.0
   summary: Square HTTP API sözleşmesi (BE-35), uygulaması apps/api (BE-18).
   description: |
     Contract-first API sözleşmesi. Zincirdeki hesaplar, event'ler ve instruction argümanları
@@ -837,6 +837,7 @@ paths:
       tags: [disputes]
       operationId: listDisputeEvidence
       summary: Job'un dispute kanıtları (kurum, agent cüzdanı / sahibi ve aktif arbitrator'lar okur).
+      description: Anahtarla gelen istek `disputes:read` kapsamı ister.
       security:
         - session: []
         - apiKey: []
@@ -865,6 +866,7 @@ paths:
       tags: [disputes]
       operationId: getDisputeEvidenceContent
       summary: Kanıtın içeriği (zarfsız; içerik tipi yüklemedeki tip).
+      description: Anahtarla gelen istek `disputes:read` kapsamı ister.
       security:
         - session: []
         - apiKey: []
@@ -932,7 +934,9 @@ paths:
       tags: [arbitration]
       operationId: getArbitrationQueue
       summary: Oturumdaki arbitrator'ın açık dispute'ları; oylar, son tarih ve kanıtlarla.
-      description: Son tarihi en yakın olan önce. Çağıran aktif arbitrator değilse 403.
+      description: >-
+        Son tarihi en yakın olan önce. Çağıran aktif arbitrator değilse 403. Anahtarla gelen istek `disputes:read`
+        kapsamı ister.
       security:
         - session: []
         - apiKey: []
@@ -2281,7 +2285,18 @@ components:
         expiresAt: { type: integer, format: int64 }
     ApiKeyScope:
       type: string
-      enum: [read, 'tx:prepare', 'deliveries:write', 'agents:write', prove, 'disputes:write', 'x402:serve', 'fiat:pay']
+      enum:
+        [
+          read,
+          'tx:prepare',
+          'deliveries:write',
+          'agents:write',
+          prove,
+          'disputes:write',
+          'x402:serve',
+          'fiat:pay',
+          'disputes:read',
+        ]
     ApiKey:
       type: object
       required: [id, label, prefix, scopes, createdAt, lastUsedAt]

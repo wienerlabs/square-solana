@@ -7,6 +7,7 @@ test('yalnızca paket dizinleri ve belgeler değiştiyse etkilenen paketler', ()
     'packages/types/src/a2a.ts',
     'apps/prover/src/app.ts',
     'tests/smoke/src/smoke.ts',
+    'tests/services/src/world.ts',
     'db/prisma/schema.prisma',
     'docs/decisions/0002-mimari-yol-c-tek-anchor-workspace.md',
     'README.md',

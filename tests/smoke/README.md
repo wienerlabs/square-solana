@@ -10,7 +10,7 @@ Aynı komutlar her kümede çalışır; küme bir JSON yapılandırmasıyla seç
 |---|---|
 | `init` | Programları okur (executable, upgrade authority, executable hash). Eksik config'leri kurar: `init_registry_config`, `init_verifier_config`, `init_config`. Authority yapılandırmadaki yerel `admin` anahtarıysa talimatı gönderir. Değilse authority Squads vault'udur: talimat gönderilmez, Squads'a girilecek biçimde (program, hesaplar, base64 veri) yazılır ([runbook adım 5](../../docs/runbooks/upgrade.md#5-configlerin-kurulması-vault-imzasıyla)). Ardından Square ALT'ını açar ya da doğrular ([tx-budget.md §4](../../docs/design/tx-budget.md#4-square-alt)). En son config'leri zincirden okuyup kayıt satırlarını (Markdown) yazar. |
 | `smoke` | 8 adım ve iki varyant gerçek işlemlerle (aşağıda). Her tx'in imzası, CU'su (`meta.computeUnitsConsumed`), CU sınırı, ücreti ve boyutu `docs/deploy/smoke-<küme>.md`'ye yazılır. |
-| `smoke:localnet` | Geçici bir `solana-test-validator` açar, programları `target/deploy/*.so`'dan yükler, `init` ve `smoke`'u koşar, validator'ı kapatır. Rapor: [`docs/deploy/smoke-localnet.md`](../../docs/deploy/smoke-localnet.md). |
+| `smoke:localnet` | Geçici bir `solana-test-validator` açar (RPC, faucet ya da gossip portu zaten bağlantı kabul ediyorsa validator'ı açmadan hata verir), programları `target/deploy/*.so`'dan yükler, `init` ve `smoke`'u koşar, validator'ı kapatır. Rapor: [`docs/deploy/smoke-localnet.md`](../../docs/deploy/smoke-localnet.md). |
 
 ```bash
 pnpm turbo run build --filter @squaresdk/solana-smoke...             # paket ve bağımlılıkları
@@ -168,6 +168,21 @@ kurulumu kullanır, yeniden kurmaz. Kayıt deploy'la oluşur: `docs/deploy/smoke
 
 Birim testleri zincirsizdir. Zincirle çalışan akışlar (`runSmoke`, localnet koşucusunun süreç yönetimi,
 prover) `smoke:localnet` koşusunda gerçek işlemlerle sınanır ve kapsam ölçümünün dışındadır.
+Validator'ın port ön denetimi ise birim testindedir: port doluysa `child_process` hiç çağrılmadan hata verilir
+(`test/localnet.test.ts`).
+
+Modüller `@squaresdk/solana-smoke/<modül>` olarak dışa açıktır. Servis entegrasyon testi
+([`tests/services`](../services/), BE-36) localnet koşucusunun parçalarını (`startValidator`, `fundLocalnet`,
+`assertDeployedPrograms`), `runInit`'i ve `runSmoke`'u kullanır. `runSmoke`'un isteğe bağlı üç kancası vardır;
+verilmezse smoke tx'leri kendisi gönderir:
+- `screen(wallet)`: adım 3'ün screening kaydını yazar (servis testinde screener servisi).
+- `finalize(job, expectError)`: challenge bittikten sonra finalize'ı yapar ya da beklenen bekletmeyi bekler (servis
+  testinde keeper servisi).
+- `provers`: bölüme özel prover (fiat dahil); verilmeyen bölüm ortak `prover`'ı kullanır (servis testinde ispat-yok
+  ispatı API ve prover servisinden).
+
+Keeper finalize'ı ispat bağlandığı anda yapabileceği için bakiye ve itibar karşılaştırmalarının "önce" değerleri
+ispattan önce okunur.
 
 ## Devnet koşusu
 

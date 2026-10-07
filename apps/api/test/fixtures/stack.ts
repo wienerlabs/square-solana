@@ -292,7 +292,6 @@ export async function startStack(options: {
       client,
       tx,
       arbitrators,
-      evidence,
       ...(options.clock ? { clock: options.clock } : {}),
     }),
     webhooks: createWebhookService({

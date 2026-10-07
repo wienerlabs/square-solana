@@ -281,17 +281,17 @@ model Dispute {
   raisedAt             BigInt            @map("raised_at")
   deadline             BigInt
   /// Eşiğe ulaşıldığı zaman; karar yoksa 0.
-  decidedAt            BigInt            @map("decided_at")
+  decidedAt            BigInt            @default(0) @map("decided_at")
   /// `execute_resolution` ya da `lapse_dispute`'un kapattığı zaman; açıksa 0.
-  closedAt             BigInt            @map("closed_at")
+  closedAt             BigInt            @default(0) @map("closed_at")
   resolution           DisputeResolution
   lapsed               Boolean
   /// Bit i: sayımın dayandığı setteki `arbitrators[i]` karara oy verdi.
-  approvalMask         Int               @map("approval_mask")
-  approvalCount        Int               @map("approval_count")
+  approvalMask         Int               @default(0) @map("approval_mask")
+  approvalCount        Int               @default(0) @map("approval_count")
   /// Sayımın dayandığı arbitrator seti (u32). Config'teki sürüm daha yeniyse sonraki oy sayımı sıfırlar
   /// (ADR 0016).
-  arbitratorSetVersion BigInt            @map("arbitrator_set_version")
+  arbitratorSetVersion BigInt            @default(0) @map("arbitrator_set_version")
   slot                 BigInt
   indexedAt            DateTime          @map("indexed_at") @db.Timestamptz(3)
 
@@ -646,6 +646,7 @@ enum ApiKeyScope {
   disputesWrite   @map("disputes:write")
   x402Serve       @map("x402:serve")
   fiatPay         @map("fiat:pay")
+  disputesRead    @map("disputes:read")
 }
 
 /// API anahtarı (`ApiKey`). Gizli değer saklanmaz, yalnızca SHA-256'sı; `prefix` listelemede gösterilir.
@@ -705,6 +706,7 @@ model X402Endpoint {
 model X402Payment {
   id          String       @id @default(uuid()) @db.Uuid
   endpointId  String       @map("endpoint_id") @db.Uuid
+  wallet      String       @db.VarChar(44)
   /// `svm:<64 hex>` ya da `json:<64 hex>`.
   fingerprint String       @db.VarChar(69)
   transaction String       @db.VarChar(88)
@@ -718,8 +720,8 @@ model X402Payment {
   reportedAt  DateTime     @default(now()) @map("reported_at") @db.Timestamptz(3)
   endpoint    X402Endpoint @relation(fields: [endpointId], references: [id], onDelete: Cascade)
 
-  @@unique([network, fingerprint])
-  @@unique([network, transaction])
+  @@unique([wallet, network, fingerprint])
+  @@unique([wallet, network, transaction])
   @@index([endpointId, settledAt])
   @@map("x402_payments")
 }

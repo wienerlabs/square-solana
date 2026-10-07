@@ -49,7 +49,7 @@ export function disputeRoutes(deps: {
     '/v1/disputes/:job/evidence',
     readLimit,
     route(async (req, res) => {
-      const principal = requireActor(res, 'read');
+      const principal = requireActor(res, 'disputes:read');
       sendOk(res, await deps.evidence.list({ wallet: principal.wallet, job: pathAddress(req, 'job') }));
     }),
   );
@@ -58,7 +58,7 @@ export function disputeRoutes(deps: {
     '/v1/disputes/:job/evidence/:id',
     readLimit,
     route(async (req, res) => {
-      const principal = requireActor(res, 'read');
+      const principal = requireActor(res, 'disputes:read');
       const { contentType, content } = await deps.evidence.content({
         wallet: principal.wallet,
         job: pathAddress(req, 'job'),
@@ -91,7 +91,7 @@ export function disputeRoutes(deps: {
     '/v1/arbitration/queue',
     readLimit,
     route(async (req, res) => {
-      const principal = requireActor(res, 'read');
+      const principal = requireActor(res, 'disputes:read');
       const page = parse(QueueQuery, req.query, 'sorgu');
       sendPage(res, await deps.arbitration.queue(principal.wallet, page));
     }),

@@ -1280,6 +1280,70 @@ importers:
         specifier: ^5.0.3
         version: 5.0.3(@opentelemetry/api@1.9.1)(@types/node@24.19.1)(@vitest/coverage-v8@5.0.3)(jsdom@30.1.1(@noble/hashes@2.4.0))(vite@8.3.2(@types/node@24.19.1)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
 
+  tests/services:
+    dependencies:
+      '@aws-sdk/client-s3':
+        specifier: ^3.1146.0
+        version: 3.1146.0
+      '@solana/spl-token':
+        specifier: ^0.4.15
+        version: 0.4.15(@solana/web3.js@1.99.0(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@6.0.6))(bufferutil@4.1.0)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)(utf-8-validate@6.0.6)
+      '@solana/web3.js':
+        specifier: ^1.99.0
+        version: 1.99.0(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@6.0.6)
+      '@squaresdk/solana-db':
+        specifier: workspace:*
+        version: link:../../db
+      '@squaresdk/solana-policy':
+        specifier: workspace:*
+        version: link:../../packages/policy
+      '@squaresdk/solana-sdk':
+        specifier: workspace:*
+        version: link:../../packages/sdk
+      '@squaresdk/solana-smoke':
+        specifier: workspace:*
+        version: link:../smoke
+      '@squaresdk/solana-types':
+        specifier: workspace:*
+        version: link:../../packages/types
+      '@testcontainers/postgresql':
+        specifier: ^12.2.0
+        version: 12.2.0
+      bs58:
+        specifier: ^6.0.0
+        version: 6.0.0
+      testcontainers:
+        specifier: ^12.2.0
+        version: 12.2.0
+    devDependencies:
+      '@squaresdk/solana-api':
+        specifier: workspace:*
+        version: link:../../apps/api
+      '@squaresdk/solana-config':
+        specifier: workspace:*
+        version: link:../../packages/config
+      '@squaresdk/solana-indexer':
+        specifier: workspace:*
+        version: link:../../apps/indexer
+      '@squaresdk/solana-keeper':
+        specifier: workspace:*
+        version: link:../../apps/keeper
+      '@squaresdk/solana-prover':
+        specifier: workspace:*
+        version: link:../../apps/prover
+      '@squaresdk/solana-screener':
+        specifier: workspace:*
+        version: link:../../apps/screener
+      '@types/node':
+        specifier: ^24.0.0
+        version: 24.19.1
+      '@vitest/coverage-v8':
+        specifier: ^5.0.3
+        version: 5.0.3(vitest@5.0.3)
+      vitest:
+        specifier: ^5.0.3
+        version: 5.0.3(@opentelemetry/api@1.9.1)(@types/node@24.19.1)(@vitest/coverage-v8@5.0.3)(jsdom@30.1.1(@noble/hashes@2.4.0))(vite@8.3.2(@types/node@24.19.1)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
+
   tests/smoke:
     dependencies:
       '@anchor-lang/core':
