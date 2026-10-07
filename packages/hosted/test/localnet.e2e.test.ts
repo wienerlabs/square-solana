@@ -316,6 +316,7 @@ describe.skipIf(!ENABLED)('localnet: yapılandırmadan hosted agent → teslim; 
             allowedAgents: [{ agentRecord: workerRecord.toBase58() }],
             deadlineSecs: 6 * HOUR,
             challengePeriodSecs: HOUR,
+            maxJobsPerDay: 20,
             ledgerPath: 'state/ledger.json',
           },
         }),

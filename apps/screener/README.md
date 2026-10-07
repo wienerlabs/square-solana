@@ -170,9 +170,15 @@ Koşu OFAC'ın canlı listesini indirir:
 Ağ ve programlar `scripts/deploy/networks/devnet.json`'dandır
 ([deploy kaydı](../../docs/deploy/devnet.md#screener-be-16)).
 
+**Fonlamanın gerçek reddi** localnet servis testindedir ([`tests/services`](../../tests/services/), BE-36):
+- Screener süreç olarak açılır. OFAC kaynağı, işaretli cüzdanı içeren sentetik bir listedir (yerel https).
+- Akışın üç cüzdanı `Clear`, işaretli cüzdan `Flagged` yazılır.
+- Cüzdanı işaretli olan agent'a açılan işin `fund_job`'ı `ScreeningFlagged` ile düşer.
+
+`ScreeningExpired` ve `ScreeningRequired` reddi program testlerindedir ([tests/programs](../../tests/programs/)).
+
 ## Kalanlar
 
-- **Fonlamanın gerçek reddi:** `ScreeningFlagged` / `ScreeningExpired` BE-36'dadır (localnet).
 - **Chainalysis:** Canlı API'ye karşı smoke testi kayıtla alınan bir API anahtarı ister. Anahtar yokken servis
   yalnızca OFAC listesiyle tarar.
 - **Dağıtım:** Railway servisi ve secret tanımı dağıtım işidir.

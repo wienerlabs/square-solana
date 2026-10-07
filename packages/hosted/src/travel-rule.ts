@@ -20,9 +20,25 @@ const SESSION_MARGIN_SECS = 30;
 const failure = (what: string, error: { code: string; message: string }) =>
   new Error(`${what}: ${error.code}: ${error.message}`);
 
+const SIGN_IN_MESSAGE =
+  /^([a-z0-9.-]+(?::\d+)?) wants you to sign in with your Solana account:\n(\S+)\n\nSign in to Square\.\n\nNonce: (\S+)\nIssued At: (\S+)\nExpiration Time: (\S+)$/;
+
+function isSquareSignIn(message: string, expected: { domain: string; wallet: string; nonce: string }): boolean {
+  const match = SIGN_IN_MESSAGE.exec(message);
+  return (
+    match !== null &&
+    match[1] === expected.domain &&
+    match[2] === expected.wallet &&
+    match[3] === expected.nonce &&
+    !Number.isNaN(Date.parse(match[4]!)) &&
+    !Number.isNaN(Date.parse(match[5]!))
+  );
+}
+
 /** Square API'sinde saklayan Travel Rule deposu; kurumun keypair'iyle oturum açar. */
 export function createApiTravelRuleStore(options: {
   baseUrl: string;
+  authDomain: string;
   keypair: Keypair;
   fetch?: typeof fetch;
   /** Unix saniyesi. */
@@ -37,6 +53,9 @@ export function createApiTravelRuleStore(options: {
     if (session && session.expiresAt - SESSION_MARGIN_SECS > now()) return session.api;
     const challenge = await anonymous.createAuthChallenge({ wallet });
     if (!challenge.success) throw failure('Travel Rule oturumu (challenge)', challenge.error);
+    if (!isSquareSignIn(challenge.data.message, { domain: options.authDomain, wallet, nonce: challenge.data.nonce })) {
+      throw new Error('Travel Rule oturumu: API bu cüzdan için Square oturum mesajı göndermedi; imzalanmadı');
+    }
     const signature = ed25519.sign(
       new TextEncoder().encode(challenge.data.message),
       options.keypair.secretKey.slice(0, 32),

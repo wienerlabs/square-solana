@@ -12,6 +12,7 @@ const AFFECTED_SAFE = [
   /^packages\/[^/]+\//,
   /^apps\/[^/]+\//,
   /^tests\/smoke\//,
+  /^tests\/services\//,
   /^(packages|apps)\/README\.md$/,
   /^db\//,
   /^\.changeset\//,

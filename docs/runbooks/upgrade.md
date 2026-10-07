@@ -214,4 +214,5 @@ iki üyeyle onaylayıp yürütür ve verifier'ın son deploy slot'unun değişme
 | Bir üyenin anahtarı ele geçirildi | Aynı gün üye değiştirilir; bekleyen işlemler iptal edilir |
 | Buffer yanlış yüklendi | `solana program close <buffer>` (buffer authority vault ise Squads işlemiyle) |
 | MPP authority anahtarı sızdı | Aynı gün §7 ile döndürülür; yeni anahtar hazır değilse sıfır anahtarla (`update_mpp_authority`) fiat rayı kapatılır |
+| Bir arbitrator dispute'un kararını tek başına belirledi (ilk oy panelin görüşüne aykırı; diğer oylar `ResolutionMismatch` alır, konsol yalnızca o kararı sunar) | Dispute'un `deadline`'ından önce `update_arbitrators` Squads vault işlemiyle gönderilir ve şüpheli üye setten çıkarılır. Sürüm artar, sonraki oy sayımı sıfırlar; kalan üyeler eşiğe son tarihten önce ulaşmalıdır ([ADR 0016](../decisions/0016-dispute-m-of-n-zaman-asimi-ve-ispatsiz-bekleme.md#açık-noktalar)) |
 | Program keypair'i sızdı | Deploy edilmiş program için etkisi yoktur (upgrade authority vault'tadır); henüz deploy edilmemişse kimlik yeniden üretilir (adım 1–2) |

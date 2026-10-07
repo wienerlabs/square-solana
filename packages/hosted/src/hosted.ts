@@ -145,7 +145,12 @@ export async function createHostedAgent(config: HostedConfig, deps: HostedDeps):
         deps.travelRule !== undefined
           ? deps.travelRule
           : institutionSigner!.type === 'keypair' && config.delegation.travelRule
-            ? createApiTravelRuleStore({ baseUrl: config.api.baseUrl, keypair: institutionSigner!.keypair, now })
+            ? createApiTravelRuleStore({
+                baseUrl: config.api.baseUrl,
+                authDomain: config.api.authDomain!,
+                keypair: institutionSigner!.keypair,
+                now,
+              })
             : null,
     });
   }

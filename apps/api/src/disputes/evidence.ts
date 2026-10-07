@@ -38,6 +38,14 @@ export function evidenceView(row: EvidenceRow, disputeReasonHash: string | null)
   });
 }
 
+export async function evidenceOf(db: PrismaClient, job: string): Promise<DisputeEvidence[]> {
+  const [rows, dispute] = await Promise.all([
+    db.disputeEvidence.findMany({ where: { job }, orderBy: [{ createdAt: 'asc' }, { id: 'asc' }] }),
+    db.dispute.findUnique({ where: { job }, select: { reasonHash: true } }),
+  ]);
+  return rows.map((row) => evidenceView(row, dispute?.reasonHash ?? null));
+}
+
 export function createEvidenceService(deps: {
   db: PrismaClient;
   store: EvidenceStore;
@@ -62,7 +70,7 @@ export function createEvidenceService(deps: {
 
   async function reader(caller: Caller, job: string) {
     const row = await jobOf(job);
-    const role = await parties.roleOf(caller, row);
+    const role = await parties.roleOf(caller, row, 'read');
     if (!role) throw forbidden('kanıtı yalnızca kurum, agent cüzdanı / sahibi ve aktif arbitrator’lar okur');
     return row;
   }
@@ -70,7 +78,7 @@ export function createEvidenceService(deps: {
   return {
     async upload({ caller, job, content, contentType }) {
       const row = await jobOf(job);
-      const role = await parties.roleOf(caller, row);
+      const role = await parties.roleOf(caller, row, 'upload');
       if (!role) throw forbidden('kanıtı yalnızca kurum, agent cüzdanı / sahibi ve aktif arbitrator’lar yükler');
       const allowed = role === 'institution' ? INSTITUTION_STATUSES : DISPUTE_STATUSES;
       if (!allowed.has(row.status)) {
@@ -105,11 +113,7 @@ export function createEvidenceService(deps: {
 
     async list({ caller, job }) {
       await reader(caller, job);
-      const [rows, reasonHash] = await Promise.all([
-        db.disputeEvidence.findMany({ where: { job }, orderBy: [{ createdAt: 'asc' }, { id: 'asc' }] }),
-        reasonHashOf(job),
-      ]);
-      return rows.map((row) => evidenceView(row, reasonHash));
+      return evidenceOf(db, job);
     },
 
     async content({ caller, job, id }) {

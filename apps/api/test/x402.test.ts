@@ -217,6 +217,22 @@ describe('ödeme bildirimi ve kullanım', () => {
   });
 });
 
+describe('ödeme kaydının sahibi', () => {
+  it('başka bir cüzdanın aynı ödemeyi önce bildirmesi tanım sahibinin kaydını engellemez', async () => {
+    const owner = stack.api({ session: await login(stack.api(), wallet()) });
+    const intruder = stack.api({ session: await login(stack.api(), wallet()) });
+    const endpoint = await created(owner, definition());
+    const copy = await created(intruder, definition());
+    const payment = report({ settledAt: 1_791_300_000 });
+    expect(await intruder.recordX402Payment(copy.id, payment)).toMatchObject({ success: true });
+    expect(await owner.recordX402Payment(endpoint.id, payment)).toMatchObject({
+      success: true,
+      data: { ...payment, endpointId: endpoint.id },
+    });
+    expect(await owner.getX402EndpointUsage(endpoint.id)).toMatchObject({ data: { payments: 1 } });
+  });
+});
+
 describe('kabul: tanım → 402 → ödeme → 200 → kullanım sayacı', () => {
   it('geliştiricinin sunucusu tanımı API’den okur, ödemeyi ister ve uzlaştırdığını bildirir', async () => {
     const owner = wallet();

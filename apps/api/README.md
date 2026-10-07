@@ -42,7 +42,7 @@ başlığıyla aynıdır. Zamanlar Unix saniyesidir.
   - Belirteç `sqs_` + 32 rastgele bayttır; veritabanında yalnızca SHA-256'sı durur.
   - Belirteç `Authorization: Bearer` başlığıyla gönderilir; `DELETE /v1/auth/session` oturumu kapatır.
 - **API anahtarı:** Oturumla oluşturulur; kapsamlar `read`, `tx:prepare`, `deliveries:write`, `agents:write`,
-  `prove`, `disputes:write`, `x402:serve`.
+  `prove`, `disputes:write`, `disputes:read`, `x402:serve`, `fiat:pay`.
   - Anahtar `sqk_` + 32 rastgele bayttır ve yalnızca oluşturma yanıtında bir kez döner.
   - Listelemede ilk 12 karakteri (`prefix`) görünür.
   - Anahtar `X-API-Key` başlığıyla gönderilir. İki başlık birlikte gönderilemez.
@@ -53,7 +53,7 @@ başlığıyla aynıdır. Zamanlar Unix saniyesidir.
   | Anahtar yönetimi, oturum kapatma, politika meta | Oturum |
   | `uploadDelivery`, `putAgentCard`, `prepareTx` | Oturum ya da kapsamlı anahtar |
   | `prove` | Yalnızca `prove` kapsamlı anahtar |
-  | `uploadDisputeEvidence` (`disputes:write`), `prepareDisputeVote` (`tx:prepare`), `listDisputeEvidence`, `getDisputeEvidenceContent`, `getArbitrationQueue` (`read`) | Oturum ya da kapsamlı anahtar; kaynak üzerindeki yetki [Uyuşmazlık](#uyuşmazlık)'ta |
+  | `uploadDisputeEvidence` (`disputes:write`), `prepareDisputeVote` (`tx:prepare`), `listDisputeEvidence`, `getDisputeEvidenceContent`, `getArbitrationQueue` (`disputes:read`) | Oturum ya da kapsamlı anahtar; kaynak üzerindeki yetki [Uyuşmazlık](#uyuşmazlık)'ta |
   | Webhook abonelikleri | Oturum; yalnızca aktif arbitrator |
   | `createX402Endpoint`, `updateX402Endpoint`, `deleteX402Endpoint` | Oturum |
   | `listX402Endpoints`, `getX402Endpoint`, `getX402EndpointUsage`, `recordX402Payment` | Oturum ya da `x402:serve` kapsamlı anahtar |
@@ -245,9 +245,10 @@ Geliştirici portalının (FE-22, web `/app/developers`) arka ucu. Karar:
 - **Ödeme** geliştiricinin sunucusunda istenir: `@squaresdk/solana-x402` `paidRouteFromDefinition` tanımı
   `getX402Endpoint` ile okur. Facilitator ve ücret ödeyen cüzdan o sunucudadır; API ödeme yolunda değildir.
 - **Bildirim** (`recordX402Payment`, `x402_payments`): sunucu uzlaştırdığı her ödemeyi bildirir.
-  - `fingerprint` ödeme yükünün tekrar koruması kimliği, `transaction` makbuzun işlem imzasıdır. İkisi de ağ
-    başına tekildir.
-  - Aynı bildirimin tekrarı ilk kaydı 200 ile döner; başka tanıma ya da farklı işlemle bildirim 409 alır.
+  - `fingerprint` ödeme yükünün tekrar koruması kimliği, `transaction` makbuzun işlem imzasıdır. İkisi de tanım
+    sahibinin cüzdanı ve ağ başına tekildir: başka bir cüzdanın aynı ödemeyi daha önce bildirmesi kaydı engellemez.
+  - Aynı bildirimin tekrarı ilk kaydı 200 ile döner; aynı cüzdanın başka tanımına ya da farklı işlemle bildirim 409
+    alır.
   - Ağ, mint ve alıcı tanımınkiyle aynı olmalıdır (400, `details.fields`). Tutar bildirildiği gibi kaydedilir.
 - **Kullanım** (`getX402EndpointUsage`): ödemeli çağrı sayısı, ağ ve mint başına toplam, son ödeme zamanı, son
   20 ödeme. Tanım silinince kullanım kaydı da silinir.

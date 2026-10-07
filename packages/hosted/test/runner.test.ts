@@ -44,6 +44,7 @@ const full = (signer: Record<string, unknown> = { type: 'keypair', keypairPath: 
       allowedAgents: [{ agentRecord: Keypair.generate().publicKey.toBase58() }],
       deadlineSecs: 600,
       challengePeriodSecs: 600,
+      maxJobsPerDay: 20,
       ledgerPath: 'ledger.json',
     },
     ...(signer.type === 'keypair' && {
