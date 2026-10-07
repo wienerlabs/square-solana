@@ -11,9 +11,16 @@ import {
 import type { PaymentPayload } from '@x402/core/types';
 import { decodePaymentSignatureHeader } from '@x402/core/http';
 import { describe, expect, it, vi } from 'vitest';
-import { createSelfFacilitator, localFacilitatorClient, SELF_FACILITATOR_LIMITS } from '../src/facilitator.js';
+import { createSelfFacilitator, localFacilitatorClient } from '../src/facilitator.js';
 import { SOLANA_DEVNET } from '../src/networks.js';
-import { buildPaymentHeader, createWallets, memoryReplayStore, startFakeSolanaRpc, startPaidApp } from './helpers.js';
+import {
+  buildPaymentHeader,
+  createWallets,
+  memoryReplayStore,
+  startFakeSolanaRpc,
+  startPaidApp,
+  TEST_LIMITS,
+} from './helpers.js';
 
 const { constructed } = vi.hoisted(() => ({ constructed: [] as unknown[][] }));
 
@@ -29,20 +36,21 @@ vi.mock('@x402/svm/exact/facilitator', async (importOriginal) => {
 });
 
 describe('kendi facilitator’ın ücret sınırları', () => {
-  it('compute, priority fee ve imza sayısı varsayılan olarak sınırlıdır; çağıranın ayarı ezer', async () => {
+  it('sınırlar zorunludur ve şemaya olduğu gibi geçer', async () => {
     const wallets = await createWallets();
     const rpcUrls = { [SOLANA_DEVNET]: 'http://127.0.0.1:9' };
-    createSelfFacilitator({ feePayer: wallets.feePayer, rpcUrls });
-    createSelfFacilitator({ feePayer: wallets.feePayer, rpcUrls, scheme: { maxComputeUnits: 300_000 } });
-    expect(constructed.map((args) => args[2])).toEqual([
-      SELF_FACILITATOR_LIMITS,
-      { ...SELF_FACILITATOR_LIMITS, maxComputeUnits: 300_000 },
-    ]);
-    expect(SELF_FACILITATOR_LIMITS).toEqual({
-      maxComputeUnits: 100_000,
-      maxPriorityFeeMicroLamports: 50_000,
-      maxRequiredSignatures: 2,
-    });
+    createSelfFacilitator({ feePayer: wallets.feePayer, rpcUrls, limits: TEST_LIMITS });
+    expect(constructed.at(-1)![2]).toEqual({ ...TEST_LIMITS });
+    expect(() => createSelfFacilitator({ feePayer: wallets.feePayer, rpcUrls } as never)).toThrow(/limits gerekli/);
+    for (const bad of [undefined, 0, 1.5, Number.NaN]) {
+      expect(() =>
+        createSelfFacilitator({
+          feePayer: wallets.feePayer,
+          rpcUrls,
+          limits: { ...TEST_LIMITS, maxComputeUnits: bad as number },
+        }),
+      ).toThrow(/limits\.maxComputeUnits/);
+    }
   });
 });
 
@@ -75,7 +83,7 @@ async function withComputeBudget(
 }
 
 describe('kendi facilitator’ın ücret sınırları doğrulamada', () => {
-  it('sınırı aşan compute ya da priority fee reddedilir; undefined ayar sınırı kaldırmaz', async () => {
+  it('sınırı aşan compute ya da priority fee facilitator imzalamadan reddedilir', async () => {
     const rpc = await startFakeSolanaRpc();
     const wallets = await createWallets();
     rpc.addMint(wallets.mint, 6);
@@ -85,32 +93,21 @@ describe('kendi facilitator’ın ücret sınırları doğrulamada', () => {
       const payload = decodePaymentSignatureHeader(headers['PAYMENT-SIGNATURE']!);
       const requirements = payload.accepted;
       const rpcUrls = { [SOLANA_DEVNET]: rpc.url };
-      const strict = localFacilitatorClient(createSelfFacilitator({ feePayer: wallets.feePayer, rpcUrls }));
-      const unset = localFacilitatorClient(
-        createSelfFacilitator({
-          feePayer: wallets.feePayer,
-          rpcUrls,
-          scheme: {
-            maxComputeUnits: undefined,
-            maxPriorityFeeMicroLamports: undefined,
-            maxRequiredSignatures: undefined,
-          },
-        }),
+      const strict = localFacilitatorClient(
+        createSelfFacilitator({ feePayer: wallets.feePayer, rpcUrls, limits: TEST_LIMITS }),
       );
       const manyUnits = await withComputeBudget(payload, wallets.payer, 1_400_000, 1n);
       const highPrice = await withComputeBudget(payload, wallets.payer, 20_000, 1_000_000n);
 
       expect(await strict.verify(payload, requirements)).toMatchObject({ isValid: true });
-      for (const facilitator of [strict, unset]) {
-        expect(await facilitator.verify(manyUnits, requirements)).toMatchObject({
-          isValid: false,
-          invalidReason: expect.stringContaining('compute_limit'),
-        });
-        expect(await facilitator.verify(highPrice, requirements)).toMatchObject({
-          isValid: false,
-          invalidReason: expect.stringContaining('compute_price'),
-        });
-      }
+      expect(await strict.verify(manyUnits, requirements)).toMatchObject({
+        isValid: false,
+        invalidReason: expect.stringContaining('compute_limit'),
+      });
+      expect(await strict.verify(highPrice, requirements)).toMatchObject({
+        isValid: false,
+        invalidReason: expect.stringContaining('compute_price'),
+      });
     } finally {
       await app.close();
       await rpc.close();

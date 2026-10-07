@@ -64,6 +64,7 @@ async function facilitatorOptions(): Promise<FacilitatorOptions> {
     mode: 'self',
     feePayer: await parseFeePayerKeypair(facilitator.feePayerKeypair),
     rpcUrls: { [network]: config.solana.rpcUrl },
+    limits: facilitator.limits,
   };
 }
 

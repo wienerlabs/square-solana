@@ -26,6 +26,7 @@ import {
   startFakeSolanaRpc,
   type Listening,
   type Wallets,
+  TEST_LIMITS,
 } from './helpers.js';
 
 // Tip hizası: API'nin görünümü tanım olarak, bildirim kaydı API'nin gövdesi olarak doğrudan kullanılır.
@@ -71,7 +72,11 @@ const definition = (overrides: Partial<X402EndpointDefinition> = {}): X402Endpoi
 
 function gatewayWith(events: X402Event[] = []): X402Gateway {
   return createX402Gateway({
-    facilitator: createFacilitatorClient({ feePayer: wallets.feePayer, rpcUrls: { [SOLANA_DEVNET]: rpc.url } }),
+    facilitator: createFacilitatorClient({
+      feePayer: wallets.feePayer,
+      rpcUrls: { [SOLANA_DEVNET]: rpc.url },
+      limits: TEST_LIMITS,
+    }),
     replay: createMemoryReplayStore(),
     networks: [SOLANA_DEVNET],
     onEvent: (event) => events.push(event),

@@ -67,6 +67,12 @@ export async function listen(app: Express): Promise<Listening> {
 
 export const PRICE_BASE_UNITS = '250000';
 
+export const TEST_LIMITS = Object.freeze({
+  maxComputeUnits: 100_000,
+  maxPriorityFeeMicroLamports: 50_000,
+  maxRequiredSignatures: 2,
+});
+
 export interface PaidApp extends Listening {
   readonly events: X402Event[];
   /** İşleyicinin kaç kez çalıştığı (route adına göre). */
@@ -86,7 +92,11 @@ export async function startPaidApp(
   const events: X402Event[] = [];
   const calls = { report: 0, upfront: 0, broken: 0, cookie: 0, locals: 0 };
   const gateway = createX402Gateway({
-    facilitator: createFacilitatorClient({ feePayer: wallets.feePayer, rpcUrls: { [SOLANA_DEVNET]: rpc.url } }),
+    facilitator: createFacilitatorClient({
+      feePayer: wallets.feePayer,
+      rpcUrls: { [SOLANA_DEVNET]: rpc.url },
+      limits: TEST_LIMITS,
+    }),
     networks: [SOLANA_DEVNET],
     onEvent: (event) => events.push(event),
     ...overrides,

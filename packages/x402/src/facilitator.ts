@@ -25,6 +25,12 @@ export const DEFAULT_FACILITATOR_MODE: FacilitatorMode = 'self';
 /** Ücret ödeyen cüzdan: işlemi ikinci imzacı olarak imzalar (`@solana/kit` `KeyPairSigner`'ı uyar). */
 export type FeePayerSigner = TransactionSigner & MessagePartialSigner;
 
+export interface FacilitatorLimits {
+  readonly maxComputeUnits: number;
+  readonly maxPriorityFeeMicroLamports: number;
+  readonly maxRequiredSignatures: number;
+}
+
 export interface SelfFacilitatorOptions {
   readonly mode?: 'self';
   /**
@@ -34,8 +40,9 @@ export interface SelfFacilitatorOptions {
   readonly feePayer: FeePayerSigner;
   /** Ağ başına RPC adresi; anahtarlar desteklenen ağlardır. Yerleşik (herkese açık) RPC kullanılmaz. */
   readonly rpcUrls: Partial<Record<SolanaNetwork, string>>;
-  /** Resmi exact şemasının sınırları (öncelik ücreti, hesaplama birimi, bekleyen uzlaştırma deposu). */
-  readonly scheme?: ExactSvmSchemeOptions;
+  readonly limits: FacilitatorLimits;
+  /** Resmi exact şemasının diğer ayarları (ör. bekleyen uzlaştırma deposu). */
+  readonly scheme?: Omit<ExactSvmSchemeOptions, keyof FacilitatorLimits>;
 }
 
 export interface RemoteFacilitatorOptions {
@@ -62,17 +69,29 @@ function rpcFor(network: SolanaNetwork, url: string): FacilitatorRpcClient {
   }
 }
 
-export const SELF_FACILITATOR_LIMITS: Readonly<ExactSvmSchemeOptions> = Object.freeze({
-  maxComputeUnits: 100_000,
-  maxPriorityFeeMicroLamports: 50_000,
-  maxRequiredSignatures: 2,
-});
+const LIMIT_FIELDS = ['maxComputeUnits', 'maxPriorityFeeMicroLamports', 'maxRequiredSignatures'] as const;
 
-const definedOptions = (options: ExactSvmSchemeOptions | undefined): ExactSvmSchemeOptions =>
-  Object.fromEntries(Object.entries(options ?? {}).filter(([, value]) => value !== undefined));
+function checkedLimits(limits: FacilitatorLimits | undefined): FacilitatorLimits {
+  if (!limits)
+    throw new Error(
+      'kendi facilitator için limits gerekli (maxComputeUnits, maxPriorityFeeMicroLamports, maxRequiredSignatures)',
+    );
+  for (const field of LIMIT_FIELDS) {
+    const value: unknown = limits[field];
+    if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 1) {
+      throw new Error(`facilitator sınırı limits.${field} pozitif tamsayı olmalı: ${String(value)}`);
+    }
+  }
+  return {
+    maxComputeUnits: limits.maxComputeUnits,
+    maxPriorityFeeMicroLamports: limits.maxPriorityFeeMicroLamports,
+    maxRequiredSignatures: limits.maxRequiredSignatures,
+  };
+}
 
 /** Resmi `x402Facilitator`: exact şeması verilen ağlar için ücret ödeyen cüzdanla kaydedilir. */
 export function createSelfFacilitator(options: SelfFacilitatorOptions): x402Facilitator {
+  const limits = checkedLimits(options.limits);
   const rpcs: Record<string, FacilitatorRpcClient> = {};
   for (const [network, url] of Object.entries(options.rpcUrls) as [SolanaNetwork, string | undefined][]) {
     if (url) rpcs[network] = rpcFor(network, url);
@@ -82,7 +101,7 @@ export function createSelfFacilitator(options: SelfFacilitatorOptions): x402Faci
   const signer = toFacilitatorSvmSigner(options.feePayer, rpcs);
   return new x402Facilitator().register(
     networks as `${string}:${string}`[],
-    new ExactSvmScheme(signer, undefined, { ...SELF_FACILITATOR_LIMITS, ...definedOptions(options.scheme) }),
+    new ExactSvmScheme(signer, undefined, { ...options.scheme, ...limits }),
   );
 }
 

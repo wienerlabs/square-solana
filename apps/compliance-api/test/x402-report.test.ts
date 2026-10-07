@@ -68,7 +68,11 @@ beforeAll(async () => {
   rpc.addMint(mint, 6);
 
   const x402 = createComplianceX402({
-    facilitator: { feePayer, rpcUrls: { [NETWORK]: rpc.url } },
+    facilitator: {
+      feePayer,
+      rpcUrls: { [NETWORK]: rpc.url },
+      limits: { maxComputeUnits: 100_000, maxPriorityFeeMicroLamports: 50_000, maxRequiredSignatures: 2 },
+    },
     replay: createPrismaReplayStore(db.client),
     idempotency: { store: createPrismaIdempotencyStore(db.client), ttlSeconds: IDEMPOTENCY_TTL_SECONDS },
     network: NETWORK,
