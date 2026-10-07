@@ -86,6 +86,16 @@ describe('audit events', () => {
       title: 'Compliance proof bound: refused',
       detail: 'The amount is above the per-transaction limit',
     });
+    const preflight = (refusalCode: number) =>
+      timelineEntryOf(event('verifier', 'PreflightProofSet', { job, policy, refusalCode, proofTimestamp: NOW }));
+    expect(describeJobEvent(preflight(0).event, usdc)).toEqual({
+      title: 'Pre-acceptance proof bound',
+      detail: "the job's terms satisfy the policy",
+    });
+    expect(describeJobEvent(preflight(32).event, usdc)).toEqual({
+      title: 'Pre-acceptance proof bound',
+      detail: 'only temporary rules refuse it now: The release is outside the allowed time window',
+    });
     const recorded = timelineEntryOf(
       event('verifier', 'ReleaseRecorded', {
         job,

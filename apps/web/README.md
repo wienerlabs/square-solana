@@ -13,7 +13,7 @@ Square'in web uygulaması: Next.js 16 (App Router), React 19, Tailwind CSS 4 ve 
 | `/app/agents` | Agent dizini: beceri, fiyat ve tamamlanmış iş filtresi, sıralama (FE-05) |
 | `/app/agents/[agentRecord]` | Agent profili: kayıt ve kart, beceriler ve fiyatlar, itibar, validation geçmişi, işler (FE-05) |
 | `/app/jobs/new` | İş açma ve fonlama: agent, tutar, deadline, challenge süresi, politika bağlama, iş tanımı ve hash'i, iki tarafın screening'i, `create_job` + `fund_job` (FE-06); eşik üstünde Travel Rule formu ve `commit_travel_rule` (FE-18) |
-| `/app/jobs/[job]` | İş detayı: zincirdeki job, event'lerden canlı zaman çizelgesi, zincir saatine göre challenge sayacı; agent cüzdanı için kabul ve teslim (FE-07); alacağın listelenmesi, geri çekilmesi ve onaylı alıcının alımı, payee (FE-08); uyum ispatının durumu, kurumun ispatı üretip bağlaması (FE-09); herkesin tetikleyebildiği finalize, ödeme, validation, itibar ve keeper günlüğü (FE-10); Travel Rule durumu, commitment ve API'de saklanan kayıtla doğrulama (FE-18); uyuşmazlık: itiraz, ispatsız bekleme başvurusu, oy durumu ve son tarih, kararın ödenmesi, lapse (FE-17) |
+| `/app/jobs/[job]` | İş detayı: zincirdeki job, event'lerden canlı zaman çizelgesi, zincir saatine göre challenge sayacı; kurumun kabul öncesi ön-ispatı (P-01); agent cüzdanı için kabul ve teslim (FE-07); alacağın listelenmesi, geri çekilmesi ve onaylı alıcının alımı, payee (FE-08); uyum ispatının durumu, kurumun ispatı üretip bağlaması (FE-09); herkesin tetikleyebildiği finalize, ödeme, validation, itibar ve keeper günlüğü (FE-10); Travel Rule durumu, commitment ve API'de saklanan kayıtla doğrulama (FE-18); uyuşmazlık: itiraz, ispatsız bekleme başvurusu, oy durumu ve son tarih, kararın ödenmesi, lapse (FE-17) |
 | `/app/arbitration` | Arbitrator konsolu: açık dispute'lar, kanıtlar, oylar, oy ve webhook abonelikleri; navigasyonda arbitrator rolünde görünür (FE-17) |
 | `/app/claims` | Alacak piyasası: satıştaki alacaklar, fiyat, iskonto, kimin alabileceği (FE-08) |
 | `/audit/[job]` | Denetim görünümü: job'un herkese açık uyum geçmişi; event'ler ve işlemleri, ispatın kararı ve geçmişi, validation kaydı. Politikanın içeriği yok (FE-12) |
@@ -110,7 +110,7 @@ hesabından okunur (program arayüzü §4). Tx'ler SDK'nın akışıyla (`flow.c
 | Parça | Davranış |
 |---|---|
 | Agent | did:aip v2 Solana DID'i ya da `AgentRecord` adresi. DID bu ağın ve escrow'un okuduğu registry'nin olmalı; kayıt zincirden okunur, yalnızca etkin agent iş alır. Ödeme kaydın `wallet`'ına |
-| Şartlar | Tutar USDC olarak (mint'in ondalığıyla), deadline yerel saatle, challenge süresi dakika olarak config'in sınırlarında. Politika, bu tarayıcıda commit edilmiş etkin politikalardan seçilir (FE-04); bağlanırsa release ispata bağlanır. Tutar politikanın public tavanını aşarsa uyarı |
+| Şartlar | Tutar USDC olarak (mint'in ondalığıyla), deadline yerel saatle, challenge süresi dakika olarak config'in sınırlarında. Politika, bu tarayıcıda commit edilmiş etkin politikalardan seçilir (FE-04); bağlanırsa release ispata bağlanır. Tutar politikanın public tavanını aşarsa iş açılmaz: escrow `AmountAboveDailyCeiling` döner, sayfa sebebini yazar ve düğmeyi kapatır ([ADR 0028](../../docs/decisions/0028-kabul-oncesi-on-ispat-ve-dispute-duzeltmeleri.md)). Politikalı işte kurum, fonlamadan sonra iş sayfasında kabul öncesi ön-ispatı bağlar |
 | İş tanımı | JSON nesnesi; A2A ile agent'a gider, zincire yalnızca RFC 8785 kanonik biçiminin SHA-256'sı (`spec_hash`). Job adresi kurum + hash'ten türer; aynı tanımla açılmış iş varsa durumu gösterilir ve fonlanabilir |
 | Screening | Kurumun ve agent cüzdanının `ScreeningRecord`'u, escrow'un kuralıyla (`square_common::screening`): kayıt yok, işaretli, süresi dolmuş. Biri temiz değilse fonlama kapanır ve hangi cüzdanın neden kapattığı yazılır; program yine reddederse `ScreeningRequired` / `ScreeningExpired` / `ScreeningFlagged` aynı açıklamayla gösterilir, iş açık kalır |
 | Fonlama | Kurumun USDC bakiyesi yetmiyorsa fonlama kapanır. Tutar Travel Rule eşiğinde ya da üstündeyse zincirdeki commitment bu tarayıcıdaki kayıtla eşleşene kadar kapalıdır (FE-18, aşağıda) |
@@ -125,7 +125,7 @@ Herkese açık; eylemler bağlı cüzdana göre açılır. Yalnızca `SQUARE_PRO
 | Job | Escrow `Job` hesabı: durum, tutar, kurum, agent (DID çözümüne bağlantı), ödeme cüzdanı (alacak satıldıysa alıcı, değilse agent cüzdanı; iade edilen ya da iptal edilen işte kurum), deadline, challenge süresi, politika ve sürümü, `spec_hash`, teslimde URI ve `work_hash` |
 | Zaman çizelgesi | Job hesabına ve alacak listelemesine (`["claim", job]`) dokunan son 50 işlemin loglarındaki escrow event'leri (`JobCreated` … `Finalized`, alacak ve uyuşmazlık event'leri), eskiden yeniye; yalnızca bu job'un ve escrow programının event'leri. Listelemenin geri çekilmesi (`cancel_claim`) yalnızca listelemeye dokunduğu için iki adres de izlenir. İki adresten birini anan her onaylı işlemde job, listeleme ve zaman çizelgesi yeniden okunur: log aboneliği (`onLogs`, WebSocket) anında bildirir; abonelik kurulamaz ya da koparsa iki adresin en yeni imzası 5 saniyede bir yoklanır (sekme görünürken). Aynı işlem ikisinden de gelirse bir kez okunur |
 | Challenge sayacı | `challenge_end` zincir saatine göre: Clock sysvar'ının `unix_timestamp`'i okunur (dakikada bir yeniden), aradaki saniyeler yerel saatle ilerler. Escrow'un kuralıyla `challenge_end`'te kapanır |
-| Agent | Bağlı cüzdan job'un `agent_wallet`'ıysa: fonlanmış işte `accept_job`; kabul edilmiş işte teslim dosyası tarayıcıda hash'lenir (SHA-256, SDK `workHash`), teslim URI'si en fazla 128 bayt, deadline'dan önce `submit_work`. Escrow hata kodu IDL'deki mesajıyla |
+| Agent | Bağlı cüzdan job'un `agent_wallet`'ıysa: fonlanmış işte `accept_job` (politikalı işte kurumun ön-ispatı bağlanana kadar düğme kapalı, sebebi yazılı); kabul edilmiş işte teslim dosyası tarayıcıda hash'lenir (SHA-256, SDK `workHash`), teslim URI'si en fazla 128 bayt, deadline'dan önce `submit_work`. Escrow hata kodu IDL'deki mesajıyla |
 | Teslim dosyası | `SQUARE_API_URL` tanımlıysa dosya cüzdan oturumuyla API'ye yüklenir (`uploadDelivery`): depo içeriği SHA-256'sıyla adresler, makbuzun `deliveryUri`'si teslim URI'si olur. Makbuzun `workHash`'i tarayıcıdaki hash'ten farklıysa URI kullanılmaz; zincire tarayıcıdaki hash yazılır. API job'u henüz indexlemediyse (`not_found`) ya da cüzdan job'un agent'ı değilse (`forbidden`) sebebi yazılır. Dosya değişince önceki makbuzun URI'si temizlenir. URI elle de girilebilir (dosya başka yerde barındırılıyorsa); API tanımlı değilse yalnızca elle |
 | Ağ | Job, zaman çizelgesi, saat ve log aboneliği ağ doğrulanmadan açılmaz |
 
@@ -141,6 +141,18 @@ Agent, teslim edilmiş işin alacağını (release'teki ödemeyi alma hakkı) is
 | Kanıt dosyası | `square-buyer-proof` v1 JSON: küme, politika, kök, alıcı, alıcının `leaf_salt`'ı ve Merkle kanıtı; diğer alıcıların salt'larını taşımaz. Kurum politika sayfasından indirir (liste zincirdekiyle aynıyken), alıcı iş sayfasında yükler. Dosya tarayıcıda zincirdeki güncel köke karşı denetlenir; başka cüzdanın, başka politikanın ya da kümenin dosyası ve eski listeden kalan dosya ayrı mesajla reddedilir, listede olmayan cüzdana "Your wallet is not on the institution's approved buyer list." |
 | Alım | Satıcı ve işi fonlayan kurum alamaz. Alıcının screening'i temiz ve taze, USDC bakiyesi fiyata yetiyor ve kanıt geçerliyse `buy_claim` (fiyat listelemeninki; öne geçme koruması). Escrow hata kodu IDL mesajıyla ve ne yapılacağıyla (`BuyerNotEligible`, screening kodları, `ClaimPriceChanged`) |
 | Payee | Alacak satıldıysa alıcı, değilse agent cüzdanı (SDK `payeeOf` ile aynı kural); iş sayfasında "Paid to" satırı canlı güncellenir |
+
+## Kabul öncesi ön-ispat (P-01)
+
+Politikalı işte (fiat dahil) escrow, agent'ın kabulünden önce kurumun ön-ispatını ister (`PreflightProof`,
+[ADR 0028](../../docs/decisions/0028-kabul-oncesi-on-ispat-ve-dispute-duzeltmeleri.md)). İş `Open` ya da `Funded`'ken iş sayfasının "Pre-acceptance proof" bölümü:
+
+| Parça | Davranış |
+|---|---|
+| Durum | Herkese açık: ön-ispat bağlı mı (`Bound` / `Missing`), anı (zincir saati) ve kalan geçici ret sebepleri. Bağlı değilse agent'ın "Accept the job" düğmesi kapalıdır ve sebebi yazılır |
+| Üretme | Bağlı cüzdan işi açan kurumsa. Politika, sır ve prover FE-09'daki gibidir. Witness işin kendi koşullarıyla, zincir saatinde kurulur (`buildPreflightWitness`: net işin tutarı, payee agent cüzdanı, sayaç 0). Kalıcı bir kural ya da günlük tavan çiğneniyorsa sayfa sebepleri yazar ve bağlamayı açmaz; iş kabul edilemez, iptal edilmelidir |
+| Bağlama | `set_preflight_proof` (`buildSetPreflightProofTx`); ispatın anı bağlamada zincir saatine en fazla 600 s uzak olmalı, sayfa 540 s içinde bağlatır. Smart account'lu kurumda vault işlemidir (FE-21); sonradan multisig bağlamış kurumda sayfa bunu söyler. Verifier hata kodu IDL mesajıyla (`PreflightRefused`) |
+| Zaman çizelgesi | `PreflightProofSet` (API'den): bağlandı, kalan geçici sebepler |
 
 ## Uyum ispatı ve release durumu (FE-09)
 
