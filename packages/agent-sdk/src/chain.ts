@@ -32,6 +32,12 @@ export class AgentTxError extends Error {
   }
 }
 
+const FINALIZED: ReadonlySet<Commitment> = new Set<Commitment>(['finalized', 'max', 'root']);
+
+export function settledCommitment(commitment: Commitment): Commitment {
+  return FINALIZED.has(commitment) ? 'finalized' : 'confirmed';
+}
+
 export interface TxSender {
   send(label: string, built: BuiltTx, signers: readonly WalletLike[]): Promise<string>;
 }
@@ -42,7 +48,7 @@ export function createTxSender(deps: {
   client: SquareClient;
 }): TxSender {
   const { connection, commitment, client } = deps;
-  const confirmation: Commitment = commitment === 'finalized' ? 'finalized' : 'confirmed';
+  const confirmation = settledCommitment(commitment);
   const mapError = (error: unknown) => {
     try {
       return client.mapError(error);
@@ -92,8 +98,12 @@ export interface JobState extends JobInfo {
 }
 
 /** Escrow `Job` hesabı; yoksa null. Durum IDL varyant adıdır (`funded`, `accepted` …). */
-export async function readJob(client: SquareClient, address: PublicKey): Promise<JobState | null> {
-  const account = await client.escrow.fetch('job', address);
+export async function readJob(
+  client: SquareClient,
+  address: PublicKey,
+  commitment: Commitment,
+): Promise<JobState | null> {
+  const account = await client.escrow.program.account.job.fetchNullable(address, commitment);
   if (!account) return null;
   return {
     address,

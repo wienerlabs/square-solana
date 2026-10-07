@@ -1,12 +1,12 @@
 // Job yürütücüsünün yeniden başlatma ve kesinti yolları (görev bağlamı sahte, zincir benzetim): kabul edilmiş
 // job'da kabul tekrarlanmaz, teslim edilmiş job'da yalnızca görev tamamlanır, iptal edilen görevde tx yok.
-import { Keypair, type PublicKey } from '@solana/web3.js';
+import { Keypair, type AccountInfo, type Commitment, type PublicKey } from '@solana/web3.js';
 import type { TaskContext } from '@squaresdk/solana-a2a';
 import { specHashing } from '@squaresdk/solana-sdk';
 import type { JobStatus, Message } from '@squaresdk/solana-types';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { createTxSender, toWallet } from '../src/chain.js';
-import { assertDiscountBps, claimPrice, createJobExecutor } from '../src/job.js';
+import { createTxSender, settledCommitment, toWallet } from '../src/chain.js';
+import { JobFailure, assertDiscountBps, claimPrice, createJobExecutor } from '../src/job.js';
 import { DeliveryUploadError } from '../src/delivery.js';
 import type { Admission, ClaimListing, DeliveryUploader, JobRequest } from '../src/types.js';
 import { handler, STATS } from './helpers/harness.js';
@@ -63,11 +63,14 @@ function executor(
     upload?: DeliveryUploader['upload'];
     admit?: Admission;
     now?: () => number;
+    commitment?: Commitment;
   } = {},
 ) {
+  const commitment = options.commitment ?? 'confirmed';
   return createJobExecutor({
     client: sim.client,
-    sender: createTxSender({ connection: sim.connection(), commitment: 'confirmed', client: sim.client }),
+    commitment,
+    sender: createTxSender({ connection: sim.connection(), commitment, client: sim.client }),
     wallet: toWallet(signer),
     capabilities: [STATS],
     handler: async (request) => {
@@ -102,6 +105,9 @@ async function job(status: JobStatus): Promise<PublicKey> {
 
 const specParts: Message['parts'] = [{ data: SPEC as never }];
 
+const completedOnChain = (status: JobStatus, workHash = '0'.repeat(64), deliveryUri = '') =>
+  `complete:job zincirde teslim edilmiş (${status}): workHash ${workHash}, deliveryUri ${deliveryUri}`;
+
 beforeEach(async () => {
   sim = new SimChain();
   await sim.setConfig();
@@ -127,7 +133,7 @@ describe('job yürütücüsü', () => {
     const address = await job('delivered');
     const first = fakeContext(address, specParts);
     await executor({ discountBps: 1_000 }).onTask(first.context);
-    expect(first.calls).toEqual(['complete:job zincirde teslim edilmiş (delivered)']);
+    expect(first.calls).toEqual([completedOnChain('delivered')]);
     expect(requests).toEqual([]);
     expect(sim.sent.map((ix) => ix.name)).toEqual(['listClaim']);
     expect(listings[0]!.price).toBe(3_600_000n);
@@ -141,7 +147,7 @@ describe('job yürütücüsü', () => {
     const address = await job('released');
     const { calls, context } = fakeContext(address, specParts);
     await executor({ discountBps: 1_000 }).onTask(context);
-    expect(calls).toEqual(['complete:job zincirde teslim edilmiş (released)']);
+    expect(calls).toEqual([completedOnChain('released')]);
     expect(sim.sent).toEqual([]);
   });
 
@@ -173,6 +179,7 @@ describe('job yürütücüsü', () => {
     const late = fakeContext(await job('funded'), specParts);
     const abortingExecutor = createJobExecutor({
       client: sim.client,
+      commitment: 'confirmed',
       sender: createTxSender({ connection: sim.connection(), commitment: 'confirmed', client: sim.client }),
       wallet: toWallet(signer),
       capabilities: [STATS],
@@ -198,6 +205,7 @@ describe('job yürütücüsü', () => {
   it('işleyici geçersiz çıktı dönerse hata verir', async () => {
     const bad = createJobExecutor({
       client: sim.client,
+      commitment: 'confirmed',
       sender: createTxSender({ connection: sim.connection(), commitment: 'confirmed', client: sim.client }),
       wallet: toWallet(signer),
       capabilities: [STATS],
@@ -292,7 +300,105 @@ describe('geçici hatalar ve kabul kapısı', () => {
     const recorded = fakeContext(address, specParts);
     await executor().onTask(recorded.context);
     expect(recorded.calls.some((call) => call.startsWith('addArtifact'))).toBe(false);
-    expect(recorded.calls.at(-1)).toMatch(/^complete:job zincirde teslim edilmiş/);
+    expect(recorded.calls.at(-1)).toBe(completedOnChain('delivered', '09'.repeat(32), 'ipfs://onceki-teslimat'));
+    expect(errors.some((error) => error instanceof JobFailure && /yerel çıktı/.test(error.message))).toBe(true);
+  });
+
+  it('kabul indikten sonra okumalar hep fonlanmış gösterse de InvalidStatus görevi düşürmez', async () => {
+    const address = await job('funded');
+    const key = address.toBase58();
+    const stale = sim.accounts.get(key)!;
+    let lagging = 0;
+    let confirms = 0;
+    sim.confirmFailure = () => (++confirms === 1 ? new Error('confirm zaman aşımı') : null);
+    sim.readHook = (seen, info) => {
+      if (seen !== key || sim.jobStatus(address) !== 'accepted' || lagging >= 3) return info;
+      lagging += 1;
+      return stale;
+    };
+    const recorded = fakeContext(address, specParts);
+    await executor().onTask(recorded.context);
+    expect(lagging).toBe(3);
+    expect(kinds()).toEqual(['acceptJob', 'submitWork']);
+    expect(recorded.calls.at(-1)).toMatch(/^complete:teslim edildi: submit_work /);
+    expect(errors.some((error) => /accept_job: escrow invalidStatus/i.test(String(error)))).toBe(true);
+  });
+
+  it('teslimden sonra okuma kabulün de gerisine düşse InvalidStatus görevi düşürmez, artefakt sunulur', async () => {
+    const address = await job('funded');
+    const key = address.toBase58();
+    const funded = sim.accounts.get(key)!;
+    let accepted: AccountInfo<Buffer> | null = null;
+    const pending: AccountInfo<Buffer>[] = [];
+    let submits = 0;
+    let confirms = 0;
+    sim.before = async (name) => {
+      if (name !== 'submitWork') return;
+      submits += 1;
+      if (submits === 1) accepted = sim.accounts.get(key)!;
+      if (submits === 2) pending.push(funded);
+    };
+    sim.confirmFailure = () => (++confirms === 2 ? new Error('confirm zaman aşımı') : null);
+    sim.readHook = (seen, info) => {
+      if (seen !== key || sim.jobStatus(address) !== 'delivered') return info;
+      if (submits === 1) return accepted;
+      return pending.shift() ?? info;
+    };
+    const recorded = fakeContext(address, specParts);
+    await executor().onTask(recorded.context);
+    expect(submits).toBe(2);
+    expect(pending).toEqual([]);
+    expect(kinds()).toEqual(['acceptJob', 'submitWork']);
+    expect(recorded.calls).toContain('addArtifact');
+    expect(recorded.calls.at(-1)).toMatch(
+      /^complete:job zincirde teslim edilmiş \(delivered\): workHash [0-9a-f]{64}, /,
+    );
+    expect(errors.some((error) => /submit_work: escrow invalidStatus/i.test(String(error)))).toBe(true);
+  });
+
+  it('kabulde InvalidStatus ve job iptal edilmişse görev düşer, submit_work gönderilmez', async () => {
+    const address = await job('funded');
+    sim.before = async (name) => {
+      if (name === 'acceptJob') await sim.patchJob(address, { status: { cancelled: {} } });
+    };
+    const recorded = fakeContext(address, specParts);
+    await expect(executor().onTask(recorded.context)).rejects.toThrow(/accept_job: escrow invalidStatus/i);
+    expect(kinds()).toEqual([]);
+    expect(recorded.calls.some((call) => call.startsWith('addArtifact'))).toBe(false);
+  });
+
+  it('processed bağlantıda job en az confirmed okunur: yalnız processed görünen teslim içeriği açmaz', async () => {
+    const address = await job('accepted');
+    const key = address.toBase58();
+    let processedView: AccountInfo<Buffer> | null = null;
+    let failed = false;
+    sim.failure = (name) => {
+      if (name !== 'submitWork' || failed) return null;
+      failed = true;
+      return new Error('submit_work: socket hang up');
+    };
+    sim.readHook = (seen, info, commitment) => {
+      if (seen !== key) return info;
+      return processedView && commitment !== 'confirmed' && commitment !== 'finalized' ? processedView : info;
+    };
+    const recorded = fakeContext(address, specParts);
+    await executor({
+      commitment: 'processed',
+      upload: async ({ content, contentType }) => {
+        const receipt = await receiptOf(content, contentType);
+        const original = sim.accounts.get(key)!;
+        await sim.patchJob(address, {
+          status: { delivered: {} },
+          workHash: [...Buffer.from(receipt.workHash, 'hex')],
+          deliveryUri: receipt.deliveryUri,
+        });
+        processedView = sim.accounts.get(key)!;
+        sim.accounts.set(key, original);
+        return receipt;
+      },
+    }).onTask(recorded.context);
+    expect(kinds()).toEqual(['submitWork']);
+    expect(recorded.calls.at(-1)).toMatch(/^complete:teslim edildi: submit_work /);
   });
 
   it('depo kalıcı olarak reddederse ya da süre dolarsa yeniden denenmez', async () => {
@@ -365,5 +471,16 @@ describe('createTxSender', () => {
     );
     await sender.send('accept_job', built, [toWallet(signer)]);
     expect(seen).toEqual(['confirmed']);
+  });
+});
+
+describe('onay seviyesi', () => {
+  it('tx ve job okuması en az confirmed; finalized ve eski takma adları finalized kalır', () => {
+    expect(settledCommitment('processed')).toBe('confirmed');
+    expect(settledCommitment('recent')).toBe('confirmed');
+    expect(settledCommitment('confirmed')).toBe('confirmed');
+    expect(settledCommitment('finalized')).toBe('finalized');
+    expect(settledCommitment('max')).toBe('finalized');
+    expect(settledCommitment('root')).toBe('finalized');
   });
 });

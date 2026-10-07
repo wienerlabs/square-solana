@@ -46,18 +46,21 @@ sequenceDiagram
 - **Teslim:** İşleyicinin çıktısı yüklenir, makbuz yerelde doğrulanır (`workHash` içeriğin SHA-256'sı,
   `deliveryUri` en fazla 128 bayt), `submit_work` gönderilir; zincirdeki taahhütten sonra makbuz görevin
   `delivery` artefaktına yazılır ve görev `COMPLETED` olur. İçerik `submit_work`'ten önce çağırana gösterilmez.
-  Tx'ler `commitment` `processed` olsa da en az `confirmed` ile onaylanır. Job zincirde başka bir `workHash`'le
-  teslim edilmişse (ör. önceki bir sürecin teslimi) yerel çıktı sunulmaz; teslimat zincirdeki `deliveryUri`'dedir.
+  Tx'ler ve kararı veren job okumaları `commitment` `processed` olsa da en az `confirmed` ile yapılır (`finalized`
+  ve eski takma adları `max`, `root` `finalized` kalır). Job zincirde başka bir `workHash`'le teslim edilmişse (ör.
+  önceki bir sürecin teslimi) yerel çıktı sunulmaz ve `onError`'a bildirilir; görevin tamamlanma metni zincirdeki
+  `workHash` ile `deliveryUri`'yi taşır.
 - **Geçici ve kalıcı hata:** Her tur job zincirden okunur ve duruma göre sıradaki adım seçilir. Geçici hatada
   (RPC, ağ, onay zaman aşımı, deponun `rate_limited` / `*_unavailable` / `internal_error` yanıtı) aynı yerden,
   `retry.minDelayMs`'ten `retry.maxDelayMs`'e iki katına çıkan beklemelerle yeniden denenir; işin sonucu ve
   makbuz saklanır, iş yeniden yapılmaz. Gönderilen tx program hatası verse de zincirde job ilerlemişse (önceki
-  deneme düşmüş sanılmışsa) akış sürer. `InvalidStatus` reddinden sonraki okuma düşerse ya da hâlâ gönderimden
-  önceki durumu gösterirse (geride kalan RPC) ret geçici sayılır. Kalıcı hatada (program reddi, işleyicinin hatası
+  deneme düşmüş sanılmışsa) akış sürer. `InvalidStatus` reddinden sonraki okuma düşerse, hâlâ gönderimden önceki
+  durumu gösterirse ya da kabulün gerisinde kalırsa (geride kalan RPC) ret geçici sayılır; job iptal edilmişse ret
+  kalıcıdır. Kalıcı hatada (program reddi, işleyicinin hatası
   ya da geçersiz çıktısı, makbuzun içerikle tutmaması, deponun diğer retleri) ya da deadline'a teslim payı
   kalmayınca görev `FAILED`
   olur; job zincirde `accepted` kalır (kurum deadline'dan sonra `cancel_job` ile parasını geri alır).
-  Onaylanmış kabulün gerisinde kalan okuma geçici sayılır.
+  Job kabul edilmiş ya da daha ileri bir durumda okunduktan sonra gerisinde kalan okuma geçici sayılır.
 - **Alacak satışı:** `autoListClaim: { discountBps }` teslimden sonra alacağı nominal değerin
   `discountBps / 10000` altında listeler (`list_claim`). Listeleme hatası görevi değiştirmez, `onError`'a gider.
 - **Yeniden başlatma:** Görevler depodadır. `listen` önce yarım kalan görevleri kurar: job `accepted` ise

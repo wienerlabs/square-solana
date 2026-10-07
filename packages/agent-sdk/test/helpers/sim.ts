@@ -12,6 +12,7 @@ import {
   PublicKey,
   VersionedTransaction,
   type AccountInfo,
+  type Commitment,
   type Connection,
 } from '@solana/web3.js';
 import { createSquareClient, SQUARE_IDLS, type SquareClient, type SquareProgramIds } from '@squaresdk/solana-sdk';
@@ -65,7 +66,13 @@ export class SimChain {
   failure: ((name: string) => Error | null) | null = null;
   /** Verilirse adı eşleşen talimattan önce beklenir (ör. zincirdeki durumu değiştirmek için). */
   before: ((name: string) => Promise<void>) | null = null;
-  readHook: ((address: string, info: AccountInfo<Buffer> | null) => AccountInfo<Buffer> | null | Error) | null = null;
+  readHook:
+    | ((
+        address: string,
+        info: AccountInfo<Buffer> | null,
+        commitment: Commitment | undefined,
+      ) => AccountInfo<Buffer> | null | Error)
+    | null = null;
   confirmFailure: (() => Error | null) | null = null;
   private slot = 0;
   private signatures = 0;
@@ -305,9 +312,9 @@ export class SimChain {
   connection(): Connection {
     const nextSlot = () => (this.slot += 1);
     const accounts = this.accounts;
-    const read = (address: PublicKey) => {
+    const read = (address: PublicKey, commitment?: Commitment) => {
       const info = accounts.get(address.toBase58()) ?? null;
-      const seen = this.readHook ? this.readHook(address.toBase58(), info) : info;
+      const seen = this.readHook ? this.readHook(address.toBase58(), info, commitment) : info;
       if (seen instanceof Error) throw seen;
       return seen;
     };
@@ -319,10 +326,10 @@ export class SimChain {
         blockhash: new PublicKey(Uint8Array.from({ length: 32 }, (_, i) => i + 1)).toBase58(),
         lastValidBlockHeight: 4242,
       }),
-      getAccountInfo: async (address: PublicKey) => read(address),
-      getAccountInfoAndContext: async (address: PublicKey) => ({
+      getAccountInfo: async (address: PublicKey, commitment?: Commitment) => read(address, commitment),
+      getAccountInfoAndContext: async (address: PublicKey, commitment?: Commitment) => ({
         context: { slot: nextSlot() },
-        value: read(address),
+        value: read(address, commitment),
       }),
       getMultipleAccountsInfo: async (addresses: PublicKey[]) => addresses.map((address) => read(address)),
       sendRawTransaction: async (raw: Uint8Array) => {
