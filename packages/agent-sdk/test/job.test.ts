@@ -6,7 +6,7 @@ import { specHashing } from '@squaresdk/solana-sdk';
 import type { JobStatus, Message } from '@squaresdk/solana-types';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createTxSender, settledCommitment, toWallet } from '../src/chain.js';
-import { JobFailure, assertDiscountBps, claimPrice, createJobExecutor } from '../src/job.js';
+import { JobFailure, assertDiscountBps, assertRetryOptions, claimPrice, createJobExecutor } from '../src/job.js';
 import { DeliveryUploadError } from '../src/delivery.js';
 import type { Admission, ClaimListing, DeliveryUploader, JobRequest } from '../src/types.js';
 import { handler, STATS } from './helpers/harness.js';
@@ -48,7 +48,7 @@ const requests: JobRequest[] = [];
 const listings: ClaimListing[] = [];
 const errors: unknown[] = [];
 
-const FAST_RETRY = { minDelayMs: 1, maxDelayMs: 5, submitMarginSeconds: 30 };
+const FAST_RETRY = { minDelayMs: 1, maxDelayMs: 5, submitMarginSeconds: 30, gateLagSeconds: 60 };
 
 const receiptOf = async (content: Uint8Array, contentType: string) => ({
   workHash: Buffer.from(await crypto.subtle.digest('SHA-256', content)).toString('hex'),
@@ -64,6 +64,7 @@ function executor(
     admit?: Admission;
     now?: () => number;
     commitment?: Commitment;
+    retry?: typeof FAST_RETRY;
   } = {},
 ) {
   const commitment = options.commitment ?? 'confirmed';
@@ -81,7 +82,7 @@ function executor(
     delivery: { upload: options.upload ?? (async ({ content, contentType }) => receiptOf(content, contentType)) },
     ...(options.discountBps ? { autoListClaim: { discountBps: options.discountBps } } : {}),
     ...(options.admit ? { admit: options.admit } : {}),
-    retry: FAST_RETRY,
+    retry: options.retry ?? FAST_RETRY,
     tx: { computeUnitPrice: 1_000n },
     now: options.now ?? (() => Math.floor(Date.now() / 1000)),
     onError: (error) => errors.push(error),
@@ -368,6 +369,24 @@ describe('geçici hatalar ve kabul kapısı', () => {
     expect(served).toBe(true);
     expect(kinds()).toEqual(['acceptJob', 'submitWork']);
     expect(recorded.calls.at(-1)).toMatch(/^complete:teslim edildi: submit_work /);
+  });
+
+  it('kapının gecikme payı retry.gateLagSeconds’ten okunur', async () => {
+    const address = await job('funded');
+    const key = address.toBase58();
+    const funded = sim.accounts.get(key)!;
+    await sim.patchJob(address, { status: { open: {} } });
+    const open = sim.accounts.get(key)!;
+    sim.accounts.set(key, funded);
+    let lagging = 1;
+    sim.readHook = (seen, info, commitment) =>
+      seen === key && commitment === 'confirmed' && lagging-- > 0 ? open : info;
+    const recorded = fakeContext(address, specParts);
+    await executor({ retry: { ...FAST_RETRY, gateLagSeconds: 0 } }).onTask(recorded.context);
+    expect(recorded.calls).toEqual(['reject:job fonlanmamış: kurum fund_job’dan sonra görevi yeniden açmalı']);
+    expect(kinds()).toEqual([]);
+    expect(() => assertRetryOptions({ ...FAST_RETRY, gateLagSeconds: -1 })).toThrow('gateLagSeconds');
+    expect(() => assertRetryOptions({ ...FAST_RETRY, gateLagSeconds: 1.5 })).toThrow('gateLagSeconds');
   });
 
   it('kapının gördüğü fonlama süre içinde görünmezse görev fonlanmamış diye reddedilir', async () => {

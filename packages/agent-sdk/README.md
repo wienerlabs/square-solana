@@ -61,8 +61,11 @@ sequenceDiagram
   kalmayınca görev `FAILED`
   olur; job zincirde `accepted` kalır (kurum deadline'dan sonra `cancel_job` ile parasını geri alır).
   Job kabul edilmiş ya da daha ileri bir durumda okunduktan sonra gerisinde kalan okuma geçici sayılır. Görev kapısı
-  job'u fonlanmış gördüyse ve kararı veren okuma job'u açık ya da yok gösteriyorsa bu da 60 saniye boyunca geçici sayılır; sonra görev fonlanmamış diye reddedilir ya da düşer. Bu çalışmada fonlanmış okunan job'un sonradan açık görünmesi de deadline'a teslim payı kalana kadar geçicidir; pay kalmadıysa açık job hemen reddedilir. Gönderilen tx zincirde inmiş görünürse sıradaki adım
-  bu okumayla seçilir, geride kalan bir okumayla tx yeniden gönderilmez.
+  job'u fonlanmış gördüyse ve kararı veren okuma job'u açık ya da yok gösteriyorsa bu da `retry.gateLagSeconds`
+  (varsayılan 60 saniye) boyunca geçici sayılır; sonra görev fonlanmamış diye reddedilir ya da düşer. Bu çalışmada
+  fonlanmış okunan job'un sonradan açık görünmesi de deadline'a teslim payı kalana kadar geçicidir; pay kalmadıysa
+  açık job hemen reddedilir. Gönderilen tx zincirde inmiş görünürse sıradaki adım bu okumayla seçilir, geride kalan
+  bir okumayla tx yeniden gönderilmez.
 - **Alacak satışı:** `autoListClaim: { discountBps }` teslimden sonra alacağı nominal değerin
   `discountBps / 10000` altında listeler (`list_claim`). Listeleme hatası görevi değiştirmez, `onError`'a gider.
 - **Yeniden başlatma:** Görevler depodadır. `listen` önce yarım kalan görevleri kurar: job `accepted` ise
@@ -120,7 +123,7 @@ Dağıtıma bağlı hiçbir değerin varsayılanı yoktur.
 | `store`, `authenticate` | A2A görev deposu ve çağıran kimliği (`@squaresdk/solana-a2a`) |
 | `autoListClaim?` | `{ discountBps }`, 1 ile 9999 arası; `onClaimListed?` her listelemede |
 | `admit?` | `({ capability, job, spec, taskId })`: metin dönerse görev `accept_job`'dan önce bu gerekçeyle reddedilir (ör. kapasite) |
-| `retry?` | `{ minDelayMs, maxDelayMs, submitMarginSeconds }`; varsayılan `DEFAULT_RETRY` (1 sn, 30 sn, 30 sn) |
+| `retry?` | `{ minDelayMs, maxDelayMs, submitMarginSeconds, gateLagSeconds }`; varsayılan `DEFAULT_RETRY` (1 sn, 30 sn, 30 sn, 60 sn) |
 | `limits?` | A2A sunucu sınırları; varsayılanlar `DEFAULT_A2A_LIMITS` |
 | `tx?` | `computeUnitPrice`, `addressLookupTables` |
 | `onError?`, `logger?`, `now?` | Hatalar tel üzerinden gönderilmez, buraya gelir |

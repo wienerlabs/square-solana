@@ -28,7 +28,6 @@ import type {
 } from './types.js';
 
 const BPS = 10_000n;
-const GATE_LAG_GRACE_SECONDS = 60;
 const DELIVERED: ReadonlySet<JobStatus> = new Set(['delivered', 'disputed', 'resolved', 'released', 'refunded']);
 const ACCEPTED_OR_LATER: ReadonlySet<JobStatus> = new Set(['accepted', ...DELIVERED]);
 
@@ -36,6 +35,7 @@ export const DEFAULT_RETRY: RetryOptions = Object.freeze({
   minDelayMs: 1_000,
   maxDelayMs: 30_000,
   submitMarginSeconds: 30,
+  gateLagSeconds: 60,
 });
 
 export class JobFailure extends Error {
@@ -113,13 +113,16 @@ function capabilityOf(spec: unknown, capabilities: readonly AgentCapability[]): 
 }
 
 export function assertRetryOptions(retry: RetryOptions): void {
-  const { minDelayMs, maxDelayMs, submitMarginSeconds } = retry;
+  const { minDelayMs, maxDelayMs, submitMarginSeconds, gateLagSeconds } = retry;
   if (!Number.isSafeInteger(minDelayMs) || minDelayMs < 1) throw new Error('retry.minDelayMs pozitif tamsayı olmalı');
   if (!Number.isSafeInteger(maxDelayMs) || maxDelayMs < minDelayMs) {
     throw new Error('retry.maxDelayMs, retry.minDelayMs’ten küçük olmayan bir tamsayı olmalı');
   }
   if (!Number.isSafeInteger(submitMarginSeconds) || submitMarginSeconds < 0) {
     throw new Error('retry.submitMarginSeconds negatif olmayan tamsayı olmalı');
+  }
+  if (!Number.isSafeInteger(gateLagSeconds) || gateLagSeconds < 0) {
+    throw new Error('retry.gateLagSeconds negatif olmayan tamsayı olmalı');
   }
 }
 
@@ -225,7 +228,7 @@ export function createJobExecutor(deps: JobExecutorDeps): TaskExecutor {
       let floor: JobStatus | null = null;
       let known: JobState | null = null;
       const admittedAt = deps.now();
-      const gateAhead = () => context.job.status === 'funded' && deps.now() - admittedAt < GATE_LAG_GRACE_SECONDS;
+      const gateAhead = () => context.job.status === 'funded' && deps.now() - admittedAt < retry.gateLagSeconds;
 
       const capabilityFor = (): AgentCapability => {
         if (capability) return capability;

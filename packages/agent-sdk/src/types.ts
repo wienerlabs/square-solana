@@ -76,6 +76,7 @@ export interface RetryOptions {
   minDelayMs: number;
   maxDelayMs: number;
   submitMarginSeconds: number;
+  gateLagSeconds: number;
 }
 
 export interface AgentLogger {
