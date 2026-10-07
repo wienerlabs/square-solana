@@ -130,16 +130,25 @@ export class SignatureTracker {
 const isoTime = (unix: number) => new Date(unix * 1000).toISOString().replace(/\.\d{3}Z$/, 'Z');
 const str = (value: unknown) => (value instanceof PublicKey ? value.toBase58() : String(value));
 const num = (value: unknown) => BigInt((value as { toString(): string }).toString());
+/** 32 bayt: API'nin event'inde hex, RPC'den çözülende bayt dizisi. */
+const bytesHex = (value: unknown) => (typeof value === 'string' ? value : hex(Uint8Array.from(value as number[])));
 
 /** Event'in okunur başlığı ve (varsa) ayrıntısı. Tutarlar settlement mint'in taban biriminde. */
 export function describeJobEvent(
   event: JobEvent,
   formatAmount: (base: bigint) => string,
+  /** Fiat işte (ADR 0024) release zincirde para taşımaz: ödeme kartla Square'e yapılmıştır. */
+  context: { fiat?: boolean } = {},
 ): { title: string; detail?: string } {
   const d = event.data;
   switch (event.name) {
     case 'JobCreated':
       return { title: 'Job opened', detail: `${formatAmount(num(d.amount))} for agent wallet ${str(d.agent_wallet)}` };
+    case 'FiatJobCreated':
+      return {
+        title: 'Fiat job opened',
+        detail: `${formatAmount(num(d.amount))} to be paid by card, for agent wallet ${str(d.agent_wallet)}`,
+      };
     case 'JobFunded':
       return { title: 'Funded', detail: `${formatAmount(num(d.amount))} locked in the vault` };
     case 'JobAccepted':
@@ -156,14 +165,18 @@ export function describeJobEvent(
     case 'ClaimCancelled':
       return { title: 'Receivable listing withdrawn' };
     case 'ReleaseVerified':
-      return { title: 'Release proof verified', detail: `${formatAmount(num(d.net_amount))} to ${str(d.payee)}` };
+      return context.fiat
+        ? { title: 'Release proof verified', detail: `the card payment of ${formatAmount(num(d.net_amount))}` }
+        : { title: 'Release proof verified', detail: `${formatAmount(num(d.net_amount))} to ${str(d.payee)}` };
     case 'ReleaseRefused':
       return {
         title: 'Release refused by the proof',
         detail: `${formatAmount(num(d.refunded_amount))} refunded to the institution: ${refusalReasons(Number(d.refusal_code)).join('; ')}`,
       };
     case 'Finalized':
-      return { title: 'Paid out', detail: `keeper fee ${formatAmount(num(d.keeper_fee))}` };
+      return context.fiat
+        ? { title: 'Released', detail: `by ${str(d.keeper)}; the job was paid by card` }
+        : { title: 'Paid out', detail: `keeper fee ${formatAmount(num(d.keeper_fee))}` };
     case 'JobCancelled':
       return { title: 'Cancelled', detail: `${formatAmount(num(d.refunded_amount))} refunded` };
     case 'JobAgentWalletSynced':
@@ -209,6 +222,11 @@ export function describeJobEvent(
             detail: refusalReasons(Number(d.refusal_code)).join('; '),
           };
     }
+    case 'MppPaymentVerified':
+      return {
+        title: 'Card payment bound',
+        detail: `${formatAmount(num(d.amount))}, receipt commitment ${bytesHex(d.stripe_receipt_hash)}`,
+      };
     case 'ReleaseRecorded':
       return {
         title: 'Release recorded by the verifier',

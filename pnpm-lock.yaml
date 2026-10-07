@@ -616,6 +616,9 @@ importers:
       '@squaresdk/solana-types':
         specifier: workspace:*
         version: link:../../packages/types
+      '@stripe/stripe-js':
+        specifier: 9.17.0
+        version: 9.17.0
       bn.js:
         specifier: ^5.2.5
         version: 5.2.5

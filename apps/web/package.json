@@ -29,6 +29,7 @@
     "@squaresdk/solana-policy": "workspace:*",
     "@squaresdk/solana-sdk": "workspace:*",
     "@squaresdk/solana-types": "workspace:*",
+    "@stripe/stripe-js": "9.17.0",
     "bn.js": "^5.2.5",
     "bs58": "^6.0.0",
     "next": "16.3.8",

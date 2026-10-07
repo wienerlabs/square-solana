@@ -11,6 +11,7 @@ import { Address } from '@/components/ui/address';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { hex } from '@/lib/agent-registration';
 import { ENV_VARS, PROGRAM_ID_ENV } from '@/lib/config';
+import { isFiatJob } from '@/lib/fiat';
 import { claimListingAddress } from '@/lib/idl-pda';
 import { explorerTxUrl, proofHistory, readAuditEvents, type AuditEvents } from '@/lib/job-audit';
 import { describeJobEvent, readJobTimeline, TIMELINE_LIMIT, type TimelineEntry } from '@/lib/job-detail';
@@ -317,7 +318,9 @@ function JobAudit({ jobAddress, escrowProgramId }: { jobAddress: string; escrowP
             ) : (
               <ol aria-label="Job events" className="mt-3 grid gap-3 text-sm">
                 {events.value.entries.map((entry: TimelineEntry, index) => {
-                  const { title, detail } = describeJobEvent(entry.event, formatAmount);
+                  const { title, detail } = describeJobEvent(entry.event, formatAmount, {
+                    fiat: chain.state === 'ready' && chain.value !== null && isFiatJob(chain.value.job),
+                  });
                   return (
                     <li key={`${entry.signature}:${index}`} className="grid gap-1 border-l-2 border-border pl-3">
                       <span className="font-medium">{title}</span>

@@ -76,6 +76,7 @@ pnpm license:write
 | `@solana/wallet-standard-chains` | npm | Apache-2.0 | runtime | `@squaresdk/solana-web` | ✓ |
 | `@solana/web3.js` | npm | MIT | runtime | `@squaresdk/solana-a2a`, `@squaresdk/solana-agent-sdk`, `@squaresdk/solana-api`, `@squaresdk/solana-cctp`, `@squaresdk/solana-cli`, `@squaresdk/solana-compliance-api`, `@squaresdk/solana-db`, `@squaresdk/solana-fee-payer`, `@squaresdk/solana-hardening`, `@squaresdk/solana-hosted`, `@squaresdk/solana-identity`, `@squaresdk/solana-indexer`, `@squaresdk/solana-keeper`, `@squaresdk/solana-mcp`, `@squaresdk/solana-monorepo`, `@squaresdk/solana-policy`, `@squaresdk/solana-screener`, `@squaresdk/solana-sdk`, `@squaresdk/solana-services-e2e`, `@squaresdk/solana-smoke`, `@squaresdk/solana-web` | ✓ |
 | `@sqds/multisig` | npm | MIT | runtime | `@squaresdk/solana-fee-payer`, `@squaresdk/solana-monorepo`, `@squaresdk/solana-sdk`, `@squaresdk/solana-web` | ✓ |
+| `@stripe/stripe-js` | npm | MIT | runtime | `@squaresdk/solana-web` | ✓ |
 | `@tailwindcss/postcss` | npm | MIT | dev | `@squaresdk/solana-web` | ✓ |
 | `@testcontainers/postgresql` | npm | MIT | runtime | `@squaresdk/solana-a2a`, `@squaresdk/solana-agent-sdk`, `@squaresdk/solana-api`, `@squaresdk/solana-cctp`, `@squaresdk/solana-compliance-api`, `@squaresdk/solana-db`, `@squaresdk/solana-fee-payer`, `@squaresdk/solana-hardening`, `@squaresdk/solana-hosted`, `@squaresdk/solana-indexer`, `@squaresdk/solana-keeper`, `@squaresdk/solana-screener`, `@squaresdk/solana-services-e2e`, `@squaresdk/solana-x402` | ✓ |
 | `@testing-library/dom` | npm | MIT | dev | `@squaresdk/solana-web` | ✓ |
@@ -137,7 +138,7 @@ pnpm license:write
 | `yaml` | npm | ISC | runtime | `@squaresdk/solana-hosted`, `@squaresdk/solana-monorepo`, `@squaresdk/solana-sdk`, `@squaresdk/solana-types` | ✓ |
 | `zod` | npm | MIT | runtime | `@squaresdk/solana-a2a`, `@squaresdk/solana-api`, `@squaresdk/solana-cli`, `@squaresdk/solana-compliance-api`, `@squaresdk/solana-fee-payer`, `@squaresdk/solana-hosted`, `@squaresdk/solana-indexer`, `@squaresdk/solana-keeper`, `@squaresdk/solana-mcp`, `@squaresdk/solana-observability`, `@squaresdk/solana-prover`, `@squaresdk/solana-screener`, `@squaresdk/solana-smoke`, `@squaresdk/solana-types`, `@squaresdk/solana-web` | ✓ |
 
-**Özet:** 88 npm, 26 Cargo doğrudan bağımlılık; lisans dağılımı: 61× MIT, 45× Apache-2.0, 3× MIT OR Apache-2.0, 1× BSD-2-Clause, 1× GPL-3.0, 1× ISC, 1× MPL-2.0, 1× OFL-1.1.
+**Özet:** 89 npm, 26 Cargo doğrudan bağımlılık; lisans dağılımı: 62× MIT, 45× Apache-2.0, 3× MIT OR Apache-2.0, 1× BSD-2-Clause, 1× GPL-3.0, 1× ISC, 1× MPL-2.0, 1× OFL-1.1.
 
 **Mainnet öncesi hukuki inceleme gerektirenler:**
 - `snarkjs` (npm) — GPL-3.0. Groth16 ispatı üretimi; çalışma zamanında yalnızca apps/prover (BE-11). @squaresdk/solana-policy (BE-10) yalnızca testlerde kullanır: createLocalProver snarkjs içermez, çağıranın kurduğu groth16 nesnesini alır. tests/smoke (BC-31, private, yayımlanmaz) operatör makinesinde ve CI'da in-process ispat için kullanır. Servis imajı dağıtılmadan önce hukuki onay gerekir.

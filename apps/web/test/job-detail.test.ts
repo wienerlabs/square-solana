@@ -94,6 +94,50 @@ describe('job events from logs', () => {
       detail: '250 USDC refunded',
     });
   });
+
+  it('describes a fiat job: opened without a vault, paid by card, released without a payout on chain', () => {
+    const wallet = key();
+    const keeper = key();
+    const fiat = (name: string, data: Record<string, unknown>) =>
+      describeJobEvent(
+        jobEventsFromLogs(escrow, invocation(escrow, [programData(name, { job, ...data })]), job)[0]!,
+        usdc,
+        { fiat: true },
+      );
+    expect(
+      fiat('FiatJobCreated', {
+        institution: key(),
+        agent_record: key(),
+        agent_wallet: wallet,
+        policy: key(),
+        policy_version: 2,
+        mint: key(),
+        amount: new BN(12_500_000),
+        spec_hash: Array(32).fill(1),
+        deadline: new BN(1_790_086_400),
+      }),
+    ).toEqual({
+      title: 'Fiat job opened',
+      detail: `12.5 USDC to be paid by card, for agent wallet ${wallet.toBase58()}`,
+    });
+    expect(fiat('Finalized', { keeper, keeper_fee: new BN(0) })).toEqual({
+      title: 'Released',
+      detail: `by ${keeper.toBase58()}; the job was paid by card`,
+    });
+    expect(fiat('ReleaseVerified', { payee: wallet, net_amount: new BN(12_500_000), release_proof: null })).toEqual({
+      title: 'Release proof verified',
+      detail: 'the card payment of 12.5 USDC',
+    });
+    // Verifier event'i API'nin indexer'ından gelir: makbuz commitment'ı hex.
+    const receipt = 'ab'.repeat(32);
+    expect(
+      describeJobEvent(
+        { name: 'MppPaymentVerified', data: { job, amount: '12500000', stripe_receipt_hash: receipt } },
+        usdc,
+        { fiat: true },
+      ),
+    ).toEqual({ title: 'Card payment bound', detail: `12.5 USDC, receipt commitment ${receipt}` });
+  });
 });
 
 describe('live updates', () => {

@@ -15,12 +15,16 @@ export const squareApi = (apiUrl: string, session?: string, smartAccount?: strin
     ...(session && { auth: { session, ...(smartAccount && { smartAccount }) } }),
   });
 
-/** Başarısız API yanıtı: zarfın hata kodu ve API'nin mesajı. */
+/**
+ * Başarısız API yanıtı: zarfın hata kodu, API'nin mesajı ve ayrıntıları (ör. kart reddinde `declineCode`, günlük
+ * tavanda `dailyCeiling`).
+ */
 export class SquareApiError extends Error {
   constructor(
     readonly code: ApiErrorCode,
     readonly apiMessage: string,
     readonly programError: ProgramErrorRef | null = null,
+    readonly details: Readonly<Record<string, unknown>> | null = null,
   ) {
     super(`${apiMessage} (${code})`);
     this.name = 'SquareApiError';
@@ -30,7 +34,12 @@ export class SquareApiError extends Error {
 /** Zarfın verisi; başarısız yanıtta `SquareApiError`. */
 export function unwrap<T>(envelope: ApiEnvelope<T>): T {
   if (!envelope.success) {
-    throw new SquareApiError(envelope.error.code, envelope.error.message, envelope.error.programError);
+    throw new SquareApiError(
+      envelope.error.code,
+      envelope.error.message,
+      envelope.error.programError,
+      envelope.error.details,
+    );
   }
   return envelope.data;
 }
@@ -60,7 +69,7 @@ export const isUnauthorized = (error: unknown): boolean =>
 export function apiErrorText(error: unknown, programHint?: (name: string) => string | null): string {
   const failure =
     error instanceof ApiClientError && error.error
-      ? new SquareApiError(error.error.code, error.error.message, error.error.programError)
+      ? new SquareApiError(error.error.code, error.error.message, error.error.programError, error.error.details)
       : error;
   if (failure instanceof SquareApiError) {
     const base = API_ERROR_TEXT[failure.code] ?? failure.apiMessage;

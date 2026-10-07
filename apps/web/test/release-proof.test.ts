@@ -34,6 +34,7 @@ const job = (fields: Partial<JobAccount> = {}) =>
     amount: new BN(250_000_000),
     status: { delivered: {} },
     policy: key(),
+    rail: { escrow: {} },
     ...fields,
   }) as JobAccount;
 const proof = (fields: Partial<ProofView> = {}): ProofView => ({
@@ -95,6 +96,20 @@ describe('freshness', () => {
       kind: 'stale',
       reasons: ['The net amount changed after the proof was made.'],
     });
+  });
+
+  it('pays a fiat job its whole amount to the agent wallet: no keeper fee, no receivable buyer', () => {
+    const operator = { dailySpent: 0n, dayStartUnix: noon - DAY / 2 };
+    const fiat = job({ rail: { fiat: {} } });
+    // `verify_mpp_payment_proof` ispatı işin tamamıyla bağlar; escrow'un neti (keeper ücreti düşülmüş) bayattır.
+    expect(releaseOutlook(state(proof({ netAmount: 250_000_000n }), operator), fiat, null, noon).kind).toBe('pays');
+    expect(releaseOutlook(state(proof(), operator), fiat, null, noon)).toMatchObject({
+      kind: 'stale',
+      reasons: ['The net amount changed after the proof was made.'],
+    });
+    // Fiat işin alacağı satılmaz: listeleme olsa da payee agent'tır.
+    const sold = { buyer, status: { bought: {} } } as ClaimListingAccount;
+    expect(releaseOutlook(state(proof({ netAmount: 250_000_000n }), operator), fiat, sold, noon).kind).toBe('pays');
   });
 });
 

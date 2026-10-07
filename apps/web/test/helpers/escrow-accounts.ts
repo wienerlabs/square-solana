@@ -51,6 +51,9 @@ export interface JobFields {
   challenge_end?: number;
   policy?: PublicKey | null;
   dispute?: DisputeFields;
+  /** Ödeme rayı (ADR 0024); verilmezse escrow. */
+  rail?: 'escrow' | 'fiat';
+  settled_at?: number;
 }
 
 const bn = (value: number | bigint) => new BN(value.toString());
@@ -74,7 +77,7 @@ export async function encodeJob(fields: JobFields): Promise<Buffer> {
     challenge_period: bn(3_600),
     challenge_end: bn(fields.challenge_end ?? 1_790_010_000),
     delivered_at: bn(1_790_006_400),
-    settled_at: bn(0),
+    settled_at: bn(fields.settled_at ?? 0),
     work_hash: Array(32).fill(2),
     travel_rule_commitment: Array(32).fill(0),
     policy_commitment: Array(32).fill(0),
@@ -99,7 +102,7 @@ export async function encodeJob(fields: JobFields): Promise<Buffer> {
       resolution: d.resolution ?? { Pending: {} },
     },
     delivery_uri: 'https://deliveries.example.org/work',
-    rail: { Escrow: {} },
+    rail: { [capital(fields.rail ?? 'escrow')]: {} },
   });
 }
 

@@ -18,6 +18,7 @@ import {
   readPanelEscrow,
   type InstitutionOverview,
 } from '@/lib/dashboards';
+import { amountInCents, formatUsd } from '@/lib/fiat';
 import { readChainTime } from '@/lib/job-detail';
 import type { SettlementToken } from '@/lib/settlement';
 import { squareApi } from '@/lib/square-api';
@@ -90,6 +91,8 @@ function InstitutionPanel({ owner, apiUrl, escrowProgramId }: { owner: string } 
   const { overview, chainNow, token } = snapshot.value;
   const usdc = usdcFormatter(token);
   const totals = jobTotals(overview.jobs.items, token.mint.toBase58());
+  // Fiat işlerin tutarı USD'dir: 1 sent = 10^(decimals − 2) taban birim (ADR 0024 §7).
+  const fiatCents = amountInCents(totals.fiat.paid, token.decimals);
   const usage = dailyUsage(overview.operator, chainNow, overview.policies.items);
 
   const policyColumns: readonly Column<PolicyView>[] = [
@@ -220,6 +223,15 @@ function InstitutionPanel({ owner, apiUrl, escrowProgramId }: { owner: string } 
             detail="jobs whose USDC went back to the institution"
           />
         </dl>
+        {totals.fiat.jobs > 0 && (
+          <dl className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <Stat
+              label="Paid by card"
+              value={fiatCents === null ? usdc(totals.fiat.paid) : formatUsd(fiatCents)}
+              detail={`${counted(totals.fiat.released, 'fiat job')} released, ${totals.fiat.awaitingPayment} delivered and awaiting payment; not in escrow`}
+            />
+          </dl>
+        )}
         {totals.otherMint > 0 && (
           <p className="mt-3 text-caption text-muted">
             {counted(totals.otherMint, 'job')} in another mint than the settlement mint; not in the totals.

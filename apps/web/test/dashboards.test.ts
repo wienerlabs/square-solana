@@ -48,7 +48,12 @@ const claimListing = (job: string, status: ClaimStatus, price: string, faceValue
 const job = (
   status: JobStatus,
   amount: string,
-  fields: { mint?: string; claim?: { status: ClaimStatus; price: string }; createdAt?: number } = {},
+  fields: {
+    mint?: string;
+    claim?: { status: ClaimStatus; price: string };
+    createdAt?: number;
+    rail?: 'escrow' | 'fiat';
+  } = {},
 ): JobView => {
   const address = key();
   const wallet = key();
@@ -95,7 +100,7 @@ const job = (
         resolution: { kind: 'pending' },
       },
       deliveryUri: '',
-      rail: 'escrow',
+      rail: fields.rail ?? 'escrow',
     },
     payee: wallet,
     claim: fields.claim ? claimListing(address, fields.claim.status, fields.claim.price, amount) : null,
@@ -144,6 +149,24 @@ describe('job totals', () => {
     expect(totals.escrowed).toBe(400_000_000n);
     expect(totals.released).toBe(400_000_000n);
     expect(totals.otherMint).toBe(1);
+    expect(totals.fiat).toEqual({ jobs: 0, awaitingPayment: 0, released: 0, paid: 0n });
+  });
+
+  it('keep fiat jobs out of the escrow: nothing is locked, the institution pays by card', () => {
+    const totals = jobTotals(
+      [
+        job('funded', '250000000'),
+        job('accepted', '125000000', { rail: 'fiat' }),
+        job('delivered', '75000000', { rail: 'fiat' }),
+        job('released', '50000000', { rail: 'fiat' }),
+        job('released', '400000000'),
+      ],
+      USDC,
+    );
+    expect(totals.escrowed).toBe(250_000_000n);
+    expect(totals.released).toBe(400_000_000n);
+    expect(totals.counts).toMatchObject({ funded: 1, accepted: 0, delivered: 0, released: 1 });
+    expect(totals.fiat).toEqual({ jobs: 3, awaitingPayment: 1, released: 1, paid: 50_000_000n });
   });
 });
 
@@ -248,7 +271,19 @@ describe('agent earnings', () => {
       released: 0n,
       sold: { count: 0, price: 0n },
       pending: { count: 0, net: 0n },
+      fiat: { count: 0, amount: 0n },
     });
+  });
+
+  it('count released fiat jobs apart and never as USDC on its way to the agent wallet', () => {
+    const jobs = [
+      job('delivered', '100000000', { rail: 'fiat' }),
+      job('released', '60000000', { rail: 'fiat' }),
+      job('delivered', '200000000'),
+    ];
+    const earnings = agentEarnings(view('60000000'), jobs, KEEPER_FEE_BPS, USDC);
+    expect(earnings.fiat).toEqual({ count: 1, amount: 60_000_000n });
+    expect(earnings.pending).toEqual({ count: 1, net: releaseNetAmount(200_000_000n, KEEPER_FEE_BPS) });
   });
 });
 

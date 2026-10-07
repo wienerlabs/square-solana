@@ -181,7 +181,11 @@ function AgentPanel({ owner, apiUrl, escrowProgramId, genesisHash }: { owner: st
               <Stat
                 label="Released"
                 value={usdc(earnings.released)}
-                detail="Net paid for completed jobs (reputation total_earned), including sold receivables, which the buyers were paid"
+                detail={`Net paid for completed jobs (reputation total_earned), including sold receivables, which the buyers were paid${
+                  earnings.fiat.count > 0
+                    ? `, and ${counted(earnings.fiat.count, 'fiat job')} (${usdc(earnings.fiat.amount)}) the institution paid by card to Square, not to the agent wallet`
+                    : ''
+                }`}
               />
               <Stat
                 label="Receivables sold"

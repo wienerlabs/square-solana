@@ -91,7 +91,7 @@ const AWAITING_RELEASE: readonly JobStatus[] = ['funded', 'accepted', 'delivered
 const isEscrowed = (status: JobStatus) => (ESCROWED_STATUSES as readonly JobStatus[]).includes(status);
 
 export interface JobTotals {
-  /** Duruma göre iş sayısı. */
+  /** Duruma göre escrow işlerinin sayısı. */
   counts: Record<JobStatus, number>;
   /** Kasada kilitli tutar (`ESCROWED_STATUSES`). */
   escrowed: bigint;
@@ -99,9 +99,14 @@ export interface JobTotals {
   released: bigint;
   /** Settlement mint'inden başka mint'teki işler: sayılır, tutarları toplamlara girmez. */
   otherMint: number;
+  /**
+   * Fiat işler (ADR 0024): kasada tutar kilitlenmez, kurum kartla Square'e öder. `awaitingPayment` teslim edilmiş ve
+   * henüz release edilmemiş işler, `paid` release edilmişlerin tutarı (settlement mint'inin biriminde, USD karşılığı).
+   */
+  fiat: { jobs: number; awaitingPayment: number; released: number; paid: bigint };
 }
 
-/** İşlerin durum sayıları ve settlement mint'indeki tutarları. */
+/** İşlerin durum sayıları ve settlement mint'indeki tutarları; fiat işler ayrı sayılır. */
 export function jobTotals(jobs: readonly JobView[], mint: string): JobTotals {
   const counts = {
     open: 0,
@@ -117,7 +122,17 @@ export function jobTotals(jobs: readonly JobView[], mint: string): JobTotals {
   let escrowed = 0n;
   let released = 0n;
   let otherMint = 0;
+  const fiat = { jobs: 0, awaitingPayment: 0, released: 0, paid: 0n };
   for (const { account } of jobs) {
+    if (account.rail === 'fiat') {
+      fiat.jobs += 1;
+      if (account.status === 'delivered') fiat.awaitingPayment += 1;
+      if (account.status === 'released') {
+        fiat.released += 1;
+        if (account.mint === mint) fiat.paid += BigInt(account.amount);
+      }
+      continue;
+    }
     counts[account.status] += 1;
     if (account.mint !== mint) {
       otherMint += 1;
@@ -126,7 +141,7 @@ export function jobTotals(jobs: readonly JobView[], mint: string): JobTotals {
     if (isEscrowed(account.status)) escrowed += BigInt(account.amount);
     if (account.status === 'released') released += BigInt(account.amount);
   }
-  return { counts, escrowed, released, otherMint };
+  return { counts, escrowed, released, otherMint, fiat };
 }
 
 // ------------------------------------------------------------------ kurum
@@ -275,6 +290,11 @@ export interface AgentEarnings {
   sold: { count: number; price: bigint };
   /** Release'i bekleyen, alacağı satılmamış işler: bugünkü keeper ücretiyle agent cüzdanına gidecek net. */
   pending: { count: number; net: bigint };
+  /**
+   * Release edilmiş fiat işler (ADR 0024 / 0026): tutarları `released`'ın içindedir, ama kurum kartla Square'e ödedi;
+   * agent cüzdanına USDC gitmedi. Bekleyen fiat işler `pending`'e girmez.
+   */
+  fiat: { count: number; amount: bigint };
 }
 
 export function agentEarnings(
@@ -287,9 +307,17 @@ export function agentEarnings(
     released: view.reputation ? BigInt(view.reputation.totalEarned) : 0n,
     sold: { count: 0, price: 0n },
     pending: { count: 0, net: 0n },
+    fiat: { count: 0, amount: 0n },
   };
   for (const job of jobs) {
     if (job.account.mint !== mint) continue;
+    if (job.account.rail === 'fiat') {
+      if (job.account.status === 'released') {
+        earnings.fiat.count += 1;
+        earnings.fiat.amount += BigInt(job.account.amount);
+      }
+      continue;
+    }
     if (soldClaim(job)) {
       earnings.sold.count += 1;
       earnings.sold.price += BigInt(job.claim!.price);

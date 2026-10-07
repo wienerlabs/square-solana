@@ -12,8 +12,8 @@ Square'in web uygulaması: Next.js 16 (App Router), React 19, Tailwind CSS 4 ve 
 | `/app/did` | did:aip çözümü: kayıt zincirden, kart kendi adresinden; DID belgesi ve meta verisi. `?did=` ile paylaşılır (FE-05) |
 | `/app/agents` | Agent dizini: beceri, fiyat ve tamamlanmış iş filtresi, sıralama (FE-05) |
 | `/app/agents/[agentRecord]` | Agent profili: kayıt ve kart, beceriler ve fiyatlar, itibar, validation geçmişi, işler (FE-05) |
-| `/app/jobs/new` | İş açma ve fonlama: agent, tutar, deadline, challenge süresi, politika bağlama, iş tanımı ve hash'i, iki tarafın screening'i, `create_job` + `fund_job` (FE-06); eşik üstünde Travel Rule formu ve `commit_travel_rule` (FE-18) |
-| `/app/jobs/[job]` | İş detayı: zincirdeki job, event'lerden canlı zaman çizelgesi, zincir saatine göre challenge sayacı; agent cüzdanı için kabul ve teslim (FE-07); alacağın listelenmesi, geri çekilmesi ve onaylı alıcının alımı, payee (FE-08); uyum ispatının durumu, kurumun ispatı üretip bağlaması (FE-09); herkesin tetikleyebildiği finalize, ödeme, validation, itibar ve keeper günlüğü (FE-10); Travel Rule durumu, commitment ve API'de saklanan kayıtla doğrulama (FE-18); uyuşmazlık: itiraz, ispatsız bekleme başvurusu, oy durumu ve son tarih, kararın ödenmesi, lapse (FE-17) |
+| `/app/jobs/new` | İş açma ve fonlama: agent, tutar, deadline, challenge süresi, politika bağlama, iş tanımı ve hash'i, iki tarafın screening'i, `create_job` + `fund_job` (FE-06); eşik üstünde Travel Rule formu ve `commit_travel_rule` (FE-18); ödeme rayı: USDC escrow ya da kartla USD, `create_fiat_job` (FE-20) |
+| `/app/jobs/[job]` | İş detayı: zincirdeki job, event'lerden canlı zaman çizelgesi, zincir saatine göre challenge sayacı; agent cüzdanı için kabul ve teslim (FE-07); alacağın listelenmesi, geri çekilmesi ve onaylı alıcının alımı, payee (FE-08); uyum ispatının durumu, kurumun ispatı üretip bağlaması (FE-09); herkesin tetikleyebildiği finalize, ödeme, validation, itibar ve keeper günlüğü (FE-10); Travel Rule durumu, commitment ve API'de saklanan kayıtla doğrulama (FE-18); uyuşmazlık: itiraz, ispatsız bekleme başvurusu, oy durumu ve son tarih, kararın ödenmesi, lapse (FE-17); fiat işte kartla ödeme: ödeme öncesi politika denetimi, kartla ya da kayıtlı kartla ödeme, makbuz, ispatın bağlanması ve finalize (FE-20) |
 | `/app/arbitration` | Arbitrator konsolu: açık dispute'lar, kanıtlar, oylar, oy ve webhook abonelikleri; navigasyonda arbitrator rolünde görünür (FE-17) |
 | `/app/claims` | Alacak piyasası: satıştaki alacaklar, fiyat, iskonto, kimin alabileceği (FE-08) |
 | `/audit/[job]` | Denetim görünümü: job'un herkese açık uyum geçmişi; event'ler ve işlemleri, ispatın kararı ve geçmişi, validation kaydı. Politikanın içeriği yok (FE-12) |
@@ -30,7 +30,7 @@ Değerler ortamdan gelir ve kök layout'ta **istek anında, sunucuda** okunur (`
 | `SQUARE_SOLANA_CLUSTER` | `devnet`, `testnet`, `mainnet-beta` ya da `localnet` |
 | `SQUARE_SOLANA_RPC_URL` | O cluster'ın JSON-RPC ucu; `https` (yalnızca `localnet` için `http`). WebSocket ucu web3.js tarafından bundan türetilir |
 | `SQUARE_PROVER_URL` | İsteğe bağlı: release ispatını üreten prover servisinin kök adresi ([`apps/prover`](../prover/README.md)); `https` (yalnızca `localnet` için `http`). Tanımlı değilse kurum iş sayfasında ispat üretemez, ispatın durumu yine görünür. Prover'ın `CORS_ORIGINS`'i web'in adresini içermeli |
-| `SQUARE_API_URL` | İsteğe bağlı: Square API'nin kök adresi ([`apps/api`](../api/README.md)); `https` (yalnızca `localnet` için `http`). Keeper günlüğü buradan okunur, cüzdan oturumu buradan açılır, teslim dosyası buraya yüklenir (FE-10, FE-03, FE-07); dispute kanıtı, arbitrator kuyruğu, oy tx'i, webhook abonelikleri ve geliştirici portalı (`/app/developers`) buradan gelir (FE-17, FE-22). Tanımlı değilse sayfa bunu söyler: kurum yalnızca kanıtın hash'iyle itiraz eder, arbitrator konsolu ve geliştirici portalı kapanır. Sondaki eğik çizgi atılır. API'nin `CORS_ORIGINS`'i web'in adresini, `API_AUTH_DOMAIN`'i web'in host'unu (`location.host`, ör. `app.example.com`) içermeli |
+| `SQUARE_API_URL` | İsteğe bağlı: Square API'nin kök adresi ([`apps/api`](../api/README.md)); `https` (yalnızca `localnet` için `http`). Keeper günlüğü buradan okunur, cüzdan oturumu buradan açılır, teslim dosyası buraya yüklenir (FE-10, FE-03, FE-07); dispute kanıtı, arbitrator kuyruğu, oy tx'i, webhook abonelikleri ve geliştirici portalı (`/app/developers`) buradan gelir (FE-17, FE-22). Kartla ödeme (Stripe'ın yayımlanabilir anahtarı, ödeme, makbuz, kayıtlı kart) buradan gider (FE-20). Tanımlı değilse sayfa bunu söyler: kurum yalnızca kanıtın hash'iyle itiraz eder, arbitrator konsolu ve geliştirici portalı kapanır. Sondaki eğik çizgi atılır. API'nin `CORS_ORIGINS`'i web'in adresini, `API_AUTH_DOMAIN`'i web'in host'unu (`location.host`, ör. `app.example.com`) içermeli |
 | `SQUARE_FEE_PAYER_URL` | İsteğe bağlı: sponsorlu işlem servisinin kök adresi ([`apps/fee-payer`](../fee-payer/README.md), BE-27); `https` (yalnızca `localnet` için `http`). Sponsorlu gönderim ve smart account ([aşağıda](#smart-account-ve-sponsorlu-işlem-fe-21)) bunu ister. Servis Square API'nin oturumunu kabul ettiği için `SQUARE_API_URL` de gerekir. Sondaki eğik çizgi atılır. Servisin `CORS_ORIGINS`'i web'in adresini içermeli |
 | `SQUARE_PROGRAM_ID_{REGISTRY,POLICY,VERIFIER,ESCROW}` | İsteğe bağlı: programların o cluster'daki adresi (db ile aynı adlar; IDL'deki adres kullanılmaz). Tanımlı olan program landing'de adresi ve zincirdeki deploy durumuyla, tanımlı olmayan "Not configured" olarak görünür. USDC bakiyesi escrow'un config'inden okunduğu için `ESCROW` gerekir. Geçersiz bir değer yapılandırma hatasıdır |
 | `SQUARE_LOOKUP_TABLE` | İsteğe bağlı: Square address lookup table'ı (BC-28; servislerde `API_LOOKUP_TABLE`, devnet'teki [kayıt](../../docs/deploy/devnet.md#square-alt)). Ağ sayfası tablonun durumunu ve içeriğinin SDK'nın beklediği adreslerle aynı olup olmadığını gösterir; tanımlı değilse bunu söyler. Geçersiz bir değer yapılandırma hatasıdır |
@@ -165,6 +165,37 @@ Politikaya bağlı işte escrow, kurumun bağladığı release ispatına (`Relea
 | İtibar | Agent'ın `AgentReputation` hesabı: tamamlanan, başarısız ve uyuşmazlıklı işler, toplam kazanç, son settlement. İspatla reddedilen release sayılmaz (ADR 0013); sayfa bunu yazar |
 | Keeper günlüğü | `listKeeperActions` (API, `SQUARE_API_URL`): job için keeper'ın (`apps/keeper`) denemeleri, sonucu, bekleme sebebi, ücreti, imzası ve sonraki denemesi; son 20. Keeper'ın bekletme ve onay kayıtları zincirde işlem üretmediği için iş teslim edilmişken ya da son deneme onay beklerken 15 saniyede bir yeniden okunur (sekme görünürken) |
 
+## Kartla ödeme: fiat rayı (FE-20)
+
+Fiat işte vault, fonlama, challenge penceresi, dispute, Travel Rule commitment'ı ve alacak satışı yoktur
+([ADR 0024](../../docs/decisions/0024-stripe-mpp-fiat-rayi.md)). Kurum teslim edilen işin tutarını USD olarak
+Square'in Stripe hesabına öder; MPP authority makbuzu işe ve tutara bağlayarak imzalar; kurumun uyum ispatı bu
+attestation'la `verify_mpp_payment_proof`'a bağlanır; `finalize_fiat_payment` işi `Released` yapar
+([ADR 0026](../../docs/decisions/0026-stripe-mpp-fiat-odemesi.md)). Ödeme alınıp ispat bağlanamazsa para iade
+edilemez; arayüz ödemeyi buna göre açar.
+
+| Parça | Davranış |
+|---|---|
+| Açılış | İş açma sayfasında "Card in USD (Stripe)": `flow.createFiatJob`. Politika zorunludur; challenge süresi ve fonlama yoktur. Tutar tam sent olmalı ve Stripe'ın en düşük tutarından (`getFiatConfig().minimumAmountMinor`) az olmamalı: 1 sent = 10^(decimals − 2) taban birim. İki tarafın screening'i açılışta denetlenir; biri temiz değilse açılış kapanır. Square API'sinin fiat rayı yapılandırılmamışsa seçenek kapalıdır ve sebebi yazılır |
+| Kabul ve teslim | Agent fiat işi açıkken (`Open`) kabul eder; teslim escrow işindeki gibidir |
+| Ön denetim | Kurum ödemeden önce politikayı prover'da denetler: witness zincir saatiyle, makbuz sinyali sıfırdan farklı bir değerle kurulur (devrenin 12. sinyali ret koduna girmez). Ret varsa sebepleri yazılır ve ödeme kapalı kalır. Denetim aynı UTC gününde ve 540 s içinde geçerlidir; kalan süre yazılır |
+| Ödeme | Kart alanı Stripe'ın çerçevesidir (`@stripe/stripe-js`, Card Element): kart bilgisi yalnızca Stripe'a gider. `createFiatPayment` (`offSession: false`) PaymentIntent'i açar ya da işin açık PaymentIntent'ini döner, `confirmCardPayment` onaylar (3D Secure dahil), ardından `reconcileFiatPayment` attestation'ı yazar. Kayıtlı kartla `offSession: true`; banka onay isterse (`requires_action`) aynı PaymentIntent Stripe'ın penceresiyle onaylanır. Ret sebepleri zarfın ayrıntılarından (`declineCode`, günlük tavanda `dailyCeiling`) yazılır. Stripe ödemeyi işliyorsa (`processing`) mutabakat yeniden sorulur |
+| Makbuz | `getFiatAttestation` (yalnızca kurumun yetkilisine): ödenen tutar ve anı, PaymentIntent, makbuz commitment'ı, imzalayan MPP authority ve kaynağı (webhook, mutabakat, MPP) |
+| İspat bağlama | "Prove and bind": witness makbuz commitment'ıyla kurulur, ispat üretilir ve `buildVerifyMppPaymentProofTx` ile (attestation imzası Ed25519 precompile'ında) tek adımda bağlanır. Uyumlu olmayan ispat bağlanmaz; ret sebebi ve geçici mi kalıcı mı olduğu yazılır. İspat bayatlarsa sebepleriyle yeniden bağlama istenir |
+| Finalize | Herkese açık, cüzdanla (sponsorlu olabilir): `flow.finalizeFiatPayment`. Tetikleyen itibar ve validation kaydının rent'ini öder; keeper ücreti yoktur. Keeper fiat işleri finalize etmez |
+| Kayıtlı kart | Hesap sayfası, kurum rolünde: `createFiatSetupIntent` ve `confirmCardSetup`. Square kartı Stripe'ın `setup_intent.succeeded` webhook'uyla kaydeder; sayfa kaydı birkaç kez okur, gelmediyse bunu söyler. Kart kurum anahtarı başınadır (cüzdan ya da smart account vault'u) |
+| Paneller | Kurum panelinde fiat işler kasada sayılmaz; "Paid by card" release edilmiş fiat işlerin USD toplamı. Agent panelinde bekleyen fiat işler release bekleyen USDC'ye girmez; release edilmiş fiat işler itibarın `total_earned`'ündedir, ama ödeme agent cüzdanına değil Square'e yapılmıştır |
+| Zaman çizelgesi | `FiatJobCreated`, `MppPaymentVerified` (API'den), fiat işte `Finalized` "Released" olarak |
+
+- **Ödemenin açılmadığı durumlar:** Prover (`SQUARE_PROVER_URL`) yoksa, işin politikası bu tarayıcıda yoksa ya da
+  kurumun yetkilisi sonradan bağlanmış bir Squads vault'uysa ispat bu sayfadan bağlanamaz. Bu durumda ödeme
+  düğmeleri gösterilmez, sebep yazılır.
+- **Smart account:** İspat bağlama tx'indeki Ed25519 precompile vault mesajına girmez; yürütme tx'inde yürütmenin
+  hemen önüne konur (`sendInstructionsAsVault`). Bu yüzden adım yalnızca tek başına yürütebilen üyeyle (eşik 1,
+  zaman kilidi yok) gönderilebilir; öneri açılmadan reddedilir.
+- **Bu sürümde yok:** Agent'a USD ödemesi (Stripe Connect, ADR 0026 madde 1). MPP 402 yolu (`payFiatJobMpp`)
+  `fiat:pay` kapsamlı API anahtarıyla ödeme ajanları içindir; arayüzde yoktur.
+
 ## Denetim görünümü (FE-12)
 
 `/audit/[job]`, herkese açık; iş detayındaki zaman çizelgesinden "Audit trail" ile açılır. Uygulama gezinmesi yoktur: bağlantıyı alan biri (denetçi, karşı taraf) cüzdan bağlamadan okur. Yalnızca `SQUARE_PROGRAM_ID_ESCROW` gerekir; ağ doğrulanmadan hiçbir şey okunmaz.
@@ -293,6 +324,7 @@ kararı: [ADR 0023](../../docs/decisions/0023-x402-ucretli-uc-nokta-tanimlari.md
   - Multisig'i `set_institution_multisig` ile sonradan bağlanmış kurumun (kurum hesabı cüzdandan türemiş) adımları bu
     sayfadan önerilmez; bu kurumun ispat bölümü durumu söylemeye devam eder.
   - CCTP ile fonlama (FE-19) cüzdanla çalışır.
+  - Fiat işin ispat bağlaması (FE-20) Ed25519 precompile taşır: yalnızca tek başına yürütebilen üyeyle gider.
 
 ## Tasarım sistemi
 
