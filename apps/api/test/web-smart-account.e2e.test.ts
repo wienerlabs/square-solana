@@ -345,7 +345,9 @@ describe.skipIf(!ENABLED)('localnet: smart account ile 8 adım arayüzden sponso
     const jobKey = (await jobs())[0]!.publicKey;
     await institution.getByRole('button', { name: 'Fund the job' }).click();
     await until('fonlama', UI_TIMEOUT_MS, async () => (await jobStatus(jobKey)) === 'funded');
-    // Kabul öncesi ön-ispat (ADR 0028): kurum prover'la üretir ve vault'uyla bağlar; agent ancak sonra kabul eder.
+    // Kabul öncesi ön-ispat (ADR 0028): kurum iş sayfasında prover'la üretir ve vault'uyla bağlar; agent ancak
+    // sonra kabul eder.
+    await open(institution, `/app/jobs/${jobKey.toBase58()}`);
     await institution.getByLabel('Payment category').selectOption(CATEGORY);
     await institution.getByLabel('Prover API key').fill(PROVER_KEY);
     await institution.getByRole('button', { name: 'Make the pre-acceptance proof' }).click();
