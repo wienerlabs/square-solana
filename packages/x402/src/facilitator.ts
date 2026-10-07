@@ -68,6 +68,9 @@ export const SELF_FACILITATOR_LIMITS: Readonly<ExactSvmSchemeOptions> = Object.f
   maxRequiredSignatures: 2,
 });
 
+const definedOptions = (options: ExactSvmSchemeOptions | undefined): ExactSvmSchemeOptions =>
+  Object.fromEntries(Object.entries(options ?? {}).filter(([, value]) => value !== undefined));
+
 /** Resmi `x402Facilitator`: exact şeması verilen ağlar için ücret ödeyen cüzdanla kaydedilir. */
 export function createSelfFacilitator(options: SelfFacilitatorOptions): x402Facilitator {
   const rpcs: Record<string, FacilitatorRpcClient> = {};
@@ -79,7 +82,7 @@ export function createSelfFacilitator(options: SelfFacilitatorOptions): x402Faci
   const signer = toFacilitatorSvmSigner(options.feePayer, rpcs);
   return new x402Facilitator().register(
     networks as `${string}:${string}`[],
-    new ExactSvmScheme(signer, undefined, { ...SELF_FACILITATOR_LIMITS, ...options.scheme }),
+    new ExactSvmScheme(signer, undefined, { ...SELF_FACILITATOR_LIMITS, ...definedOptions(options.scheme) }),
   );
 }
 

@@ -119,9 +119,22 @@ export interface X402Gateway {
 interface RequestState {
   payment?: X402Payment;
   readonly onSettled?: (payment: X402SettledPayment) => void;
-  readonly response?: Response;
-  readonly headersBeforeHandler?: ReadonlySet<string>;
 }
+
+type HeaderValue = number | string | readonly string[];
+
+interface RequestContext {
+  readonly state: RequestState;
+  readonly response: Response;
+  readonly headersBeforeHandler: ReadonlyMap<string, HeaderValue>;
+}
+
+const headerSnapshot = (response: Response): ReadonlyMap<string, HeaderValue> =>
+  new Map(
+    Object.entries(response.getHeaders()).flatMap(([name, value]): [string, HeaderValue][] =>
+      value === undefined ? [] : [[name, Array.isArray(value) ? [...value] : value]],
+    ),
+  );
 
 const LOCALS_KEY = 'squareX402';
 
@@ -137,12 +150,12 @@ export function createX402Gateway(options: X402GatewayOptions): X402Gateway {
   const ttlMs = (options.replayTtlSeconds ?? DEFAULT_REPLAY_TTL_SECONDS) * 1000;
   const emit = (event: X402Event): void => {
     try {
-      options.onEvent?.(event);
+      void Promise.resolve(options.onEvent?.(event)).catch(() => undefined);
     } catch {
       return;
     }
   };
-  const storage = new AsyncLocalStorage<RequestState>();
+  const storage = new AsyncLocalStorage<RequestContext>();
 
   const server = new x402ResourceServer(options.facilitator);
   registerExactSvmScheme(server, {
@@ -186,7 +199,7 @@ export function createX402Gateway(options: X402GatewayOptions): X402Gateway {
     const payment = describe(paymentPayload, requirements, result.payer ?? '');
     const claimed = await claim(payment.fingerprint, payment.network);
     if (claimed !== 'ok') return abort(claimed);
-    const state = storage.getStore();
+    const state = storage.getStore()?.state;
     if (state) state.payment = payment;
     emit({ type: 'verified', payment });
   });
@@ -199,11 +212,12 @@ export function createX402Gateway(options: X402GatewayOptions): X402Gateway {
   });
 
   const discardHandlerHeaders = () => {
-    const state = storage.getStore();
-    const response = state?.response;
-    if (!response || !state.headersBeforeHandler || response.headersSent) return;
-    for (const name of response.getHeaderNames()) {
-      if (!state.headersBeforeHandler.has(name)) response.removeHeader(name);
+    const context = storage.getStore();
+    if (!context || context.response.headersSent) return;
+    const { response, headersBeforeHandler } = context;
+    for (const name of response.getHeaderNames()) response.removeHeader(name);
+    for (const [name, value] of headersBeforeHandler) {
+      response.setHeader(name, typeof value === 'object' ? [...value] : value);
     }
   };
 
@@ -222,7 +236,7 @@ export function createX402Gateway(options: X402GatewayOptions): X402Gateway {
     }
     const payer = result.payer ?? '';
     emit({ type: 'settled', fingerprint, network: requirements.network, transaction: result.transaction, payer });
-    const state = storage.getStore();
+    const state = storage.getStore()?.state;
     if (!state) return;
     const settled: X402SettledPayment = {
       ...describe(paymentPayload, requirements, payer),
@@ -267,13 +281,9 @@ export function createX402Gateway(options: X402GatewayOptions): X402Gateway {
       };
       const middleware = paymentMiddleware(config, server);
       const handler: RequestHandler = (req, res, next) => {
-        const state: RequestState = {
-          ...(route.onSettled ? { onSettled: route.onSettled } : {}),
-          response: res,
-          headersBeforeHandler: new Set(res.getHeaderNames()),
-        };
+        const state: RequestState = route.onSettled ? { onSettled: route.onSettled } : {};
         res.locals[LOCALS_KEY] = state;
-        storage.run(state, () => {
+        storage.run({ state, response: res, headersBeforeHandler: headerSnapshot(res) }, () => {
           middleware(req, res, next).catch(next);
         });
       };
