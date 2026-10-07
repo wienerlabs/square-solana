@@ -2,12 +2,13 @@ import { readFileSync, symlinkSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { Keypair } from '@solana/web3.js';
+import type { Prover } from '@squaresdk/solana-policy';
 import { describe, expect, it } from 'vitest';
 import { defaultReportPath, isEntryPoint, parseCli, writeText } from '../src/cli.js';
 import { ClusterConfigSchema } from '../src/config.js';
 import { REPO_ROOT } from '../src/keys.js';
 import { localnetConfig, localnetProgramIds, parseLocalnetArgs } from '../src/localnet.js';
-import { earliestProofTime, newRunId, SAME_DAY_MARGIN_SECS, utc } from '../src/smoke.js';
+import { earliestProofTime, newRunId, proverFor, SAME_DAY_MARGIN_SECS, utc } from '../src/smoke.js';
 import { IDS, tempDir } from './helpers.js';
 
 describe('parseCli', () => {
@@ -105,5 +106,19 @@ describe('smoke yardımcıları', () => {
     expect(earliestProofTime(day + 86_400 - 300, day + 86_400 - 100)).toBe(day + 86_400 + 2);
     expect(earliestProofTime(day + 86_400 - 100, day)).toBe(day + 86_400 + 2);
     expect(earliestProofTime(day + 86_400 - 100, day, 50)).toBe(day + 86_400 - 100);
+  });
+
+  it('bölüme özel prover verilmişse o kullanılır (fiat dahil), yoksa ortak prover', () => {
+    const prover = (name: string): Prover => ({
+      prove: () => Promise.reject(new Error(name)),
+    });
+    const shared = prover('ortak');
+    const fiat = prover('fiat');
+    const remote = prover('uzak');
+    const options = { prover: shared, provers: { fiat, 'ispat-yok': remote } };
+    expect(proverFor(options, 'fiat')).toBe(fiat);
+    expect(proverFor(options, 'ispat-yok')).toBe(remote);
+    expect(proverFor(options, 'akış')).toBe(shared);
+    expect(proverFor({ prover: shared }, 'fiat')).toBe(shared);
   });
 });

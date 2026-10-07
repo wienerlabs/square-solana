@@ -1,0 +1,44 @@
+{
+  "name": "@squaresdk/solana-services-e2e",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Servis entegrasyon testi (BE-36): localnet'te dört program, Postgres ve S3 uyumlu depo; api, indexer, keeper, prover ve screener gerçek süreçler; 8 adım, ispat-ret, ispat-yok ve fiat varyantları SDK ve policy paketiyle, servislerin etkileri ve indexer uzlaştırması",
+  "license": "Apache-2.0",
+  "type": "module",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run --coverage",
+    "test:localnet": "SQUARE_LOCALNET=1 vitest run --reporter=verbose test/localnet.e2e.test.ts"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.1146.0",
+    "@solana/spl-token": "^0.4.15",
+    "@solana/web3.js": "^1.99.0",
+    "@squaresdk/solana-db": "workspace:*",
+    "@squaresdk/solana-policy": "workspace:*",
+    "@squaresdk/solana-sdk": "workspace:*",
+    "@squaresdk/solana-smoke": "workspace:*",
+    "@squaresdk/solana-types": "workspace:*",
+    "@testcontainers/postgresql": "^12.2.0",
+    "bs58": "^6.0.0",
+    "testcontainers": "^12.2.0"
+  },
+  "devDependencies": {
+    "@squaresdk/solana-api": "workspace:*",
+    "@squaresdk/solana-config": "workspace:*",
+    "@squaresdk/solana-indexer": "workspace:*",
+    "@squaresdk/solana-keeper": "workspace:*",
+    "@squaresdk/solana-prover": "workspace:*",
+    "@squaresdk/solana-screener": "workspace:*",
+    "@types/node": "^24.0.0",
+    "@vitest/coverage-v8": "^5.0.3",
+    "vitest": "^5.0.3"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}
