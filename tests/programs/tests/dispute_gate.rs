@@ -141,29 +141,44 @@ fn a_split_needs_a_proof_of_the_agent_share() {
 #[test]
 fn a_final_refusal_refunds_the_award_but_the_bond_stays_a_penalty() {
     let mut r = ReleaseWorld::new(false);
-    let job = resolved(&mut r, "c", DisputeResolution::FavorAgent);
-    let amount = r.amount("c");
+    // ADR 0028'den sonra kalıcı ret yalnızca alacak satılınca çıkabilir: alacak kurumun politikasında engelli
+    // alıcıya satıldı, karar agent tarafının (alıcının) lehine.
+    let job = r.delivered_job("a");
+    let buyer = r.sell_claim_to_blocked_buyer(&job);
+    let amount = r.amount("a");
     let bond = min_bond(amount);
+    let institution = Institution {
+        key: r.institution.key.insecure_clone(),
+        token_account: r.institution.token_account,
+    };
+    r.w.raise_dispute(&institution, &job, bond)
+        .expect("raise_dispute");
+    r.w.decide(&job, DisputeResolution::FavorAgent);
+    r.w.h.set_time(r.proof_time());
     let caller = r.w.h.funded(LAMPORTS);
-    let settlement = r.settlement(&caller, r.agent.wallet.pubkey());
+    let settlement = r.settlement(&caller, buyer);
+    let buyer_before = r.w.balance(&settlement.payee_token_account).unwrap();
     let institution_before = r.w.balance(&r.institution.token_account).unwrap();
 
-    r.bind(&job, &r.proof("dispute_refused_per_tx"))
+    r.bind(&job, &r.proof("dispute_refused_blocked_buyer"))
         .expect("kalıcı ret");
     let executed = execute(&mut r, &caller, &job, settlement).expect("execute_resolution");
-    // Escrow kapıdan geçmez ve kuruma döner; bond cezadır, kapıdan geçmeden agent tarafına kesilir.
-    assert_eq!(r.w.balance(&settlement.payee_token_account), Some(bond));
+    // Escrow kapıdan geçmez ve kuruma döner; bond cezadır, kapıdan geçmeden agent tarafına (alıcıya) kesilir.
+    assert_eq!(
+        r.w.balance(&settlement.payee_token_account),
+        Some(buyer_before + bond)
+    );
     assert_eq!(
         r.w.balance(&r.institution.token_account),
         Some(institution_before + amount)
     );
     assert_eq!(r.w.job(&job).status, JobStatus::Refunded);
     let refused: ReleaseRefused = event(&executed);
-    assert_eq!((refused.refusal_code, refused.refunded_amount), (1, amount));
+    assert_eq!((refused.refusal_code, refused.refunded_amount), (8, amount));
     let validation: ValidationRecord = r.w.h.account(&validation_address(&job)).unwrap();
     assert_eq!(
         (validation.outcome, validation.refusal_code),
-        (ValidationOutcome::Refused, 1)
+        (ValidationOutcome::Refused, 8)
     );
     let reputation: AgentReputation = r.w.h.account(&reputation_address(&r.agent.record)).unwrap();
     assert_eq!(

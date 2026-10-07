@@ -7,6 +7,10 @@
 //! Stripe MPP fiat rayı (BC-37, ADR 0024): `verify_mpp_payment_proof` fiat işin Stripe ödemesini MPP
 //! authority'nin Ed25519 attestation'ı ve aynı devrenin ispatıyla (`stripe_receipt_hash` ≠ 0) job'a
 //! bağlar; authority config'tedir ve `update_mpp_authority` ile program upgrade'i olmadan değişir.
+//!
+//! Kabul öncesi ön-ispat (ADR 0028): `set_preflight_proof` policy'li işin, agent kabul etmeden önce, kendi
+//! koşullarıyla (net = tutar, payee = agent cüzdanı, sayaç 0) kalıcı ya da günlük tavan biti olmadan geçtiğini
+//! `PreflightProof`'a yazar; escrow `accept_job`'da onu ister.
 use anchor_lang::prelude::*;
 
 pub mod binding;
@@ -40,6 +44,8 @@ pub const VERIFIER_CONFIG_SEED: &[u8] = square_common::seeds::VERIFIER_CONFIG_SE
 pub const OPERATOR_STATE_SEED: &[u8] = square_common::seeds::OPERATOR_STATE_SEED;
 #[constant]
 pub const RELEASE_PROOF_SEED: &[u8] = square_common::seeds::RELEASE_PROOF_SEED;
+#[constant]
+pub const PREFLIGHT_PROOF_SEED: &[u8] = square_common::seeds::PREFLIGHT_PROOF_SEED;
 
 /// İspatın anı (`proof_timestamp`, sinyal 9) ile zincirin saati arasındaki en büyük fark (ADR 0012).
 pub const CLOCK_TOLERANCE_SECS: i64 = 600;
@@ -100,6 +106,33 @@ pub mod square_verifier {
             proof_c,
             refusal_code,
             net_amount,
+            proof_timestamp,
+        )
+    }
+
+    /// Pre-acceptance compliance proof (ADR 0028): before the agent accepts a policy job (Open or
+    /// Funded), the institution's authority proves the job against its own terms. The program builds
+    /// the signals from the job: net = `job.amount` (the upper bound of every release to the agent
+    /// side), payee = `Job.agent_wallet`, mint, daily counter 0, the job address and a zero
+    /// `stripe_receipt_hash`; the policy snapshot is the job's. `refusal_code` must have no permanent
+    /// bit and no daily-ceiling bit (time window and category are temporary); otherwise
+    /// `PreflightRefused`. Writes `PreflightProof`, which escrow `accept_job` requires; can be re-bound
+    /// until acceptance. Arguments: `refusal_code` is public signal 0; `proof_timestamp` is public
+    /// signal 9 (Unix seconds), within the clock tolerance.
+    pub fn set_preflight_proof(
+        ctx: Context<SetPreflightProof>,
+        proof_a: [u8; 64],
+        proof_b: [u8; 128],
+        proof_c: [u8; 64],
+        refusal_code: u16,
+        proof_timestamp: i64,
+    ) -> Result<()> {
+        instructions::set_preflight_proof::handler(
+            ctx,
+            proof_a,
+            proof_b,
+            proof_c,
+            refusal_code,
             proof_timestamp,
         )
     }

@@ -196,6 +196,39 @@ fn bind_ix(
     }
 }
 
+/// Kabul öncesi ön-ispat (ADR 0028), kurum vault'unun imzasıyla: payee agent vault'u, net tutarın tamamı.
+fn preflight_ix(
+    w: &World,
+    authority: &Pubkey,
+    policy: PolicyAccounts,
+    job: &Pubkey,
+    fx: &Value,
+) -> Instruction {
+    let p = proof(fx, "preflight");
+    Instruction {
+        program_id: square_verifier::ID,
+        accounts: square_verifier::accounts::SetPreflightProof {
+            payer: w.h.payer.pubkey(),
+            authority: *authority,
+            config: verifier_config_address(),
+            institution: policy.institution,
+            policy: policy.policy,
+            job: *job,
+            preflight_proof: preflight_address(job),
+            system_program: anchor_lang::system_program::ID,
+        }
+        .to_account_metas(None),
+        data: square_verifier::instruction::SetPreflightProof {
+            proof_a: p.proof_a,
+            proof_b: p.proof_b,
+            proof_c: p.proof_c,
+            refusal_code: p.refusal_code,
+            proof_timestamp: p.timestamp,
+        }
+        .data(),
+    }
+}
+
 #[test]
 fn the_eight_steps_pass_with_squads_vaults_and_a_sponsor_paying() {
     let (mut w, fx, v) = world();
@@ -257,7 +290,14 @@ fn the_eight_steps_pass_with_squads_vaults_and_a_sponsor_paying() {
     as_vault(&mut w, &[fund], v.institution).expect("fund_job");
     assert_eq!(w.balance(&vault_address(&job)), Some(amount));
 
-    // 4. Agent vault'u kabul eder ve teslim eder.
+    // 4. Kurum vault'u kabul öncesi ön-ispatı bağlar (ADR 0028); agent vault'u kabul eder ve teslim eder.
+    let preflight = preflight_ix(&w, &v.institution, policy, &job, &fx);
+    as_vault(
+        &mut w,
+        &[compute_unit_limit(CU_LIMIT), preflight],
+        v.institution,
+    )
+    .expect("set_preflight_proof");
     let accept = w.accept_ix(&v.agent, &job, record, spec_hash);
     as_vault(&mut w, &[accept], v.agent).expect("accept_job");
     let submit = w.submit_ix(&v.agent, &job, record, DELIVERY_URI);
@@ -323,11 +363,18 @@ fn the_sponsor_pays_but_holds_no_role() {
     let amount: u64 = fx["amount"].as_str().unwrap().parse().unwrap();
     let spec_hash = sha256(fx["spec"].as_str().unwrap());
     let policy_id = sha256(fx["policy"]["policy_id"].as_str().unwrap());
+    // Fikstürün politikası: kabul öncesi ön-ispat (ADR 0028) onun commitment'ına karşı doğrulanır.
+    let commitment: [u8; 32] = array(fx["policy"]["commitment"].as_str().unwrap());
+    let ceiling: u64 = fx["policy"]["daily_ceiling"]
+        .as_str()
+        .unwrap()
+        .parse()
+        .unwrap();
 
     let init = init_institution_ix(&w, &v.institution);
     as_vault(&mut w, &[init], v.institution).expect("init_institution");
     let institution = institution_address(&v.institution);
-    let set = w.set_policy_ix(&v.institution, institution, policy_id, [0x2c; 32], CEILING);
+    let set = w.set_policy_ix(&v.institution, institution, policy_id, commitment, ceiling);
     as_vault(&mut w, &[set], v.institution).expect("set_policy");
     let policy = PolicyAccounts {
         policy: policy_address(&institution, &policy_id),
@@ -380,6 +427,13 @@ fn the_sponsor_pays_but_holds_no_role() {
         .assert_error(anchor_error(EscrowError::AgentMismatch));
 
     // Rent'in dönüşü kayıtlı ödeyiciye bağlı: kapanışta rent başka bir hesaba yönlendirilemez.
+    let preflight = preflight_ix(&w, &v.institution, policy, &job, &fx);
+    as_vault(
+        &mut w,
+        &[compute_unit_limit(CU_LIMIT), preflight],
+        v.institution,
+    )
+    .expect("set_preflight_proof");
     let accept = w.accept_ix(&v.agent, &job, record, spec_hash);
     as_vault(&mut w, &[accept], v.agent).expect("accept_job");
     let submit = w.submit_ix(&v.agent, &job, record, DELIVERY_URI);

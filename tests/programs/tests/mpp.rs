@@ -55,6 +55,7 @@ fn a_stripe_payment_settles_a_fiat_job() {
     let job = {
         let wallet = f.r.agent.wallet.insecure_clone();
         let (record, spec) = (f.r.agent.record, f.r.spec(FIAT));
+        f.r.preflight(&job, FIAT);
         let ix = f.r.w.accept_ix(&wallet.pubkey(), &job, record, spec);
         f.r.w.h.send(&[ix], &[&wallet]).expect("accept_job");
         let ix =
@@ -316,6 +317,7 @@ fn an_accepted_fiat_job_is_cancelled_only_after_the_deadline() {
     let mut f = FiatWorld::new();
     f.create().expect("create_fiat_job");
     let job = f.r.job_address(FIAT);
+    f.r.preflight(&job, FIAT);
     let wallet = f.r.agent.wallet.insecure_clone();
     let ix =
         f.r.w

@@ -111,19 +111,20 @@ fn a_compliant_fresh_proof_pays_the_agent_and_advances_the_counter() {
 #[test]
 fn a_final_refusal_refunds_the_net_to_the_institution() {
     let mut r = ReleaseWorld::new(true);
-    let (job, keeper, settlement) = ready(&mut r, "c");
-    // Satılmamış listeleme: iadede `Defaulted` olur.
-    let wallet = r.agent.wallet.insecure_clone();
-    let price = r.w.claim_price(&job);
-    r.w.list_claim(&wallet, &job, price).expect("list_claim");
-    let p = r.proof("refused_per_tx");
+    let (job, keeper, _) = ready(&mut r, "a");
+    // ADR 0028'den sonra kalıcı ret yalnızca alacak satılınca çıkabilir: alıcı kurumun politikasında engelli.
+    // Satılmış alacak iadede `Defaulted` olur.
+    let buyer = r.sell_claim_to_blocked_buyer(&job);
+    let settlement = r.settlement(&keeper, buyer);
+    let p = r.proof("refused_blocked_buyer");
     r.bind(&job, &p).expect("ret ispatı");
     let before = r.w.balance(&settlement.institution_token_account).unwrap();
+    let buyer_before = r.w.balance(&settlement.payee_token_account).unwrap();
 
     let executed = r
         .finalize(&keeper, &job, settlement)
         .expect("finalize_payment");
-    let amount = r.amount("c");
+    let amount = r.amount("a");
     let refund = amount - fee(amount);
     assert_eq!(p.net_amount, refund);
     assert_eq!(
@@ -134,7 +135,10 @@ fn a_final_refusal_refunds_the_net_to_the_institution() {
         r.w.balance(&settlement.keeper_token_account),
         Some(fee(amount))
     );
-    assert_eq!(r.w.balance(&settlement.payee_token_account), Some(0));
+    assert_eq!(
+        r.w.balance(&settlement.payee_token_account),
+        Some(buyer_before)
+    );
     assert_eq!(r.w.job(&job).status, JobStatus::Refunded);
     assert_eq!(r.w.claim(&job).status, ClaimStatus::Defaulted);
 
@@ -146,7 +150,7 @@ fn a_final_refusal_refunds_the_net_to_the_institution() {
             refused.refunded_amount,
             refused.release_proof
         ),
-        (job, 1, refund, release_proof_address(&job))
+        (job, 8, refund, release_proof_address(&job))
     );
     assert!(events::<ReleaseVerified>(&executed).is_empty());
     assert_eq!(event::<Finalized>(&executed).keeper_fee, fee(amount));
@@ -156,7 +160,7 @@ fn a_final_refusal_refunds_the_net_to_the_institution() {
     let validation: ValidationRecord = r.w.h.account(&validation_address(&job)).unwrap();
     assert_eq!(
         (validation.outcome, validation.refusal_code),
-        (ValidationOutcome::Refused, 1)
+        (ValidationOutcome::Refused, 8)
     );
     assert_eq!(
         event::<ValidationRecorded>(&executed).outcome,

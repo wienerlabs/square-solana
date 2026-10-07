@@ -10,7 +10,7 @@ pub use crate::contract::square_registry_contract::constants::{
     AGENT_SEED, REGISTRY_CONFIG_SEED, SCREENING_SEED,
 };
 pub use crate::contract::square_verifier_contract::constants::{
-    OPERATOR_STATE_SEED, RELEASE_PROOF_SEED, VERIFIER_CONFIG_SEED,
+    OPERATOR_STATE_SEED, PREFLIGHT_PROOF_SEED, RELEASE_PROOF_SEED, VERIFIER_CONFIG_SEED,
 };
 
 /// Taşınan programların sözleşmede karşılığı olmayan seed'leri. Programlar sözleşmeye geçtikçe
@@ -29,7 +29,7 @@ mod tests {
     /// Sözleşmedeki seed tablosuyla (program arayüzü §5) bayt bayt aynı.
     #[test]
     fn contract_seed_values() {
-        let table: [(&[u8], &[u8]); 16] = [
+        let table: [(&[u8], &[u8]); 17] = [
             (AGENT_SEED, b"agent"),
             (REGISTRY_CONFIG_SEED, b"registry_config"),
             (SCREENING_SEED, b"screening"),
@@ -38,6 +38,7 @@ mod tests {
             (VERIFIER_CONFIG_SEED, b"verifier_config"),
             (OPERATOR_STATE_SEED, b"operator_state"),
             (RELEASE_PROOF_SEED, b"release_proof"),
+            (PREFLIGHT_PROOF_SEED, b"preflight_proof"),
             (CONFIG_SEED, b"config"),
             (JOB_SEED, b"job"),
             (VAULT_SEED, b"escrow_token"),

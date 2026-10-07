@@ -10,8 +10,8 @@ use solana_keypair::Keypair;
 use solana_signer::Signer;
 use square_common::seeds::{
     AGENT_SEED, CLAIM_SEED, CONFIG_SEED, ESCROW_AUTHORITY_SEED, INSTITUTION_SEED, JOB_SEED,
-    POLICY_SEED, REGISTRY_CONFIG_SEED, REPUTATION_SEED, SCREENING_SEED, VALIDATION_SEED,
-    VAULT_SEED, VERIFIER_CONFIG_SEED,
+    POLICY_SEED, PREFLIGHT_PROOF_SEED, REGISTRY_CONFIG_SEED, REPUTATION_SEED, SCREENING_SEED,
+    VALIDATION_SEED, VAULT_SEED, VERIFIER_CONFIG_SEED,
 };
 use square_escrow::state::{EscrowConfig, Job};
 use square_escrow::{EscrowParams, LinkedPrograms};
@@ -102,6 +102,11 @@ pub fn escrow_authority_address() -> Pubkey {
 
 pub fn verifier_config_address() -> Pubkey {
     Pubkey::find_program_address(&[VERIFIER_CONFIG_SEED], &square_verifier::ID).0
+}
+
+/// Policy'li işin kabul öncesi ön-ispatı (ADR 0028): `["preflight_proof", job]`, verifier.
+pub fn preflight_address(job: &Pubkey) -> Pubkey {
+    Pubkey::find_program_address(&[PREFLIGHT_PROOF_SEED, job.as_ref()], &square_verifier::ID).0
 }
 
 pub fn registry_config_address() -> Pubkey {
@@ -433,10 +438,12 @@ impl World {
     ) -> Instruction {
         Instruction {
             program_id: square_escrow::ID,
-            accounts: square_escrow::accounts::AgentJob {
+            accounts: square_escrow::accounts::AcceptJob {
                 agent: *agent,
                 job: *job,
                 agent_record,
+                config: config_address(),
+                preflight_proof: preflight_address(job),
             }
             .to_account_metas(None),
             data: square_escrow::instruction::AcceptJob { spec_hash: spec }.data(),
@@ -575,10 +582,36 @@ impl World {
 
     pub fn accepted_job_with(&mut self, policy: bool) -> (Institution, Agent, Pubkey) {
         let (institution, agent, job) = self.funded_job_with(policy);
+        if policy {
+            self.preflight_written(&job);
+        }
         let ix = self.accept_ix(&agent.wallet.pubkey(), &job, agent.record, SPEC);
         let wallet = agent.wallet.insecure_clone();
         self.h.send(&[ix], &[&wallet]).expect("accept_job");
         (institution, agent, job)
+    }
+
+    /// Verifier'ın `set_preflight_proof`'ta yazdığı ön-ispat hesabı (ADR 0028), bu işin policy anlık
+    /// görüntüsüyle. Escrow dünyasının politikası rastgele bir commitment taşır, gerçek ispatı yoktur; escrow
+    /// yalnızca hesabın sahibine, adresine ve alanlarına bakar. Gerçek ispatla yol `preflight.rs`'te.
+    pub fn preflight_written(&mut self, job: &Pubkey) {
+        let account = self.job(job);
+        let proof = square_verifier::state::PreflightProof {
+            job: *job,
+            policy: account.policy.expect("policy'li iş"),
+            policy_commitment: account.policy_commitment,
+            refusal_code: 0,
+            proof_timestamp: self.h.now(),
+            bump: Pubkey::find_program_address(
+                &[PREFLIGHT_PROOF_SEED, job.as_ref()],
+                &square_verifier::ID,
+            )
+            .1,
+        };
+        let mut data = Vec::new();
+        anchor_lang::AccountSerialize::try_serialize(&proof, &mut data).expect("PreflightProof");
+        self.h
+            .set_program_account(preflight_address(job), square_verifier::ID, data);
     }
 
     /// Teslim edilmiş policy'siz iş; challenge penceresi `CHALLENGE`.
