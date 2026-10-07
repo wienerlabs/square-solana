@@ -106,7 +106,7 @@ Her servis bir Railway servisidir; derleme ve sağlık denetimi `apps/<servis>/r
 
 ### compliance-api
 
-`apps/compliance-api/.env.example` · 35 değişken, 7 secret
+`apps/compliance-api/.env.example` · 38 değişken, 7 secret
 
 | Değişken | Bölüm | Secret | Not |
 |---|---|---|---|
@@ -132,6 +132,9 @@ Her servis bir Railway servisidir; derleme ve sağlık denetimi `apps/<servis>/r
 | `DATABASE_URL` | x402 (zorunlu; @squaresdk/solana-x402, BE-24) | **secret** | Square'in tek veritabanı (db/): ödeme yüklerinin tekrar korumaları `replay_guards` tablosunda |
 | `X402_IDEMPOTENCY_TTL_SECONDS` | x402 (zorunlu; @squaresdk/solana-x402, BE-24) |  | Uzlaştırılmış raporun aynı ödeme kimliğiyle tekrar istenince ücretsiz döndüğü süre (saniye; `idempotency_records`) |
 | `X402_FEE_PAYER_KEYPAIR` | x402 facilitator (ADR 0018) | **secret** | Boşsa kendi facilitator'ımız: işlem ücretini aşağıdaki cüzdan öder, SOLANA_RPC_URL ile doğrular ve gönderir. Yalnızca SOL tutan, X402_PUBLISHER_WALLET'tan ayrı 64 baytlık keypair (base58 ya da JSON dizi) |
+| `X402_FACILITATOR_MAX_COMPUTE_UNITS` | x402 facilitator (ADR 0018) |  | Kendi facilitator'ımızın ücret sınırları (zorunlu): CU, micro-lamport/CU priority fee ve imza sayısı üst sınırı |
+| `X402_FACILITATOR_MAX_PRIORITY_FEE_MICRO_LAMPORTS` | x402 facilitator (ADR 0018) |  |  |
+| `X402_FACILITATOR_MAX_SIGNATURES` | x402 facilitator (ADR 0018) |  |  |
 | `X402_FACILITATOR_URL` | x402 facilitator (ADR 0018) |  | Doluysa harici x402 facilitator'ı (…/verify, …/settle, …/supported) ve isteğe bağlı bearer belirteci |
 | `X402_FACILITATOR_TOKEN` | x402 facilitator (ADR 0018) | **secret** |  |
 | `HELIUS_API_KEY` | Kayıtsız ödeme izleyicisi | **secret** | İsteğe bağlı: tanımlıysa izleyici çalışır ve HELIUS_API_URL zorunludur |

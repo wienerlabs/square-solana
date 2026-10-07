@@ -1,7 +1,8 @@
 // Stripe MPP fiat rayı (BE-25, ADR 0024, ADR 0026). Ödeme Square'in Stripe hesabına yapılır; MPP authority başarılı
 // ödemenin kanonik makbuzunu işe ve tutara bağlayarak imzalar. Kurallar:
 // - Ödemeyi job'un kurumunun güncel yetkilisi açar; iş fiat rayında ve `Delivered` olmalı, ödeme public günlük
-//   tavanı aşmamalı.
+//   tavanı aşmamalı. Kurum anahtarı bir smart account'un vault'uysa yetkili, `X-Square-Smart-Account` başlığıyla
+//   gelen `Initiate` yetkili üyedir (caller.ts).
 // - İş başına bir attestation (`mpp_payments.job` tekil). Attestation'ı olan işe gelen ikinci başarılı ödeme iade
 //   edilir; aynı PaymentIntent yeniden gelirse kayıt değişmez.
 // - Makbuz her yolda (webhook, mutabakat, MPP) PaymentIntent Stripe'tan yeniden okunarak kurulur; olay gövdesine
@@ -22,6 +23,7 @@ import type {
 import type { Keypair } from '@solana/web3.js';
 import { PublicKey } from '@solana/web3.js';
 import type Stripe from 'stripe';
+import type { Caller } from '../caller.js';
 import { HttpError, badRequest, conflict, forbidden, notFound } from '../http.js';
 import type { InstitutionAuthority } from '../institution-authority.js';
 import { MINIMUM_AMOUNT_MINOR, type FiatChain, type FiatJob } from './chain.js';
@@ -47,19 +49,19 @@ export function stripeFailure(what: string, error: unknown): HttpError {
 export interface FiatService {
   config(): FiatConfigView;
   /** Kurumun güncel yetkilisi değilse 403; kurum indexlenmemişse 404. */
-  requireAuthority(institution: string, wallet: string): Promise<void>;
+  requireAuthority(institution: string, caller: Caller): Promise<void>;
   /** Ödemeye hazır iş: fiat rayında, `Delivered`, attestation'sız, tavanı aşmıyor; çağıran kurumun yetkilisi. */
-  payableJob(job: string, wallet: string): Promise<FiatJob>;
-  createPayment(job: string, wallet: string, offSession: boolean): Promise<FiatPayment>;
-  attestation(job: string, wallet: string): Promise<FiatAttestation>;
-  reconcile(job: string, wallet: string): Promise<FiatAttestation>;
+  payableJob(job: string, caller: Caller): Promise<FiatJob>;
+  createPayment(job: string, caller: Caller, offSession: boolean): Promise<FiatPayment>;
+  attestation(job: string, caller: Caller): Promise<FiatAttestation>;
+  reconcile(job: string, caller: Caller): Promise<FiatAttestation>;
   /** MPP ile alınan ödeme: PaymentIntent işe kaydedilir (mutabakat için), sonra attestation yazılır. */
   recordMpp(job: FiatJob, paymentIntent: string): Promise<FiatAttestation | null>;
   /** Başarılı PaymentIntent'in attestation'ı (`record` kuralları); iş başkasınınsa ya da kopyaysa null. */
   record(paymentIntent: string, source: FiatAttestationSource, eventId: string | null): Promise<FiatAttestation | null>;
   webhook(payload: Buffer, signature: string): Promise<StripeWebhookReceipt>;
-  setupIntent(institution: string, wallet: string): Promise<FiatSetupIntent>;
-  customer(institution: string, wallet: string): Promise<FiatCustomer>;
+  setupIntent(institution: string, caller: Caller): Promise<FiatSetupIntent>;
+  customer(institution: string, caller: Caller): Promise<FiatCustomer>;
 }
 
 export interface FiatServiceDeps {
@@ -84,10 +86,10 @@ export function createFiatService(deps: FiatServiceDeps): FiatService {
   const signer = settings.mppAuthority;
   const signerAddress = signer.publicKey.toBase58();
 
-  async function requireAuthority(institution: string, wallet: string): Promise<void> {
+  async function requireAuthority(institution: string, caller: Caller): Promise<void> {
     const keys = await authority.institutionOfSigner(institution);
     if (!keys) throw notFound('kurum indexlenmemiş');
-    if (!(await authority.isAuthority(keys, wallet))) {
+    if (!(await authority.isAuthority(keys, caller))) {
       throw forbidden('yalnızca kurumun güncel yetkilisi fiat ödemesi yapabilir');
     }
   }
@@ -227,9 +229,9 @@ export function createFiatService(deps: FiatServiceDeps): FiatService {
     }
   }
 
-  async function payableJob(address: string, wallet: string): Promise<FiatJob> {
+  async function payableJob(address: string, caller: Caller): Promise<FiatJob> {
     const job = await chain.job(address);
-    await requireAuthority(job.institution, wallet);
+    await requireAuthority(job.institution, caller);
     if (await db.mppPayment.findUnique({ where: { job: address } })) throw conflict('işin ödemesi zaten alındı');
     await chain.requirePayable(job, Math.floor(clock() / 1000));
     return job;
@@ -412,22 +414,22 @@ export function createFiatService(deps: FiatServiceDeps): FiatService {
       return record(paymentIntent, 'mpp', null);
     },
 
-    async createPayment(address, wallet, offSession) {
-      const job = await payableJob(address, wallet);
+    async createPayment(address, caller, offSession) {
+      const job = await payableJob(address, caller);
       return offSession ? payOffSession(job) : payOnSession(job);
     },
 
-    async attestation(address, wallet) {
+    async attestation(address, caller) {
       const job = await chain.job(address);
-      await requireAuthority(job.institution, wallet);
+      await requireAuthority(job.institution, caller);
       const row = await db.mppPayment.findUnique({ where: { job: address } });
       if (!row) throw notFound('işin ödemesi yok');
       return view(row);
     },
 
-    async reconcile(address, wallet) {
+    async reconcile(address, caller) {
       const job = await chain.job(address);
-      await requireAuthority(job.institution, wallet);
+      await requireAuthority(job.institution, caller);
       const existing = await db.mppPayment.findUnique({ where: { job: address } });
       if (existing) return view(existing);
       const intents = await db.fiatPaymentIntent.findMany({ where: { job: address }, orderBy: { createdAt: 'desc' } });
@@ -457,8 +459,8 @@ export function createFiatService(deps: FiatServiceDeps): FiatService {
       return { event: event.id, type: event.type, recorded };
     },
 
-    async setupIntent(institution, wallet) {
-      await requireAuthority(institution, wallet);
+    async setupIntent(institution, caller) {
+      await requireAuthority(institution, caller);
       const customer = await ensureCustomer(institution);
       let setup: Stripe.SetupIntent;
       try {
@@ -475,8 +477,8 @@ export function createFiatService(deps: FiatServiceDeps): FiatService {
       return { institution, customer, setupIntent: setup.id, clientSecret: setup.client_secret };
     },
 
-    async customer(institution, wallet) {
-      await requireAuthority(institution, wallet);
+    async customer(institution, caller) {
+      await requireAuthority(institution, caller);
       const saved = await db.stripeCustomer.findUnique({ where: { institution } });
       if (!saved) throw notFound('kurumun Stripe müşterisi yok');
       if (!saved.paymentMethod) return { institution, customer: saved.customer, card: null };

@@ -47,9 +47,14 @@ export function multisigMembers(owner: PublicKey, data: Buffer): SquadsMember[] 
 
 /**
  * Cüzdan, multisig'te öneri açabilen (`Initiate`) bir üye mi; üyeler hesaptan o anda okunur. Hesap Squads v4
- * multisig'i değilse yetkili doğrulanamaz (403), RPC düşerse 503.
+ * multisig'i değilse yetkili doğrulanamaz (403, `notMultisig` metniyle), RPC düşerse 503.
  */
-export async function isMultisigInitiator(connection: Connection, multisig: string, wallet: string): Promise<boolean> {
+export async function isMultisigInitiator(
+  connection: Connection,
+  multisig: string,
+  wallet: string,
+  notMultisig = 'kurumun multisig hesabı Squads v4 multisig değil; yetkili doğrulanamadı',
+): Promise<boolean> {
   let info;
   try {
     info = await connection.getAccountInfo(new PublicKey(multisig), 'confirmed');
@@ -58,6 +63,6 @@ export async function isMultisigInitiator(connection: Connection, multisig: stri
   }
   const members = info ? multisigMembers(info.owner, info.data) : null;
   // Bağlama sırasında program hesabı Squads v4 multisig'i olarak denetledi; artık değilse yetkili doğrulanamaz.
-  if (!members) throw forbidden('kurumun multisig hesabı Squads v4 multisig değil; yetkili doğrulanamadı');
+  if (!members) throw forbidden(notMultisig);
   return members.some((member) => member.key === wallet && (member.permissions & PERMISSION_INITIATE) !== 0);
 }

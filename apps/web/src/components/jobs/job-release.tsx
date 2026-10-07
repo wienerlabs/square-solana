@@ -2,7 +2,6 @@
 
 import Link from 'next/link';
 import { useEffect, useId, useState, type ReactNode } from 'react';
-import { useWallet } from '@solana/wallet-adapter-react';
 import type { PublicKey } from '@solana/web3.js';
 import {
   buildReleaseWitness,
@@ -14,7 +13,8 @@ import {
 } from '@squaresdk/solana-policy';
 import type { ClaimListingAccount, JobAccount } from '@squaresdk/solana-sdk';
 import type { ProveResponse } from '@squaresdk/solana-types';
-import { useNetworkGuard, useSendTransaction } from '@/components/network-guard';
+import { useActor } from '@/components/actor';
+import { useNetworkGuard } from '@/components/network-guard';
 import { useWebConfig } from '@/components/providers';
 import { Address } from '@/components/ui/address';
 import { Button } from '@/components/ui/button';
@@ -33,7 +33,7 @@ import {
   type ReleaseOutlook,
   type ReleaseState,
 } from '@/lib/release-proof';
-import { TransactionBlockedError } from '@/lib/send-transaction';
+import { sendErrorText } from '@/lib/sponsored-send';
 import { useSignatureStatus } from '@/lib/use-signature-status';
 
 type Load<T> = { state: 'loading' } | { state: 'ready'; value: T } | { state: 'error'; message: string };
@@ -91,14 +91,14 @@ export function JobRelease({
   chainNow: number | null;
   formatAmount(base: bigint): string;
 }) {
-  const { publicKey } = useWallet();
+  const institution = useActor('institution').address;
   if (account.policy === null) return null;
   const status = Object.keys(account.status)[0];
   const bindable = status === 'delivered' || status === 'disputed';
   const outlook =
     state.state === 'ready' && chainNow !== null ? releaseOutlook(state.value, account, listing, chainNow) : null;
   const proof = state.state === 'ready' ? state.value.proof : null;
-  const isInstitution = Boolean(publicKey?.equals(account.institution));
+  const isInstitution = Boolean(institution?.equals(account.institution));
 
   return (
     <section aria-labelledby="release-heading" className="rounded-card border border-border bg-surface p-6">
@@ -221,13 +221,13 @@ function BindProof({
   chainNow: number | null;
   formatAmount(base: bigint): string;
 }) {
-  const { publicKey } = useWallet();
+  const actor = useActor('institution');
   const { proverUrl } = useWebConfig();
   const guard = useNetworkGuard();
-  const send = useSendTransaction();
   const categoryId = useId();
   const keyId = useId();
-  const owner = publicKey!;
+  // Yalnızca kurum adına (cüzdan ya da smart account vault'u, FE-21) çizilir.
+  const owner = actor.address!;
 
   // Politika ve sır FE-04'ün bu tarayıcıdaki çalışma alanından; sunucuya gitmez.
   const [material, setMaterial] = useState<ReturnType<typeof policyMaterialFor> | null>(null);
@@ -325,15 +325,11 @@ function BindProof({
       const built = await buildSetComplianceProofTx(
         escrow.client,
         { authority: owner, institution: state.institution, policy: account.policy, job: jobKey, proof: proved.proof },
-        { feePayer: owner },
+        await actor.options(),
       );
-      setSignature(await send(built.transaction));
+      setSignature(await actor.send(built.transaction));
     } catch (caught) {
-      setError(
-        caught instanceof TransactionBlockedError
-          ? caught.message
-          : (verifierErrorMessage(caught) ?? (caught as Error).message),
-      );
+      setError(sendErrorText(caught, verifierErrorMessage));
     } finally {
       setStep('idle');
     }

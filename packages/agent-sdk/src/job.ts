@@ -4,11 +4,11 @@
 // accept_job → WORKING → işleyici → teslimat yükleme → artefakt → submit_work → COMPLETED → (isteğe bağlı)
 // list_claim. `onTask` yeniden başlatmada tekrar çağrılabilir: job zaten `accepted` ise kabul tekrarlanmaz,
 // `delivered` ise yalnızca görev tamamlanır.
-import { PublicKey } from '@solana/web3.js';
+import { PublicKey, type Commitment } from '@solana/web3.js';
 import type { TaskContext, TaskExecutor } from '@squaresdk/solana-a2a';
 import type { BuildOptions, SquareClient, WalletLike } from '@squaresdk/solana-sdk';
 import type { DeliveryReceipt, JobStatus } from '@squaresdk/solana-types';
-import { AgentTxError, readJob, type JobState, type TxSender } from './chain.js';
+import { AgentTxError, readJob, settledCommitment, type JobState, type TxSender } from './chain.js';
 import {
   DeliveryUploadError,
   deliveryArtifact,
@@ -35,6 +35,7 @@ export const DEFAULT_RETRY: RetryOptions = Object.freeze({
   minDelayMs: 1_000,
   maxDelayMs: 30_000,
   submitMarginSeconds: 30,
+  gateLagSeconds: 60,
 });
 
 export class JobFailure extends Error {
@@ -66,6 +67,7 @@ function sleep(ms: number, signal: AbortSignal): Promise<void> {
 
 export interface JobExecutorDeps {
   client: SquareClient;
+  commitment: Commitment;
   sender: TxSender;
   wallet: WalletLike;
   capabilities: readonly AgentCapability[];
@@ -111,7 +113,7 @@ function capabilityOf(spec: unknown, capabilities: readonly AgentCapability[]): 
 }
 
 export function assertRetryOptions(retry: RetryOptions): void {
-  const { minDelayMs, maxDelayMs, submitMarginSeconds } = retry;
+  const { minDelayMs, maxDelayMs, submitMarginSeconds, gateLagSeconds } = retry;
   if (!Number.isSafeInteger(minDelayMs) || minDelayMs < 1) throw new Error('retry.minDelayMs pozitif tamsayı olmalı');
   if (!Number.isSafeInteger(maxDelayMs) || maxDelayMs < minDelayMs) {
     throw new Error('retry.maxDelayMs, retry.minDelayMs’ten küçük olmayan bir tamsayı olmalı');
@@ -119,10 +121,14 @@ export function assertRetryOptions(retry: RetryOptions): void {
   if (!Number.isSafeInteger(submitMarginSeconds) || submitMarginSeconds < 0) {
     throw new Error('retry.submitMarginSeconds negatif olmayan tamsayı olmalı');
   }
+  if (!Number.isSafeInteger(gateLagSeconds) || gateLagSeconds < 0) {
+    throw new Error('retry.gateLagSeconds negatif olmayan tamsayı olmalı');
+  }
 }
 
 export function createJobExecutor(deps: JobExecutorDeps): TaskExecutor {
   const { client, sender, wallet } = deps;
+  const readCommitment = settledCommitment(deps.commitment);
   const retry = deps.retry ?? DEFAULT_RETRY;
   assertRetryOptions(retry);
   const options = (): BuildOptions => ({
@@ -220,6 +226,9 @@ export function createJobExecutor(deps: JobExecutorDeps): TaskExecutor {
       let deadline: number | null = null;
 
       let floor: JobStatus | null = null;
+      let known: JobState | null = null;
+      const admittedAt = deps.now();
+      const gateAhead = () => context.job.status === 'funded' && deps.now() - admittedAt < retry.gateLagSeconds;
 
       const capabilityFor = (): AgentCapability => {
         if (capability) return capability;
@@ -232,25 +241,40 @@ export function createJobExecutor(deps: JobExecutorDeps): TaskExecutor {
       for (;;) {
         if (context.signal.aborted) return;
         try {
-          const job = await readJob(client, address);
+          const job = known ?? (await readJob(client, address, readCommitment));
+          known = null;
           if (!job) {
-            if (deadline === null) throw new JobFailure(`job zincirde yok: ${context.job.address}`);
+            if (deadline === null && !gateAhead()) throw new JobFailure(`job zincirde yok: ${context.job.address}`);
             throw new Error(`job zincirde okunamadı: ${context.job.address}`);
           }
           deadline = job.deadline;
           if (floor === 'accepted' && !ACCEPTED_OR_LATER.has(job.status) && job.status !== 'cancelled') {
             throw new Error(`zincir okuması geride: job ${job.status}, kabul onaylandı`);
           }
+          if (ACCEPTED_OR_LATER.has(job.status)) floor = 'accepted';
           if (sending === 'funded' && ACCEPTED_OR_LATER.has(job.status)) sending = null;
           if (sending === 'accepted' && DELIVERED.has(job.status)) sending = null;
 
           if (DELIVERED.has(job.status)) {
-            if (output && receipt) await context.addArtifact(deliveryArtifact(output, receipt), { lastChunk: true });
-            await context.complete(`job zincirde teslim edilmiş (${job.status})`);
+            if (output && receipt && receipt.workHash.toLowerCase() === job.workHash) {
+              await context.addArtifact(deliveryArtifact(output, receipt), { lastChunk: true });
+            } else if (output && receipt) {
+              deps.onError(
+                new JobFailure(
+                  `job zincirde başka bir teslimle (${job.workHash}) teslim edilmiş, yerel çıktı sunulmadı`,
+                ),
+              );
+            }
+            await context.complete(
+              `job zincirde teslim edilmiş (${job.status}): workHash ${job.workHash}, deliveryUri ${job.deliveryUri}`,
+            );
             if (job.status === 'delivered') await listClaim(job);
             return;
           }
           if (job.status === 'open') {
+            if ((gateAhead() || decided) && job.deadline - retry.submitMarginSeconds > deps.now()) {
+              throw new Error('zincir okuması geride: job open, fonlanmış görülmüştü');
+            }
             await context.reject('job fonlanmamış: kurum fund_job’dan sonra görevi yeniden açmalı');
             return;
           }
@@ -318,16 +342,27 @@ export function createJobExecutor(deps: JobExecutorDeps): TaskExecutor {
         } catch (error) {
           if (context.signal.aborted) return;
           if (error instanceof AgentTxError && error.program !== null && sending !== null) {
-            const fresh = await readJob(client, address).catch(() => null);
+            const fresh = await readJob(client, address, readCommitment).catch(() => null);
             const landed =
               fresh !== null &&
               ((sending === 'funded' && ACCEPTED_OR_LATER.has(fresh.status)) ||
                 (sending === 'accepted' && DELIVERED.has(fresh.status)));
-            if (!landed) throw error;
-            deps.onError(error);
-            continue;
+            if (landed) {
+              floor = 'accepted';
+              known = fresh;
+              deps.onError(error);
+              continue;
+            }
+            const unconfirmed =
+              error.program === 'escrow' &&
+              error.errorName?.toLowerCase() === 'invalidstatus' &&
+              (fresh === null ||
+                fresh.status === sending ||
+                (floor === 'accepted' && !ACCEPTED_OR_LATER.has(fresh.status) && fresh.status !== 'cancelled'));
+            if (!unconfirmed) throw error;
+          } else if (isPermanent(error)) {
+            throw error;
           }
-          if (isPermanent(error)) throw error;
           if (deadline !== null && deadline - retry.submitMarginSeconds <= deps.now()) {
             throw new JobFailure(`job süresi doldu: ${messageOf(error)}`, { cause: error });
           }

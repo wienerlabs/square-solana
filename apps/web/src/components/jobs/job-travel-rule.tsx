@@ -3,16 +3,17 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { PublicKey } from '@solana/web3.js';
 import type { TravelRuleStatus as StoredTravelRule } from '@squaresdk/solana-types';
+import { useActor } from '@/components/actor';
 import type { ApiClientState } from '@/components/api-client';
 import { ApiSessionPanel } from '@/components/api-session-panel';
-import { useNetworkGuard, useSendTransaction } from '@/components/network-guard';
+import { useNetworkGuard } from '@/components/network-guard';
 import { TravelRuleFormFields } from '@/components/travel-rule/travel-rule-form';
 import { Button } from '@/components/ui/button';
 import { StatusBadge, type Tone } from '@/components/ui/status-badge';
 import { TxConfirmation } from '@/components/ui/tx-confirmation';
 import { escrowErrorMessage, type EscrowSetup } from '@/lib/job-wizard';
 import { bytesToHex, hexToBytes } from '@/lib/policy-draft';
-import { TransactionBlockedError } from '@/lib/send-transaction';
+import { sendErrorText } from '@/lib/sponsored-send';
 import { SquareApiError, unwrap } from '@/lib/square-api';
 import {
   checkTravelRuleForm,
@@ -111,7 +112,7 @@ export function JobTravelRule({
   onConfirmed?(): void;
 }) {
   const guard = useNetworkGuard();
-  const send = useSendTransaction();
+  const actor = useActor('institution');
   const jobKey = useMemo(() => new PublicKey(jobAddress), [jobAddress]);
   const status = travelRuleStatus({ ...job, threshold: setup.travelRuleThreshold });
   const bound = isBound(job.commitment);
@@ -166,17 +167,11 @@ export function JobTravelRule({
       setStored(saved);
       const built = await setup.client.flow.commitTravelRule(
         { institution, job: jobKey, commitment: hexToBytes(saved.commitment) },
-        { feePayer: institution },
+        await actor.options(),
       );
-      setSignature(await send(built.transaction));
+      setSignature(await actor.send(built.transaction));
     } catch (caught) {
-      setError(
-        caught instanceof TransactionBlockedError
-          ? caught.message
-          : caught instanceof SquareApiError
-            ? api.report(caught)
-            : (escrowErrorMessage(caught) ?? (caught as Error).message),
-      );
+      setError(caught instanceof SquareApiError ? api.report(caught) : sendErrorText(caught, escrowErrorMessage));
     } finally {
       setBusy(null);
     }

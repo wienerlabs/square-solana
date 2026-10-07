@@ -18,7 +18,7 @@ ve kalıcı tekrar korumasını ve idempotent yanıtı ekler. Facilitator karar�
 | `gateway` | `createX402Gateway({ facilitator, replay, idempotency, networks, rpcUrl, replayTtlSeconds, onEvent })` ve `gateway.paidRoute({ price, payTo, network, description, settle, onSettled })` (Express ara katmanı). İşleyici ödemeyi `getX402Payment(res)` ile okur; `onSettled` route'ta zincire yazılan her ödemeyi verir |
 | `definition` | `paidRouteFromDefinition(gateway, kaynak, { onPayment, refreshSeconds, settle })`: Square geliştirici portalındaki tanımdan (`X402Endpoint`) ücretli route ve uzlaştırılan ödemenin bildirimi ([Portal tanımları](#portal-tanımları-fe-22)) |
 | `client` | `createPayingFetch({ signer, networks, rpcUrl, spendControls })`: ödeyen `fetch`, cüzdan imzalayıcısı enjekte edilir; sunucu duyurduysa ödeme kimliği ekler (`paymentIdentifierExtension`). `readPaymentReceipt(response)`: `PAYMENT-RESPONSE` makbuzu |
-| `facilitator` | `createFacilitatorClient({ mode: 'self', feePayer, rpcUrls })` (varsayılan) ya da `({ mode: 'remote', url, authToken })`, `createSelfFacilitator`, `DEFAULT_FACILITATOR_MODE` |
+| `facilitator` | `createFacilitatorClient({ mode: 'self', feePayer, rpcUrls, limits })` (varsayılan) ya da `({ mode: 'remote', url, authToken })`, `createSelfFacilitator`, `DEFAULT_FACILITATOR_MODE`. `mode: 'self'`'te `limits` zorunludur: `maxComputeUnits`, `maxPriorityFeeMicroLamports` (micro-lamport/CU) ve `maxRequiredSignatures`, pozitif tamsayı. Facilitator'ın cüzdanından ödenecek ücretin üst sınırıdır ve operatörün kararıdır, varsayılanı yoktur; sınırı aşan ödeme doğrulamada, facilitator imzalamadan önce reddedilir. Resmi istemci 20 000 CU, 1 micro-lamport/CU ve 2 imza kullanır. `enableSmartWalletVerification` açıksa şemanın ayrı `smartWallet*` sınırları geçerlidir |
 | `facilitator-http` | `createFacilitatorRouter({ facilitator, authToken })`: kendi facilitator'ımızı başka servislere x402 facilitator HTTP API'siyle açar (`POST /verify`, `POST /settle`, `GET /supported`; bearer belirteci zorunlu) |
 | `idempotent` | `PaymentResponseStore` (hardening'in `IdempotencyStore`'uyla aynı), `IdempotencyOptions`: ödeme kimliğiyle kayıtlı yanıt ([aşağıda](#idempotent-yanıt)) |
 | `replay` | `ReplayStore` (hardening'in arayüzüyle aynı), `paymentFingerprint(payload)`, `replayScope(network)`, `createMemoryReplayStore()` (tek süreçlik geliştirme deposu) |
@@ -34,7 +34,15 @@ import { createPrismaIdempotencyStore, createPrismaReplayStore } from '@squaresd
 import { createFacilitatorClient, createX402Gateway, getX402Payment, SOLANA_MAINNET } from '@squaresdk/solana-x402';
 
 const gateway = createX402Gateway({
-  facilitator: createFacilitatorClient({ feePayer, rpcUrls: { [SOLANA_MAINNET]: process.env.SOLANA_RPC_URL! } }),
+  facilitator: createFacilitatorClient({
+    feePayer,
+    rpcUrls: { [SOLANA_MAINNET]: process.env.SOLANA_RPC_URL! },
+    limits: {
+      maxComputeUnits: Number(process.env.X402_FACILITATOR_MAX_COMPUTE_UNITS),
+      maxPriorityFeeMicroLamports: Number(process.env.X402_FACILITATOR_MAX_PRIORITY_FEE_MICRO_LAMPORTS),
+      maxRequiredSignatures: Number(process.env.X402_FACILITATOR_MAX_SIGNATURES),
+    },
+  }),
   replay: createPrismaReplayStore(db),
   idempotency: { store: createPrismaIdempotencyStore(db), ttlSeconds: 86_400 },
   networks: [SOLANA_MAINNET],
@@ -119,10 +127,18 @@ app.get(
 5. Uzlaştırma iki biçimde olur:
    - `settle: 'after-handler'` (varsayılan, x402 `authorization` akışı): işleyici çalışır, yanıt 2xx/3xx ise
      facilitator işlemi ikinci imzacı olarak imzalar ve zincire gönderir. İşleyici 4xx/5xx dönerse ödeme
-     alınmaz.
+     alınmaz. Uzlaştırma düşerse istemci 402 alır (uzak facilitator bozuk yanıt verirse 502) ve başlıklar
+     işleyiciden önceki değerlerine döner: işleyicinin eklediği ya da değiştirdiği başlıklar (`Set-Cookie`, `ETag`,
+     `Link`, özel başlıklar) yanıtta kalmaz. İşleyicinin yan etkileri (veritabanı yazımı, dış çağrı, yanıt yazılırken başlık ekleyen oturum ya da cookie-session değişikliği) geri alınmaz;
+     yan etkili route'lar `before-handler` kullanmalıdır.
    - `settle: 'before-handler'` (`upfront` akışı): ödeme işleyiciden önce zincire yazılır. İşleyici işlem
      imzasını `getX402Payment(res).settlement.transaction` ile görür.
 6. Yanıtın `PAYMENT-RESPONSE` başlığı makbuzdur: işlem imzası, ağ ve ödeyen.
+
+`onEvent` gözlem içindir. `settle_failed` olayı, facilitator işlem imzasını bildirdiyse `transaction` alanını taşır;
+gönderilip doğrulanamayan bir işlem zincirde yine de görünebilir ve mutabakat bu imzayla yapılır. `onEvent`'in
+fırlattığı hata ve döndürdüğü promise'in reddi yutulur: isteğin akışını, tekrar korumasının kararını ve
+uzlaştırmayı değiştirmez. `res.locals.squareX402` yalnızca ödeme bilgisini taşır.
 
 ## Tekrar koruması
 

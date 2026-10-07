@@ -2,14 +2,15 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useId, useMemo, useState, type ReactNode } from 'react';
-import { useConnection, useWallet } from '@solana/wallet-adapter-react';
+import { useConnection } from '@solana/wallet-adapter-react';
 import { PublicKey } from '@solana/web3.js';
 import { squareIdentity } from '@squaresdk/solana-identity';
 import type { ClaimListingAccount, JobAccount } from '@squaresdk/solana-sdk';
 import type { DeliveryReceipt } from '@squaresdk/solana-types';
 import { useApiClient } from '@/components/api-client';
 import { useApiSession } from '@/components/api-session';
-import { useNetworkGuard, useSendTransaction } from '@/components/network-guard';
+import { useActor } from '@/components/actor';
+import { useNetworkGuard } from '@/components/network-guard';
 import { useWebConfig } from '@/components/providers';
 import { Address } from '@/components/ui/address';
 import { Button } from '@/components/ui/button';
@@ -39,7 +40,7 @@ import {
 import { ENV_VARS } from '@/lib/config';
 import { escrowErrorMessage, formatDuration, readEscrowSetup, type EscrowSetupLookup } from '@/lib/job-wizard';
 import { readReleaseState, type ReleaseState } from '@/lib/release-proof';
-import { TransactionBlockedError } from '@/lib/send-transaction';
+import { sendErrorText } from '@/lib/sponsored-send';
 import { formatUnits } from '@/lib/settlement';
 import { JOB_STATUS_TONE, statusLabel } from '@/lib/status';
 import type { TravelRuleVerification } from '@/lib/travel-rule';
@@ -71,12 +72,15 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-/** Bir işin zincirdeki durumu, canlı zaman çizelgesi ve challenge sayacı; agent cüzdanı için kabul ve teslim. */
+/**
+ * Bir işin zincirdeki durumu, canlı zaman çizelgesi ve challenge sayacı; agent için kabul ve teslim. Rollerin
+ * adresi cüzdan ya da rolün smart account vault'udur (FE-21).
+ */
 export function JobDetail({ jobAddress, escrowProgramId }: { jobAddress: string; escrowProgramId: string }) {
   const { connection } = useConnection();
-  const { publicKey } = useWallet();
   const guard = useNetworkGuard();
-  const send = useSendTransaction();
+  const agentActor = useActor('agent');
+  const institutionActor = useActor('institution');
   const { apiUrl } = useWebConfig();
   const apiSession = useApiSession();
   const verified = guard.rpc.state === 'ready' && !guard.rpc.mismatch;
@@ -189,10 +193,12 @@ export function JobDetail({ jobAddress, escrowProgramId }: { jobAddress: string;
     };
   }, [escrow, jobKey, account, revision]);
 
-  // Agent eylemleri: yalnızca job'un agent cüzdanı.
-  const isAgent = Boolean(account && publicKey?.equals(account.agentWallet));
-  const institutionKey = account && publicKey?.equals(account.institution) ? publicKey : null;
-  const apiClient = useApiClient();
+  // Agent eylemleri: yalnızca job'un agent cüzdanı (rolün adresi).
+  const agentKey = agentActor.address;
+  const isAgent = Boolean(account && agentKey?.equals(account.agentWallet));
+  const institutionKey =
+    account && institutionActor.address?.equals(account.institution) ? institutionActor.address : null;
+  const apiClient = useApiClient(institutionActor.api);
   const [travelVerification, setTravelVerification] = useState<TravelRuleVerification | null>(null);
   const fileId = useId();
   const uriId = useId();
@@ -220,7 +226,10 @@ export function JobDetail({ jobAddress, escrowProgramId }: { jobAddress: string;
     setBusy('upload');
     setActionError(null);
     try {
-      const stored = await apiSession.call((api) => api.uploadDelivery(jobKey.toBase58(), content.file));
+      const stored = await apiSession.call(
+        (api) => api.uploadDelivery(jobKey.toBase58(), content.file),
+        agentActor.api,
+      );
       const problem = receiptProblem(stored, content.hash);
       if (problem) {
         setActionError(problem);
@@ -236,24 +245,21 @@ export function JobDetail({ jobAddress, escrowProgramId }: { jobAddress: string;
   };
 
   const act = async (kind: 'accept' | 'submit') => {
-    if (!escrow || !publicKey) return;
+    if (!escrow || !agentKey) return;
     setBusy(kind);
     setActionError(null);
     try {
+      const options = await agentActor.options();
       const built =
         kind === 'accept'
-          ? await escrow.client.flow.acceptJob({ agent: publicKey, job: jobKey }, { feePayer: publicKey })
+          ? await escrow.client.flow.acceptJob({ agent: agentKey, job: jobKey }, options)
           : await escrow.client.flow.submitWork(
-              { agent: publicKey, job: jobKey, workHash: content!.hash, deliveryUri },
-              { feePayer: publicKey },
+              { agent: agentKey, job: jobKey, workHash: content!.hash, deliveryUri },
+              options,
             );
-      setSignature(await send(built.transaction));
+      setSignature(await agentActor.send(built.transaction));
     } catch (error) {
-      setActionError(
-        error instanceof TransactionBlockedError
-          ? error.message
-          : (escrowErrorMessage(error) ?? (error as Error).message),
-      );
+      setActionError(sendErrorText(error, escrowErrorMessage));
     } finally {
       setBusy(null);
     }

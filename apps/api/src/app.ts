@@ -20,6 +20,7 @@ import express, { type NextFunction, type Request, type Response } from 'express
 import helmet from 'helmet';
 import { authenticate, principalOf } from './auth/middleware.js';
 import type { AuthService } from './auth/service.js';
+import { SMART_ACCOUNT_HEADER } from './caller.js';
 import type { CardService } from './cards.js';
 import type { CctpService } from './cctp.js';
 import type { DeliveryService } from './deliveries.js';
@@ -111,7 +112,7 @@ export function createApp(deps: AppDeps): express.Express {
   app.use(
     cors({
       origin: [...deps.corsOrigins],
-      allowedHeaders: ['authorization', 'content-type', 'x-api-key'],
+      allowedHeaders: ['authorization', 'content-type', 'x-api-key', SMART_ACCOUNT_HEADER],
       exposedHeaders: [
         'X-Request-Id',
         'RateLimit-Limit',

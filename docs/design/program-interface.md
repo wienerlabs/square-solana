@@ -35,7 +35,7 @@ Bir program gerçek uygulamasına kavuştuğunda, o programın `anchor build` il
 
 | Rol | Kim | Ne imzalar |
 |---|---|---|
-| `institution` | Kurumun anahtarı; `set_institution_multisig` sonrasında **yalnızca** bağlı Squads v4 vault PDA'sı | policy: `set_institution_multisig`, `set_policy`, `update_policy`, `set_buyer_root`, `deactivate_policy`; verifier: `set_compliance_proof`; escrow: `create_job`, `commit_travel_rule`, `fund_job`, `raise_dispute`, `cancel_job` |
+| `institution` | Kurumun anahtarı; `set_institution_multisig` sonrasında policy ve verifier'da **yalnızca** bağlı Squads v4 vault PDA'sı. Escrow'un iş talimatlarında yetkili `Job.institution`, yani işi açan imzacıdır: bağlamadan önce açılmış işlerde açan anahtar kalır ([BC-39 P-02](../security/review-bc-39.md#p-02-multisige-geçişte-açık-işlerin-yetkisi-açan-anahtarda-kalır-orta)) | policy: `set_institution_multisig`, `set_policy`, `update_policy`, `set_buyer_root`, `deactivate_policy`; verifier: `set_compliance_proof`; escrow: `create_job`, `commit_travel_rule`, `fund_job`, `raise_dispute`, `cancel_job` |
 | `agent` | `Job.agent_wallet` (kayıttaki `AgentRecord.wallet`'ın job'a kopyası) | `accept_job`, `submit_work`, `list_claim`, `escalate_missing_proof` |
 | agent `owner` | `AgentRecord.owner` (kaydı yöneten anahtar, Squads vault olabilir) | `register_agent`, `update_agent`, `set_agent_status`, `transfer_agent_ownership`, `deregister_agent`, escrow `sync_agent_wallet` |
 | `seller` | Alacağı listeleyen agent cüzdanı | `cancel_claim` |

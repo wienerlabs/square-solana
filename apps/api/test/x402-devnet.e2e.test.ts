@@ -100,6 +100,7 @@ describe.skipIf(!ENABLED)('devnet: geliştirici portalı (anahtar, ücretli uç 
       facilitator: createFacilitatorClient({
         feePayer: await createKeyPairSignerFromBytes(secret(ENV.feePayer!)),
         rpcUrls: { [SOLANA_DEVNET]: rpcUrl },
+        limits: { maxComputeUnits: 100_000, maxPriorityFeeMicroLamports: 50_000, maxRequiredSignatures: 2 },
       }),
       replay: createPrismaReplayStore(stack.db),
       networks: [SOLANA_DEVNET],

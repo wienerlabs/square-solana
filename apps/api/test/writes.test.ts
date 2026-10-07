@@ -2,7 +2,9 @@
 import { createHash } from 'node:crypto';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { inject } from 'vitest';
+import { squadsVaultAddress } from '@squaresdk/solana-sdk/squads';
 import type { AgentCard } from '@squaresdk/solana-types';
+import { PublicKey } from '@solana/web3.js';
 import { loadOpenApi } from '../src/openapi.js';
 import { PERMISSION_INITIATE } from '../src/squads.js';
 import { apiKey, login } from './fixtures/login.js';
@@ -236,5 +238,131 @@ describe('politika meta verisi', () => {
       error: { code: 'invalid_input' },
     });
     expect(await api.putPolicyMeta(owner.address, meta)).toMatchObject({ error: { code: 'not_found' } });
+  });
+});
+
+describe('smart account (X-Square-Smart-Account, FE-21)', () => {
+  const meta = { name: 'Vault spend', description: 'Smart account policy', labels: ['vault'], updatedAt: 0 };
+  /** Multisig ve vault'u: üyeler zincirde (fikstür RPC'si), vault `squadsVaultAddress(multisig, 0)`. */
+  const smartAccount = (members: readonly { key: string; permissions: number }[]) => {
+    const multisig = world.squadsMultisig(members);
+    return { multisig: multisig.toBase58(), vault: squadsVaultAddress(multisig, 0)[0].toBase58() };
+  };
+  const as = async (who: ReturnType<typeof wallet>, multisig?: string) =>
+    stack.api({ session: await login(stack.api(), who), ...(multisig ? { smartAccount: multisig } : {}) });
+
+  it('teslimat: vault agent ise Initiate yetkili üye başlıkla yükler; yükleyen üyenin cüzdanıdır', async () => {
+    const [proposer, voter, stranger] = [wallet(), wallet(), wallet()];
+    const account = smartAccount([
+      { key: proposer.address, permissions: PERMISSION_INITIATE | 2 | 4 },
+      { key: voter.address, permissions: 2 },
+    ]);
+    const job = await world.job({
+      institution: await world.institution(wallet().address),
+      agentRecord: await world.agent(account.vault, account.vault),
+      agentWallet: account.vault,
+    });
+    const blob = () => new Blob(['vault teslimatı'], { type: 'text/plain' });
+
+    const receipt = await (await as(proposer, account.multisig)).uploadDelivery(job.address, blob());
+    if (!receipt.success) throw new Error(receipt.error.message);
+    expect(receipt.data.workHash).toBe(sha256('vault teslimatı'));
+    expect((await stack.db.delivery.findFirstOrThrow()).uploadedBy).toBe(proposer.address);
+
+    // Başlıksız, oy yetkili ama öneri açamayan üye ve üye olmayan cüzdan vault adına yazamaz.
+    expect(await (await as(proposer)).uploadDelivery(job.address, blob())).toMatchObject({
+      error: { code: 'forbidden' },
+    });
+    expect(await (await as(voter, account.multisig)).uploadDelivery(job.address, blob())).toMatchObject({
+      error: { code: 'forbidden' },
+    });
+    expect(await (await as(stranger, account.multisig)).uploadDelivery(job.address, blob())).toMatchObject({
+      error: { code: 'forbidden' },
+    });
+    // Başlıktaki multisig başka bir multisig'se vault eşleşmez.
+    const other = smartAccount([{ key: proposer.address, permissions: 7 }]);
+    expect(await (await as(proposer, other.multisig)).uploadDelivery(job.address, blob())).toMatchObject({
+      error: { code: 'forbidden' },
+    });
+  });
+
+  it('başlık: geçersiz adres 400, Squads multisig olmayan hesap 403, RPC düşerse 503', async () => {
+    const proposer = wallet();
+    const account = smartAccount([{ key: proposer.address, permissions: 7 }]);
+    const job = await world.job({
+      institution: await world.institution(wallet().address),
+      agentRecord: await world.agent(account.vault, account.vault),
+      agentWallet: account.vault,
+    });
+    const session = await login(stack.api(), proposer);
+    const upload = (header: string) => {
+      const form = new FormData();
+      form.append('file', new Blob(['x']));
+      return fetch(`${stack.url}/v1/jobs/${job.address}/deliveries`, {
+        method: 'POST',
+        headers: { authorization: `Bearer ${session}`, 'x-square-smart-account': header },
+        body: form,
+      });
+    };
+    const invalid = await upload('not-an-address');
+    expect(invalid.status).toBe(400);
+    expect(await invalid.json()).toMatchObject({ error: { code: 'invalid_input' } });
+
+    stack.rpc.setAccount(account.multisig, { owner: PROGRAM_IDS.policy.toBase58(), data: Buffer.alloc(80) });
+    expect(await (await upload(account.multisig)).json()).toMatchObject({
+      error: { code: 'forbidden', message: 'X-Square-Smart-Account bir Squads v4 multisig hesabı değil' },
+    });
+    stack.rpc.failWith = 500;
+    expect(await (await upload(account.multisig)).json()).toMatchObject({ error: { code: 'rpc_unavailable' } });
+  });
+
+  it('agent card: kayıttan önce yol vault ve agentId ile, kayıttan sonra sahibi vault olan kayıt', async () => {
+    const proposer = wallet();
+    const account = smartAccount([{ key: proposer.address, permissions: 7 }]);
+    const agentId = 'vault-agent';
+    const record = stack.client.pda.agentRecord(new PublicKey(account.vault), agentId)[0].toBase58();
+    const card = {
+      type: 'https://eips.ethereum.org/EIPS/eip-8004#registration-v1',
+      name: 'Vault Agent',
+      description: 'Agent owned by a smart account',
+      url: 'https://agents.example.com/a2a',
+      version: '1.0.0',
+      capabilities: { streaming: false, pushNotifications: false },
+      defaultInputModes: ['text/plain'],
+      defaultOutputModes: ['text/plain'],
+      skills: [{ id: 'review', name: 'Review', description: 'Reviews papers', tags: ['research'] }],
+      services: [{ name: 'A2A', endpoint: 'https://agents.example.com/a2a', version: '1.0.0' }],
+      registrations: [{ agentRegistry: `solana:${CHAIN_REF}:${PROGRAM_IDS.registry.toBase58()}`, agentId: record }],
+      active: true,
+    } satisfies AgentCard;
+
+    expect(await (await as(proposer)).putAgentCard(record, card, { agentId })).toMatchObject({
+      error: { code: 'forbidden' },
+    });
+    const hosted = await (await as(proposer, account.multisig)).putAgentCard(record, card, { agentId });
+    if (!hosted.success) throw new Error(hosted.error.message);
+    expect(hosted.data.agentCardUri).toBe(`${PUBLIC_BASE_URL}/a/${record}/.well-known/agent-card.json`);
+
+    // Kayıt indexlendikten sonra sahibi vault: üye başlıkla günceller, başlıksız yazamaz.
+    await world.agent(account.vault, account.vault, { address: record });
+    expect((await (await as(proposer, account.multisig)).putAgentCard(record, card)).success).toBe(true);
+    expect(await (await as(proposer)).putAgentCard(record, card)).toMatchObject({ error: { code: 'forbidden' } });
+  });
+
+  it('politika meta verisi: kurum anahtarı vault ise üye başlıkla yazar; updatedBy üyenin cüzdanıdır', async () => {
+    const [proposer, voter] = [wallet(), wallet()];
+    const account = smartAccount([
+      { key: proposer.address, permissions: PERMISSION_INITIATE | 2 },
+      { key: voter.address, permissions: 2 },
+    ]);
+    const policy = await world.policy(await world.institution(account.vault));
+    const view = await (await as(proposer, account.multisig)).putPolicyMeta(policy, meta);
+    if (!view.success) throw new Error(view.error.message);
+    expect(view.data.meta).toMatchObject({ name: 'Vault spend' });
+    expect((await stack.db.policyMeta.findFirstOrThrow()).updatedBy).toBe(proposer.address);
+    expect(await (await as(proposer)).putPolicyMeta(policy, meta)).toMatchObject({ error: { code: 'forbidden' } });
+    expect(await (await as(voter, account.multisig)).putPolicyMeta(policy, meta)).toMatchObject({
+      error: { code: 'forbidden' },
+    });
   });
 });

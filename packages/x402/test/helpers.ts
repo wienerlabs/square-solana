@@ -67,15 +67,22 @@ export async function listen(app: Express): Promise<Listening> {
 
 export const PRICE_BASE_UNITS = '250000';
 
+export const TEST_LIMITS = Object.freeze({
+  maxComputeUnits: 100_000,
+  maxPriorityFeeMicroLamports: 50_000,
+  maxRequiredSignatures: 2,
+});
+
 export interface PaidApp extends Listening {
   readonly events: X402Event[];
   /** İşleyicinin kaç kez çalıştığı (route adına göre). */
-  readonly calls: { report: number; upfront: number; broken: number };
+  readonly calls: { report: number; upfront: number; broken: number; cookie: number; locals: number };
 }
 
 /**
- * Ücretli üç route'lu uygulama: `/report` (uzlaştırma işleyiciden sonra), `/upfront` (önce) ve `/broken`
- * (işleyici 500 döner). Yanıt gövdesi işleyicinin gördüğü ödeme bilgisidir.
+ * Ücretli beş route'lu uygulama: `/report` (uzlaştırma işleyiciden sonra), `/upfront` (önce), `/cookie`
+ * (işleyici başlık koyar), `/locals` (işleyici `res.locals`'ı döner) ve `/broken` (işleyici 500 döner). Yanıt
+ * gövdesi işleyicinin gördüğü ödeme bilgisidir.
  */
 export async function startPaidApp(
   wallets: Wallets,
@@ -83,9 +90,13 @@ export async function startPaidApp(
   overrides: Partial<X402GatewayOptions> & Pick<X402GatewayOptions, 'replay'>,
 ): Promise<PaidApp> {
   const events: X402Event[] = [];
-  const calls = { report: 0, upfront: 0, broken: 0 };
+  const calls = { report: 0, upfront: 0, broken: 0, cookie: 0, locals: 0 };
   const gateway = createX402Gateway({
-    facilitator: createFacilitatorClient({ feePayer: wallets.feePayer, rpcUrls: { [SOLANA_DEVNET]: rpc.url } }),
+    facilitator: createFacilitatorClient({
+      feePayer: wallets.feePayer,
+      rpcUrls: { [SOLANA_DEVNET]: rpc.url },
+      limits: TEST_LIMITS,
+    }),
     networks: [SOLANA_DEVNET],
     onEvent: (event) => events.push(event),
     ...overrides,
@@ -106,6 +117,25 @@ export async function startPaidApp(
     (_req, res) => {
       calls.upfront += 1;
       res.json({ ok: true, payment: getX402Payment(res) });
+    },
+  );
+  app.use('/cookie', (_req, res, next) => {
+    res.cookie('visitor', 'ziyaretci-1').set('Link', '</yardim>; rel="help"');
+    next();
+  });
+  app.get('/cookie', gateway.paidRoute({ price, payTo: wallets.payTo, network: SOLANA_DEVNET }), (_req, res) => {
+    calls.cookie += 1;
+    res.cookie('session', 'paid-content');
+    res.set('Link', '</files/paid-report.pdf>').set('X-Report-Id', 'rapor-7').set('ETag', '"paid-etag"');
+    res.set('Date', 'Wed, 01 Jan 2020 00:00:00 GMT');
+    res.json({ ok: true, report: 'ücretli içerik' });
+  });
+  app.get(
+    '/locals',
+    gateway.paidRoute({ price, payTo: wallets.payTo, network: SOLANA_DEVNET, onSettled: () => undefined }),
+    (_req, res) => {
+      calls.locals += 1;
+      res.json(structuredClone(res.locals));
     },
   );
   app.get('/broken', gateway.paidRoute({ price, payTo: wallets.payTo, network: SOLANA_DEVNET }), (_req, res) => {

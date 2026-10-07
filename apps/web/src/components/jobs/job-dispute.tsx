@@ -6,10 +6,11 @@ import { useWallet } from '@solana/wallet-adapter-react';
 import type { PublicKey, VersionedTransaction } from '@solana/web3.js';
 import { sha256 } from '@noble/hashes/sha256';
 import type { JobAccount } from '@squaresdk/solana-sdk';
+import { useActor, type Actor } from '@/components/actor';
 import { useApiClient, type ApiClientState } from '@/components/api-client';
 import { ApiSessionPanel } from '@/components/api-session-panel';
 import { EvidencePanel } from '@/components/dispute/evidence-panel';
-import { useNetworkGuard, useSendTransaction } from '@/components/network-guard';
+import { useNetworkGuard } from '@/components/network-guard';
 import { Address } from '@/components/ui/address';
 import { Button } from '@/components/ui/button';
 import { StatusBadge, type Tone } from '@/components/ui/status-badge';
@@ -34,7 +35,7 @@ import {
 } from '@/lib/dispute';
 import { formatDuration, type EscrowSetup } from '@/lib/job-wizard';
 import { bytesToHex, hexToBytes } from '@/lib/policy-draft';
-import { TransactionBlockedError } from '@/lib/send-transaction';
+import { sendErrorText } from '@/lib/sponsored-send';
 import { formatUnits, parseUnits, settlementAccount, type SettlementToken } from '@/lib/settlement';
 import { unwrap } from '@/lib/square-api';
 import { useTokenBalance } from '@/lib/use-settlement';
@@ -64,7 +65,6 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
 
 /** Bir escrow tx'inin kurulup gönderilmesi; onaylanınca `onConfirmed`. Escrow hatası dispute açıklamasıyla. */
 function useEscrowAction(onConfirmed?: () => void) {
-  const send = useSendTransaction();
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [signature, setSignature] = useState<string | null>(null);
@@ -75,23 +75,25 @@ function useEscrowAction(onConfirmed?: () => void) {
   }, [confirmed, onConfirmed]);
   const pending = signature !== null && !confirmed && status?.stage !== 'failed';
 
+  // Tx rolün hesabıyla (FE-21) kurulur ve gönderilir: kurum, agent ya da herkese açık adımda cüzdan.
   const run = useCallback(
-    async (kind: string, build: () => Promise<VersionedTransaction>, explain?: (error: unknown) => string | null) => {
+    async (
+      kind: string,
+      actor: Actor,
+      build: (options: { feePayer: PublicKey }) => Promise<VersionedTransaction>,
+      explain?: (error: unknown) => string | null,
+    ) => {
       setBusy(kind);
       setError(null);
       try {
-        setSignature(await send(await build()));
+        setSignature(await actor.send(await build(await actor.options())));
       } catch (caught) {
-        setError(
-          caught instanceof TransactionBlockedError
-            ? caught.message
-            : (explain?.(caught) ?? disputeErrorMessage(caught) ?? (caught as Error).message),
-        );
+        setError(sendErrorText(caught, (error) => explain?.(error) ?? disputeErrorMessage(error)));
       } finally {
         setBusy(null);
       }
     },
-    [send],
+    [],
   );
   const feedback = (
     <>
@@ -126,9 +128,15 @@ export function JobDispute({
   formatAmount(base: bigint): string;
   onConfirmed?(): void;
 }) {
+  // Arbitrator cüzdanıyla oy verir; kurum ve agent rolün hesabıyla (cüzdan ya da smart account vault'u).
   const { publicKey } = useWallet();
+  const institutionActor = useActor('institution');
+  const agentActor = useActor('agent');
+  const anyone = useActor(null);
+  const isInstitution = Boolean(institutionActor.address?.equals(account.institution));
+  const isAgent = Boolean(agentActor.address?.equals(account.agentWallet));
   const guard = useNetworkGuard();
-  const session = useApiClient();
+  const session = useApiClient(isInstitution ? institutionActor.api : isAgent ? agentActor.api : undefined);
   const action = useEscrowAction(onConfirmed);
 
   // Config her değişiklikte yeniden okunur: arbitrator seti ve eşik oy sayımını belirler.
@@ -156,8 +164,6 @@ export function JobDispute({
   const phase = disputePhase(facts, status, chainNow);
   const amount = BigInt(account.amount.toString());
   const challengeEnd = account.challengeEnd.toNumber();
-  const isInstitution = Boolean(publicKey?.equals(account.institution));
-  const isAgent = Boolean(publicKey?.equals(account.agentWallet));
   const isArbitrator = Boolean(publicKey && params?.arbitrators.some((key) => key.equals(publicKey)));
   const hasPolicy = account.policy !== null;
 
@@ -209,7 +215,9 @@ export function JobDispute({
   if (phase.phase === 'none' && !raisable && escalation.state === 'notApplicable') return null;
 
   const party = isInstitution || isAgent || isArbitrator;
-  const caller = publicKey;
+  // Herkese açık adımlar (kararın yürütülmesi, lapse): bağlı cüzdan, sponsorlu olabilir.
+  const caller = anyone.address;
+  const agent = agentActor.address;
   const tally = params ? voteTally(facts, params) : null;
   const canAct = guard.canTransact && action.busy === null && !action.pending;
 
@@ -244,11 +252,12 @@ export function JobDispute({
             session={session}
             formatAmount={formatAmount}
             action={action}
+            actor={institutionActor}
             canAct={canAct}
           />
         )}
 
-        {escalation.state !== 'notApplicable' && caller && (
+        {escalation.state !== 'notApplicable' && agent && (
           <div className="grid gap-2">
             <h3 className="text-sm font-medium">Missing proof</h3>
             {escalation.state === 'waiting' && (
@@ -274,11 +283,8 @@ export function JobDispute({
             <div>
               <Button
                 onClick={() =>
-                  void action.run('escalate', async () => {
-                    const built = await escrow.client.flow.escalateMissingProof(
-                      { agent: caller, job: jobKey },
-                      { feePayer: caller },
-                    );
+                  void action.run('escalate', agentActor, async (options) => {
+                    const built = await escrow.client.flow.escalateMissingProof({ agent, job: jobKey }, options);
                     return built.transaction;
                   })
                 }
@@ -301,8 +307,8 @@ export function JobDispute({
             loading={action.busy === 'execute'}
             onExecute={() =>
               caller &&
-              void action.run('execute', async () => {
-                const built = await escrow.client.flow.executeResolution({ caller, job: jobKey }, { feePayer: caller });
+              void action.run('execute', anyone, async (options) => {
+                const built = await escrow.client.flow.executeResolution({ caller, job: jobKey }, options);
                 return built.transaction;
               })
             }
@@ -321,8 +327,8 @@ export function JobDispute({
                 variant="secondary"
                 onClick={() =>
                   caller &&
-                  void action.run('lapse', async () => {
-                    const built = await escrow.client.flow.lapseDispute({ caller, job: jobKey }, { feePayer: caller });
+                  void action.run('lapse', anyone, async (options) => {
+                    const built = await escrow.client.flow.lapseDispute({ caller, job: jobKey }, options);
                     return built.transaction;
                   })
                 }
@@ -509,6 +515,7 @@ function RaiseDispute({
   session,
   formatAmount,
   action,
+  actor,
   canAct,
 }: {
   escrow: EscrowSetup;
@@ -523,6 +530,7 @@ function RaiseDispute({
   session: ApiClientState;
   formatAmount(base: bigint): string;
   action: ReturnType<typeof useEscrowAction>;
+  actor: Actor;
   canAct: boolean;
 }) {
   const fileId = useId();
@@ -548,7 +556,7 @@ function RaiseDispute({
   const signedIn = Boolean(session.api);
 
   const raise = () =>
-    void action.run('raise', async () => {
+    void action.run('raise', actor, async (options) => {
       if (!evidence || !bond?.ok || !token) throw new Error('Choose the evidence and the bond first.');
       let reasonHash = evidence.hash;
       if (needsUpload) {
@@ -573,7 +581,7 @@ function RaiseDispute({
           bond: bond.value,
           institutionTokenAccount: settlementAccount(institution, token),
         },
-        { feePayer: institution },
+        options,
       );
       return built.transaction;
     });

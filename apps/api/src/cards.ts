@@ -2,6 +2,8 @@
 // - Kayıt indexlenmişse çağıran `AgentRecord.owner`'dır.
 // - Kart kayıttan önce yüklenir (8 adımın 2.si): çağıran `agentId`'yi (`register_agent`'ın `agent_id`'si) verir;
 //   yol, çağıranın cüzdanı ve bu kimlikle türetilen PDA'ya (`["agent", owner, agent_id]`) eşit olmalıdır.
+// - Sahip bir smart account'un vault'uysa multisig'in `Initiate` yetkili üyesi `X-Square-Smart-Account` başlığıyla
+//   yazar; kayıttan önce yol vault ve `agentId` ile türetilir (caller.ts).
 // Kartın `registrations`'ı bu kaydı (`solana:<chain-ref>:<registry>` + AgentRecord) içermelidir. Saklanan
 // baytlar kartın RFC 8785 kanonik JSON'udur; `agentCardHash` bu baytların SHA-256'sı, `agentCardUri` A2A keşif
 // yoludur. İkisi `register_agent` / `update_agent`'ın argümanlarıdır.
@@ -10,11 +12,12 @@ import type { PrismaClient } from '@squaresdk/solana-db';
 import { specHashing, type SquarePda } from '@squaresdk/solana-sdk';
 import { AgentCardSchema, type AgentCard, type AgentCardHosting } from '@squaresdk/solana-types';
 import { PublicKey } from '@solana/web3.js';
+import type { Caller, CallerAuthority } from './caller.js';
 import { badRequest, forbidden, parse } from './http.js';
 
 export interface CardService {
   put(params: {
-    wallet: string;
+    caller: Caller;
     agentRecord: string;
     agentId: string | null;
     card: unknown;
@@ -34,38 +37,44 @@ export function createCardService(deps: {
   registryProgramId: PublicKey;
   chainRef: string;
   publicBaseUrl: string;
+  callers: CallerAuthority;
   clock?: () => number;
 }): CardService {
   const { db } = deps;
   const clock = deps.clock ?? Date.now;
   const registry = `solana:${deps.chainRef}:${deps.registryProgramId.toBase58()}`;
 
-  async function authorize(wallet: string, agentRecord: string, agentId: string | null) {
+  async function authorize(caller: Caller, agentRecord: string, agentId: string | null) {
     const agent = await db.agent.findUnique({ where: { address: agentRecord } });
     if (agent) {
-      if (agent.owner !== wallet) throw forbidden('kartı yalnızca kaydın sahibi yazabilir');
+      if (!(await deps.callers.actsFor(caller, agent.owner))) throw forbidden('kartı yalnızca kaydın sahibi yazabilir');
       return agent;
     }
     if (agentId === null) throw badRequest('kayıt henüz yok: agentId (register_agent agent_id) gerekli');
-    let derived: PublicKey;
+    // Kayıttan önce sahip yoldan bulunur: çağıranın cüzdanı ya da başlıktaki smart account'un vault'u.
+    let owner: string | undefined;
     try {
-      [derived] = deps.pda.agentRecord(new PublicKey(wallet), agentId);
+      owner = [caller.wallet, caller.smartAccount?.vault]
+        .filter((candidate): candidate is string => candidate !== undefined)
+        .find((candidate) => deps.pda.agentRecord(new PublicKey(candidate), agentId)[0].toBase58() === agentRecord);
     } catch (error) {
       throw badRequest(error instanceof Error ? error.message : String(error));
     }
-    if (derived.toBase58() !== agentRecord) {
-      throw forbidden('agentRecord, çağıranın cüzdanı ve agentId ile türetilen kayıt değil');
+    if (owner === undefined || !(await deps.callers.actsFor(caller, owner))) {
+      throw forbidden(
+        "agentRecord, çağıranın cüzdanı (ya da smart account vault'u) ve agentId ile türetilen kayıt değil",
+      );
     }
     return null;
   }
 
   return {
-    async put({ wallet, agentRecord, agentId, card }) {
+    async put({ caller, agentRecord, agentId, card }) {
       const parsed = parse(AgentCardSchema, card, 'agent card');
       if (!parsed.registrations.some((entry) => entry.agentRegistry === registry && entry.agentId === agentRecord)) {
         throw badRequest(`registrations bu kaydı içermeli: { agentRegistry: ${registry}, agentId: ${agentRecord} }`);
       }
-      const agent = await authorize(wallet, agentRecord, agentId);
+      const agent = await authorize(caller, agentRecord, agentId);
       const raw = Buffer.from(specHashing.canonicalizeSpec(parsed), 'utf8');
       const contentHash = createHash('sha256').update(raw).digest('hex');
       const uri = `${deps.publicBaseUrl}${cardPath(agentRecord)}`;

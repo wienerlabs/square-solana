@@ -31,6 +31,7 @@ Değerler ortamdan gelir ve kök layout'ta **istek anında, sunucuda** okunur (`
 | `SQUARE_SOLANA_RPC_URL` | O cluster'ın JSON-RPC ucu; `https` (yalnızca `localnet` için `http`). WebSocket ucu web3.js tarafından bundan türetilir |
 | `SQUARE_PROVER_URL` | İsteğe bağlı: release ispatını üreten prover servisinin kök adresi ([`apps/prover`](../prover/README.md)); `https` (yalnızca `localnet` için `http`). Tanımlı değilse kurum iş sayfasında ispat üretemez, ispatın durumu yine görünür. Prover'ın `CORS_ORIGINS`'i web'in adresini içermeli |
 | `SQUARE_API_URL` | İsteğe bağlı: Square API'nin kök adresi ([`apps/api`](../api/README.md)); `https` (yalnızca `localnet` için `http`). Keeper günlüğü buradan okunur, cüzdan oturumu buradan açılır, teslim dosyası buraya yüklenir (FE-10, FE-03, FE-07); dispute kanıtı, arbitrator kuyruğu, oy tx'i, webhook abonelikleri ve geliştirici portalı (`/app/developers`) buradan gelir (FE-17, FE-22). Tanımlı değilse sayfa bunu söyler: kurum yalnızca kanıtın hash'iyle itiraz eder, arbitrator konsolu ve geliştirici portalı kapanır. Sondaki eğik çizgi atılır. API'nin `CORS_ORIGINS`'i web'in adresini, `API_AUTH_DOMAIN`'i web'in host'unu (`location.host`, ör. `app.example.com`) içermeli |
+| `SQUARE_FEE_PAYER_URL` | İsteğe bağlı: sponsorlu işlem servisinin kök adresi ([`apps/fee-payer`](../fee-payer/README.md), BE-27); `https` (yalnızca `localnet` için `http`). Sponsorlu gönderim ve smart account ([aşağıda](#smart-account-ve-sponsorlu-işlem-fe-21)) bunu ister. Servis Square API'nin oturumunu kabul ettiği için `SQUARE_API_URL` de gerekir. Sondaki eğik çizgi atılır. Servisin `CORS_ORIGINS`'i web'in adresini içermeli |
 | `SQUARE_PROGRAM_ID_{REGISTRY,POLICY,VERIFIER,ESCROW}` | İsteğe bağlı: programların o cluster'daki adresi (db ile aynı adlar; IDL'deki adres kullanılmaz). Tanımlı olan program landing'de adresi ve zincirdeki deploy durumuyla, tanımlı olmayan "Not configured" olarak görünür. USDC bakiyesi escrow'un config'inden okunduğu için `ESCROW` gerekir. Geçersiz bir değer yapılandırma hatasıdır |
 | `SQUARE_LOOKUP_TABLE` | İsteğe bağlı: Square address lookup table'ı (BC-28; servislerde `API_LOOKUP_TABLE`, devnet'teki [kayıt](../../docs/deploy/devnet.md#square-alt)). Ağ sayfası tablonun durumunu ve içeriğinin SDK'nın beklediği adreslerle aynı olup olmadığını gösterir; tanımlı değilse bunu söyler. Geçersiz bir değer yapılandırma hatasıdır |
 
@@ -244,6 +245,54 @@ kararı: [ADR 0023](../../docs/decisions/0023-x402-ucretli-uc-nokta-tanimlari.md
 | API anahtarları | Liste: etiket, ön ek, kapsamlar, oluşturma ve son kullanım zamanı. Oluşturma etiket ve kapsamlarla; sır yalnızca oluşturma yanıtında gelir, bir kez gösterilir ve kopyalanır, kapatılınca sayfadan silinir. İptal hemen geçerlidir |
 | Ücretli uç noktalar | Tanım: ad, yol (geliştiricinin sunucusundaki route), fiyat, mint, ağ, alıcı (`payTo`, varsayılan bağlı cüzdan), açıklama, etkin / pasif. Ağ uygulamanın kümesinden gelir (localnet'te devnet), mint ağın USDC'si; USDC'de fiyat USDC olarak girilir ve tam sayı aritmetiğiyle taban birime çevrilir, başka mint'te taban birimdir. Düzenleme, pasifleştirme ve silme. Kullanım: ödemeli çağrı sayısı, tahsil edilen toplam, son ödeme ve son ödemeler (ödeyen, tutar, işlem) |
 | SDK örnekleri | Seçilen anahtar ve uç noktayla doldurulur, kopyalanır: `createApiClient` (anahtarın kapsamına göre), geliştiricinin sunucusu (`paidRouteFromDefinition` → `paidRoute`, kendi facilitator'ı, ödemenin bildirimi) ve ödeyen istemci (`createPayingFetch`). Sırlar ortam değişkenlerindedir. `test/developer-snippets.test.ts` her örneği doldurulmuş hâliyle gerçek paketlere karşı TypeScript derleyicisinden geçirir |
+
+## Smart account ve sponsorlu işlem (FE-21)
+
+`/app/account`. Rolün zincirdeki adresi ve işlemlerin ücretini kimin ödediği burada seçilir. Bileşenler
+[`actor.tsx`](src/components/actor.tsx)'teki `useActor(rol)`'den rolün adresini, SDK seçeneklerini (`options()`:
+ücret ve rent ödeyicisi), gönderimi (`send`) ve API isteklerinin seçeneğini (`api`) alır.
+
+| Mod | Rol adresi | Ücret ve rent | Gönderim |
+|---|---|---|---|
+| Cüzdan (varsayılan) | Cüzdan | Cüzdan | FE-03'teki korumalı gönderim |
+| Sponsorlu | Cüzdan | Sponsor | Cüzdan imzalar; `POST /v1/sponsor` (`submit: true`) denetleyip sponsorla imzalar ve gönderir |
+| Smart account | Squads v4 multisig'inin 0 numaralı vault'u | Sponsor | Talimatlar vault tx'ine sarılır (SDK `wrapInVault`): öneri (vault tx, proposal, üyenin onayı) zincirde onaylanınca yürütme. İkisi de sponsorlu |
+
+- **Seçimler:** Sponsorlu gönderim cüzdan başına (`localStorage.square-sponsored:<cüzdan>`), smart account cüzdan ve
+  rol başına (`square-smart-account:<cüzdan>:<rol>`) bu tarayıcıda tutulur. Smart account kurum, agent ve alıcı için
+  vardır. Arbitrator cüzdanıyla oy verir. Finalize, kararın yürütülmesi ve lapse gibi herkese açık adımlar cüzdanla
+  (sponsorlu olabilir) gider.
+- **Sponsor bilgisi:** Adres ve tavanlar servisin oturumlu `/v1/sponsor/info` ucundan okunur. Gerekirse önce API
+  oturumu imzalatılır. Compute unit sınırı simülasyonla ölçülür, %20 pay eklenir ve sponsorun tavanını aşamaz. Ret
+  sebebi (`error.details.reason`) arayüz metnine çevrilir ([`fee-payer.ts`](src/lib/fee-payer.ts)).
+- **Smart account açma:** Sponsor `multisig_create_v2`'nin `creator`'ıdır; rent'i ve Squads'ın oluşturma ücretini o
+  öder. `createKey` tarayıcıda üretilen tek kullanımlık anahtardır ve yalnızca açılışı imzalar; cüzdan imza atmaz.
+  - Bağlı cüzdan her zaman üyedir. Diğer üyeler bütün yetkilerle (Initiate, Vote, Execute) eklenir.
+  - Eşik en çok üye sayısıdır. Multisig özerktir; zaman kilidi yoktur.
+- **Var olan smart account:** Adres zincirden okunur. Cüzdan `Initiate` yetkili üye değilse seçilemez.
+- **Üyelik görünümü:**
+  - Üyeler ve yetkileri; eşik ve zaman kilidi.
+  - Vault (rolün adresi) ile SOL ve USDC bakiyesi. USDC vault'un adresine yatırılır.
+  - Son on öneri: durum, onaylar, iç talimatların programları. Bayatlamış öneri (`stale_transaction_index`'e kadar)
+    yürütülemez.
+  - Oy veren üye onaylar, yürütme yetkili üye onaylanmış öneriyi zaman kilidinden sonra yürütür. İkisi de sponsorlu.
+- **Eşik 1'den büyükse:** Adım öneriden sonra durur ve sayfa öneriyi söyler ("Proposed as smart account transaction
+  #N"). Diğer üyeler hesap sayfasından onaylar, yürütme yetkili bir üye yürütür.
+- **API:** Rol adına giden istekler `X-Square-Smart-Account: <multisig>` başlığını taşır
+  ([apps/api](../api/README.md#kimlik), API sözleşmesi v0.24.0). Kapsananlar: teslimat yükleme, kart barındırma,
+  Travel Rule ve dispute kanıtı. API cüzdanın multisig'te `Initiate` yetkili üye olduğunu zincirden okur.
+- **Sayfalar:** Politika, agent kaydı, iş açma ve fonlama, iş detayı (kabul, teslim, ispat, alacak, uyuşmazlık) ve
+  paneller rolün adresiyle çalışır. Sayfanın üstündeki not hangi adres adına gidildiğini ve ücretin kimde olduğunu
+  söyler.
+- **Sponsorlu finalize:** Sponsor yalnızca Square ya da Squads talimatı taşıyan tx'i öder
+  (`no_square_instruction`). Bu yüzden keeper ücretinin USDC hesabı ayrı bir tx'le değil, finalize'la aynı tx'te
+  açılır; rent'i sponsor öder.
+- **Bilinen sınırlar:**
+  - `finalize_payment`'ın açtığı itibar ve doğrulama kayıtlarının rent'ini program tetikleyene ödetir
+    (`payer = keeper`). Sponsorlu finalize'da da cüzdanın bu rent kadar SOL'ü olmalı.
+  - Multisig'i `set_institution_multisig` ile sonradan bağlanmış kurumun (kurum hesabı cüzdandan türemiş) adımları bu
+    sayfadan önerilmez; bu kurumun ispat bölümü durumu söylemeye devam eder.
+  - CCTP ile fonlama (FE-19) cüzdanla çalışır.
 
 ## Tasarım sistemi
 
