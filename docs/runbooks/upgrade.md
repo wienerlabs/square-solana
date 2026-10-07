@@ -82,7 +82,7 @@ node scripts/deploy/squads-multisig.mjs show --rpc <url> --multisig <adres>   # 
 | Üyeler | MuhammedAkinci, mehmethayirli, kh0ra (her biri kendi donanım cüzdanı ya da kişisel anahtarı) |
 | Eşik | 2 |
 | İzinler | üç üye de Initiate + Vote + Execute |
-| Time lock | devnet 0; mainnet kararı BC-42'de |
+| Time lock | 0 (yalnızca devnet, [ADR 0027](../decisions/0027-yalnizca-devnet.md)) |
 
 Kurulumdan sonra doğrulanır ve deploy kaydına yazılır:
 
