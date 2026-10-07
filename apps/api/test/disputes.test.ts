@@ -208,6 +208,32 @@ describe('dispute kanıtı', () => {
     expect(await byMember.listDisputeEvidence(job.address)).toMatchObject({ error: { code: 'forbidden' } });
   });
 
+  it('multisig okunamazken (503) okuma alttaki rolle sürer, yükleme yeniden denenmek üzere 503 alır', async () => {
+    const multisig = world.squadsMultisig([{ key: wallet().address, permissions: PERMISSION_INITIATE }]);
+    const institutionPda = await world.institution(wallet().address, { multisig });
+    const vault = (await stack.db.institution.findUniqueOrThrow({ where: { address: institutionPda } })).multisigVault!;
+    const job = await world.job({
+      institution: vault,
+      agentRecord,
+      agentWallet: agentWallet.address,
+      disputed: true,
+      status: 'disputed',
+      amount: AMOUNT,
+      dispute: { deadline: new BN(DEADLINE), arbitratorSetVersion: 4, approvalMask: 0, approvalCount: 0 },
+    });
+    const byAgent = await session(agentWallet);
+    expect(await byAgent.uploadDisputeEvidence(job.address, new Blob(['agent yanıtı']))).toMatchObject({
+      success: true,
+      data: { role: 'agent' },
+    });
+    stack.rpc.failWith = 503;
+    const listed = await byAgent.listDisputeEvidence(job.address);
+    expect(listed.success && listed.data.map((e) => e.role)).toEqual(['agent']);
+    expect(await byAgent.uploadDisputeEvidence(job.address, new Blob(['ikinci yanıt']))).toMatchObject({
+      error: { code: 'rpc_unavailable' },
+    });
+  });
+
   it('yetki, kapsam, boyut ve bilinmeyen job', async () => {
     const job = await disputedJob();
     expect(await stack.api().uploadDisputeEvidence(job.address, new Blob(['x']))).toMatchObject({

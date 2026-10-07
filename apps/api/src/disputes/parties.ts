@@ -3,9 +3,11 @@
 //   `multisig_vault`'u) vault mesaj imzalayamaz; multisig'te öneri açabilen (`Initiate`) üyeler kurum sayılır.
 // - Agent: job'un agent cüzdanı ya da agent kaydının sahibi.
 // - Arbitrator: escrow config'indeki aktif set.
-// Bir cüzdan birden çok role uyuyorsa ilk uyan rol (kurum, agent, arbitrator) geçerlidir.
+// Bir cüzdan birden çok role uyuyorsa ilk uyan rol (kurum, agent, arbitrator) geçerlidir. Üstteki denetim hata
+// verirse okumada alttaki rol geçerlidir; yüklemede yalnızca kalıcı hatada (403), geçici hata (503) yükselir.
 import type { EvidenceRole, PrismaClient } from '@squaresdk/solana-db';
 import type { Connection } from '@solana/web3.js';
+import { HttpError } from '../http.js';
 import { isMultisigInitiator } from '../squads.js';
 import type { Arbitrators } from './arbitrators.js';
 
@@ -16,11 +18,13 @@ export interface JobParties {
   readonly agentWallet: string;
 }
 
+export type RoleUse = 'read' | 'upload';
+
 export interface Parties {
-  roleOf(wallet: string, job: JobParties): Promise<EvidenceRole | null>;
+  roleOf(wallet: string, job: JobParties, use: RoleUse): Promise<EvidenceRole | null>;
 }
 
-const ROLES: readonly EvidenceRole[] = ['institution', 'agent', 'arbitrator'];
+const lasting = (error: unknown) => error instanceof HttpError && error.status === 403;
 
 export function createParties(deps: { db: PrismaClient; connection: Connection; arbitrators: Arbitrators }): Parties {
   const { db } = deps;
@@ -38,20 +42,23 @@ export function createParties(deps: { db: PrismaClient; connection: Connection; 
   }
 
   return {
-    async roleOf(wallet, job) {
+    async roleOf(wallet, job, use) {
       if (wallet === job.institution) return 'institution';
-      const checks = await Promise.allSettled([
-        isVaultInitiator(wallet, job),
-        isAgent(wallet, job),
-        deps.arbitrators.indexOf(wallet).then((index) => index !== null),
-      ]);
-      const matched = ROLES.find((_, i) => {
-        const check = checks[i]!;
-        return check.status === 'fulfilled' && check.value;
-      });
-      if (matched) return matched;
-      const failed = checks.find((check): check is PromiseRejectedResult => check.status === 'rejected');
-      if (failed) throw failed.reason;
+      const checks: [EvidenceRole, () => Promise<boolean>][] = [
+        ['institution', () => isVaultInitiator(wallet, job)],
+        ['agent', () => isAgent(wallet, job)],
+        ['arbitrator', async () => (await deps.arbitrators.indexOf(wallet)) !== null],
+      ];
+      const failures: unknown[] = [];
+      for (const [role, check] of checks) {
+        try {
+          if (await check()) return role;
+        } catch (error) {
+          if (use === 'upload' && !lasting(error)) throw error;
+          failures.push(error);
+        }
+      }
+      if (failures.length > 0) throw failures[0];
       return null;
     },
   };

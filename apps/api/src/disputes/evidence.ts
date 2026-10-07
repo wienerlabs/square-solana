@@ -69,7 +69,7 @@ export function createEvidenceService(deps: {
 
   async function reader(wallet: string, job: string) {
     const row = await jobOf(job);
-    const role = await parties.roleOf(wallet, row);
+    const role = await parties.roleOf(wallet, row, 'read');
     if (!role) throw forbidden('kanıtı yalnızca kurum, agent cüzdanı / sahibi ve aktif arbitrator’lar okur');
     return row;
   }
@@ -77,7 +77,7 @@ export function createEvidenceService(deps: {
   return {
     async upload({ wallet, job, content, contentType }) {
       const row = await jobOf(job);
-      const role = await parties.roleOf(wallet, row);
+      const role = await parties.roleOf(wallet, row, 'upload');
       if (!role) throw forbidden('kanıtı yalnızca kurum, agent cüzdanı / sahibi ve aktif arbitrator’lar yükler');
       const allowed = role === 'institution' ? INSTITUTION_STATUSES : DISPUTE_STATUSES;
       if (!allowed.has(row.status)) {

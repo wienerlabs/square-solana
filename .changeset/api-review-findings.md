@@ -11,8 +11,7 @@ Bağımsız incelemenin API bulguları (API sözleşmesi v0.25.0).
 `@squaresdk/solana-api`: gizli dispute kanıtı (liste, içerik) ve arbitrator kuyruğu anahtarla gelen istekte `read` yerine
 `disputes:read` ister; `read` anahtarı bu verilere artık erişemez. `recordX402Payment`'ın tekilliği tanım sahibinin
 cüzdanı başınadır; başka bir cüzdan aynı ödemeyi önce bildirerek sahibinin kaydını engelleyemez. Kuyruk kanıtları
-taraf rolü çözmeden okur; Squads vault'lu bir kurumun multisig'i okunamasa da açılır. Kanıtın taraf denetiminde
-multisig okunamazsa agent ve arbitrator yine kendi rolleriyle okur ve yükler. Bildirim kiralaması satır alınırken
+taraf rolü çözmeden okur; Squads vault'lu bir kurumun multisig'i okunamasa da açılır. Kanıtın taraf denetiminde multisig okunamazsa agent ve arbitrator kendi rolleriyle okur; yükleme yalnızca multisig kalıcı olarak doğrulanamıyorsa (403) alttaki rolle sürer, geçici hatada (503) yeniden denenir. Denetimler öncelik sırasıyla ve yalnızca gerektiğinde çalışır. Bildirim kiralaması satır alınırken
 başlar ve yalnızca satırın okunduğu andaki deneme sayısı ve sırası tutuyorsa alınır; başka örneğin ilerlettiği satır
 eski kopyayla yeniden gönderilmez. `API_ARBITRATOR_CACHE_SECONDS` en çok 300; `API_NOTIFY_ALLOW_INSECURE` yalnızca yerel geliştirme
 adresinde açılır.

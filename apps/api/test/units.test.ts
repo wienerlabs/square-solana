@@ -9,6 +9,7 @@ import { createLogger } from '@squaresdk/solana-observability';
 import { Keypair, PublicKey } from '@solana/web3.js';
 import { describe, expect, it } from 'vitest';
 import { loadConfig } from '../src/config.js';
+import { createParties } from '../src/disputes/parties.js';
 import { startLoop } from '../src/loop.js';
 import { loadOpenApi } from '../src/openapi.js';
 import { PERMISSION_INITIATE, SQUADS_PROGRAM_ID, multisigMembers } from '../src/squads.js';
@@ -247,5 +248,60 @@ describe('döngü', () => {
     expect(runs).toBeGreaterThan(2);
     expect(errors).toHaveLength(1);
     expect(() => startLoop({ intervalMs: 0, immediate: false, run: async () => {}, onError: () => {} })).toThrow();
+  });
+});
+
+describe('dispute tarafları', () => {
+  const job = { address: 'job', institution: 'vault', agentRecord: 'record', agentWallet: 'agent' };
+
+  function parties(vault: 'none' | 'down' | 'missing') {
+    const calls = { agentDb: 0, arbitrators: 0, rpc: 0 };
+    const multisig = Keypair.generate().publicKey.toBase58();
+    const db = {
+      institution: { findFirst: async () => (vault === 'none' ? null : { account: { multisig } }) },
+      agent: {
+        findUnique: async () => {
+          calls.agentDb += 1;
+          return { owner: 'owner' };
+        },
+      },
+    };
+    const connection = {
+      getAccountInfo: async () => {
+        calls.rpc += 1;
+        if (vault === 'down') throw new Error('rpc kapalı');
+        return null;
+      },
+    };
+    const arbitrators = {
+      indexOf: async (wallet: string) => {
+        calls.arbitrators += 1;
+        return wallet === 'arbitrator' ? 0 : null;
+      },
+    };
+    return {
+      calls,
+      parties: createParties({ db: db as never, connection: connection as never, arbitrators: arbitrators as never }),
+    };
+  }
+
+  it('denetimler öncelik sırasıyla ve yalnızca gerektiğinde çalışır', async () => {
+    const { calls, parties: plain } = parties('none');
+    expect(await plain.roleOf('agent', job, 'upload')).toBe('agent');
+    expect(calls).toEqual({ agentDb: 0, arbitrators: 0, rpc: 0 });
+    expect(await plain.roleOf('owner', job, 'read')).toBe('agent');
+    expect(calls).toEqual({ agentDb: 1, arbitrators: 0, rpc: 0 });
+    expect(await plain.roleOf('arbitrator', job, 'read')).toBe('arbitrator');
+    expect(await plain.roleOf('yabancı', job, 'read')).toBeNull();
+  });
+
+  it('multisig okunamazsa okuma alttaki role düşer, yükleme yalnızca kalıcı 403’te düşer', async () => {
+    const down = parties('down').parties;
+    expect(await down.roleOf('arbitrator', job, 'read')).toBe('arbitrator');
+    await expect(down.roleOf('arbitrator', job, 'upload')).rejects.toMatchObject({ status: 503 });
+    await expect(down.roleOf('yabancı', job, 'read')).rejects.toMatchObject({ status: 503 });
+    const missing = parties('missing').parties;
+    expect(await missing.roleOf('arbitrator', job, 'upload')).toBe('arbitrator');
+    await expect(missing.roleOf('yabancı', job, 'upload')).rejects.toMatchObject({ status: 403 });
   });
 });
