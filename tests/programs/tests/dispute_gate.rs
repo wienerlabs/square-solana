@@ -18,6 +18,7 @@ use square_escrow::{
     DisputeRaised, DisputeResolved, MissingProofEscalated, ReleaseRefused, ReleaseVerified,
 };
 use square_program_tests::{anchor_error, compute_unit_limit, cu, event, Outcome};
+use square_registry::ScreeningStatus;
 
 const LAMPORTS: u64 = 1_000_000_000;
 
@@ -170,6 +171,69 @@ fn a_final_refusal_refunds_the_award_but_the_bond_stays_a_penalty() {
         (reputation.jobs_completed, reputation.jobs_disputed),
         (0, 1)
     );
+}
+
+#[test]
+fn a_flagged_payee_without_an_award_does_not_lock_the_refund_or_the_bond() {
+    let mut r = ReleaseWorld::new(false);
+    let job = resolved(&mut r, "c", DisputeResolution::FavorAgent);
+    let amount = r.amount("c");
+    let bond = min_bond(amount);
+    let caller = r.w.h.funded(LAMPORTS);
+    let settlement = r.settlement(&caller, r.agent.wallet.pubkey());
+    let institution_before = r.w.balance(&r.institution.token_account).unwrap();
+    r.bind(&job, &r.proof("dispute_refused_per_tx"))
+        .expect("kalıcı ret");
+
+    // Süresi dolmuş kayıt yenilenebilir: ödeme bekler, bond'un yolu kayda göre belirlenir.
+    let wallet = r.agent.wallet.pubkey();
+    let now = r.proof_time();
+    r.w.h.set_time(now - SCREENING_TTL - 1);
+    r.w.screen(&wallet, ScreeningStatus::Clear);
+    r.w.h.set_time(now);
+    execute(&mut r, &caller, &job, settlement)
+        .expect_err("kayıt eskidi")
+        .assert_error(anchor_error(EscrowError::ScreeningExpired));
+    assert_eq!(r.w.job(&job).status, JobStatus::Resolved);
+
+    // Agent payı 0: payee'ye gidecek tek şey bond'dur. Yaptırımlı adrese ödeme yapılmaz; bond kuruma döner,
+    // iade beklemez (ADR 0028 madde 3).
+    r.w.screen(&wallet, ScreeningStatus::Flagged);
+    let executed = execute(&mut r, &caller, &job, settlement).expect("execute_resolution");
+    assert_eq!(r.w.balance(&settlement.payee_token_account), Some(0));
+    assert_eq!(
+        r.w.balance(&r.institution.token_account),
+        Some(institution_before + amount + bond)
+    );
+    assert_eq!(r.w.job(&job).status, JobStatus::Refunded);
+    let resolved: DisputeResolved = event(&executed);
+    assert_eq!(
+        (
+            resolved.agent_side_amount,
+            resolved.institution_refund,
+            resolved.bond_to_agent_side,
+            resolved.bond_returned
+        ),
+        (0, amount, 0, bond)
+    );
+}
+
+#[test]
+fn a_flagged_payee_still_holds_an_award() {
+    let mut r = ReleaseWorld::new(false);
+    let job = resolved(&mut r, "a", DisputeResolution::FavorAgent);
+    let caller = r.w.h.funded(LAMPORTS);
+    let settlement = r.settlement(&caller, r.agent.wallet.pubkey());
+    r.bind(&job, &r.proof("dispute_favor_agent"))
+        .expect("tam tutarın ispatı");
+
+    // Agent payı sıfırdan büyükse kural aynıdır: ödeme payee'nin temiz kaydını bekler (ADR 0013 madde 3).
+    let wallet = r.agent.wallet.pubkey();
+    r.w.screen(&wallet, ScreeningStatus::Flagged);
+    execute(&mut r, &caller, &job, settlement)
+        .expect_err("bayraklı payee")
+        .assert_error(anchor_error(EscrowError::ScreeningFlagged));
+    assert_eq!(r.w.job(&job).status, JobStatus::Resolved);
 }
 
 #[test]

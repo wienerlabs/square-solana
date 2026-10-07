@@ -34,6 +34,8 @@
    Aynı kural `init_config` ve `update_arbitrators`'ta uygulanır. Bir arbitrator bir dispute'ta bir kez oy
    verir (bit maskesi). İlk oy kararı belirler, sonraki oylar ona eşit olmalıdır (`ResolutionMismatch`).
    `Pending` bir oy değildir, `Split.agent_amount` escrow'u aşamaz. M oya ulaşınca iş `Resolved` olur.
+   **Değişti:** [ADR 0028](0028-kabul-oncesi-on-ispat-ve-dispute-duzeltmeleri.md) madde 4 (program sözleşmesi
+   v0.8.0): ilk oy bir öneri açar, farklı oy ret sayılır ve yeterli ret öneriyi sıfırlar.
 2. **Aktif dispute'ta set değişimi:** Oylar oy anındaki sete göre sayılır. Dispute'un saklı
    `arbitrator_set_version`'ı config'ten eskiyse, bir sonraki oy sayımı sıfırlar: maske, sayaç ve bekleyen
    karar düşer, sürüm güncellenir, sonra oy sayılır. Son tarih ve bond değişmez. Karara bağlanmış

@@ -59,7 +59,7 @@ beforeEach(async () => {
 const session = async (who: Wallet) => stack.api({ session: await login(stack.api(), who) });
 
 /** Dispute'lu job: `dispute` Anchor biçiminde alan değişiklikleri. */
-const disputedJob = (dispute: Record<string, unknown> = {}, status = 'disputed') =>
+const disputedJob = (dispute: Record<string, unknown> = {}, status = 'disputed', rejectionMask = 0) =>
   world.job({
     institution: institution.address,
     agentRecord,
@@ -67,6 +67,7 @@ const disputedJob = (dispute: Record<string, unknown> = {}, status = 'disputed')
     disputed: true,
     status,
     amount: AMOUNT,
+    rejectionMask,
     dispute: {
       deadline: new BN(DEADLINE),
       arbitratorSetVersion: 4,
@@ -284,13 +285,17 @@ describe('dispute kanıtı', () => {
 });
 
 describe('arbitrator kuyruğu', () => {
-  it('açık dispute’lar son tarihe göre; oylar DisputeVote event’lerinden, oy durumu sayımdan', async () => {
-    // panel[0] oy verdi (bit 0), set sürümü config'le aynı.
-    const voted = await disputedJob({
-      approvalMask: 0b001,
-      approvalCount: 1,
-      resolution: { favorAgent: {} },
-    });
+  it('açık dispute’lar son tarihe göre; oylar onay ve ret event’lerinden, oy durumu iki maskeden', async () => {
+    // panel[0] öneriyi açtı (onay biti 0), panel[1] ret verdi (ret biti 1); set sürümü config'le aynı.
+    const voted = await disputedJob(
+      {
+        approvalMask: 0b001,
+        approvalCount: 1,
+        resolution: { favorAgent: {} },
+      },
+      'disputed',
+      0b010,
+    );
     const later = await disputedJob({ deadline: new BN(DEADLINE + 100) });
     const expired = await disputedJob({ deadline: new BN(NOW - 1) });
     // Eski set sürümündeki oy sayılmaz: sonraki oy sayımı sıfırlar.
@@ -301,6 +306,12 @@ describe('arbitrator kuyruğu', () => {
       arbitrator: new PublicKey(panel[0]!.address),
       resolution: { favorAgent: {} },
       approvalCount: 1,
+    });
+    await world.chainEvent(voted.address, 'DisputeVoteRejected', {
+      arbitrator: new PublicKey(panel[1]!.address),
+      resolution: { favorInstitution: {} },
+      rejectionCount: 1,
+      proposalReset: false,
     });
 
     const byFirst = await session(panel[0]!);
@@ -317,15 +328,31 @@ describe('arbitrator kuyruğu', () => {
     expect(expiredItem).toMatchObject({ hasVoted: false, canVote: false, threshold: 2 });
     expect(votedItem).toMatchObject({ hasVoted: true, canVote: false });
     expect(votedItem!.votes).toEqual([
-      expect.objectContaining({ arbitrator: panel[0]!.address, resolution: { kind: 'favorAgent' }, approvalCount: 1 }),
+      expect.objectContaining({
+        kind: 'approve',
+        arbitrator: panel[0]!.address,
+        resolution: { kind: 'favorAgent' },
+        approvalCount: 1,
+        rejectionCount: null,
+        proposalReset: false,
+      }),
+      expect.objectContaining({
+        kind: 'reject',
+        arbitrator: panel[1]!.address,
+        resolution: { kind: 'favorInstitution' },
+        approvalCount: null,
+        rejectionCount: 1,
+        proposalReset: false,
+      }),
     ]);
     expect(laterItem).toMatchObject({ hasVoted: false, canVote: true, votes: [] });
     expect(staleItem).toMatchObject({ hasVoted: false, canVote: true });
 
     const second = await (await session(panel[1]!)).getArbitrationQueue({ limit: 2, page: 1 });
+    // panel[1]'in reti de oydur: aynı öneriye yeniden oy veremez.
     expect(second.success && second.data.map((item) => [item.hasVoted, item.canVote])).toEqual([
       [false, false],
-      [false, true],
+      [true, false],
     ]);
     expect(await (await session(wallet())).getArbitrationQueue()).toMatchObject({ error: { code: 'forbidden' } });
     expect(await stack.api().getArbitrationQueue()).toMatchObject({ error: { code: 'unauthorized' } });
@@ -402,16 +429,25 @@ describe('oy', () => {
     expect(sponsored.success && decode(sponsored.data.transaction).feePayer).toBe(sponsor);
   });
 
-  it('üyelik, tekrar oy, ilk karara uyum, son tarih, tutar ve durum denetimleri', async () => {
+  it('üyelik, tekrar oy, ret oyu, son tarih, tutar ve durum denetimleri', async () => {
     const job = await disputedJob({ approvalMask: 0b001, approvalCount: 1, resolution: { favorAgent: {} } });
     const vote = (kind: 'favorAgent' | 'favorInstitution' | 'pending') =>
       ({ resolution: { kind }, feePayer: null, computeUnitPrice: null }) as const;
     expect(await (await session(panel[0]!)).prepareDisputeVote(job.address, vote('favorAgent'))).toMatchObject({
-      error: { code: 'conflict', message: 'arbitrator bu dispute’ta oy verdi' },
+      error: { code: 'conflict', message: 'arbitrator bekleyen öneriye oy verdi' },
     });
+    // Bekleyen öneriden farklı karar ret oyudur (ADR 0028); ret veren aynı öneriye yeniden oy veremez.
     const bySecond = await session(panel[1]!);
-    expect(await bySecond.prepareDisputeVote(job.address, vote('favorInstitution'))).toMatchObject({
-      error: { code: 'conflict', details: { resolution: { kind: 'favorAgent' } } },
+    const rejection = await bySecond.prepareDisputeVote(job.address, vote('favorInstitution'));
+    if (!rejection.success) throw new Error(JSON.stringify(rejection.error));
+    expect(decode(rejection.data.transaction).name).toBe('resolveDispute');
+    const rejectedBySecond = await disputedJob(
+      { approvalMask: 0b001, approvalCount: 1, resolution: { favorAgent: {} } },
+      'disputed',
+      0b010,
+    );
+    expect(await bySecond.prepareDisputeVote(rejectedBySecond.address, vote('favorAgent'))).toMatchObject({
+      error: { code: 'conflict', message: 'arbitrator bekleyen öneriye oy verdi' },
     });
     expect(await bySecond.prepareDisputeVote(job.address, vote('pending'))).toMatchObject({
       error: { code: 'invalid_input' },

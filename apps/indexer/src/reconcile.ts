@@ -102,6 +102,7 @@ const DISPUTE_COLUMNS = [
   'resolution',
   'lapsed',
   'approvalMask',
+  'rejectionMask',
   'approvalCount',
   'arbitratorSetVersion',
 ] as const;

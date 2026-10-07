@@ -2457,8 +2457,10 @@ export type SquareEscrowContract = {
     {
       "name": "resolveDispute",
       "docs": [
-        "One arbitrator vote. The first vote sets the pending resolution, later votes must match it;",
-        "reaching the threshold moves the job to `Resolved` (`DisputeDecided`). No funds move here."
+        "One arbitrator vote. The first vote opens a proposal; the same resolution approves it, a",
+        "different one rejects it (`DisputeVoteRejected`). When rejections make the threshold",
+        "unreachable the proposal is reset and the next vote opens a new one (ADR 0028). Reaching the",
+        "threshold moves the job to `Resolved` (`DisputeDecided`). No funds move here."
       ],
       "discriminator": [
         231,
@@ -2967,6 +2969,19 @@ export type SquareEscrowContract = {
       ]
     },
     {
+      "name": "disputeVoteRejected",
+      "discriminator": [
+        0,
+        16,
+        175,
+        230,
+        0,
+        233,
+        76,
+        89
+      ]
+    },
+    {
       "name": "escrowConfigUpdated",
       "discriminator": [
         165,
@@ -3286,12 +3301,12 @@ export type SquareEscrowContract = {
     {
       "code": 6024,
       "name": "alreadyVoted",
-      "msg": "Arbitrator has already voted on this dispute"
+      "msg": "Arbitrator has already voted on this proposal"
     },
     {
       "code": 6025,
       "name": "resolutionMismatch",
-      "msg": "Vote does not match the pending resolution"
+      "msg": "Vote must name a resolution"
     },
     {
       "code": 6026,
@@ -3882,6 +3897,38 @@ export type SquareEscrowContract = {
       }
     },
     {
+      "name": "disputeVoteRejected",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "job",
+            "type": "pubkey"
+          },
+          {
+            "name": "arbitrator",
+            "type": "pubkey"
+          },
+          {
+            "name": "resolution",
+            "type": {
+              "defined": {
+                "name": "disputeResolution"
+              }
+            }
+          },
+          {
+            "name": "rejectionCount",
+            "type": "u8"
+          },
+          {
+            "name": "proposalReset",
+            "type": "bool"
+          }
+        ]
+      }
+    },
+    {
       "name": "escrowConfig",
       "docs": [
         "Singleton. seeds = [\"config\"]"
@@ -4307,6 +4354,14 @@ export type SquareEscrowContract = {
                 "name": "settlementRail"
               }
             }
+          },
+          {
+            "name": "disputeRejectionMask",
+            "docs": [
+              "Arbitrators that rejected the pending proposal (ADR 0028): bit i = `config.arbitrators[i]`.",
+              "Appended last: accounts created before the field read their zero padding as no rejection."
+            ],
+            "type": "u8"
           }
         ]
       }

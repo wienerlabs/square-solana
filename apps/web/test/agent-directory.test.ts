@@ -212,6 +212,7 @@ describe('profile', () => {
         },
         deliveryUri: 'https://deliveries.example/report',
         rail: 'escrow',
+        disputeRejectionMask: 0,
       },
       payee: wallet,
       claim: null,

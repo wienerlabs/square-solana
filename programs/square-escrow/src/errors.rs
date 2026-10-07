@@ -56,9 +56,9 @@ pub enum EscrowError {
     InsufficientBond,
     #[msg("Signer is not an active arbitrator")]
     NotArbitrator,
-    #[msg("Arbitrator has already voted on this dispute")]
+    #[msg("Arbitrator has already voted on this proposal")]
     AlreadyVoted,
-    #[msg("Vote does not match the pending resolution")]
+    #[msg("Vote must name a resolution")]
     ResolutionMismatch,
     #[msg("Dispute has not reached the arbitrator threshold")]
     ResolutionNotDecided,

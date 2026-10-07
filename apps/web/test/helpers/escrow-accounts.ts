@@ -51,6 +51,8 @@ export interface JobFields {
   challenge_end?: number;
   policy?: PublicKey | null;
   dispute?: DisputeFields;
+  /** `Job.dispute_rejection_mask` (ADR 0028); yoksa 0. */
+  dispute_rejection_mask?: number;
 }
 
 const bn = (value: number | bigint) => new BN(value.toString());
@@ -100,6 +102,7 @@ export async function encodeJob(fields: JobFields): Promise<Buffer> {
     },
     delivery_uri: 'https://deliveries.example.org/work',
     rail: { Escrow: {} },
+    dispute_rejection_mask: fields.dispute_rejection_mask ?? 0,
   });
 }
 

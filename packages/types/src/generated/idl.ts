@@ -219,6 +219,16 @@ export const DisputeVoteSchema = z.object({
 });
 export type DisputeVote = z.infer<typeof DisputeVoteSchema>;
 
+/** escrow: DisputeVoteRejected */
+export const DisputeVoteRejectedSchema = z.object({
+  job: Address,
+  arbitrator: Address,
+  resolution: DisputeResolutionSchema,
+  rejectionCount: z.number().int().min(0).max(255),
+  proposalReset: z.boolean(),
+});
+export type DisputeVoteRejected = z.infer<typeof DisputeVoteRejectedSchema>;
+
 /** escrow: EscrowParams */
 export const EscrowParamsSchema = z.object({
   minChallengePeriod: U64,
@@ -344,6 +354,7 @@ export const JobSchema = z.object({
   dispute: DisputeInfoSchema,
   deliveryUri: z.string(),
   rail: SettlementRailSchema,
+  disputeRejectionMask: z.number().int().min(0).max(255),
 });
 export type Job = z.infer<typeof JobSchema>;
 
@@ -859,6 +870,7 @@ export const IDL_PROGRAMS = {
       "DisputeRaised",
       "DisputeResolved",
       "DisputeVote",
+      "DisputeVoteRejected",
       "EscrowConfigUpdated",
       "FiatJobCreated",
       "Finalized",
@@ -1023,12 +1035,12 @@ export const IDL_PROGRAMS = {
       {
         "code": 6024,
         "name": "AlreadyVoted",
-        "msg": "Arbitrator has already voted on this dispute"
+        "msg": "Arbitrator has already voted on this proposal"
       },
       {
         "code": 6025,
         "name": "ResolutionMismatch",
-        "msg": "Vote does not match the pending resolution"
+        "msg": "Vote must name a resolution"
       },
       {
         "code": 6026,
@@ -1183,6 +1195,7 @@ export const ProgramEventPayloadSchema = z.discriminatedUnion('name', [
   z.object({ program: z.literal('escrow'), name: z.literal('DisputeRaised'), data: DisputeRaisedSchema }),
   z.object({ program: z.literal('escrow'), name: z.literal('DisputeResolved'), data: DisputeResolvedSchema }),
   z.object({ program: z.literal('escrow'), name: z.literal('DisputeVote'), data: DisputeVoteSchema }),
+  z.object({ program: z.literal('escrow'), name: z.literal('DisputeVoteRejected'), data: DisputeVoteRejectedSchema }),
   z.object({ program: z.literal('escrow'), name: z.literal('EscrowConfigUpdated'), data: EscrowConfigUpdatedSchema }),
   z.object({ program: z.literal('escrow'), name: z.literal('FiatJobCreated'), data: FiatJobCreatedSchema }),
   z.object({ program: z.literal('escrow'), name: z.literal('Finalized'), data: FinalizedSchema }),

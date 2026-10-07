@@ -142,6 +142,7 @@ describe('tarama', () => {
       decidedAt: 0n,
       closedAt: 0n,
       approvalMask: 0b101,
+      rejectionMask: 0b010,
       approvalCount: 2,
       arbitratorSetVersion: 3n,
     });
@@ -378,11 +379,14 @@ describe('uzlaştırma', () => {
     ).toBeNull();
 
     // Oy sayımı sütunları (BE-22) zincirdekinden farklı: sapma sayılır ve onarılır.
-    await db.client.dispute.updateMany({ data: { approvalMask: 0, approvalCount: 0, arbitratorSetVersion: 0n } });
+    await db.client.dispute.updateMany({
+      data: { approvalMask: 0, rejectionMask: 0, approvalCount: 0, arbitratorSetVersion: 0n },
+    });
     const tally = await stack.reconciler.run({ repair: true });
     expect(tally.tables.find((t) => t.table === 'disputes')).toMatchObject({ stale: 1 });
     expect(await db.client.dispute.findFirstOrThrow()).toMatchObject({
       approvalMask: 0b101,
+      rejectionMask: 0b010,
       approvalCount: 2,
       arbitratorSetVersion: 3n,
     });

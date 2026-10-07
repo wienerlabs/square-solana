@@ -2,9 +2,10 @@ use anchor_lang::prelude::*;
 use square_common::seeds::{CONFIG_SEED, JOB_SEED};
 
 use crate::dispute;
+use crate::dispute::VoteOutcome;
 use crate::errors::EscrowError;
 use crate::state::{DisputeResolution, EscrowConfig, Job, JobStatus};
-use crate::{DisputeDecided, DisputeVote};
+use crate::{DisputeDecided, DisputeVote, DisputeVoteRejected};
 
 #[derive(Accounts)]
 pub struct ResolveDispute<'info> {
@@ -33,21 +34,40 @@ pub fn handler(ctx: Context<ResolveDispute>, resolution: DisputeResolution) -> R
     require!(now < job.dispute.deadline, EscrowError::DisputeWindowClosed);
     let index = dispute::arbitrator_index(config, &arbitrator)?;
     dispute::validate_vote(&resolution, job.amount)?;
-    let decided = dispute::tally(&mut job.dispute, config, index, resolution)?;
-    let job_key = job.key();
-    emit!(DisputeVote {
-        job: job_key,
-        arbitrator,
+    let state: &mut Job = job;
+    let outcome = dispute::tally(
+        &mut state.dispute,
+        &mut state.dispute_rejection_mask,
+        config,
+        index,
         resolution,
-        approval_count: job.dispute.approval_count,
-    });
-    if decided {
-        job.status = JobStatus::Resolved;
-        job.dispute.decided_at = now;
-        emit!(DisputeDecided {
+    )?;
+    let job_key = job.key();
+    match outcome {
+        VoteOutcome::Approved { decided } => {
+            emit!(DisputeVote {
+                job: job_key,
+                arbitrator,
+                resolution,
+                approval_count: job.dispute.approval_count,
+            });
+            if decided {
+                job.status = JobStatus::Resolved;
+                job.dispute.decided_at = now;
+                emit!(DisputeDecided {
+                    job: job_key,
+                    resolution,
+                });
+            }
+        }
+        // Bekleyen öneriden farklı oy, öneriye ret sayılır (ADR 0028 madde 4).
+        VoteOutcome::Rejected { rejections, reset } => emit!(DisputeVoteRejected {
             job: job_key,
+            arbitrator,
             resolution,
-        });
+            rejection_count: rejections,
+            proposal_reset: reset,
+        }),
     }
     Ok(())
 }
