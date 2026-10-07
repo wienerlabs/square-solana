@@ -17,6 +17,7 @@ export const LedgerEntrySchema = z.object({
   /** Tutarın sayıldığı UTC gününün başı (unix saniyesi). */
   day: z.number().int(),
   createdAt: z.number().int(),
+  deadline: z.number().int().optional(),
   /** `reserved`: tutar ayrıldı, job henüz fonlanmadı; `funded`: escrow kilitli. */
   status: z.enum(['reserved', 'funded']),
   /** Zincire bağlanan Travel Rule commitment'ı; kaydın kendisi Square API'sinde şifrelidir, burada değil. */
@@ -35,6 +36,7 @@ export interface DelegationLedger {
   get(job: string): LedgerEntry | null;
   /** UTC gününde bağlanan toplam. */
   spentOn(day: number): bigint;
+  jobsOn(day: number): number;
   put(entry: LedgerEntry): void;
   remove(job: string): void;
   /** Defterdeki job adresleri, açılış sırasıyla. */
@@ -52,6 +54,12 @@ class MemoryLedger implements DelegationLedger {
     let total = 0n;
     for (const entry of this.entries.values()) if (entry.day === dayStart(day)) total += BigInt(entry.amount);
     return total;
+  }
+
+  jobsOn(day: number): number {
+    let count = 0;
+    for (const entry of this.entries.values()) if (entry.day === dayStart(day)) count += 1;
+    return count;
   }
 
   put(entry: LedgerEntry): void {

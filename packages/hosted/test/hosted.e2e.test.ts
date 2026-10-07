@@ -173,6 +173,7 @@ beforeAll(async () => {
       ],
       deadlineSecs: 3_600,
       challengePeriodSecs: 600,
+      maxJobsPerDay: 20,
       ledgerPath: 'state/ledger.json',
     },
   });
