@@ -1,23 +1,29 @@
 import { readFileSync } from 'node:fs';
 import { dirname, isAbsolute, resolve } from 'node:path';
 import { PublicKey } from '@solana/web3.js';
+import { DELIVERY_URI_MAX_BYTES } from '@squaresdk/solana-agent-sdk';
+import { REFUSAL, type RefusalRule } from '@squaresdk/solana-policy';
 import {
   Address,
+  ClusterConfigSchema,
   KeyPath,
   PositiveSecs,
   U64,
   parseClusterConfig,
   type ClusterConfig,
 } from '@squaresdk/solana-smoke/config';
-import { POLICY_CIRCUIT_LIMITS, PolicyCategorySchema } from '@squaresdk/solana-types';
+import { POLICY_CIRCUIT_LIMITS, PolicyCategorySchema, TimeWindowSchema } from '@squaresdk/solana-types';
 import { z } from 'zod';
-import { DEFAULT_REPORT_SIGNATURES, MAX_REPORT_ACCOUNTS, MAX_REPORT_SIGNATURES } from './report.js';
+import { basePathOf, DELIVERIES_PATH } from './delivery.js';
+import { RPC_MAX_MULTIPLE_ACCOUNTS, RPC_MAX_SIGNATURES, type ReportLimits } from './report.js';
 
 export const REPORT_ROLES = ['payer', 'institution', 'agent', 'buyer', 'keeper'] as const;
 export type ReportRole = (typeof REPORT_ROLES)[number];
 export const MAX_POLICIES = 8;
 export const MAX_EXTRA_BUYERS = 15;
-export const MAX_PUBLIC_URL_LENGTH = 52;
+export const MAX_CALLER_INSTITUTIONS = 8;
+const WORK_HASH_HEX_LENGTH = 64;
+const REFUSAL_RULES = Object.keys(REFUSAL) as [RefusalRule, ...RefusalRule[]];
 
 const ROLE_TARGET = new RegExp(`^(${REPORT_ROLES.join('|')})(:usdc)?$`);
 const NAME = /^[a-z0-9][a-z0-9-]{0,31}$/;
@@ -36,6 +42,17 @@ const isAddress = (value: string) => {
 export const isReportTarget = (value: string) =>
   ROLE_TARGET.test(value) || value === 'mint' || value === 'institution:pda' || isAddress(value);
 
+export function deliveryUriBytes(publicUrl: string): number {
+  const prefix = `${new URL(publicUrl).origin}${basePathOf(publicUrl)}${DELIVERIES_PATH}/`;
+  return Buffer.byteLength(prefix, 'utf8') + WORK_HASH_HEX_LENGTH;
+}
+
+export function expectedRefusalCode(rules: readonly RefusalRule[]): number {
+  return rules.reduce((code, rule) => code | REFUSAL[rule], 0);
+}
+
+const distinct = (items: readonly unknown[]) => new Set(items.map(String)).size === items.length;
+
 const Name = z.string().regex(NAME, 'küçük harf, rakam ve tire (en fazla 32)');
 const Positive = U64.refine((value) => value > 0n, { message: 'sıfır olamaz' });
 
@@ -48,8 +65,29 @@ const PolicySchema = z.object({
     .min(1)
     .max(POLICY_CIRCUIT_LIMITS.allowedCategories)
     .refine((items) => new Set(items).size === items.length, { message: 'kategori tekrar edemez' }),
+  timeWindow: TimeWindowSchema.nullable(),
 });
 export type DemoPolicyValues = z.infer<typeof PolicySchema>;
+
+const RetrySchema = z
+  .object({
+    minDelayMs: z.number().int().positive(),
+    maxDelayMs: z.number().int().positive(),
+    submitMarginSecs: z.number().int().min(0),
+  })
+  .refine((retry) => retry.maxDelayMs >= retry.minDelayMs, {
+    message: 'maxDelayMs, minDelayMs değerinden küçük olamaz',
+    path: ['maxDelayMs'],
+  });
+
+const TimingSchema = z.object({
+  taskTimeoutSecs: PositiveSecs,
+  claimListingTimeoutSecs: PositiveSecs,
+  a2aRequestTimeoutSecs: PositiveSecs,
+  pollIntervalMs: z.number().int().positive(),
+  proofDayMarginSecs: PositiveSecs,
+});
+export type DemoTiming = z.infer<typeof TimingSchema>;
 
 const SeedSchema = z.object({
   institutionName: z
@@ -81,11 +119,20 @@ const AgentSchema = z.object({
     .url({ protocol: /^https$/ })
     .transform((value) => value.replace(/\/+$/, ''))
     .refine((value) => !/[?#]/.test(value), { message: 'sorgu ya da parça içeremez' })
-    .refine((value) => value.length <= MAX_PUBLIC_URL_LENGTH, {
-      message: `en fazla ${MAX_PUBLIC_URL_LENGTH} karakter (teslimat adresi 128 baytı aşmamalı)`,
+    .refine((value) => deliveryUriBytes(value) <= DELIVERY_URI_MAX_BYTES, {
+      message: `teslimat adresi (<publicUrl>${DELIVERIES_PATH}/<64 hex>) ${DELIVERY_URI_MAX_BYTES} baytı aşıyor`,
     }),
   price: Positive,
   autoListClaimBps: z.number().int().min(1).max(9_999).optional(),
+  maxReportAccounts: z.number().int().min(1).max(RPC_MAX_MULTIPLE_ACCOUNTS),
+  maxReportSignatures: z.number().int().min(0).max(RPC_MAX_SIGNATURES),
+  retry: RetrySchema,
+  institutions: z
+    .array(Address)
+    .max(MAX_CALLER_INSTITUTIONS)
+    .refine(distinct, { message: 'kurum adresi tekrar edemez' })
+    .default([]),
+  wallet: Address.optional(),
 });
 
 const ScenarioSchema = z
@@ -97,12 +144,16 @@ const ScenarioSchema = z
     challengePeriodSecs: PositiveSecs,
     deadlineSecs: PositiveSecs,
     claimSale: z.boolean().default(false),
+    refusalRules: z
+      .array(z.enum(REFUSAL_RULES))
+      .min(1)
+      .refine(distinct, { message: 'ret kuralı tekrar edemez' })
+      .optional(),
     report: z.object({
       targets: z
         .array(z.string().refine(isReportTarget, { message: 'rol, rol:usdc, institution:pda, mint ya da adres' }))
-        .min(1)
-        .max(MAX_REPORT_ACCOUNTS),
-      signatures: z.number().int().min(0).max(MAX_REPORT_SIGNATURES).default(DEFAULT_REPORT_SIGNATURES),
+        .min(1),
+      signatures: z.number().int().min(0),
     }),
   })
   .refine((s) => s.deadlineSecs > s.challengePeriodSecs, {
@@ -112,12 +163,16 @@ const ScenarioSchema = z
   .refine((s) => !(s.claimSale && s.expect === 'refused'), {
     message: 'ret senaryosunda alacak satılmaz (alıcıya ödenmez)',
     path: ['claimSale'],
+  })
+  .refine((s) => (s.expect === 'refused') === (s.refusalRules !== undefined), {
+    message: 'refusalRules ret senaryosunda zorunlu, onay senaryosunda verilmez',
+    path: ['refusalRules'],
   });
 export type ScenarioValues = z.infer<typeof ScenarioSchema>;
 
 const DemoSchema = z.object({
   agent: AgentSchema,
-  taskTimeoutSecs: PositiveSecs.default(180),
+  timing: TimingSchema,
   scenarios: z.record(Name, ScenarioSchema).refine((items) => Object.keys(items).length >= 1, {
     message: 'en az bir senaryo',
   }),
@@ -143,6 +198,20 @@ const SectionsSchema = z
           message: `agent'ın fiyatından (${demo.agent.price}) az`,
         });
       }
+      if (scenario.report.targets.length > demo.agent.maxReportAccounts) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['demo', 'scenarios', name, 'report', 'targets'],
+          message: `en fazla demo.agent.maxReportAccounts (${demo.agent.maxReportAccounts}) hedef`,
+        });
+      }
+      if (scenario.report.signatures > demo.agent.maxReportSignatures) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['demo', 'scenarios', name, 'report', 'signatures'],
+          message: `en fazla demo.agent.maxReportSignatures (${demo.agent.maxReportSignatures})`,
+        });
+      }
       if (scenario.claimSale && demo.agent.autoListClaimBps === undefined) {
         ctx.addIssue({
           code: 'custom',
@@ -157,21 +226,50 @@ export type SeedValues = z.infer<typeof SeedSchema>;
 export type DemoValues = z.infer<typeof DemoSchema>;
 export type DemoAgentSettings = DemoValues['agent'];
 
+export const reportLimitsOf = (
+  agent: Pick<DemoAgentSettings, 'maxReportAccounts' | 'maxReportSignatures'>,
+): ReportLimits => ({
+  maxAccounts: agent.maxReportAccounts,
+  maxSignatures: agent.maxReportSignatures,
+});
+
 export interface DemoConfig {
   cluster: ClusterConfig;
   seed: SeedValues | undefined;
   demo: DemoValues | undefined;
 }
 
+const AgentConfigSchema = ClusterConfigSchema.pick({
+  cluster: true,
+  rpcUrl: true,
+  commitment: true,
+  programIds: true,
+  lookupTable: true,
+  computeUnitPrice: true,
+}).extend({
+  keys: z.object({ agent: KeyPath }),
+  demo: z.object({ agent: AgentSchema }),
+});
+export type AgentConfig = z.infer<typeof AgentConfigSchema>;
+
 const resolvePath = (baseDir: string, path: string) => (isAbsolute(path) ? path : resolve(baseDir, path));
+
+function issuesOf(error: z.ZodError): string {
+  return error.issues.map((issue) => `  ${issue.path.join('.') || '(kök)'}: ${issue.message}`).join('\n');
+}
+
+function readConfigFile(path: string): unknown {
+  try {
+    return JSON.parse(readFileSync(path, 'utf8'));
+  } catch (error) {
+    throw new Error(`yapılandırma okunamadı (${path}): ${(error as Error).message}`, { cause: error });
+  }
+}
 
 export function parseDemoConfig(raw: unknown, baseDir: string, env: NodeJS.ProcessEnv = {}): DemoConfig {
   const cluster = parseClusterConfig(raw, baseDir, env);
   const result = SectionsSchema.safeParse(raw);
-  if (!result.success) {
-    const issues = result.error.issues.map((issue) => `  ${issue.path.join('.') || '(kök)'}: ${issue.message}`);
-    throw new Error(`demo yapılandırması geçersiz:\n${issues.join('\n')}`);
-  }
+  if (!result.success) throw new Error(`demo yapılandırması geçersiz:\n${issuesOf(result.error)}`);
   const { seed, demo } = result.data;
   return {
     cluster,
@@ -185,13 +283,20 @@ export function parseDemoConfig(raw: unknown, baseDir: string, env: NodeJS.Proce
 }
 
 export function loadDemoConfig(path: string, env: NodeJS.ProcessEnv = process.env): DemoConfig {
-  let raw: unknown;
-  try {
-    raw = JSON.parse(readFileSync(path, 'utf8'));
-  } catch (error) {
-    throw new Error(`yapılandırma okunamadı (${path}): ${(error as Error).message}`, { cause: error });
-  }
-  return parseDemoConfig(raw, dirname(resolve(path)), env);
+  return parseDemoConfig(readConfigFile(path), dirname(resolve(path)), env);
+}
+
+export function parseAgentConfig(raw: unknown, baseDir: string, env: NodeJS.ProcessEnv = {}): AgentConfig {
+  const rpcOverride = env.SMOKE_RPC_URL?.trim();
+  const input =
+    rpcOverride && typeof raw === 'object' && raw !== null ? { ...(raw as object), rpcUrl: rpcOverride } : raw;
+  const result = AgentConfigSchema.safeParse(input);
+  if (!result.success) throw new Error(`agent yapılandırması geçersiz:\n${issuesOf(result.error)}`);
+  return { ...result.data, keys: { agent: resolvePath(baseDir, result.data.keys.agent) } };
+}
+
+export function loadAgentConfig(path: string, env: NodeJS.ProcessEnv = process.env): AgentConfig {
+  return parseAgentConfig(readConfigFile(path), dirname(resolve(path)), env);
 }
 
 export function requireSeed(config: DemoConfig): SeedValues {

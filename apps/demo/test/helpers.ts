@@ -15,13 +15,28 @@ export const USDC_DEVNET = '4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU';
 export const tempDir = (prefix = 'square-demo-test-') => mkdtempSync(join(tmpdir(), prefix));
 export const address = () => Keypair.generate().publicKey.toBase58();
 
+export const EVERY_DAY = {
+  days: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'],
+  startHourUtc: 0,
+  endHourUtc: 23,
+};
+
 export const policy = (overrides: Record<string, unknown> = {}) => ({
   maxPerTx: '10000000',
   maxDaily: '100000000',
   dailyCeiling: '200000000',
   categories: ['research'],
+  timeWindow: EVERY_DAY,
   ...overrides,
 });
+
+export const TIMING = {
+  taskTimeoutSecs: 180,
+  claimListingTimeoutSecs: 60,
+  a2aRequestTimeoutSecs: 30,
+  pollIntervalMs: 500,
+  proofDayMarginSecs: 180,
+};
 
 export const scenario = (overrides: Record<string, unknown> = {}) => ({
   policy: 'standard',
@@ -30,7 +45,7 @@ export const scenario = (overrides: Record<string, unknown> = {}) => ({
   paymentCategory: 'research',
   challengePeriodSecs: 60,
   deadlineSecs: 3_600,
-  report: { targets: ['institution', 'institution:usdc', 'mint'] },
+  report: { targets: ['institution', 'institution:usdc', 'mint'], signatures: 5 },
   ...overrides,
 });
 
@@ -80,14 +95,30 @@ export function rawDemoConfig(
         publicUrl: 'https://agent.example.org/',
         price: '1000000',
         autoListClaimBps: 300,
+        maxReportAccounts: 8,
+        maxReportSignatures: 10,
+        retry: { minDelayMs: 1_000, maxDelayMs: 30_000, submitMarginSecs: 30 },
         ...overrides.agent,
       },
+      timing: TIMING,
       scenarios: {
         approved: scenario(),
-        refused: scenario({ policy: 'strict', expect: 'refused' }),
+        refused: scenario({ policy: 'strict', expect: 'refused', refusalRules: ['perTx'] }),
       },
       ...overrides.demo,
     },
     ...overrides.root,
+  };
+}
+
+export function rawAgentConfig(agent: Record<string, unknown> = {}) {
+  const full = rawDemoConfig();
+  return {
+    cluster: full.cluster,
+    rpcUrl: full.rpcUrl,
+    commitment: full.commitment,
+    programIds: full.programIds,
+    keys: { agent: 'keys/agent.json' },
+    demo: { agent: { ...full.demo.agent, ...agent } },
   };
 }

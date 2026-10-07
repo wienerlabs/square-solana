@@ -12,10 +12,14 @@ import type { AgentCapability, JobHandler } from '@squaresdk/solana-agent-sdk';
 import { SQUARE_IDLS, specHashing, type SquareProgramIds, type SquareProgramName } from '@squaresdk/solana-sdk';
 
 export const ACCOUNT_REPORT_ID = 'solana.account-report';
-export const MAX_REPORT_ACCOUNTS = 8;
-export const MAX_REPORT_SIGNATURES = 10;
-export const DEFAULT_REPORT_SIGNATURES = 5;
+export const RPC_MAX_MULTIPLE_ACCOUNTS = 100;
+export const RPC_MAX_SIGNATURES = 1_000;
 const SOL_DECIMALS = 9;
+
+export interface ReportLimits {
+  maxAccounts: number;
+  maxSignatures: number;
+}
 
 export type ChainReader = Pick<
   Connection,
@@ -139,11 +143,11 @@ const canonicalAddress = (value: unknown): PublicKey | null => {
   }
 };
 
-export function parseReportSpec(spec: unknown): ReportRequest {
+export function parseReportSpec(spec: unknown, limits: ReportLimits): ReportRequest {
   if (!isRecord(spec)) throw new Error('job spec bir JSON nesnesi olmalı');
   const { accounts, signatures } = spec;
-  if (!Array.isArray(accounts) || accounts.length === 0 || accounts.length > MAX_REPORT_ACCOUNTS) {
-    throw new Error(`spec.accounts 1 ile ${MAX_REPORT_ACCOUNTS} arası adres listesi olmalı`);
+  if (!Array.isArray(accounts) || accounts.length === 0 || accounts.length > limits.maxAccounts) {
+    throw new Error(`spec.accounts 1 ile ${limits.maxAccounts} arası adres listesi olmalı`);
   }
   const keys = accounts.map((value, index) => {
     const key = canonicalAddress(value);
@@ -153,16 +157,20 @@ export function parseReportSpec(spec: unknown): ReportRequest {
   if (new Set(keys.map((key) => key.toBase58())).size !== keys.length) {
     throw new Error('spec.accounts tekrar eden adres içeriyor');
   }
-  const count = signatures ?? DEFAULT_REPORT_SIGNATURES;
-  if (typeof count !== 'number' || !Number.isInteger(count) || count < 0 || count > MAX_REPORT_SIGNATURES) {
-    throw new Error(`spec.signatures 0 ile ${MAX_REPORT_SIGNATURES} arası tamsayı olmalı`);
+  if (
+    typeof signatures !== 'number' ||
+    !Number.isInteger(signatures) ||
+    signatures < 0 ||
+    signatures > limits.maxSignatures
+  ) {
+    throw new Error(`spec.signatures 0 ile ${limits.maxSignatures} arası tamsayı olmalı`);
   }
-  return { accounts: keys, signatures: count };
+  return { accounts: keys, signatures };
 }
 
-export function reportSpecError(spec: unknown): string | null {
+export function reportSpecError(spec: unknown, limits: ReportLimits): string | null {
   try {
-    parseReportSpec(spec);
+    parseReportSpec(spec, limits);
     return null;
   } catch (error) {
     return error instanceof Error ? error.message : String(error);
@@ -394,9 +402,13 @@ export function accountReportCapability(price: bigint): AgentCapability {
   };
 }
 
-export function accountReportHandler(params: { reader: ChainReader; programIds: SquareProgramIds }): JobHandler {
+export function accountReportHandler(params: {
+  reader: ChainReader;
+  programIds: SquareProgramIds;
+  limits: ReportLimits;
+}): JobHandler {
   return async (request) => {
-    const parsed = parseReportSpec(request.spec);
+    const parsed = parseReportSpec(request.spec, params.limits);
     await request.progress(`${parsed.accounts.length} hesap okunuyor`);
     const report = await buildAccountReport(params.reader, parsed, {
       job: request.job.address,

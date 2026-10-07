@@ -13,8 +13,16 @@ import { roleKey } from '@squaresdk/solana-smoke/keys';
 import { utc } from '@squaresdk/solana-smoke/smoke';
 import BN from 'bn.js';
 import { createDemoAgent } from './agent.js';
+import { assertSupportedCluster } from './cluster.js';
 import { requireDemo, requireSeed, type DemoConfig } from './demo-config.js';
-import { demoBuyerTree, demoPolicies, loadOrCreatePolicySecret, type DemoPolicy } from './policies.js';
+import {
+  demoBuyerTree,
+  demoPolicies,
+  demoPolicyId,
+  loadOrCreatePolicySecret,
+  policySecretExists,
+  type DemoPolicy,
+} from './policies.js';
 
 export type SeedActionKind = 'created' | 'updated' | 'funded' | 'unchanged';
 
@@ -24,6 +32,10 @@ export interface SeedAction {
   action: SeedActionKind;
   detail: string;
   signature: string | null;
+}
+
+export interface SeedOptions {
+  rotatePolicySecret?: boolean;
 }
 
 export interface SeedResult {
@@ -70,7 +82,7 @@ export function topUp(current: bigint, target: bigint): bigint {
   return current >= target ? 0n : target - current;
 }
 
-export async function runSeed(context: Context, config: DemoConfig): Promise<SeedResult> {
+export async function runSeed(context: Context, config: DemoConfig, options: SeedOptions = {}): Promise<SeedResult> {
   const { client, connection } = context;
   const cluster = context.config;
   const values = requireSeed(config);
@@ -94,6 +106,7 @@ export async function runSeed(context: Context, config: DemoConfig): Promise<See
   const send = async (step: string, label: string, build: () => Promise<BuiltTx>, signers: Keypair[]) =>
     (await context.sender.send(step, label, build, signers)).signature;
 
+  await assertSupportedCluster(connection, cluster.cluster);
   const [registryConfig, escrowConfig, verifierConfig] = await Promise.all([
     client.registry.fetch('registryConfig', pda.registryConfig()[0]),
     client.escrow.fetch('escrowConfig', pda.escrowConfig()[0]),
@@ -114,6 +127,85 @@ export async function runSeed(context: Context, config: DemoConfig): Promise<See
     return info ? BigInt((await connection.getTokenAccountBalance(ata(owner))).value.amount) : null;
   };
   context.log(`seed ${cluster.cluster}: mint ${mint.toBase58()} (${mintInfo.decimals} ondalık)`);
+
+  if (demo.agent.wallet && !demo.agent.wallet.equals(key.agent.publicKey)) {
+    throw new Error(
+      `demo.agent.wallet ${demo.agent.wallet.toBase58()}, agent anahtarı ${key.agent.publicKey.toBase58()}`,
+    );
+  }
+  const institutionPda = pda.institution(key.institution.publicKey)[0];
+  const institution = await client.policy.fetch('institution', institutionPda);
+  if (institution?.multisigVault) {
+    throw new Error(
+      `kurum bir Squads vault'una bağlı (${institution.multisigVault.toBase58()}); demo anahtarlı kurum ister`,
+    );
+  }
+
+  const screeningNow = await chainTime(connection);
+  const screeningPlan = await Promise.all(
+    (
+      [
+        ['institution', key.institution.publicKey],
+        ['agent', key.agent.publicKey],
+        ['buyer', key.buyer.publicKey],
+      ] as const
+    ).map(async ([role, wallet]) => {
+      const address = pda.screeningRecord(wallet)[0];
+      return { role, wallet, address, existing: await client.registry.fetch('screeningRecord', address) };
+    }),
+  );
+  for (const { role, wallet, existing } of screeningPlan) {
+    if (existing && variantOf(existing.status) === 'flagged') {
+      throw new Error(
+        `${role} cüzdanı screening'de işaretli (Flagged): ${wallet.toBase58()}; demo bu cüzdanla kurulamaz`,
+      );
+    }
+  }
+  const isFresh = (existing: (typeof screeningPlan)[number]['existing']) =>
+    existing !== null &&
+    variantOf(existing.status) === 'clear' &&
+    existing.expiresAt.toNumber() - screeningNow >= values.screening.minRemainingSecs;
+  const screeningToWrite = screeningPlan.filter((item) => !isFresh(item.existing));
+  const screener = context.keys.screener;
+  if (screeningToWrite.length > 0) {
+    if (!screener) {
+      throw new Error(
+        `${screeningToWrite.map((item) => item.role).join(', ')} için güncel screening kaydı yok ve yapılandırmada screener anahtarı yok: kaydı screener servisi ya da scripts/deploy/record-screening.mjs yazar`,
+      );
+    }
+    if (!registryConfig.screenerAuthority.equals(screener.publicKey)) {
+      throw new Error(`screener anahtarı config'tekinden farklı: ${registryConfig.screenerAuthority.toBase58()}`);
+    }
+  }
+
+  const policyNames = Object.keys(values.policies);
+  const noDemoPolicyOnChain = (
+    await Promise.all(
+      policyNames.map((name) => client.policy.fetch('policy', pda.policy(institutionPda, demoPolicyId(name))[0])),
+    )
+  ).every((account) => account === null);
+  const allowCreate =
+    options.rotatePolicySecret === true || noDemoPolicyOnChain || policySecretExists(values.policySecret);
+  const { secret, created: secretCreated } = loadOrCreatePolicySecret(values.policySecret, { allowCreate });
+  if (secretCreated) context.log(`  politika sırrı üretildi: ${values.policySecret} (0600)`);
+  const policies = demoPolicies({ secret, institutionPda, mint, pda, policies: values.policies });
+  const buyers = [key.buyer.publicKey, ...values.extraBuyers];
+  const tree = demoBuyerTree(secret, buyers);
+
+  const payerUsdc = (await tokenBalance(key.payer.publicKey)) ?? 0n;
+  const usdcTargets = [
+    ['institution', key.institution.publicKey, values.funding.institutionUsdc],
+    ['buyer', key.buyer.publicKey, values.funding.buyerUsdc],
+  ] as const;
+  const deficits = await Promise.all(
+    usdcTargets.map(async ([, wallet, target]) => topUp((await tokenBalance(wallet)) ?? 0n, target)),
+  );
+  const needed = deficits.reduce((sum, value) => sum + value, 0n);
+  if (needed > payerUsdc) {
+    throw new Error(
+      `payer'ın settlement token bakiyesi ${payerUsdc}, dağıtım için ${needed} gerekli (${ata(key.payer.publicKey).toBase58()}); devnet'te Circle faucet ile payer'ın adresine USDC alınır`,
+    );
+  }
 
   async function fundSol(step: string) {
     for (const [role, wallet, target] of [
@@ -141,20 +233,6 @@ export async function runSeed(context: Context, config: DemoConfig): Promise<See
 
   await fundSol('sol');
 
-  const payerUsdc = (await tokenBalance(key.payer.publicKey)) ?? 0n;
-  const usdcTargets = [
-    ['institution', key.institution.publicKey, values.funding.institutionUsdc],
-    ['buyer', key.buyer.publicKey, values.funding.buyerUsdc],
-  ] as const;
-  const deficits = await Promise.all(
-    usdcTargets.map(async ([, wallet, target]) => topUp((await tokenBalance(wallet)) ?? 0n, target)),
-  );
-  const needed = deficits.reduce((sum, value) => sum + value, 0n);
-  if (needed > payerUsdc) {
-    throw new Error(
-      `payer'ın settlement token bakiyesi ${payerUsdc}, dağıtım için ${needed} gerekli (${ata(key.payer.publicKey).toBase58()}); devnet'te Circle faucet ile payer'ın adresine USDC alınır`,
-    );
-  }
   for (const [index, [role, wallet, target]] of usdcTargets.entries()) {
     const missing = deficits[index]!;
     if (missing === 0n) {
@@ -223,24 +301,8 @@ export async function runSeed(context: Context, config: DemoConfig): Promise<See
   }
 
   const screening: SeedResult['screening'] = [];
-  for (const [role, wallet] of [
-    ['institution', key.institution.publicKey],
-    ['agent', key.agent.publicKey],
-    ['buyer', key.buyer.publicKey],
-  ] as const) {
-    const address = pda.screeningRecord(wallet)[0];
-    const existing = await client.registry.fetch('screeningRecord', address);
-    const now = await chainTime(connection);
-    if (existing && variantOf(existing.status) === 'flagged') {
-      throw new Error(
-        `${role} cüzdanı screening'de işaretli (Flagged): ${wallet.toBase58()}; demo bu cüzdanla kurulamaz`,
-      );
-    }
-    if (
-      existing &&
-      variantOf(existing.status) === 'clear' &&
-      existing.expiresAt.toNumber() - now >= values.screening.minRemainingSecs
-    ) {
+  for (const { role, wallet, address, existing } of screeningPlan) {
+    if (existing && isFresh(existing)) {
       screening.push({
         role,
         wallet: wallet.toBase58(),
@@ -256,20 +318,12 @@ export async function runSeed(context: Context, config: DemoConfig): Promise<See
       });
       continue;
     }
-    const screener = context.keys.screener;
-    if (!screener) {
-      throw new Error(
-        `${role} için güncel screening kaydı yok ve yapılandırmada screener anahtarı yok: kaydı screener servisi ya da scripts/deploy/record-screening.mjs yazar`,
-      );
-    }
-    if (!registryConfig.screenerAuthority.equals(screener.publicKey)) {
-      throw new Error(`screener anahtarı config'tekinden farklı: ${registryConfig.screenerAuthority.toBase58()}`);
-    }
+    const authority = screener!;
     const ix = await client.registry.program.methods
       .recordScreening(wallet, { clear: {} }, Array.from(screeningEvidenceHash(cluster.cluster, role, wallet)))
       .accountsStrict({
         payer: key.payer.publicKey,
-        screenerAuthority: screener.publicKey,
+        screenerAuthority: authority.publicKey,
         config: pda.registryConfig()[0],
         screeningRecord: address,
         systemProgram: SystemProgram.programId,
@@ -279,7 +333,7 @@ export async function runSeed(context: Context, config: DemoConfig): Promise<See
       'seed',
       `screening: ${role}`,
       () => client.buildTx([ix], withComputeProfile(opts(key.payer), 'recordScreening')),
-      [key.payer, screener],
+      [key.payer, authority],
     );
     const written = await client.registry.fetch('screeningRecord', address);
     if (!written || variantOf(written.status) !== 'clear') throw new Error(`${role} screening kaydı yazılmadı`);
@@ -293,13 +347,6 @@ export async function runSeed(context: Context, config: DemoConfig): Promise<See
     });
   }
 
-  const institutionPda = pda.institution(key.institution.publicKey)[0];
-  const institution = await client.policy.fetch('institution', institutionPda);
-  if (institution?.multisigVault) {
-    throw new Error(
-      `kurum bir Squads vault'una bağlı (${institution.multisigVault.toBase58()}); demo anahtarlı kurum ister`,
-    );
-  }
   if (institution) {
     record({
       step: 'kurum',
@@ -332,12 +379,6 @@ export async function runSeed(context: Context, config: DemoConfig): Promise<See
       signature,
     });
   }
-
-  const { secret, created: secretCreated } = loadOrCreatePolicySecret(values.policySecret);
-  if (secretCreated) context.log(`  politika sırrı üretildi: ${values.policySecret} (0600)`);
-  const policies = demoPolicies({ secret, institutionPda, mint, pda, policies: values.policies });
-  const buyers = [key.buyer.publicKey, ...values.extraBuyers];
-  const tree = demoBuyerTree(secret, buyers);
 
   async function seedPolicy(policy: DemoPolicy): Promise<SeedResult['policies'][number]> {
     const account = await client.policy.fetch('policy', policy.address);
@@ -430,6 +471,7 @@ export async function runSeed(context: Context, config: DemoConfig): Promise<See
     commitment: cluster.commitment,
     programIds: cluster.programIds,
     callers: [],
+    listClaims: false,
     tx: {
       ...(cluster.computeUnitPrice === undefined ? {} : { computeUnitPrice: BigInt(cluster.computeUnitPrice) }),
       ...(cluster.lookupTable ? { addressLookupTables: [cluster.lookupTable] } : {}),

@@ -1,4 +1,4 @@
-import { readFileSync, statSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { Connection, Keypair, PublicKey } from '@solana/web3.js';
 import { getBuyerProof, verifyBuyerProof } from '@squaresdk/solana-policy';
@@ -12,6 +12,7 @@ import {
   demoPolicyDocument,
   demoPolicyId,
   loadOrCreatePolicySecret,
+  policySecretExists,
   readPolicySecret,
 } from '../src/policies.js';
 import { IDS, tempDir } from './helpers.js';
@@ -27,28 +28,58 @@ const { pda } = createSquareClient({
   commitment: 'confirmed',
 });
 const key = () => Keypair.generate().publicKey;
-const values = (maxPerTx: bigint) => ({
+const WINDOW = {
+  days: ['monday', 'friday'] as ('monday' | 'friday')[],
+  startHourUtc: 9,
+  endHourUtc: 17,
+};
+const values = (maxPerTx: bigint, timeWindow: typeof WINDOW | null = WINDOW) => ({
   maxPerTx,
   maxDaily: 100_000_000n,
   dailyCeiling: 200_000_000n,
   categories: ['research'],
+  timeWindow,
 });
 
 describe('politika sırrı', () => {
   it('yoksa 0600 izinle üretilir; varsa aynısı okunur', () => {
     const path = join(tempDir(), 'policy-secret');
-    const created = loadOrCreatePolicySecret(path);
+    expect(policySecretExists(path)).toBe(false);
+    const created = loadOrCreatePolicySecret(path, { allowCreate: true });
     expect(created.created).toBe(true);
+    expect(policySecretExists(path)).toBe(true);
     expect(created.secret).toHaveLength(32);
     expect(statSync(path).mode & 0o777).toBe(0o600);
     expect(readFileSync(path, 'utf8')).toBe(`${Buffer.from(created.secret).toString('hex')}\n`);
-    const again = loadOrCreatePolicySecret(path);
+    const again = loadOrCreatePolicySecret(path, { allowCreate: false });
     expect(again.created).toBe(false);
     expect(again.secret).toEqual(created.secret);
   });
 
+  it('izin verilmezse sır üretilmez: yanlış yol yeni sırla politikaları güncellemez', () => {
+    const path = join(tempDir(), 'mistyped-secret');
+    expect(() => loadOrCreatePolicySecret(path, { allowCreate: false })).toThrow(/--rotate-policy-secret/);
+    expect(policySecretExists(path)).toBe(false);
+  });
+
+  it('dizini olmayan yol ve depoya bağlanan sembolik dizin reddedilir', () => {
+    expect(() => loadOrCreatePolicySecret(join(tempDir(), 'yok', 'policy-secret'), { allowCreate: true })).toThrow(
+      /dizini yok/,
+    );
+    const dir = tempDir();
+    symlinkSync(join(REPO_ROOT, 'apps', 'demo'), join(dir, 'link'));
+    expect(() => loadOrCreatePolicySecret(join(dir, 'link', 'policy-secret'), { allowCreate: true })).toThrow(
+      /depo içinde/,
+    );
+    const nested = join(tempDir(), 'state');
+    mkdirSync(nested);
+    expect(loadOrCreatePolicySecret(join(nested, 'policy-secret'), { allowCreate: true }).created).toBe(true);
+  });
+
   it('depo içindeki yol okunmadan reddedilir; bozuk içerik adıyla raporlanır', () => {
-    expect(() => loadOrCreatePolicySecret(join(REPO_ROOT, 'policy-secret'))).toThrow(/depo içinde/);
+    expect(() => loadOrCreatePolicySecret(join(REPO_ROOT, 'policy-secret'), { allowCreate: true })).toThrow(
+      /depo içinde/,
+    );
     const path = join(tempDir(), 'policy-secret');
     writeFileSync(path, 'xyz\n');
     expect(() => readPolicySecret(path)).toThrow(/32 baytlık hex/);
@@ -76,7 +107,7 @@ describe('politikalar ve alıcı listesi', () => {
     expect(other[0]!.commitment).not.toEqual(first[0]!.commitment);
   });
 
-  it("belge kurumun PDA'sını, settlement mint'ini ve her gün 00-23 UTC penceresini taşır", () => {
+  it("belge kurumun PDA'sını, settlement mint'ini ve yapılandırmadaki zaman penceresini taşır", () => {
     const document = demoPolicyDocument({
       institutionPda,
       policyId: demoPolicyId('standard'),
@@ -91,9 +122,16 @@ describe('politikalar ve alıcı listesi', () => {
       tokenWhitelist: [mint.toBase58()],
       blockedPayees: [],
       allowedCategories: ['research'],
-      timeWindow: { startHourUtc: 0, endHourUtc: 23 },
+      timeWindow: { days: ['monday', 'friday'], startHourUtc: 9, endHourUtc: 17 },
     });
-    expect(document.timeWindow!.days).toHaveLength(7);
+    const always = demoPolicyDocument({
+      institutionPda,
+      policyId: demoPolicyId('standard'),
+      mint,
+      values: values(5n, null),
+      version: 1,
+    });
+    expect(always.timeWindow).toBeNull();
   });
 
   it("alıcı yaprak salt'ı sırdan türer: kök tekrar kurulumda aynı, kanıt kökle doğrulanır", () => {

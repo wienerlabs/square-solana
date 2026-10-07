@@ -23,6 +23,7 @@ const PROGRAM_IDS: SquareProgramIds = {
   escrow: new PublicKey(SQUARE_IDLS.escrow.address),
 };
 const LOADER = new PublicKey('BPFLoaderUpgradeab1e11111111111111111111111');
+const LIMITS = { maxAccounts: 8, maxSignatures: 10 };
 const BLOCK_TIME = 1_791_000_000;
 const key = () => Keypair.generate().publicKey;
 
@@ -145,32 +146,43 @@ const context = (accounts: number) => ({
 describe('parseReportSpec', () => {
   const accounts = [key().toBase58(), key().toBase58()];
 
-  it('adresleri PublicKey yapar; imza sayısı verilmezse 5', () => {
-    const parsed = parseReportSpec({ capability: ACCOUNT_REPORT_ID, accounts });
+  it("adresleri PublicKey yapar; imza sayısı spec'te açıkça verilir", () => {
+    const parsed = parseReportSpec({ capability: ACCOUNT_REPORT_ID, accounts, signatures: 5 }, LIMITS);
     expect(parsed.accounts.map((k) => k.toBase58())).toEqual(accounts);
     expect(parsed.signatures).toBe(5);
-    expect(parseReportSpec({ accounts, signatures: 0 }).signatures).toBe(0);
+    expect(parseReportSpec({ accounts, signatures: 0 }, LIMITS).signatures).toBe(0);
+    expect(() => parseReportSpec({ accounts }, LIMITS)).toThrow(/spec\.signatures/);
+  });
+
+  it('hesap ve imza sınırları agent yapılandırmasından gelir', () => {
+    const three = [key().toBase58(), key().toBase58(), key().toBase58()];
+    expect(() => parseReportSpec({ accounts: three, signatures: 0 }, { maxAccounts: 2, maxSignatures: 0 })).toThrow(
+      /1 ile 2 arası/,
+    );
+    expect(() => parseReportSpec({ accounts, signatures: 1 }, { maxAccounts: 2, maxSignatures: 0 })).toThrow(
+      /0 ile 0 arası/,
+    );
   });
 
   it.each([
     ['nesne olmayan spec', 'x', /JSON nesnesi/],
     ['dizi spec', [], /JSON nesnesi/],
-    ['hesap listesi yok', {}, /spec\.accounts/],
-    ['boş liste', { accounts: [] }, /spec\.accounts/],
-    ['dokuz hesap', { accounts: Array.from({ length: 9 }, () => key().toBase58()) }, /1 ile 8/],
-    ['geçersiz adres', { accounts: ['x'] }, /accounts\[0\]/],
-    ['sayı adres', { accounts: [42] }, /accounts\[0\]/],
-    ['tekrar eden adres', { accounts: [accounts[0], accounts[0]] }, /tekrar/],
+    ['hesap listesi yok', { signatures: 0 }, /spec\.accounts/],
+    ['boş liste', { accounts: [], signatures: 0 }, /spec\.accounts/],
+    ['dokuz hesap', { accounts: Array.from({ length: 9 }, () => key().toBase58()), signatures: 0 }, /1 ile 8/],
+    ['geçersiz adres', { accounts: ['x'], signatures: 0 }, /accounts\[0\]/],
+    ['sayı adres', { accounts: [42], signatures: 0 }, /accounts\[0\]/],
+    ['tekrar eden adres', { accounts: [accounts[0], accounts[0]], signatures: 0 }, /tekrar/],
     ['kesirli imza sayısı', { accounts, signatures: 1.5 }, /signatures/],
     ['fazla imza', { accounts, signatures: 11 }, /signatures/],
     ['metin imza sayısı', { accounts, signatures: '2' }, /signatures/],
   ])('%s reddedilir', (_, spec, message) => {
-    expect(() => parseReportSpec(spec)).toThrow(message);
-    expect(reportSpecError(spec)).toMatch(message);
+    expect(() => parseReportSpec(spec, LIMITS)).toThrow(message);
+    expect(reportSpecError(spec, LIMITS)).toMatch(message);
   });
 
   it('geçerli spec için ret sebebi yok', () => {
-    expect(reportSpecError({ accounts })).toBeNull();
+    expect(reportSpecError({ accounts, signatures: 3 }, LIMITS)).toBeNull();
   });
 });
 
@@ -318,7 +330,7 @@ describe('accountReportHandler', () => {
   it("raporu JSON teslimat olarak döner; specHash job'un spec hash'idir", async () => {
     const f = fixture();
     const { chain } = reader(f.world);
-    const handler = accountReportHandler({ reader: chain, programIds: PROGRAM_IDS });
+    const handler = accountReportHandler({ reader: chain, programIds: PROGRAM_IDS, limits: LIMITS });
     const spec = { capability: ACCOUNT_REPORT_ID, accounts: [f.wallet.toBase58(), f.mint.toBase58()], signatures: 1 };
     const progress = vi.fn(async () => undefined);
     const job = key();
@@ -334,7 +346,11 @@ describe('accountReportHandler', () => {
   });
 
   it('geçersiz spec hata verir', async () => {
-    const handler = accountReportHandler({ reader: reader(fixture().world).chain, programIds: PROGRAM_IDS });
+    const handler = accountReportHandler({
+      reader: reader(fixture().world).chain,
+      programIds: PROGRAM_IDS,
+      limits: LIMITS,
+    });
     await expect(handler({ spec: { accounts: [] }, job: { address: key() } } as unknown as JobRequest)).rejects.toThrow(
       /spec\.accounts/,
     );

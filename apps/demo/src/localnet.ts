@@ -1,10 +1,10 @@
-import { randomBytes } from 'node:crypto';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import { createMint, getOrCreateAssociatedTokenAccount, mintTo } from '@solana/spl-token';
 import { Keypair } from '@solana/web3.js';
+import { DAYS_OF_WEEK } from '@squaresdk/solana-types';
 import { isEntryPoint, reportFailure, stderr, writeText } from '@squaresdk/solana-smoke/cli';
 import { createContext } from '@squaresdk/solana-smoke/context';
 import { runInit } from '@squaresdk/solana-smoke/init';
@@ -21,13 +21,10 @@ import {
 } from '@squaresdk/solana-smoke/localnet';
 import { releaseProverWorkers } from '@squaresdk/solana-smoke/prover';
 import { newRunId } from '@squaresdk/solana-smoke/smoke';
-import type { RunningAgent } from './agent.js';
-import { outcomeLine, runScenarios, startInProcessAgent } from './cli.js';
+import { inProcessAgent, outcomeLine, runScenarios } from './cli.js';
 import { loadDemoConfig } from './demo-config.js';
 import type { ScenarioOutcome } from './scenario.js';
 import { runSeed, type SeedResult } from './seed.js';
-
-export const LOCALNET_FAUCET_USDC = 1_000_000_000n;
 
 export interface DemoLocalnetArgs extends ValidatorArgs {
   scenarios: string[];
@@ -69,14 +66,27 @@ export function parseDemoLocalnetArgs(argv: readonly string[]): DemoLocalnetArgs
 
 export function demoLocalnetSections(params: { extraBuyers: readonly string[]; escrowProgram: string }) {
   const report = (targets: string[], signatures: number) => ({ targets, signatures });
+  const everyDay = { days: [...DAYS_OF_WEEK], startHourUtc: 0, endHourUtc: 23 };
   return {
     seed: {
       institutionName: 'Square demo kurumu',
       policySecret: 'policy-secret',
       output: 'seed-localnet.json',
       policies: {
-        standard: { maxPerTx: '10000000', maxDaily: '100000000', dailyCeiling: '200000000', categories: ['research'] },
-        strict: { maxPerTx: '1000000', maxDaily: '100000000', dailyCeiling: '200000000', categories: ['research'] },
+        standard: {
+          maxPerTx: '10000000',
+          maxDaily: '100000000',
+          dailyCeiling: '200000000',
+          categories: ['research'],
+          timeWindow: everyDay,
+        },
+        strict: {
+          maxPerTx: '1000000',
+          maxDaily: '100000000',
+          dailyCeiling: '200000000',
+          categories: ['research'],
+          timeWindow: everyDay,
+        },
       },
       extraBuyers: [...params.extraBuyers],
       funding: {
@@ -96,8 +106,17 @@ export function demoLocalnetSections(params: { extraBuyers: readonly string[]; e
         publicUrl: 'https://demo-agent.localnet.test',
         price: '1000000',
         autoListClaimBps: 300,
+        maxReportAccounts: 8,
+        maxReportSignatures: 10,
+        retry: { minDelayMs: 1_000, maxDelayMs: 30_000, submitMarginSecs: 30 },
       },
-      taskTimeoutSecs: 120,
+      timing: {
+        taskTimeoutSecs: 120,
+        claimListingTimeoutSecs: 60,
+        a2aRequestTimeoutSecs: 30,
+        pollIntervalMs: 500,
+        proofDayMarginSecs: 180,
+      },
       scenarios: {
         approved: {
           policy: 'standard',
@@ -121,6 +140,7 @@ export function demoLocalnetSections(params: { extraBuyers: readonly string[]; e
         refused: {
           policy: 'strict',
           expect: 'refused',
+          refusalRules: ['perTx'],
           amount: '5000000',
           paymentCategory: 'research',
           challengePeriodSecs: 5,
@@ -144,17 +164,21 @@ async function main(): Promise<void> {
   const key = writeRoleKeys(keysDir);
   const logPath = join(keysDir, 'validator.log');
   let validator: LocalValidator | null = null;
-  let running: RunningAgent | null = null;
   try {
     validator = await startValidator({ args, programIds, upgradeAuthority: key.admin.publicKey, logPath });
     const { connection, rpcUrl, agave } = validator;
     stderr(`localnet: ${agave} · ${rpcUrl}`);
     await airdrop(connection, key.payer.publicKey, 100);
     await airdrop(connection, key.admin.publicKey, 10);
+    const sections = demoLocalnetSections({
+      extraBuyers: [Keypair.generate(), Keypair.generate()].map((k) => k.publicKey.toBase58()),
+      escrowProgram: programIds.escrow,
+    });
+    const faucetAmount = BigInt(sections.seed.funding.institutionUsdc) + BigInt(sections.seed.funding.buyerUsdc);
     const mint = await createMint(connection, key.payer, key.mintAuthority.publicKey, null, 6);
     const faucet = await getOrCreateAssociatedTokenAccount(connection, key.payer, mint, key.payer.publicKey);
-    await mintTo(connection, key.payer, mint, faucet.address, key.mintAuthority, LOCALNET_FAUCET_USDC);
-    stderr(`localnet mint ${mint.toBase58()}: payer'a ${LOCALNET_FAUCET_USDC} (faucet yerine)`);
+    await mintTo(connection, key.payer, mint, faucet.address, key.mintAuthority, faucetAmount);
+    stderr(`localnet mint ${mint.toBase58()}: payer'a seed'in dağıtacağı ${faucetAmount} (faucet yerine)`);
 
     const raw = {
       ...localnetConfig({
@@ -165,10 +189,7 @@ async function main(): Promise<void> {
         screener: key.screener.publicKey,
         mppAuthority: key.mppAuthority.publicKey,
       }),
-      ...demoLocalnetSections({
-        extraBuyers: [Keypair.generate(), Keypair.generate()].map((k) => k.publicKey.toBase58()),
-        escrowProgram: programIds.escrow,
-      }),
+      ...sections,
     };
     const configPath = join(keysDir, 'localnet.json');
     writeFileSync(configPath, JSON.stringify(raw, null, 2));
@@ -189,19 +210,13 @@ async function main(): Promise<void> {
     if (seeds[1]!.changes !== 0)
       throw new Error(`seed tekrarı ${seeds[1]!.changes} değişiklik yaptı; tekrar kurulum aynı değil`);
 
-    const apiKey = randomBytes(32).toString('hex');
-    running = await startInProcessAgent(context, config, apiKey, {
-      port: 0,
-      host: '127.0.0.1',
-      institutions: [key.institution.publicKey.toBase58()],
-    });
-    stderr(`agent (süreç içi): ${running.url}`);
     const runId = newRunId();
     const outcomes: ScenarioOutcome[] = await runScenarios({
       context,
       config,
       names: args.scenarios,
-      endpoint: { baseUrl: running.url, apiKey },
+      agent: inProcessAgent(context, config),
+      agentWallet: key.agent.publicKey,
       runId,
     });
 
@@ -215,7 +230,6 @@ async function main(): Promise<void> {
     stderr(`validator günlüğü: ${logPath} (hata durumunda silinmez)`);
     throw error;
   } finally {
-    await running?.close();
     await validator?.stop();
     await releaseProverWorkers();
   }

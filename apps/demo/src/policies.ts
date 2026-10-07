@@ -1,4 +1,5 @@
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
+import { basename, dirname, join, resolve } from 'node:path';
 import { sha256 } from '@noble/hashes/sha2';
 import type { PublicKey } from '@solana/web3.js';
 import {
@@ -11,7 +12,7 @@ import {
 } from '@squaresdk/solana-policy';
 import type { SquarePda } from '@squaresdk/solana-sdk';
 import { assertOutsideRepo } from '@squaresdk/solana-smoke/keys';
-import { DAYS_OF_WEEK, type PolicyDocument } from '@squaresdk/solana-types';
+import type { PolicyDocument } from '@squaresdk/solana-types';
 import type { DemoPolicyValues } from './demo-config.js';
 
 export interface DemoPolicy {
@@ -27,18 +28,44 @@ const enc = (text: string) => new TextEncoder().encode(text);
 const hex = (bytes: Uint8Array) => Buffer.from(bytes).toString('hex');
 const SECRET = /^[0-9a-f]{64}$/;
 
+export function policySecretLocation(path: string): string {
+  const directory = dirname(resolve(path));
+  let realDirectory: string;
+  try {
+    realDirectory = realpathSync(directory);
+  } catch (error) {
+    throw new Error(`politika sırrının dizini yok: ${directory}`, { cause: error });
+  }
+  const location = join(realDirectory, basename(path));
+  assertOutsideRepo(location);
+  return location;
+}
+
 export function readPolicySecret(path: string): Uint8Array {
-  assertOutsideRepo(path);
-  const text = readFileSync(path, 'utf8').trim();
+  const location = policySecretLocation(path);
+  const text = readFileSync(location, 'utf8').trim();
   if (!SECRET.test(text)) throw new Error(`politika sırrı 32 baytlık hex değil: ${path}`);
   return Uint8Array.from(Buffer.from(text, 'hex'));
 }
 
-export function loadOrCreatePolicySecret(path: string): { secret: Uint8Array; created: boolean } {
-  assertOutsideRepo(path);
-  if (existsSync(path)) return { secret: readPolicySecret(path), created: false };
+export function policySecretExists(path: string): boolean {
+  return existsSync(policySecretLocation(path));
+}
+
+export function loadOrCreatePolicySecret(
+  path: string,
+  options: { allowCreate: boolean },
+): { secret: Uint8Array; created: boolean } {
+  const location = policySecretLocation(path);
+  if (existsSync(location)) return { secret: readPolicySecret(path), created: false };
+  if (!options.allowCreate) {
+    throw new Error(
+      `politika sırrı yok: ${path}. Zincirde bu kurumun demo politikaları var; yol yanlış olabilir. ` +
+        'Yeni sırla politikaları güncellemek için seed --rotate-policy-secret ile koşulur',
+    );
+  }
   const secret = generatePolicySecret();
-  writeFileSync(path, `${hex(secret)}\n`, { mode: 0o600, flag: 'wx' });
+  writeFileSync(location, `${hex(secret)}\n`, { mode: 0o600, flag: 'wx' });
   return { secret, created: true };
 }
 
@@ -70,7 +97,7 @@ export function demoPolicyDocument(params: {
     tokenWhitelist: [params.mint.toBase58()],
     blockedPayees: [],
     allowedCategories: [...values.categories],
-    timeWindow: { days: [...DAYS_OF_WEEK], startHourUtc: 0, endHourUtc: 23 },
+    timeWindow: values.timeWindow === null ? null : { ...values.timeWindow, days: [...values.timeWindow.days] },
   };
 }
 

@@ -7,12 +7,13 @@ import {
   createAgent,
   type Agent,
   type AgentLogger,
+  type AgentOptions,
   type ApiKeyGrant,
   type ClaimListing,
   type TxOptions,
 } from '@squaresdk/solana-agent-sdk';
 import type { SquareProgramIds } from '@squaresdk/solana-sdk';
-import type { DemoAgentSettings } from './demo-config.js';
+import { reportLimitsOf, type DemoAgentSettings } from './demo-config.js';
 import { basePathOf, createDeliveryStore, type DeliveryStore } from './delivery.js';
 import { createMemoryTaskStore } from './memory-store.js';
 import { accountReportCapability, accountReportHandler, reportSpecError } from './report.js';
@@ -24,6 +25,7 @@ export interface DemoAgentParams {
   commitment: Commitment;
   programIds: SquareProgramIds;
   callers: readonly ApiKeyGrant[];
+  listClaims: boolean;
   tx: TxOptions;
   store?: TaskStore;
   logger?: AgentLogger;
@@ -55,18 +57,24 @@ export function callerGrants(apiKey: string | null, institutions: readonly strin
   return [{ keySha256: sha256Hex(apiKey), institutions: [...institutions] }];
 }
 
-export async function createDemoAgent(params: DemoAgentParams): Promise<DemoAgent> {
+export function demoAgentOptions(params: DemoAgentParams, deliveries: DeliveryStore): AgentOptions {
   const { settings } = params;
-  const deliveries = createDeliveryStore(settings.publicUrl);
-  const agent = await createAgent({
+  const discountBps = params.listClaims ? settings.autoListClaimBps : undefined;
+  const limits = reportLimitsOf(settings);
+  return {
     name: settings.name,
     description: settings.description,
     version: settings.version,
     publicUrl: settings.publicUrl,
     agentId: settings.agentId,
     capabilities: [accountReportCapability(settings.price)],
-    handler: accountReportHandler({ reader: params.connection, programIds: params.programIds }),
-    admit: ({ spec }) => reportSpecError(spec),
+    handler: accountReportHandler({ reader: params.connection, programIds: params.programIds, limits }),
+    admit: ({ spec }) => reportSpecError(spec, limits),
+    retry: {
+      minDelayMs: settings.retry.minDelayMs,
+      maxDelayMs: settings.retry.maxDelayMs,
+      submitMarginSeconds: settings.retry.submitMarginSecs,
+    },
     signer: params.signer,
     connection: params.connection,
     commitment: params.commitment,
@@ -75,15 +83,20 @@ export async function createDemoAgent(params: DemoAgentParams): Promise<DemoAgen
     store: params.store ?? createMemoryTaskStore(),
     authenticate: params.callers.length > 0 ? createApiKeyAuthenticator({ keys: params.callers }) : denyAll,
     tx: params.tx,
-    ...(settings.autoListClaimBps === undefined ? {} : { autoListClaim: { discountBps: settings.autoListClaimBps } }),
+    ...(discountBps === undefined ? {} : { autoListClaim: { discountBps } }),
     ...(params.onClaimListed ? { onClaimListed: params.onClaimListed } : {}),
     ...(params.logger ? { logger: params.logger } : {}),
     ...(params.onError ? { onError: params.onError } : {}),
-  });
+  };
+}
+
+export async function createDemoAgent(params: DemoAgentParams): Promise<DemoAgent> {
+  const deliveries = createDeliveryStore(params.settings.publicUrl);
+  const agent = await createAgent(demoAgentOptions(params, deliveries));
   return {
     agent,
     deliveries,
-    basePath: basePathOf(settings.publicUrl),
+    basePath: basePathOf(params.settings.publicUrl),
     async handle(request, response) {
       if (deliveries.handle(request, response)) return;
       await agent.handle(request, response);
