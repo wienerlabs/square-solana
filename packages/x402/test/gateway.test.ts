@@ -136,6 +136,8 @@ describe('ödeme ve makbuz', () => {
       expect(app.calls.cookie).toBe(1);
       expect(response.headers.getSetCookie()).toEqual(['visitor=ziyaretci-1; Path=/']);
       expect(response.headers.get('link')).toBe('</yardim>; rel="help"');
+      expect(response.headers.get('date')).not.toBeNull();
+      expect(response.headers.get('date')).not.toBe('Wed, 01 Jan 2020 00:00:00 GMT');
       expect(response.headers.get('x-report-id')).toBeNull();
       expect(response.headers.get('etag')).not.toBe('"paid-etag"');
       expect(await response.text()).not.toContain('ücretli içerik');
@@ -169,6 +171,7 @@ describe('ödeme ve makbuz', () => {
     expect(response.headers.getSetCookie()).toEqual(['visitor=ziyaretci-1; Path=/', 'session=paid-content; Path=/']);
     expect(response.headers.get('link')).toBe('</files/paid-report.pdf>');
     expect(response.headers.get('x-report-id')).toBe('rapor-7');
+    expect(response.headers.get('date')).toBe('Wed, 01 Jan 2020 00:00:00 GMT');
   });
 
   it('asenkron olay işleyicisinin reddi yakalanır, istek etkilenmez', async () => {
@@ -192,7 +195,7 @@ describe('ödeme ve makbuz', () => {
     }
   });
 
-  it('res.locals yalnızca ödeme bilgisini taşır ve serileştirilebilir', async () => {
+  it('res.locals yalnızca ödeme bilgisini taşır ve kopyalanabilir', async () => {
     const response = await fetch(`${app.url}/locals`, { headers: await paymentHeaderFor('/locals') });
     expect(response.status).toBe(200);
     const body = (await response.json()) as { squareX402: { payment: X402Payment } };

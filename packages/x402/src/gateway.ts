@@ -118,13 +118,13 @@ export interface X402Gateway {
 
 interface RequestState {
   payment?: X402Payment;
-  readonly onSettled?: (payment: X402SettledPayment) => void;
 }
 
 type HeaderValue = number | string | readonly string[];
 
 interface RequestContext {
   readonly state: RequestState;
+  readonly onSettled?: (payment: X402SettledPayment) => void;
   readonly response: Response;
   readonly headersBeforeHandler: ReadonlyMap<string, HeaderValue>;
 }
@@ -215,10 +215,12 @@ export function createX402Gateway(options: X402GatewayOptions): X402Gateway {
     const context = storage.getStore();
     if (!context || context.response.headersSent) return;
     const { response, headersBeforeHandler } = context;
+    const { sendDate } = response;
     for (const name of response.getHeaderNames()) response.removeHeader(name);
     for (const [name, value] of headersBeforeHandler) {
       response.setHeader(name, typeof value === 'object' ? [...value] : value);
     }
+    response.sendDate = sendDate;
   };
 
   server.onAfterSettle(async ({ paymentPayload, requirements, result, phase }) => {
@@ -236,15 +238,15 @@ export function createX402Gateway(options: X402GatewayOptions): X402Gateway {
     }
     const payer = result.payer ?? '';
     emit({ type: 'settled', fingerprint, network: requirements.network, transaction: result.transaction, payer });
-    const state = storage.getStore()?.state;
-    if (!state) return;
+    const context = storage.getStore();
+    if (!context) return;
     const settled: X402SettledPayment = {
       ...describe(paymentPayload, requirements, payer),
       settlement: { transaction: result.transaction, network: result.network },
     };
-    if (phase === 'before-handler') state.payment = settled;
+    if (phase === 'before-handler') context.state.payment = settled;
     try {
-      state.onSettled?.(settled);
+      context.onSettled?.(settled);
     } catch (error) {
       emit({ type: 'settled_callback_error', fingerprint, error });
     }
@@ -281,9 +283,15 @@ export function createX402Gateway(options: X402GatewayOptions): X402Gateway {
       };
       const middleware = paymentMiddleware(config, server);
       const handler: RequestHandler = (req, res, next) => {
-        const state: RequestState = route.onSettled ? { onSettled: route.onSettled } : {};
+        const state: RequestState = {};
         res.locals[LOCALS_KEY] = state;
-        storage.run({ state, response: res, headersBeforeHandler: headerSnapshot(res) }, () => {
+        const context: RequestContext = {
+          state,
+          response: res,
+          headersBeforeHandler: headerSnapshot(res),
+          ...(route.onSettled ? { onSettled: route.onSettled } : {}),
+        };
+        storage.run(context, () => {
           middleware(req, res, next).catch(next);
         });
       };

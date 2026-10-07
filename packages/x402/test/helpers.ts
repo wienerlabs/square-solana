@@ -117,12 +117,17 @@ export async function startPaidApp(
     calls.cookie += 1;
     res.cookie('session', 'paid-content');
     res.set('Link', '</files/paid-report.pdf>').set('X-Report-Id', 'rapor-7').set('ETag', '"paid-etag"');
+    res.set('Date', 'Wed, 01 Jan 2020 00:00:00 GMT');
     res.json({ ok: true, report: 'ücretli içerik' });
   });
-  app.get('/locals', gateway.paidRoute({ price, payTo: wallets.payTo, network: SOLANA_DEVNET }), (_req, res) => {
-    calls.locals += 1;
-    res.json(res.locals);
-  });
+  app.get(
+    '/locals',
+    gateway.paidRoute({ price, payTo: wallets.payTo, network: SOLANA_DEVNET, onSettled: () => undefined }),
+    (_req, res) => {
+      calls.locals += 1;
+      res.json(structuredClone(res.locals));
+    },
+  );
   app.get('/broken', gateway.paidRoute({ price, payTo: wallets.payTo, network: SOLANA_DEVNET }), (_req, res) => {
     calls.broken += 1;
     res.status(500).json({ ok: false });
