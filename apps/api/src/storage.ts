@@ -1,7 +1,9 @@
 // Teslimat deposu: S3 uyumlu nesne deposu (AWS S3, Cloudflare R2, MinIO …); sağlayıcı ve uç nokta ortamdan
 // gelir. Covenant'ın teslimat akışındaki gibi (Vercel Blob) içerik deposunun herkese açık adresiyle okunur:
 // `deliveryUri` = `<API_DELIVERY_PUBLIC_BASE_URL>/<workHash>`. Anahtar içeriğin SHA-256'sıdır; aynı içerik tek
-// nesnedir ve adres içeriği doğrular. Kova, nesnelerin herkese açık okunmasına dağıtımda ayarlanır.
+// nesnedir ve adres içeriği doğrular. Kova, nesnelerin herkese açık okunmasına dağıtımda ayarlanır. İçerik tipi
+// yükleyenindir; nesne indirme olarak sunulur (`Content-Disposition: attachment`): yüklenen HTML ya da SVG deponun
+// adresinde tarayıcıda çalışmaz (BE-32).
 //
 // Dispute kanıtları (BE-22) aynı uç ve kimlikle ayrı, herkese açık OKUNMAYAN bir kovadadır
 // (`createEvidenceStore`): içerik hash'i zincirde (`reason_hash`) herkese açık olduğundan adres içeriği gizlemez;
@@ -27,7 +29,13 @@ export function createDeliveryStore(config: DeliveryStoreConfig): DeliveryStore 
     async put(workHash, content, contentType) {
       if (!/^[0-9a-f]{64}$/.test(workHash)) throw new Error('workHash 64 hex olmalı');
       await client.send(
-        new PutObjectCommand({ Bucket: config.bucket, Key: workHash, Body: content, ContentType: contentType }),
+        new PutObjectCommand({
+          Bucket: config.bucket,
+          Key: workHash,
+          Body: content,
+          ContentType: contentType,
+          ContentDisposition: 'attachment',
+        }),
       );
       return { key: workHash, uri: `${config.publicBaseUrl}/${workHash}` };
     },

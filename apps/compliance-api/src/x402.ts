@@ -12,7 +12,7 @@ import { createComplianceX402, parseFeePayerKeypair, type ComplianceX402 } from 
 import { logger } from './utils/logger.js';
 
 // db paketi yalnızca ESM `import` koşulunu dışa aktarır; bu servis CommonJS derlendiği için dinamik import.
-const databaseReady = import('@squaresdk/solana-db').then(({ createDatabaseClient }) =>
+export const databaseReady = import('@squaresdk/solana-db').then(({ createDatabaseClient }) =>
   createDatabaseClient({ connectionString: config.x402.databaseUrl }),
 );
 const replayStoreReady = databaseReady.then(createPrismaReplayStore);

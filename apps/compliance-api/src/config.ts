@@ -42,6 +42,15 @@ const EnvSchema = z
     COMPLIANCE_METRICS_PORT: intFromEnv(1, 65535),
     NODE_ENV: z.enum(['development', 'test', 'production']),
     CORS_ORIGINS: commaList(z.string().url()).refine((list) => list.length > 0, 'at least one origin'),
+    /// SHA-256 (lowercase hex) of the X-API-Key values allowed on the record endpoints (proofs, attestations,
+    /// unattested payments), comma-separated. The keys themselves never reach the service (BE-32).
+    COMPLIANCE_API_KEY_SHA256: commaList(z.string().regex(/^[0-9a-f]{64}$/, 'must be a lowercase SHA-256 hex')).refine(
+      (list) => list.length > 0,
+      'at least one key hash',
+    ),
+    /// Requests per key on the record endpoints within COMPLIANCE_RATE_LIMIT_WINDOW_SECONDS.
+    COMPLIANCE_RATE_LIMIT: intFromEnv(1),
+    COMPLIANCE_RATE_LIMIT_WINDOW_SECONDS: intFromEnv(1),
 
     POSTGRES_HOST: nonEmpty,
     POSTGRES_PORT: intFromEnv(1, 65535),
@@ -137,6 +146,10 @@ export const config = {
   nodeEnv: env.NODE_ENV,
   observability,
   corsOrigins: env.CORS_ORIGINS,
+  access: {
+    apiKeySha256: env.COMPLIANCE_API_KEY_SHA256,
+    rateLimit: { limit: env.COMPLIANCE_RATE_LIMIT, windowSeconds: env.COMPLIANCE_RATE_LIMIT_WINDOW_SECONDS },
+  },
   database: {
     host: env.POSTGRES_HOST,
     port: env.POSTGRES_PORT,
