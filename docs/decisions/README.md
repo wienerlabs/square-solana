@@ -32,6 +32,7 @@ Mimari karar kayıtları (ADR). Her karar ayrı bir dosyada, sıra numarasıyla 
 | [0026](0026-stripe-mpp-fiat-odemesi.md) | Stripe MPP fiat ödemesi: Square'in Stripe hesabı, USD ve tam sent, tarayıcı, kayıtlı kart (off-session) ve MPP (`mppx`, SPT) yolları, PaymentIntent'ten kurulan kanonik makbuz ve ADR 0024 attestation'ı, imzalı webhook ve mutabakat, iş başına tek ödeme (kopyası iade), compliance-api'deki akışın kaldırılması | BE-25 (#80) |
 | [0027](0027-yalnizca-devnet.md) | Square yalnızca devnet'te çalışır: mainnet ortamı, deploy'u ve config'i yok (BE-34 ve BC-42 kapsam dışı); ağdan bağımsız kod (CAIP-2, did:aip, küme seçenekleri) korunur | BE-34 (#99), BC-42 (#98) |
 | [0028](0028-kabul-oncesi-on-ispat-ve-dispute-duzeltmeleri.md) | Kabul öncesi uyum ön-ispatı (tam tutar, sayaç 0; kalıcı bitsiz ispat olmadan `accept_job` yok), açılışta public tavan reddi, dispute'ta agent payı 0 iken bond'un `Flagged` payee'de kuruma dönmesi, M-of-N'de ret oyu | P-01 (#236), #234 |
+| [0029](0029-kurum-yetkisi-satici-ve-keeper-taramasi-screening-sirasi.md) | **Önerildi.** Policy'li işte kurum yetkisi ve kuruma ödemeler `Institution`'ın güncel yetkilisinde (multisig'e geçişte açık işler de taşınır), alacak alımında ve listelemede satıcının taranması, taranmamış keeper'ın ücretinin kuruma dönmesi, screening kaydının kararın anına göre sıralanması | P-02 (#237), P-03 (#238), P-04 (#239) |
 
 ## §12 kararlarının karşılığı
 
