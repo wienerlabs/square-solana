@@ -17,6 +17,7 @@ export const LedgerEntrySchema = z.object({
   /** Tutarın sayıldığı UTC gününün başı (unix saniyesi). */
   day: z.number().int(),
   createdAt: z.number().int(),
+  deadline: z.number().int().optional(),
   /** `reserved`: tutar ayrıldı, job henüz fonlanmadı; `funded`: escrow kilitli. */
   status: z.enum(['reserved', 'funded']),
   /** Zincire bağlanan Travel Rule commitment'ı; kaydın kendisi Square API'sinde şifrelidir, burada değil. */

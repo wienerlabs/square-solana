@@ -109,6 +109,7 @@ export function createDelegator(options: DelegatorOptions): Delegator {
     feePayer: institution,
     ...(options.computeUnitPrice !== undefined && { computeUnitPrice: options.computeUnitPrice }),
   };
+  const inflight = new Set<string>();
   let queue: Promise<unknown> = Promise.resolve();
   /** Kapı ve ayırma tek sırada. */
   const serial = <T>(work: () => Promise<T>): Promise<T> => {
@@ -260,7 +261,19 @@ export function createDelegator(options: DelegatorOptions): Delegator {
       const needsTravelRule = travelRuleThreshold > 0n && request.amount >= travelRuleThreshold;
 
       const reservation = await serial(async (): Promise<{ entry: LedgerEntry } | DelegationOutcome> => {
-        const existing = ledger.get(jobKey);
+        if (inflight.has(jobKey)) {
+          throw new DelegationError(`bu spec'le job ${jobKey} için süren bir delegasyon var; bitince yeniden çağırın`);
+        }
+        let existing = ledger.get(jobKey);
+        if (
+          existing?.status === 'reserved' &&
+          existing.deadline !== undefined &&
+          existing.deadline <= now &&
+          !(await client.escrow.fetch('job', job))
+        ) {
+          ledger.remove(jobKey);
+          existing = null;
+        }
         if (existing) {
           if (
             existing.agentRecord !== request.agentRecord ||
@@ -271,6 +284,7 @@ export function createDelegator(options: DelegatorOptions): Delegator {
               `bu spec'le job ${jobKey} farklı koşullarla ayrılmış (agent ${existing.agentRecord}, tutar ${existing.amount}, kategori ${existing.category}); başka iş için spec'i değiştirin`,
             );
           }
+          inflight.add(jobKey);
           return { entry: existing };
         }
         if (ledger.jobsOn(now) >= config.maxJobsPerDay) return refused(jobKey, 0, ['dailyJobLimit']);
@@ -296,47 +310,69 @@ export function createDelegator(options: DelegatorOptions): Delegator {
           specHash: hex(specHash),
           day: dayStart(now),
           createdAt: now,
+          deadline,
           status: 'reserved',
         };
         ledger.put(entry);
+        inflight.add(jobKey);
         return { entry };
       });
       if (!('entry' in reservation)) return reservation;
-      const { entry } = reservation;
-
-      const signatures: { step: DelegationStep; signature: string }[] = [];
-      let sentCreate = false;
       try {
-        for (;;) {
-          const next = await nextStep(job, entry, request, deadline, needsTravelRule);
-          if (!next) break;
-          if (signer.type === 'unsigned') {
-            const unsigned: UnsignedDelegationTx = {
-              job: jobKey,
-              step: next.step,
-              transaction: Buffer.from(next.built.transaction.serialize()).toString('base64'),
-              requiredSigners: next.built.signers.map((key) => key.toBase58()),
-              lastValidBlockHeight: next.built.lastValidBlockHeight,
-            };
-            await options.onUnsignedTx?.(unsigned);
-            return { status: 'awaiting_signature', specHash: entry.specHash, ...unsigned };
-          }
-          if (next.step === 'createJob') sentCreate = true;
-          signatures.push({ step: next.step, signature: await sender.send(next.step, next.built, signer.keypair) });
-        }
-      } catch (error) {
-        // create_job hiç gönderilmediyse ve job zincirde yoksa ayrılan tutar geri bırakılır.
-        if (!sentCreate && entry.status === 'reserved' && !(await client.escrow.fetch('job', job))) {
-          ledger.remove(jobKey);
-        }
-        throw error;
+        return await proceed(
+          job,
+          jobKey,
+          reservation.entry,
+          request,
+          reservation.entry.deadline ?? deadline,
+          needsTravelRule,
+        );
+      } finally {
+        inflight.delete(jobKey);
       }
-      const delivered = entry.task
-        ? { task: entry.task, dispatchError: null }
-        : await dispatch(job, entry.specHash, request);
-      const current = ledger.get(jobKey) ?? entry;
-      ledger.put({ ...current, status: 'funded', ...(delivered.task && { task: delivered.task }) });
-      return { status: 'funded', job: jobKey, specHash: entry.specHash, signatures, ...delivered };
     },
   };
+
+  async function proceed(
+    job: PublicKey,
+    jobKey: string,
+    entry: LedgerEntry,
+    request: DelegationRequest,
+    deadline: number,
+    needsTravelRule: boolean,
+  ): Promise<DelegationOutcome> {
+    const signatures: { step: DelegationStep; signature: string }[] = [];
+    let sentCreate = false;
+    try {
+      for (;;) {
+        const next = await nextStep(job, entry, request, deadline, needsTravelRule);
+        if (!next) break;
+        if (signer.type === 'unsigned') {
+          const unsigned: UnsignedDelegationTx = {
+            job: jobKey,
+            step: next.step,
+            transaction: Buffer.from(next.built.transaction.serialize()).toString('base64'),
+            requiredSigners: next.built.signers.map((key) => key.toBase58()),
+            lastValidBlockHeight: next.built.lastValidBlockHeight,
+          };
+          await options.onUnsignedTx?.(unsigned);
+          return { status: 'awaiting_signature', specHash: entry.specHash, ...unsigned };
+        }
+        if (next.step === 'createJob') sentCreate = true;
+        signatures.push({ step: next.step, signature: await sender.send(next.step, next.built, signer.keypair) });
+      }
+    } catch (error) {
+      // create_job hiç gönderilmediyse ve job zincirde yoksa ayrılan tutar geri bırakılır.
+      if (!sentCreate && entry.status === 'reserved' && !(await client.escrow.fetch('job', job))) {
+        ledger.remove(jobKey);
+      }
+      throw error;
+    }
+    const delivered = entry.task
+      ? { task: entry.task, dispatchError: null }
+      : await dispatch(job, entry.specHash, request);
+    const current = ledger.get(jobKey) ?? entry;
+    ledger.put({ ...current, status: 'funded', ...(delivered.task && { task: delivered.task }) });
+    return { status: 'funded', job: jobKey, specHash: entry.specHash, signatures, ...delivered };
+  }
 }

@@ -258,6 +258,55 @@ describe('politika limitine uyma', () => {
     expect(ledger.spentOn(NOW)).toBe(1_000n);
   });
 
+  it('ayrılmış iş kayıtlı son tarihiyle sürer', async () => {
+    sim.failure = (name) => (name === 'createJob' ? new Error('rpc kapalı') : null);
+    const request = { agentRecord: agentRecord.toBase58(), spec: spec(27), amount: 1_000n, deadline: NOW + 100 };
+    await expect(delegator().delegate(request)).rejects.toThrow(/rpc kapalı/);
+    expect(ledger.get(jobOf(spec(27)).toBase58())).toMatchObject({ status: 'reserved', deadline: NOW + 100 });
+    sim.failure = null;
+    const built = vi.spyOn(sim.client.flow, 'createJob');
+    const resumed = { agentRecord: request.agentRecord, spec: request.spec, amount: request.amount };
+    expect((await delegator({ now: () => NOW + 10 }).delegate(resumed)).status).toBe('funded');
+    expect(built.mock.calls.map(([params]) => params.deadline)).toEqual([NOW + 100]);
+  });
+
+  it('son tarihi geçmiş ayırma kapıdan yeniden geçer ve yeni son tarihle açılır', async () => {
+    sim.failure = (name) => (name === 'createJob' ? new Error('rpc kapalı') : null);
+    const request = { agentRecord: agentRecord.toBase58(), spec: spec(28), amount: 1_000n, deadline: NOW + 60 };
+    await expect(delegator().delegate(request)).rejects.toThrow(/rpc kapalı/);
+    sim.failure = null;
+    const later = NOW + 120;
+    const built = vi.spyOn(sim.client.flow, 'createJob');
+    const resumed = { agentRecord: request.agentRecord, spec: request.spec, amount: request.amount };
+    expect((await delegator({ now: () => later }).delegate(resumed)).status).toBe('funded');
+    expect(built.mock.calls.map(([params]) => params.deadline)).toEqual([later + 3_600]);
+    expect(ledger.get(jobOf(spec(28)).toBase58())).toMatchObject({ createdAt: later, deadline: later + 3_600 });
+  });
+
+  it('aynı spec’le eşzamanlı ikinci çağrı süren delegasyona katılmaz, reddedilir', async () => {
+    const d = delegator();
+    const request = { agentRecord: agentRecord.toBase58(), spec: spec(29), amount: 1_000n };
+    const results = await Promise.allSettled([d.delegate(request), d.delegate(request)]);
+    expect(results.map((result) => result.status).sort()).toEqual(['fulfilled', 'rejected']);
+    const rejected = results.find((result): result is PromiseRejectedResult => result.status === 'rejected')!;
+    expect(String(rejected.reason)).toMatch(/süren bir delegasyon/);
+    expect(ledger.spentOn(NOW)).toBe(1_000n);
+  });
+
+  it('günlük job sayısı: reddedilen çağrı yer tutmaz, ayrılmış iş sınırda sürer, gün değişince sıfırlanır', async () => {
+    const limited = (now = NOW) => delegator({ config: config({ maxJobsPerDay: 1 }), now: () => now });
+    const big = { agentRecord: agentRecord.toBase58(), spec: spec(30), amount: 900_000_000_000n };
+    expect(await limited().delegate(big)).toMatchObject({ status: 'refused' });
+    sim.failure = (name) => (name === 'createJob' ? new Error('rpc kapalı') : null);
+    const pending = { agentRecord: agentRecord.toBase58(), spec: spec(31), amount: 1n };
+    await expect(limited().delegate(pending)).rejects.toThrow(/rpc kapalı/);
+    sim.failure = null;
+    const next = { agentRecord: agentRecord.toBase58(), spec: spec(32), amount: 1n };
+    expect(await limited().delegate(next)).toMatchObject({ status: 'refused', rules: ['dailyJobLimit'] });
+    expect((await limited().delegate(pending)).status).toBe('funded');
+    expect((await limited(NOW + 86_400).delegate(next)).status).toBe('funded');
+  });
+
   it('günlük job sayısı sınırı: sınırdaki çağrı tx kurulmadan reddedilir', async () => {
     const d = delegator({ config: config({ maxJobsPerDay: 2 }) });
     for (const n of [24, 25]) {

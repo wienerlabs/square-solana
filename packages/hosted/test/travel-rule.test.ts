@@ -10,6 +10,7 @@ import { createApiTravelRuleStore } from '../src/travel-rule.js';
 import { legalPerson } from './helpers/config.js';
 
 const API = 'https://api.square.test';
+const AUTH_DOMAIN = 'app.square.test';
 const keypair = Keypair.generate();
 const job = Keypair.generate().publicKey;
 const record: TravelRuleRecord = {
@@ -98,7 +99,13 @@ describe('createApiTravelRuleStore', () => {
   it('oturum açar, kaydı saklar, commitment’ı döner; oturum süresince yeniden kullanır', async () => {
     let now = 1_000;
     const api = fakeApi();
-    const store = createApiTravelRuleStore({ baseUrl: API, keypair, fetch: api.fetch, now: () => now });
+    const store = createApiTravelRuleStore({
+      baseUrl: API,
+      authDomain: AUTH_DOMAIN,
+      keypair,
+      fetch: api.fetch,
+      now: () => now,
+    });
     expect(await store.put(job, record)).toBe('cd'.repeat(32));
     expect(await store.put(job, record)).toBe('cd'.repeat(32));
     expect(api.log).toEqual([
@@ -120,10 +127,17 @@ describe('createApiTravelRuleStore', () => {
       (_wallet: string, nonce: string) => squareMessage(other, nonce),
       (wallet: string) => squareMessage(wallet, 'baska-nonce'),
       (wallet: string, nonce: string) => `${squareMessage(wallet, nonce)}\nek satır`,
+      (wallet: string, nonce: string) => squareMessage(wallet, nonce).replace(AUTH_DOMAIN, 'staging.square.test'),
     ];
     for (const message of messages) {
       const api = fakeApi({ message });
-      const store = createApiTravelRuleStore({ baseUrl: API, keypair, fetch: api.fetch, now: () => 1_000 });
+      const store = createApiTravelRuleStore({
+        baseUrl: API,
+        authDomain: AUTH_DOMAIN,
+        keypair,
+        fetch: api.fetch,
+        now: () => 1_000,
+      });
       await expect(store.put(job, record)).rejects.toThrow(/Square oturum mesajı göndermedi/);
       expect(api.log).toEqual(['POST /v1/auth/challenge']);
     }
@@ -131,15 +145,36 @@ describe('createApiTravelRuleStore', () => {
 
   it('sunucuda düşen oturum bir kez yenilenir; diğer hatalar kodlarıyla', async () => {
     const api = fakeApi({ rejectFirstPut: true });
-    const store = createApiTravelRuleStore({ baseUrl: API, keypair, fetch: api.fetch, now: () => 1_000 });
+    const store = createApiTravelRuleStore({
+      baseUrl: API,
+      authDomain: AUTH_DOMAIN,
+      keypair,
+      fetch: api.fetch,
+      now: () => 1_000,
+    });
     expect(await store.put(job, record)).toBe('cd'.repeat(32));
     expect(api.log.filter((line) => line.includes('/auth/session'))).toHaveLength(2);
 
-    const conflict = createApiTravelRuleStore({ baseUrl: API, keypair, fetch: fakeApi({ failPut: true }).fetch });
+    const conflict = createApiTravelRuleStore({
+      baseUrl: API,
+      authDomain: AUTH_DOMAIN,
+      keypair,
+      fetch: fakeApi({ failPut: true }).fetch,
+    });
     await expect(conflict.put(job, record)).rejects.toThrow('Travel Rule kaydı: conflict: conflict');
-    const limited = createApiTravelRuleStore({ baseUrl: API, keypair, fetch: fakeApi({ failChallenge: true }).fetch });
+    const limited = createApiTravelRuleStore({
+      baseUrl: API,
+      authDomain: AUTH_DOMAIN,
+      keypair,
+      fetch: fakeApi({ failChallenge: true }).fetch,
+    });
     await expect(limited.put(job, record)).rejects.toThrow(/challenge\): rate_limited/);
-    const wrongKey = createApiTravelRuleStore({ baseUrl: API, keypair: Keypair.generate(), fetch: fakeApi().fetch });
+    const wrongKey = createApiTravelRuleStore({
+      baseUrl: API,
+      authDomain: AUTH_DOMAIN,
+      keypair: Keypair.generate(),
+      fetch: fakeApi().fetch,
+    });
     await expect(wrongKey.put(job, record)).rejects.toThrow('Travel Rule oturumu: unauthorized: unauthorized');
   });
 });

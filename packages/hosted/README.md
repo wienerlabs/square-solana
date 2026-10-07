@@ -68,7 +68,7 @@ Göreli yollar yapılandırma dosyasının dizinine göre çözülür. Dağıtı
 |---|---|
 | `agent` | Kart alanları, `publicUrl` (https), `agentId`, `register` (`self`, `api`, `none`), `listen`, `autoListClaim?`, `callers` (A2A anahtarlarının SHA-256'sı ve yetkili kurumlar) |
 | `chain` | `rpcUrl`, `commitment`, `programIds`, `computeUnitPrice?` |
-| `api` | Square API'si (`baseUrl`, `apiKeyEnv`): teslimat yükleme, kart barındırma, job keşfi |
+| `api` | Square API'si (`baseUrl`, `apiKeyEnv`, `authDomain?`): teslimat yükleme, kart barındırma, job keşfi. `authDomain` API'nin `API_AUTH_DOMAIN`'idir; Travel Rule delegasyonu açıksa zorunludur |
 | `store` | A2A görev deposu: `{ type: postgres, urlEnv }` |
 | `signers` | `agent`: job'ların agent cüzdanı (keypair dosyası). `institution`: `keypair` ya da `unsigned` (`publicKey`, `outboxDir?`) |
 | `mcp` | `servers` (`stdio`: `command`, `args`, `env`, `cwd`; `http`: `url`, `headers`), havuz ayarları (`maxConcurrency`, `toolCacheTtlMs`, `requestTimeoutMs`, `reconnect`) |
@@ -148,7 +148,9 @@ ret bitleri ve adlarıyla (`REFUSAL`, `refusalRules`) döner.
   harcayamaz.
 - **Aynı spec:** Job adresi kurum ve spec hash'inden türer. Aynı spec'le yeniden çağrı aynı job'dur; sayaca bir kez
   yazılır ve sıradaki adımdan devam eder. Koşullar ilk ayırmanınkidir: agent, tutar ya da kategori farklıysa çağrı
-  `DelegationError` ile düşer ve tx kurulmaz. `create_job` defterdeki koşullarla kurulur.
+  `DelegationError` ile düşer ve tx kurulmaz. `create_job` defterdeki koşullarla ve ayırmadaki son tarihle kurulur.
+  Son tarihi geçmiş ve zincirde açılmamış bir ayırma silinir; çağrı kapıdan yeniden geçer. Aynı spec için süren
+  bir delegasyon varken gelen ikinci çağrı beklemez, `DelegationError` ile düşer.
 - **Job sayısı:** Her job'un hesabı kurumun ödediği ve kapanmayan bir rent'tir. Tutar sınırları küçük tutarlı çok
   sayıda delegasyonu durdurmadığı için UTC gününde en çok `maxJobsPerDay` job açılır.
 
@@ -173,7 +175,8 @@ ret bitleri ve adlarıyla (`REFUSAL`, `refusalRules`) döner.
   bu commitment `commit_travel_rule` ile job'a bağlanır. Defterde yalnızca commitment durur.
 - **Oturum:** Uç kurumun güncel yetkilisinin oturumunu ister. Hosted agent oturumu kurumun keypair'iyle imzaladığı meydan
   okumayla açar (`/v1/auth/challenge` → `/v1/auth/session`) ve süresi dolana kadar yeniden kullanır. Yalnızca bu cüzdan
-  ve nonce için Square oturum mesajı (Sign-In With Solana biçimi) imzalanır; başka bir metin imzalanmaz. İmzasız kipte
+  ve nonce için, `api.authDomain` alan adında Square oturum mesajı (Sign-In With Solana biçimi) imzalanır; başka bir
+  metin ya da başka bir Square kurulumunun meydan okuması imzalanmaz. İmzasız kipte
   oturum açılamaz; eşik üstü delegasyon tx'siz reddedilir.
 
 ## Duty'ler
