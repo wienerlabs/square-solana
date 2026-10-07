@@ -14,6 +14,7 @@ Uygulama ve servisler (pnpm workspace). `package.json` adları `@squaresdk/solan
 | [`prover/`](prover/) | Release devresi için Groth16 prover servisi (snarkjs, `POST /v1/prove`); Aperture `prover-service`'ten geçmişiyle taşındı [BE-02], yeni devreye uyarlandı | [BE-11] |
 | [`compliance-api/`](compliance-api/) | Aperture compliance API'si (MPP / Stripe, x402 raporu `@squaresdk/solana-x402` üzerinden [BE-24], kayıtsız ödeme izleyicisi); geçmişiyle taşındı [BE-02], uyarlama [BE-25] ve [BE-18] | [BE-25] |
 | [`fee-payer/`](fee-payer/) | Sponsorlu işlem servisi: kullanıcının v0 tx'ini politikaya göre denetler (izinli program / talimat, sponsor anahtarının rolü, compute budget, ALT, Squads vault mesajları), simüle eder, kullanıcı başına hız sınırı ve günlük lamport bütçesiyle imzalar ya da gönderir; maliyet metrikleri ve `sponsored_txs` günlüğü ([ADR 0022](../docs/decisions/0022-fee-payer-politikasi.md)) | [BE-27] |
+| [`demo/`](demo/) | Demo senaryosu: tek komutluk seed (kurum, politika ve alıcı listesi, agent kaydı, alıcı, devnet USDC dağıtımı, screening), zincirden hesap raporu üreten demo agent (agent-sdk), ispat onay ve ret senaryoları, localnet koşucusu. Railway servisi değildir, veritabanı kullanmaz | [BE-21] |
 | [`screener/`](screener/) | Sanctions screening: OFAC SDN listesi ve Chainalysis API ile tarama, screener authority anahtarıyla registry `record_screening` tx'i, TTL yenileme, denetim kaydı ve API ([ADR 0020](../docs/decisions/0020-sanctions-screening-kaynaklari-ve-saglayici.md)) | [BE-16] |
 
 Tüm servisler tek veritabanını ([`db/`](../db/)) kullanır. Her servisin Railway tanımı `<servis>/railway.json`'dır
@@ -29,6 +30,7 @@ Tüm servisler tek veritabanını ([`db/`](../db/)) kullanır. Her servisin Rail
 [BE-16]: https://github.com/wienerlabs/square-solana/issues/49
 [BE-18]: https://github.com/wienerlabs/square-solana/issues/51
 [BE-24]: https://github.com/wienerlabs/square-solana/issues/79
+[BE-21]: https://github.com/wienerlabs/square-solana/issues/65
 [BE-22]: https://github.com/wienerlabs/square-solana/issues/72
 [BE-25]: https://github.com/wienerlabs/square-solana/issues/80
 [BE-27]: https://github.com/wienerlabs/square-solana/issues/82
