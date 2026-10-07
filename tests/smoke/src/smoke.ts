@@ -3,12 +3,19 @@
 // prover'la üretilir. Her adımdan sonra sonuç zincirden okunarak doğrulanır; bir doğrulama tutmazsa koşu
 // durur.
 //
-//   akış       1 politika + alıcı kökü · 2 agent · 3 screening, create + fund · 4 kabul + teslim ·
-//              5 alacak list + buy · 7 ispat · 6 + 8 finalize (keeper) → alıcıya ödeme, itibar, ValidationRecord
-//   ispat-ret  ayrı, işlem başı tavanı düşük bir politika: kesin ret (PER_TX) → finalize net'i kuruma iade eder
+//   akış       1 politika + alıcı kökü · 2 agent · 3 screening, create + fund, kabul öncesi ön-ispat ·
+//              4 kabul + teslim · 5 alacak list + buy · 7 ispat · 6 + 8 finalize (keeper) → alıcıya ödeme, itibar,
+//              ValidationRecord
+//   ispat-ret  ayrı bir politika: onaylı alıcı aynı zamanda politikanın engelli listesinde. Ön-ispat geçer (payee
+//              agent), alacak o alıcıya satılınca release ispatı kesin ret (BLOCKED) → finalize net'i kuruma
+//              iade eder (ADR 0028'den sonra kalıcı retin tek yolu)
 //   ispat-yok  finalize `ProofRequired` ile düşer, escrow bekler; ispat bağlanınca aynı iş ödenir
-//   fiat       (MPP authority anahtarı yapılandırılmışsa) vault'suz iş, MPP attestation'ı + ispat, ödemesiz
-//              kapanış; admin yerel anahtarsa authority rotasyonu (BC-37, fiat.ts)
+//   fiat       (MPP authority anahtarı yapılandırılmışsa) vault'suz iş, ön-ispat, MPP attestation'ı + ispat,
+//              ödemesiz kapanış; admin yerel anahtarsa authority rotasyonu (BC-37, fiat.ts)
+//
+// Policy'li işte agent ancak kurumun kabul öncesi ön-ispatından (`setPreflightProof`, ADR 0028) sonra kabul eder:
+// ispat işin kendi koşullarıyladır (net = tutar, payee = agent cüzdanı, sayaç 0) ve kalıcı ya da günlük tavan biti
+// taşıyamaz.
 //
 // Saat: ispatın anı zincirin saatidir (Clock sysvar'ı; verifier ±600 s tolerans ister) ve finalize ispatla
 // aynı UTC gününde olmalıdır (ADR 0012). Gün dönümüne challenge süresi + pay kadar kalmışsa ispat yeni güne
@@ -24,8 +31,10 @@ import {
 import { PublicKey, SystemProgram, type Keypair, type TransactionInstruction } from '@solana/web3.js';
 import {
   buildBuyerTree,
+  buildPreflightWitness,
   buildReleaseWitness,
   buildSetComplianceProofTx,
+  buildSetPreflightProofTx,
   computePolicyCommitment,
   dayStart,
   derivePolicySalts,
@@ -33,6 +42,7 @@ import {
   generatePolicySecret,
   getBuyerProof,
   isFinalRefusal,
+  preflightAccepts,
   REFUSAL,
   refusalRules,
   releaseNetAmount,
@@ -56,6 +66,8 @@ export const MIN_PAYER_LAMPORTS = 200_000_000;
 export const MIN_KEEPER_LAMPORTS = 50_000_000;
 /** Fonlanan iş sayısı: ana akış ve iki varyant. */
 export const FUNDED_JOBS = 3n;
+/** Alacağı satılan iş sayısı: ana akış ve ispat-ret; alıcı ikisinin fiyatını öder. */
+export const BOUGHT_CLAIMS = 2n;
 
 /** Koşunun kimliği: agent kimliğine, spec'lere ve politika kimliklerine girer (yeniden koşular çakışmaz). */
 export function newRunId(now: Date = new Date()): string {
@@ -177,8 +189,8 @@ export async function runSmoke(context: Context, options: SmokeOptions): Promise
       `kurumun token bakiyesi yetersiz: ${units(amount * FUNDED_JOBS)} gerekli (${ata(key.institution.publicKey).toBase58()})`,
     );
   }
-  if ((await balance(key.buyer.publicKey)) < values.claimPrice) {
-    throw new Error(`alıcının token bakiyesi yetersiz: ${units(values.claimPrice)} gerekli`);
+  if ((await balance(key.buyer.publicKey)) < values.claimPrice * BOUGHT_CLAIMS) {
+    throw new Error(`alıcının token bakiyesi yetersiz: ${units(values.claimPrice * BOUGHT_CLAIMS)} gerekli`);
   }
   for (const [role, keypair, min] of [
     ['payer', key.payer, MIN_PAYER_LAMPORTS],
@@ -215,7 +227,7 @@ export async function runSmoke(context: Context, options: SmokeOptions): Promise
   const secret = generatePolicySecret();
   const dailyCeiling = amount * 1_000n;
 
-  function policyHandle(name: string, maxPerTx: bigint): PolicyHandle {
+  function policyHandle(name: string, blockedPayees: readonly PublicKey[] = []): PolicyHandle {
     const policyId = sha256(enc(`square-smoke/${runId}/${name}`));
     return {
       address: pda.policy(institutionPda, policyId)[0],
@@ -226,9 +238,9 @@ export async function runSmoke(context: Context, options: SmokeOptions): Promise
         version: 1,
         dailyCeiling: String(dailyCeiling),
         maxDaily: String(dailyCeiling),
-        maxPerTx: String(maxPerTx),
+        maxPerTx: String(amount),
         tokenWhitelist: [mint.toBase58()],
-        blockedPayees: [],
+        blockedPayees: blockedPayees.map((payee) => payee.toBase58()),
         allowedCategories: [values.paymentCategory],
         timeWindow: { days: [...DAYS_OF_WEEK], startHourUtc: 0, endHourUtc: 23 },
       },
@@ -249,6 +261,12 @@ export async function runSmoke(context: Context, options: SmokeOptions): Promise
         policy: policy.address,
         systemProgram: SystemProgram.programId,
       })
+      .instruction();
+
+  const buyerRootIx = (policy: PolicyHandle, root: Uint8Array) =>
+    client.policy.program.methods
+      .setBuyerRoot(Array.from(root))
+      .accountsStrict({ authority: key.institution.publicKey, institution: institutionPda, policy: policy.address })
       .instruction();
 
   /** Zincirdeki politikanın commitment'ı ve tavanı yerel belgeyle aynı; belgenin sürümü zincirden. */
@@ -273,6 +291,46 @@ export async function runSmoke(context: Context, options: SmokeOptions): Promise
   // Agent kaydı adım 2'de açılır; adresi kimlikten türer (`["agent", sahip, agent_id]`).
   const agentId = `smoke-${runId}`;
   const agentRecord = pda.agentRecord(key.agent.publicKey, agentId)[0];
+
+  /** Kabul öncesi ön-ispat (ADR 0028): işin kendi koşullarıyla, zincirin saatinde üretilir ve bağlanır. */
+  async function bindPreflight(job: PublicKey, policy: PolicyHandle) {
+    const witness = await buildPreflightWitness({
+      client,
+      job,
+      policy: policy.document,
+      salts: policy.salts,
+      paymentCategory: values.paymentCategory,
+      now: await chainTime(connection),
+    });
+    const proof = await proverFor(options, section).prove(witness);
+    await send(
+      '3',
+      '`setPreflightProof` (Groth16, kabul öncesi)',
+      () =>
+        buildSetPreflightProofTx(
+          client,
+          { authority: key.institution.publicKey, institution: institutionPda, policy: policy.address, job, proof },
+          opts(key.payer),
+        ),
+      [key.payer, key.institution],
+    );
+    const bound = await client.verifier.fetch('preflightProof', pda.preflightProof(job)[0]);
+    if (!bound) throw new Error('PreflightProof yazılmadı');
+    proofs.push({
+      section,
+      job: job.toBase58(),
+      verdict: 'ön-ispat',
+      refusalCode: bound.refusalCode,
+      provingMs: proof.provingMs,
+    });
+    check(
+      bound.job.equals(job) &&
+        bound.policy.equals(policy.address) &&
+        preflightAccepts(bound.refusalCode) &&
+        bound.proofTimestamp.toNumber() === witness.timestamp,
+      `\`PreflightProof\`: işin kendi koşullarıyla, ret kodu ${bound.refusalCode} (kalıcı ya da günlük tavan biti yok)`,
+    );
+  }
 
   async function openJob(variant: string, policy: PolicyHandle) {
     const now = await chainTime(connection);
@@ -338,6 +396,7 @@ export async function runSmoke(context: Context, options: SmokeOptions): Promise
       BigInt(vault.value.amount) === amount && before - (await balance(key.institution.publicKey)) === amount,
       `job ${created.job.toBase58()} fonlandı: vault ${units(amount)}`,
     );
+    await bindPreflight(created.job, policy);
 
     const delivery = `square-smoke ${runId} ${variant}: teslim`;
     await send(
@@ -445,7 +504,7 @@ export async function runSmoke(context: Context, options: SmokeOptions): Promise
 
   // --- 8 adım ---------------------------------------------------------------------------------------------
   section = 'akış';
-  const okPolicy = policyHandle('ok', amount);
+  const okPolicy = policyHandle('ok');
   const buyers = buildBuyerTree([{ buyer: key.buyer.publicKey, leafSalt: generateLeafSalt() }]);
   const institutionExists = (await client.policy.fetch('institution', institutionPda)) !== null;
   const step1: TransactionInstruction[] = [];
@@ -464,13 +523,7 @@ export async function runSmoke(context: Context, options: SmokeOptions): Promise
     );
     step1Kinds.push('initInstitution');
   }
-  step1.push(
-    await setPolicyIx(okPolicy),
-    await client.policy.program.methods
-      .setBuyerRoot(Array.from(buyers.root))
-      .accountsStrict({ authority: key.institution.publicKey, institution: institutionPda, policy: okPolicy.address })
-      .instruction(),
-  );
+  step1.push(await setPolicyIx(okPolicy), await buyerRootIx(okPolicy, buyers.root));
   step1Kinds.push('setPolicy', 'setBuyerRoot');
   await send(
     '1',
@@ -543,46 +596,46 @@ export async function runSmoke(context: Context, options: SmokeOptions): Promise
     );
   }
 
-  const mainJob = await openJob('ana akış', okPolicy);
+  /** Adım 5: agent alacağı listeler, alıcı onaylı listedeki Merkle kanıtıyla alır. */
+  async function sellClaim(job: PublicKey) {
+    const agentBefore = await balance(key.agent.publicKey);
+    await send(
+      '5',
+      '`listClaim`',
+      () => client.flow.listClaim({ agent: key.agent.publicKey, job, price: values.claimPrice }, opts(key.payer)),
+      [key.payer, key.agent],
+    );
+    const { leafSalt, merkleProof } = getBuyerProof(buyers, key.buyer.publicKey);
+    await send(
+      '5',
+      '`buyClaim` (Merkle kanıtlı)',
+      () =>
+        client.flow.buyClaim(
+          {
+            buyer: key.buyer.publicKey,
+            job,
+            price: values.claimPrice,
+            leafSalt,
+            merkleProof,
+            buyerTokenAccount: ata(key.buyer.publicKey),
+          },
+          opts(key.payer),
+        ),
+      [key.payer, key.buyer],
+    );
+    const listing = await client.escrow.fetch('claimListing', pda.claimListing(job)[0]);
+    check(
+      listing !== null && variantOf(listing.status) === 'bought' && listing.buyer.equals(key.buyer.publicKey),
+      `alacak alıcıya satıldı; payee artık alıcı`,
+    );
+    check(
+      (await balance(key.agent.publicKey)) - agentBefore === values.claimPrice,
+      `agent fiyatı aldı: ${units(values.claimPrice)}`,
+    );
+  }
 
-  const agentBefore = await balance(key.agent.publicKey);
-  await send(
-    '5',
-    '`listClaim`',
-    () =>
-      client.flow.listClaim(
-        { agent: key.agent.publicKey, job: mainJob.address, price: values.claimPrice },
-        opts(key.payer),
-      ),
-    [key.payer, key.agent],
-  );
-  const { leafSalt, merkleProof } = getBuyerProof(buyers, key.buyer.publicKey);
-  await send(
-    '5',
-    '`buyClaim` (Merkle kanıtlı)',
-    () =>
-      client.flow.buyClaim(
-        {
-          buyer: key.buyer.publicKey,
-          job: mainJob.address,
-          price: values.claimPrice,
-          leafSalt,
-          merkleProof,
-          buyerTokenAccount: ata(key.buyer.publicKey),
-        },
-        opts(key.payer),
-      ),
-    [key.payer, key.buyer],
-  );
-  const listing = await client.escrow.fetch('claimListing', pda.claimListing(mainJob.address)[0]);
-  check(
-    listing !== null && variantOf(listing.status) === 'bought' && listing.buyer.equals(key.buyer.publicKey),
-    `alacak alıcıya satıldı; payee artık alıcı`,
-  );
-  check(
-    (await balance(key.agent.publicKey)) - agentBefore === values.claimPrice,
-    `agent fiyatı aldı: ${units(values.claimPrice)}`,
-  );
+  const mainJob = await openJob('ana akış', okPolicy);
+  await sellClaim(mainJob.address);
 
   const buyerBefore = await balance(key.buyer.publicKey);
   const keeperBefore = await balance(key.keeper.publicKey);
@@ -619,28 +672,39 @@ export async function runSmoke(context: Context, options: SmokeOptions): Promise
 
   // --- Varyant: ispat-ret ---------------------------------------------------------------------------------
   section = 'ispat-ret';
-  // İşlem başı tavan 1 atomik birim: net tutar onu aşar → PER_TX, kalıcı ret (ADR 0013).
-  const strictPolicy = policyHandle('strict', 1n);
+  // ADR 0028'den sonra kalıcı ret yalnızca alacak satılınca çıkar: onaylı alıcı, politikanın (gizli) engelli
+  // listesinde de. Ön-ispatın payee'si agent olduğu için geçer; satıştan sonra payee alıcıdır → PAYEE_BLOCKED.
+  const strictPolicy = policyHandle('blocked-buyer', [key.buyer.publicKey]);
   await send(
     '1',
-    '`setPolicy` (işlem başı tavan 1)',
-    async () => tx([await setPolicyIx(strictPolicy)], key.payer, ['setPolicy']),
+    '`setPolicy` (alıcı engelli listede) + `setBuyerRoot`',
+    async () =>
+      tx([await setPolicyIx(strictPolicy), await buyerRootIx(strictPolicy, buyers.root)], key.payer, [
+        'setPolicy',
+        'setBuyerRoot',
+      ]),
     [key.payer, key.institution],
   );
-  await confirmPolicy(strictPolicy, null);
+  await confirmPolicy(strictPolicy, buyers.root);
   const refusedJob = await openJob('ispat-ret', strictPolicy);
+  await sellClaim(refusedJob.address);
   const institutionBefore = await balance(key.institution.publicKey);
+  const buyerBeforeRefusal = await balance(key.buyer.publicKey);
   const keeperBeforeRefusal = await balance(key.keeper.publicKey);
   const reputationBeforeRefusal = await reputation();
   const refused = await bindProof(refusedJob, strictPolicy);
   check(
     variantOf(refused.bound.verdict) === 'refused' &&
-      (refused.bound.refusalCode & REFUSAL.perTx) !== 0 &&
+      refused.bound.payee.equals(key.buyer.publicKey) &&
+      (refused.bound.refusalCode & REFUSAL.payeeBlocked) !== 0 &&
       isFinalRefusal(refused.bound.refusalCode, big(refused.bound.dailySpentBefore)),
-    `\`ReleaseProof\`: ret, kod ${refused.bound.refusalCode} (${refusalRules(refused.bound.refusalCode).join(', ')}), kesin ret`,
+    `\`ReleaseProof\`: ret, payee alıcı, kod ${refused.bound.refusalCode} (${refusalRules(refused.bound.refusalCode).join(', ')}), kesin ret`,
   );
   await finalize(refusedJob);
   check((await jobStatus(refusedJob.address)) === 'refunded', 'job `Refunded`');
+  check((await balance(key.buyer.publicKey)) === buyerBeforeRefusal, 'alıcıya ödeme yok');
+  const defaulted = await client.escrow.fetch('claimListing', pda.claimListing(refusedJob.address)[0]);
+  check(defaulted !== null && variantOf(defaulted.status) === 'defaulted', 'alacak listelemesi `Defaulted`');
   check(
     (await balance(key.institution.publicKey)) - institutionBefore === net,
     `net kuruma iade edildi: ${units(net)}`,
@@ -705,6 +769,7 @@ export async function runSmoke(context: Context, options: SmokeOptions): Promise
       prover: proverFor(options, 'fiat'),
       send,
       check,
+      preflight: (job) => bindPreflight(job, okPolicy),
       recordProof: (job, verdict, refusalCode, provingMs) =>
         proofs.push({ section, job: job.toBase58(), verdict, refusalCode, provingMs }),
       units,
