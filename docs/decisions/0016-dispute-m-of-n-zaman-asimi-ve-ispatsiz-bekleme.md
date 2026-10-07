@@ -131,3 +131,25 @@
   gerektirir; v0.6.0'da yapılmadı.
 - **Alacak alıcısının başvurusu:** Başvuruyu yalnızca `job.agent_wallet` imzalar. Alacak satıldıysa payee
   alıcıdır ve başvuru için agent'a bağlıdır; alıcı bu riski alacağın fiyatına katar.
+- **FavorAgent'ta bond ve payee'nin taraması:** FavorAgent kararında bond agent tarafına kesilir. Kurum kesin bir
+  ret bağladıysa escrow kuruma döner, ama bond yine payee'ye gittiği için `execute_resolution` payee'nin temiz ve
+  taze screening kaydını ister. Payee sonradan `Flagged` olduysa iade de bekler: escrow ve bond, payee'nin kaydı
+  temizlenene kadar kilitli kalır (yaptırımlı bir adreste süresiz). `finalize_payment`'te ret payee taraması
+  istemez. Bu, Karar 7'nin "ödeme bekler, iade yapılmaz" kuralına uyar; kararın kapsamadığı bir durumdur. Hesap
+  düzenini değiştirmeyen bir çözüm (ör. agent payı sıfırken payee temiz değilse bond'u kuruma döndürmek) sahibinin
+  kararını bekliyor.
+- **Kararın ve finalize'ın günlük tavan farkı:** Karar agent tarafına keeper ücretsiz tam `amount`'u verir,
+  `finalize_payment` ise `amount - ücret`'i öder. İkisi de ispatın net tutarı olarak kapıdan geçer ve devrede iki
+  günlük tavan da (özel ve herkese açık) `daily_spent_before + net`'e bakar.
+  - Policy'li bir işin tutarı `amount - ücret <= tavan < amount` bandındaysa finalize ödenirdi. FavorAgent
+    kararında ise kurum ispatı sayacı 0'ken bağlayarak kesin `DAILY_CEILING` (ya da `DAILY_PRIVATE`) reti alır ve
+    escrow iade edilir. İspatın zamanını kurum seçtiği için panelin kararını fiilen tersine çevirebilir.
+  - Hesap düzenini değiştirmeyen iki yol var: arbitrator aracı bu bantta FavorAgent yerine
+    `Split { agent_amount: tavan }` önerir, ya da `create_job` policy'li işte `amount > tavan`'ı reddeder.
+- **İlk oy kararı belirler:** Karar 1'e uygun olarak ilk oy kararı sabitler, sonraki oylar aynı olmalıdır
+  (`ResolutionMismatch`). Bu yüzden M-of-N tek bir hatalı üyeye dayanmaz. Agent'la anlaşan bir arbitrator ilk oyu
+  FavorAgent ya da bir Split olarak verirse başka bir karar oylanamaz. Dispute son tarihte lapse olur ve kurum
+  ikinci bir dispute açamaz; policy'siz işte finalize agent'a öder. Sürüm artınca sayım sıfırlandığı için (Karar
+  2) çare, son tarihten önce `update_arbitrators`'tır
+  ([upgrade runbook'u](../runbooks/upgrade.md#8-olağan-dışı-durumlar)). Kuralın kendisi ayrı bir ADR'de yeniden
+  ele alınabilir.
