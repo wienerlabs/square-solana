@@ -1,145 +1,315 @@
-# Square (Solana)
+<div align="center">
 
-Otonom agent işleri için **uyum kapılı settlement** (compliance-gated settlement), Solana üzerinde.
+<img src="docs/assets/wiener-labs-mark.svg" alt="Wiener Labs" width="96">
 
-Kurum, harcama yetkisini (spending mandate) zincire yalnızca bir **commitment** olarak yazar;
-politikanın kendisi zincire çıkmaz. Kimliği kayıtlı agent'lar bu yetkiye göre iş yapar. Escrow,
-ödemenin mandate'e uyduğu bir **ZK ispatıyla** kanıtlanmadan serbest kalmaz. Teslimden sonra
-challenge penceresinde oluşan alacak iskontolu satılabilir, ama yalnızca kurumun politikasının
-onayladığı alıcıya.
+# Square on Solana
 
-> **Durum:** geliştirme aşamasında (M1 — Temel). Henüz deploy edilmiş program, yayımlanmış paket
-> ya da çalışan servis yok. Milestone'lar ürün sürümü değil geliştirme fazıdır; kapsam ve sıra
-> [kararlarda](docs/analysis/square-solana-analysis.md#12-kararlar) sabitlenmiştir.
+**Compliance-gated settlement for autonomous agent work.**
 
-## Kaynaklar ve yaklaşım
+Institutions mandate spending privately. Agents do the work.<br>
+Escrow releases only against a zero-knowledge proof that the payment fits the mandate.
 
-Square, üç projenin Solana kodunu tek bir Anchor workspace'inde birleştirir ve aralarındaki
-eksik bağları zincir üzerinde kurar:
+[![License](https://img.shields.io/badge/license-Apache--2.0-0b7285)](LICENSE)
+[![Solana](https://img.shields.io/badge/solana-devnet-9945FF?logo=solana&logoColor=white)](docs/deploy/devnet.md)
+[![Anchor](https://img.shields.io/badge/anchor-1.2.0-512BD4)](docs/decisions/0007-anchor-surumu.md)
+[![Agave](https://img.shields.io/badge/agave-4.1.2-14F195)](Anchor.toml)
+[![ZK](https://img.shields.io/badge/zk-Groth16%20%C2%B7%20Circom-111111)](docs/design/release-circuit.md)
+[![Node](https://img.shields.io/badge/node-24-339933?logo=nodedotjs&logoColor=white)](.nvmrc)
+[![pnpm](https://img.shields.io/badge/pnpm-10.34.6-F69220?logo=pnpm&logoColor=white)](package.json)
 
-| Katman | Kaynak | Square'de |
-|---|---|---|
-| Escrow, challenge penceresi, arbitration, alacak piyasası | [Covenant](https://github.com/wienerlabs/covenant) | `square_escrow` |
-| Politika commitment'ı, Groth16 uyum ispatı | [Aperture](https://github.com/wienerlabs/aperture) | `square_policy`, `square_verifier`, `circuits/` |
-| Agent kimliği, `did:aip`, A2A | [AIP](https://github.com/dr-wilson-empty/aip-beta) | `square_registry`, `@squaresdk/solana-identity` |
+[Protocol](docs/protocol.md) · [Architecture](#architecture) · [Quick start](#quick-start) · [Devnet](docs/deploy/devnet.md) · [Documentation](#documentation) · [Decisions](docs/decisions/)
 
-Ürün kapsamı Arc üzerindeki Square'den referans alınır; kod oradan taşınmaz. Programlar
-**geçmişleriyle** taşınır (`git subtree` ya da `git filter-repo`) ve **yeni program ID'leriyle**
-deploy edilir.
-Programlar arası entegrasyonda CPI yerine öncelik **account-read**'dedir
-([§12.1](docs/analysis/square-solana-analysis.md#121-mimari-ve-ta%C5%9F%C4%B1ma)).
+</div>
 
-## Akış: mandate'ten ödemeye 8 adım
+---
 
-| # | Kim | Ne olur | Program |
+## Why Square
+
+An institution that lets software spend money on its behalf has three problems at once. Its spending policy is
+private, so it cannot simply publish the rules on chain. Regulated money cannot move without sanctions screening and
+Travel Rule records. And the agents doing the work need to get paid promptly, without trusting the institution to
+release funds by hand.
+
+Square resolves all three on Solana:
+
+- The institution writes its spending mandate to the chain **only as a salted Poseidon commitment** plus a public
+  daily ceiling. The policy itself never leaves the institution.
+- Registered agents (`did:aip`) accept and deliver jobs funded in USDC escrow.
+- On a policy-bound job **no payment leaves escrow** until the institution binds a Groth16 proof that this exact
+  payment (payee, amount, mint, day and running daily total) complies with the committed mandate. A refusing proof
+  is a valid proof: it refunds the institution instead.
+- After delivery, the agent can sell the receivable at a discount during the challenge window, but **only to buyers
+  the institution has approved**.
+
+## Highlights
+
+| | |
+|---|---|
+| **Private mandates** | A salted policy commitment and a buyer allow list (Merkle root) on chain; the policy document stays off chain. |
+| **Zero-knowledge release gate** | A Circom circuit proves compliance with per-transaction and daily ceilings, mint and payee lists, categories and time windows. `square_verifier` checks the Groth16 proof and keeps the institution's daily counter. |
+| **On-chain screening** | Wallets are screened against the OFAC SDN list and the Chainalysis sanctions API; a `Flagged` party can neither fund nor be paid. |
+| **Receivables market** | Delivered work becomes a claim that can be listed and bought at a discount by allow-listed, screened buyers. |
+| **M-of-N arbitration** | Bonded disputes, arbitrator sets of up to seven, deadlines and lapse, and payouts that still pass the proof gate. |
+| **Travel Rule** | A salted, job-bound commitment at or above the threshold; IVMS101 records are envelope-encrypted off chain with permissioned reads and an access log. |
+| **Agent native** | `did:aip` v2 identities, signed agent cards, the A2A v1.0 task protocol, an agent SDK and a hosted agent runtime with per-capability MCP tools. |
+| **Every rail** | USDC on Solana, cross-chain funding through CCTP, a Stripe MPP fiat rail, x402 paid HTTP endpoints, and sponsored transactions through a policy-checked fee payer. |
+| **Operable by design** | Event indexer with reconciliation, permissionless keeper, prover, screener, REST API, CLI and MCP server, with Prometheus metrics, alerts and SLOs. |
+
+## How it works
+
+Eight steps take a job from mandate to payout ([protocol](docs/protocol.md),
+[program interface](docs/design/program-interface.md)):
+
+| # | Actor | What happens | Instructions |
 |---|---|---|---|
-| 1 | Kurum | Salt'lı politikanın Poseidon commitment'ını ve public günlük tavanı yazar | `square_policy` |
-| 2 | Agent | Kaydolur, `did:aip` olarak resolve edilir | `square_registry` |
-| 3 | Kurum | İş açar, USDC'yi kilitler (taraflar sanctions screening'den geçer) | `square_escrow` |
-| 4 | Agent | Teslim eder, challenge penceresi açılır; agent kaydı job'a bağlanır | `square_escrow` |
-| 5 | Agent / alıcı | Alacak listelenir; kurumun onaylı alıcı Merkle kökündeki alıcı satın alır | `square_escrow` ← `square_policy` |
-| 6 | Keeper | Pencere itirazsız kapanınca ücretli, permissionless finalize | `square_escrow` |
-| 7 | Kurumun yazılımı | Release'ten önce ispat job'a bağlanır; ispat yoksa `ProofRequired`, mandate reddederse `ReleaseRefused` | `square_verifier` → `square_escrow` |
-| 8 | Zincir | Ödeme alıcıya gider, itibar işi yapan agent'a yazılır, gate sonucu validation kaydına düşer | `square_escrow`, `square_registry` |
+| 1 | Institution | Opens its account and commits a spending policy and a public daily ceiling. | `init_institution`, `set_policy` |
+| 2 | Agent | Registers; the record resolves as a `did:aip` identifier with the hash of its agent card. | `register_agent` |
+| 3 | Screener, institution | Wallets are screened. The institution creates the job for the agent and funds it, committing Travel Rule data first when the amount requires it. | `record_screening`, `create_job`, `commit_travel_rule`, `fund_job` |
+| 4 | Agent | Accepts, delivers (SHA-256 and URI of the work) and opens the challenge window. | `accept_job`, `submit_work` |
+| 5 | Agent, buyer | The agent may sell the receivable; the buyer must be on the institution's allow list and screened clear. | `list_claim`, `buy_claim` |
+| 6 | Keeper | After the challenge window anyone can finalize and earn the keeper fee. On a policy job without a proof the release fails with `ProofRequired` and escrow waits; a final refusal refunds the institution. | `finalize_payment` |
+| 7 | Institution's software | On a policy job, binds a Groth16 proof that the payment complies with the mandate, before finalize. | `set_compliance_proof` |
+| 8 | Escrow, verifier | The payee (the buyer if the claim was sold) is paid; reputation, a validation record and the institution's daily counter are written. | `finalize_payment` with the `record_release` CPI |
 
-## Hedef on-chain mimari
+```mermaid
+stateDiagram-v2
+  [*] --> Open: create_job
+  Open --> Funded: fund_job
+  Funded --> Accepted: accept_job
+  Accepted --> Delivered: submit_work
+  Delivered --> Released: finalize_payment (no gate or compliant proof)
+  Delivered --> Refunded: finalize_payment (final refusal)
+  Delivered --> Disputed: raise_dispute
+  Disputed --> Resolved: resolve_dispute (M votes)
+  Resolved --> Released: execute_resolution
+  Resolved --> Refunded: execute_resolution
+  Open --> Cancelled: cancel_job
+  Funded --> Cancelled: cancel_job
+  Accepted --> Cancelled: cancel_job (after deadline)
+```
+
+Funding can also arrive from another chain: USDC burned through CCTP is minted and funds the job in the same
+transaction ([CCTP funding](docs/design/cctp-funding.md)).
+
+## Architecture
 
 ```mermaid
 flowchart TB
-  subgraph Square["square-solana · tek Anchor workspace"]
-    REG[[square_registry<br/>AgentRecord · did:aip]]
-    POL[[square_policy<br/>politika commitment · günlük tavan · buyer_root]]
-    VER[[square_verifier<br/>Groth16 · ReleaseProof]]
-    ESC[[square_escrow<br/>job · dispute · claim market · keeper fee]]
-    COM[(square-common<br/>seed'ler · event'ler · hata kodları)]
+  subgraph Chain["Solana · one Anchor workspace"]
+    REG[[square_registry<br/>agent records · did:aip · screening]]
+    POL[[square_policy<br/>institutions · policy commitments · buyer roots]]
+    VER[[square_verifier<br/>Groth16 release proofs · daily counters]]
+    ESC[[square_escrow<br/>jobs · claim market · disputes · reputation]]
   end
-  I[Kurum] -- politika / buyer_root --> POL
-  A[Agent] -- kayıt --> REG
-  I -- create_job + fund --> ESC
-  A -- submit_work --> ESC
-  B[Alıcı] -- buy_claim + Merkle kanıtı --> ESC
-  I -- set_compliance_proof --> VER
-  K[Keeper] -- finalize --> ESC
-  ESC -. okur .-> REG & POL & VER
-  VER -. okur .-> POL
-  COM --- REG & POL & VER & ESC
+  subgraph Services["Off-chain services · one Postgres"]
+    IDX[indexer]
+    API[REST API]
+    KEEP[keeper]
+    PROV[prover]
+    SCR[screener]
+  end
+  I[Institution] -- policy / buyer root --> POL
+  A[Agent] -- register --> REG
+  I -- create + fund job --> ESC
+  A -- accept + submit --> ESC
+  B[Buyer] -- buy claim + Merkle proof --> ESC
+  I -- compliance proof --> VER
+  KEEP -- finalize --> ESC
+  ESC -. reads .-> REG & POL & VER
+  VER -. reads .-> POL
+  SCR -- screening records --> REG
+  IDX -. events .-> Chain
+  API --- IDX
+  API -- prove --> PROV
 ```
 
-Off-chain tarafta: tek Postgres (Prisma), REST API ve uzun çalışan servisler (indexer, keeper,
-prover, screener), `@squaresdk/solana-*` paketleri ve Next.js web uygulaması.
+Programs integrate by reading each other's accounts rather than through CPI wherever possible
+([ADR 0003](docs/decisions/0003-mimari-yol-c-tek-anchor-workspace.md)).
 
-## Depo yapısı
+### On-chain programs
 
-| Dizin | İçerik |
-|---|---|
-| [`programs/`](programs/) | Anchor programları: escrow, policy, verifier, registry |
-| [`idl/`](idl/) | Program arayüz sözleşmesinin tek kaynağı: IDL'ler ([`docs/design/program-interface.md`](docs/design/program-interface.md)) |
-| [`crates/`](crates/) | Paylaşılan Rust crate'leri (`square-common`) |
-| [`circuits/`](circuits/) | Circom uyum devresi ve trusted setup belgeleri |
-| [`packages/`](packages/) | TS paketleri (`@squaresdk/solana-*`) |
-| [`apps/`](apps/) | Web uygulaması, API ve servisler |
-| [`db/`](db/) | Tek veritabanı şeması ve migration'lar |
-| [`tests/`](tests/) | Program entegrasyon testleri ve uçtan uca testler |
-| [`scripts/`](scripts/) | Deploy, init ve bakım script'leri |
-| [`docs/`](docs/) | Analiz, [kararlar (ADR)](docs/decisions/), spec'ler, tasarım belgeleri |
-
-Yapının gerekçesi: [§9](docs/analysis/square-solana-analysis.md#9-%C3%B6nerilen-monorepo-yap%C4%B1s%C4%B1).
-
-## Geliştirme ortamı
-
-| Araç | Sürüm | Kaynak |
+| Program | Holds | Devnet |
 |---|---|---|
-| Rust (host) | 1.94.1 | [`rust-toolchain.toml`](rust-toolchain.toml) |
-| Solana CLI (Agave) | 4.1.2 (platform-tools v1.54, rustc 1.89 ile SBF derlemesi) | `Anchor.toml` → `[toolchain]`, [`.cargo/config.toml`](.cargo/config.toml) |
-| Anchor CLI | 1.2.0 (`avm install 1.2.0`) | `Anchor.toml` → `[toolchain]`, [ADR 0007](docs/decisions/0007-anchor-surumu.md) |
-| Node.js | 24 (LTS) | [`.nvmrc`](.nvmrc) |
-| pnpm | 10.34.6 | `package.json` → `packageManager`, [ADR 0011](docs/decisions/0011-monorepo-araclari-pnpm-ve-turborepo.md) |
-| gitleaks | en az 8.30.1 (pre-commit kancası) | [`scripts/security/gitleaks.env`](scripts/security/gitleaks.env) |
+| `square_registry` | Agent records (`did:aip`), wallet screening records | `AL5p4aTWrmBmWa4vxJFbBjQG7Xnx2juc15FJRGpwSsA9` |
+| `square_policy` | Institutions, policy commitments, buyer allow-list roots | `63HKPj2L8a9DGeTa9Eh3NaZXthMrFUEgbs9Y28SNEc4` |
+| `square_verifier` | Release proofs (Groth16), institutions' daily counters | `8yLdDR5zoAzeEWzkNX19DKy4HfVYXb7VcU3wWStwTFPh` |
+| `square_escrow` | Jobs and vaults, claim market, disputes, reputation, validation records | `6yBTEVbizMVCWAp4c3jx6Xdsay3CiUmrJmTswY7QRWaX` |
+
+The IDLs in [`idl/`](idl/) are the single source of the program contract; seeds, events and error codes are shared
+through [`crates/square-common`](crates/).
+
+### Off-chain services
+
+| Service | What it does |
+|---|---|
+| [`apps/api`](apps/api/) | REST API: wallet (Ed25519) sessions and API keys, reads from the indexer database, transaction preparation for every step, delivery uploads, dispute evidence and x402 endpoint definitions ([OpenAPI](docs/api/openapi.yaml)). |
+| [`apps/indexer`](apps/indexer/) | Event-based indexer: finalized Square transactions into events and mirror tables, with periodic reconciliation against the chain. |
+| [`apps/keeper`](apps/keeper/) | Permissionless finalize and lapse crank with a profitability threshold and `ProofRequired` and screening awareness; optionally the CCTP relayer. |
+| [`apps/prover`](apps/prover/) | Groth16 prover for the release circuit (`POST /v1/prove`), pinned to the artifact manifest. |
+| [`apps/screener`](apps/screener/) | Sanctions screening (OFAC SDN and Chainalysis) that writes screening records as the screener authority. |
+| [`apps/fee-payer`](apps/fee-payer/) | Sponsored transactions: decodes and policy-checks v0 transactions (allowed programs and instructions, compute budget, per-transaction and daily caps). |
+| [`apps/compliance-api`](apps/compliance-api/) | Proof records and batch attestations, an unattested-payment watcher and an x402-paid compliance report. |
+| [`apps/web`](apps/web/) | Next.js app: institution and agent flows, jobs, claims, policies, arbitration console, developer portal, `did:aip` resolver and network status. |
+
+### Packages
+
+| Package | Purpose |
+|---|---|
+| [`@squaresdk/solana-sdk`](packages/sdk/) | IDLs, generated types, client, PDAs, transaction builders for all eight steps and the REST client. |
+| [`@squaresdk/solana-types`](packages/types/) | Shared zod types: API envelope, views, agent cards, A2A tasks, event payloads. |
+| [`@squaresdk/solana-policy`](packages/policy/) | Institution side: policy commitments, buyer Merkle trees, release witnesses, proving and binding. |
+| [`@squaresdk/solana-identity`](packages/identity/) | `did:aip` resolver (v2 Solana profile and v1), DID document and agent card verification. |
+| [`@squaresdk/solana-agent-sdk`](packages/agent-sdk/) | Build an agent: card and well-known route, A2A endpoint, job acceptance and delivery, claim listing. |
+| [`@squaresdk/solana-a2a`](packages/a2a/) | A2A v1.0 task protocol (JSON-RPC 2.0 and SSE): server, client, durable task store, job mapping. |
+| [`@squaresdk/solana-hosted`](packages/hosted/) | Configuration-driven institution agent that runs Claude with a per-capability MCP tool allow list and policy-gated delegation. |
+| [`@squaresdk/solana-mcp`](packages/mcp/) | Two-way MCP: a Square MCP server (read tools and signing-flow writes) and a pooled MCP client for agents. |
+| [`@squaresdk/solana-x402`](packages/x402/) | x402 v2 payment gateway on the official `@x402/*` stack: Solana exact scheme, own or remote facilitator, replay protection. |
+| [`@squaresdk/solana-cctp`](packages/cctp/) | CCTP relayer core: burn records, Circle attestations, delivery and funding on Solana. |
+| [`@squaresdk/solana-hardening`](packages/hardening/) | Shared protections: SSRF guard, durable rate limits and idempotency, RPC failover, signed actions, webhook signing. |
+| [`@squaresdk/solana-observability`](packages/observability/) | Redacting structured logger, Prometheus metrics, health checks and alert rules. |
+| [`@squaresdk/solana-cli`](packages/cli/) | `squaresdk-solana`: the eight steps, disputes and `did:aip` resolution from the terminal, with JSON output ([guide](docs/cli.md)). |
+| [`@squaresdk/solana-config`](packages/config/) | Shared tsconfig, ESLint and Prettier settings. |
+
+## Status
+
+Square runs on **Solana devnet** ([deploy record](docs/deploy/devnet.md)).
+
+- Programs were deployed from a verifiable build (`solana-verify`), and the on-chain hashes match the build.
+- The upgrade authority and every config admin is a **2-of-3 Squads v4 vault**
+  ([ADR 0008](docs/decisions/0008-upgrade-authority-2-of-3-squads.md)).
+- The eight-step smoke test has run on devnet with real transactions ([report](docs/deploy/smoke-devnet.md)).
+- There is no mainnet environment ([ADR 0027](docs/decisions/0027-yalnizca-devnet.md)); network-independent code
+  (CAIP-2, `did:aip`, cluster options) is kept.
+- Contracts: program interface v0.7.0, HTTP API v0.26.0 ([API and SDK contract](docs/design/api-sdk-contract.md)).
+
+## Quick start
+
+### Prerequisites
+
+| Tool | Version | Pinned in |
+|---|---|---|
+| Rust | 1.94.1 | [`rust-toolchain.toml`](rust-toolchain.toml) |
+| Solana CLI (Agave) | 4.1.2 | [`Anchor.toml`](Anchor.toml) |
+| Anchor CLI | 1.2.0 (`avm install 1.2.0`) | [`Anchor.toml`](Anchor.toml) |
+| Node.js | 24 | [`.nvmrc`](.nvmrc) |
+| pnpm | 10.34.6 | [`package.json`](package.json) |
+| circom | 2.2.3 | [`circuits/payment-compliance`](circuits/payment-compliance/) |
+| Docker | any recent | Postgres and S3 test containers |
+| gitleaks | 8.30.1 or later | [`scripts/security/gitleaks.env`](scripts/security/gitleaks.env) |
+
+### Build and test
 
 ```bash
-pnpm install       # git kancalarını da kurar (.githooks/, pre-commit: gitleaks)
+pnpm install        # also installs the git hooks (gitleaks pre-commit)
 pnpm build
-pnpm lint          # ESLint + Prettier (@squaresdk/solana-config)
-pnpm check:names   # paket adları @squaresdk/solana- (ADR 0001)
-pnpm test          # vitest
-pnpm secrets:scan  # gitleaks, bütün git geçmişi
-cargo build
-node scripts/ci/rust-lint.mjs   # cargo fmt --check + clippy; kapsam scripts/ci/programs.mjs
+pnpm lint           # ESLint and Prettier
+pnpm test           # vitest across the workspace
 cargo test --workspace
-mkdir -p target/deploy   # temiz klonda ilk anchor build'den önce şart, aşağıya bakın
+mkdir -p target/deploy   # once, before the first anchor build in a fresh clone
 anchor build
-node scripts/ci/idl-conformance.mjs   # program IDL'leri sözleşmeyle (idl/) uyumlu
-anchor test --validator legacy --skip-build   # program testleri (LiteSVM, tests/programs)
+anchor test --validator legacy --skip-build   # program tests (LiteSVM, tests/programs)
 ```
 
-- **Temiz klonda `anchor build`:** Anchor 0.31, `target/deploy` yokken yapılan ilk derlemede
-  programlar için yeni anahtar çifti üretir ve `declare_id!` değerleriyle `Anchor.toml`'u bu
-  rastgele ID'lerle değiştirir. Önce `mkdir -p target/deploy` çalıştırın; derlemeden sonra
-  `git status` bu dosyalarda değişiklik göstermemeli.
-- **Rust kontrolleri:** Programlar, `crates/*` ve `tests/programs` `cargo fmt --check` ve
-  `cargo clippy -D warnings`'ten geçer. Programların sözleşmeye göre durumu
-  [`scripts/ci/programs.mjs`](scripts/ci/programs.mjs)'tedir.
-- **CI ve merge kuralı:** Kontrollerin listesi, yerel karşılıkları ve zorunlu kontrol kuralı
-  [`docs/ci.md`](docs/ci.md)'de.
+Without `target/deploy`, the first `anchor build` generates fresh program keypairs and rewrites `declare_id!` and
+`Anchor.toml` with random IDs; after a build `git status` should show no changes to those files.
 
-Editör ayarları [`.editorconfig`](.editorconfig) ile paylaşılır.
+### Run the eight steps on a local validator
 
-## Belgeler
+```bash
+(cd circuits/payment-compliance && npm ci && CIRCOM=/path/to/circom npm run build)   # wasm for in-process proofs
+pnpm --filter @squaresdk/solana-smoke smoke:localnet
+```
 
-- [Birleştirme analizi](docs/analysis/square-solana-analysis.md): kaynak projeler, özellik eşlemesi,
-  riskler.
-- [Kararlar (§12)](docs/analysis/square-solana-analysis.md#12-kararlar): mimari, kapsam,
-  varsayılanlar, lisans, proje yönetimi. §12 ile çelişen her şeyde §12 geçerlidir.
-- [Mimari karar kayıtları (ADR)](docs/decisions/): §12 kararlarının kalıcı kaydı (0001-0011) ve
-  [ADR şablonu](docs/decisions/sablon.md).
-- [Milestone'lar](https://github.com/wienerlabs/square-solana/milestones) ve
-  [issue'lar](https://github.com/wienerlabs/square-solana/issues): her iş bir issue'ya bağlıdır
-  (`BC-` blockchain, `BE-` backend, `FE-` frontend).
+The run starts a throwaway `solana-test-validator`, loads the programs from `target/deploy`, initializes the
+configs and runs every step, including the refused-proof, missing-proof and fiat variants
+([smoke](tests/smoke/)).
 
-## Lisans
+### Run the whole service stack against localnet
 
-[Apache-2.0](LICENSE) ([§12.5](docs/analysis/square-solana-analysis.md#125-lisans),
-[ADR 0005](docs/decisions/0005-lisans-apache-2-0-ve-notice.md)). Kaynak
-projelerin kökenleri ve orijinal lisansları [`NOTICE`](NOTICE)'tedir. Taşınan kod ve bağımlılık
-lisansı kuralları [`docs/licensing.md`](docs/licensing.md)'de, üçüncü taraf envanteri
-[`docs/THIRD_PARTY_LICENSES.md`](docs/THIRD_PARTY_LICENSES.md)'dedir.
+```bash
+pnpm --filter @squaresdk/solana-services-e2e test:localnet
+```
+
+This brings up the validator, Postgres, an S3-compatible store and the five core services (API, indexer, keeper,
+prover, screener), runs the eight steps through them and checks that the indexer's reconciliation finds zero drift
+([services](tests/services/)).
+
+## Repository layout
+
+| Path | Contents |
+|---|---|
+| [`programs/`](programs/) | Anchor programs: registry, policy, verifier, escrow |
+| [`idl/`](idl/) | Program interface contract (IDLs) |
+| [`crates/`](crates/) | Shared Rust crates (`square-common`) |
+| [`circuits/`](circuits/) | Circom compliance circuit, artifacts and trusted setup notes |
+| [`packages/`](packages/) | TypeScript packages (`@squaresdk/solana-*`) |
+| [`apps/`](apps/) | Web app, REST API and long-running services |
+| [`db/`](db/) | The single Postgres schema and migrations (Prisma) |
+| [`tests/`](tests/) | Program tests (LiteSVM), localnet and devnet smoke, service integration tests |
+| [`scripts/`](scripts/) | Deploy, init, CI and maintenance scripts |
+| [`infra/`](infra/) | Monitoring: Prometheus rules and Grafana dashboard |
+| [`docs/`](docs/) | Protocol, design documents, decisions, runbooks, deploy records, security |
+
+## Documentation
+
+Design documents, decisions and runbooks are written in Turkish; code, identifiers and APIs are in English.
+
+| Topic | Where |
+|---|---|
+| Protocol overview | [`docs/protocol.md`](docs/protocol.md) |
+| Program interface, events | [`program-interface.md`](docs/design/program-interface.md), [`events.md`](docs/design/events.md) |
+| Release circuit | [`release-circuit.md`](docs/design/release-circuit.md), [`circuits/payment-compliance`](circuits/payment-compliance/) |
+| HTTP API | [`openapi.yaml`](docs/api/openapi.yaml), [`api-sdk-contract.md`](docs/design/api-sdk-contract.md) |
+| Data model | [`data-model.md`](docs/design/data-model.md) |
+| Agents and identity | [`a2a.md`](docs/design/a2a.md), [`did:aip` Solana profile](docs/did-aip/method-spec-v2-solana.md) |
+| Funding and fees | [`cctp-funding.md`](docs/design/cctp-funding.md), [`tx-budget.md`](docs/design/tx-budget.md) |
+| Architecture decisions | [`docs/decisions/`](docs/decisions/) |
+| Operations | [runbooks](docs/runbooks/), [environments](docs/environments.md), [SLOs](docs/slo.md) |
+| Deployments | [devnet](docs/deploy/devnet.md), [smoke reports](docs/deploy/) |
+| Security | [threat models, reviews, pentest checklist, audit package](docs/security/) |
+| CLI | [`docs/cli.md`](docs/cli.md) |
+
+## Development
+
+- **Work items:** every change belongs to an issue (`BC-` blockchain, `BE-` backend, `FE-` frontend) and lands
+  through a pull request.
+- **Checks:** the CI checks, their local commands and the merge rule are listed in [`docs/ci.md`](docs/ci.md).
+- **Commits and releases:** conventional commits; package versions through
+  [changesets](https://github.com/changesets/changesets) ([ADR 0001](docs/decisions/0001-ts-paket-adlandirma-ve-surumleme.md)).
+- **Contract changes:** the program interface lives in `idl/`; an HTTP contract version change moves the OpenAPI
+  spec, the contract document, `API_CONTRACT_VERSION` and the SDK together
+  ([API and SDK contract](docs/design/api-sdk-contract.md)).
+- **Editors:** shared settings in [`.editorconfig`](.editorconfig).
+
+## Security
+
+Threat models, review reports, the pentest checklist and the audit package are in [`docs/security/`](docs/security/).
+Every commit is scanned for secrets with gitleaks. Please report suspected vulnerabilities privately to the
+maintainers instead of opening a public issue.
+
+## Lineage
+
+Square brings the Solana code of three projects into one Anchor workspace and builds the missing links between them
+on chain. The product scope follows Square on Arc; no code is carried over from it. Programs were moved with their
+history and deployed under new program IDs ([ADR 0004](docs/decisions/0004-gecmisli-tasima-ve-yeni-program-idleri.md)).
+
+| Layer | Source | In Square |
+|---|---|---|
+| Escrow, challenge window, arbitration, claim market | [Covenant](https://github.com/wienerlabs/covenant) | `square_escrow` |
+| Policy commitment, Groth16 compliance proof | [Aperture](https://github.com/wienerlabs/aperture) | `square_policy`, `square_verifier`, `circuits/` |
+| Agent identity, `did:aip`, A2A | [AIP](https://github.com/dr-wilson-empty/aip-beta) | `square_registry`, `@squaresdk/solana-identity` |
+
+## License
+
+[Apache-2.0](LICENSE) ([ADR 0005](docs/decisions/0005-lisans-apache-2-0-ve-notice.md)). The origins and original
+licenses of the source projects are in [`NOTICE`](NOTICE); licensing rules for ported code and dependencies are in
+[`docs/licensing.md`](docs/licensing.md), and the third-party inventory is in
+[`docs/THIRD_PARTY_LICENSES.md`](docs/THIRD_PARTY_LICENSES.md).
+
+<br>
+
+<div align="center">
+  <a href="https://wienerlabs.xyz"><img src="docs/assets/wiener-labs-mark.svg" alt="Wiener Labs" width="32"></a>
+  <br>
+  <sub>Built by <a href="https://wienerlabs.xyz">Wiener Labs</a></sub>
+</div>
