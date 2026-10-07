@@ -15,6 +15,7 @@ import { inject } from 'vitest';
 import { loadOpenApi } from '../src/openapi.js';
 import { apiKey, login } from './fixtures/login.js';
 import { PROGRAM_IDS, PUBLIC_BASE_URL, startStack, truncate, type Stack } from './fixtures/stack.js';
+import { sample } from './fixtures/sample.js';
 import { World, wallet } from './fixtures/world.js';
 
 let stack: Stack;
@@ -75,7 +76,7 @@ describe('tx hazırlama', () => {
       agentRecord.toBase58(),
       SystemProgram.programId.toBase58(),
     ]);
-    expect(tx.limit).toBe(40_000);
+    expect(tx.limit).toBe(50_000);
     expect(tx.price).toBe(1_000n);
     expect(response.data).toMatchObject({
       blockhash: stack.rpc.blockhash,
@@ -106,10 +107,19 @@ describe('tx hazırlama', () => {
     expect(stack.rpc.simulated).toHaveLength(2);
   });
 
-  it('çözücü zincirdeki hesabı okur (job → agentRecord); eksik hesap 400', async () => {
+  it('çözücü zincirdeki hesabı okur (job → agentRecord, config → verifier); eksik hesap 400', async () => {
     const agent = wallet();
     const agentRecord = await world.agent(owner.address, agent.address);
     const job = await world.job({ institution: owner.address, agentRecord, agentWallet: agent.address });
+    // `preflight_proof`'un programı config'teki verifier'dır (`seeds::program`, ADR 0028); çözücü config'i okur.
+    const config = stack.client.pda.escrowConfig()[0];
+    await world.onChain(
+      'escrow',
+      'escrowConfig',
+      config,
+      sample(stack.client.escrow.program.idl, 'escrowConfig', { verifierProgram: PROGRAM_IDS.verifier }),
+    );
+    const preflight = stack.client.pda.preflightProof(new PublicKey(job.address))[0];
     const api = stack.api({ session });
     const request: TxRequest = {
       call: { program: 'escrow', instruction: 'acceptJob', args: { specHash: job.specHash } },
@@ -119,8 +129,14 @@ describe('tx hazırlama', () => {
     };
     const response = await api.prepareTx(request);
     if (!response.success) throw new Error(JSON.stringify(response.error));
-    expect(decode(response.data.transaction).accounts).toEqual([agent.address, job.address, agentRecord]);
-    expect(response.data.computeUnitLimit).toBe(20_000);
+    expect(decode(response.data.transaction).accounts).toEqual([
+      agent.address,
+      job.address,
+      agentRecord,
+      config.toBase58(),
+      preflight.toBase58(),
+    ]);
+    expect(response.data.computeUnitLimit).toBe(50_000);
     const missing = await api.prepareTx({ ...request, accounts: { agent: agent.address } });
     expect(missing).toMatchObject({ error: { code: 'invalid_input', message: expect.stringContaining('çözülemedi') } });
     const absent = await api.prepareTx({ ...request, accounts: { agent: agent.address, job: wallet().address } });

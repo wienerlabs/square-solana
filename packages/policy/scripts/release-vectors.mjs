@@ -9,7 +9,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { sha256 } from '@noble/hashes/sha2';
 import { PublicKey } from '@solana/web3.js';
 // Yalnızca kural modülü: paketin girişi SDK'yı (ve spl-token'ın bigint-buffer uyarısını) yükler.
-import { checkFresh, dailySpentAt, dayStart, isFinalRefusal, refusalRules } from '../dist/release.js';
+import { checkFresh, dailySpentAt, dayStart, isFinalRefusal, preflightAccepts, refusalRules } from '../dist/release.js';
 
 const OUT = new URL('../../../crates/square-common/tests/fixtures/release-rule-vectors.json', import.meta.url);
 
@@ -28,6 +28,7 @@ export function refusalVectors() {
       dailySpentBefore: dailySpentBefore.toString(),
       rules: refusalRules(code),
       final: isFinalRefusal(code, dailySpentBefore),
+      preflight: preflightAccepts(code),
     })),
   );
 }

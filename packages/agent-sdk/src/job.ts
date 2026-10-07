@@ -298,6 +298,13 @@ export function createJobExecutor(deps: JobExecutorDeps): TaskExecutor {
               capability = found;
               decided = true;
             }
+            // Policy'li işte kurum kabulden önce ön-ispatı bağlar (ADR 0028); yoksa escrow kabulü reddeder.
+            if (job.policy && !job.preflight) {
+              await context.reject(
+                'kurum kabul öncesi ön-ispatı bağlamamış (ADR 0028): set_preflight_proof’tan sonra görevi yeniden açmalı',
+              );
+              return;
+            }
             if (context.signal.aborted) return;
             sending = 'funded';
             const built = await client.flow.acceptJob({ agent: wallet.publicKey, job: address }, options());

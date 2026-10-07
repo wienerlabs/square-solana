@@ -124,7 +124,10 @@ export interface SquareFlow {
     },
     options: BuildOptions,
   ): Promise<BuiltTx & { /** Mint edilecek tutar (yakılan eksi Circle'ın ücreti). */ minted: bigint }>;
-  /** Adım 4: kabul. */
+  /**
+   * Adım 4: kabul. Policy'li işte kurumun kabul öncesi ön-ispatı (`set_preflight_proof`, ADR 0028) bağlı olmalıdır;
+   * yoksa escrow `PreflightRequired` ile reddeder.
+   */
   acceptJob(params: { agent: PublicKey; job: PublicKey }, options: BuildOptions): Promise<BuiltTx>;
   /** Adım 4: teslim. */
   submitWork(

@@ -90,9 +90,10 @@ function executor(
   });
 }
 
-async function job(status: JobStatus): Promise<PublicKey> {
+async function job(status: JobStatus, policy?: PublicKey): Promise<PublicKey> {
   const address = Keypair.generate().publicKey;
   await sim.setJob(address, {
+    ...(policy ? { policy } : {}),
     institution: Keypair.generate().publicKey,
     agentRecord: Keypair.generate().publicKey,
     agentWallet: signer.publicKey,
@@ -559,6 +560,26 @@ describe('geçici hatalar ve kabul kapısı', () => {
     expect(sim.sent).toEqual([]);
     expect(recorded.calls).toEqual(['reject:kapasite dolu']);
     expect(seen).toEqual([`${STATS.id}:${recorded.context.taskId}`]);
+  });
+});
+
+describe('policy’li job (ADR 0028)', () => {
+  it('kurumun kabul öncesi ön-ispatı yoksa görev kabulden önce reddedilir, tx gönderilmez', async () => {
+    const recorded = fakeContext(await job('funded', Keypair.generate().publicKey), specParts);
+    await executor().onTask(recorded.context);
+    expect(sim.sent).toEqual([]);
+    expect(recorded.calls).toEqual([
+      'reject:kurum kabul öncesi ön-ispatı bağlamamış (ADR 0028): set_preflight_proof’tan sonra görevi yeniden açmalı',
+    ]);
+  });
+
+  it('ön-ispat bağlıysa job kabul edilir ve teslim edilir', async () => {
+    const address = await job('funded', Keypair.generate().publicKey);
+    await sim.setPreflight(address);
+    const { calls, context } = fakeContext(address, specParts);
+    await executor().onTask(context);
+    expect(sim.sent.map((ix) => ix.name)).toEqual(['acceptJob', 'submitWork']);
+    expect(calls.at(-1)).toMatch(/^complete:teslim edildi: submit_work /);
   });
 });
 

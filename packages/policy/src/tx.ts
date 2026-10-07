@@ -1,4 +1,5 @@
-// Adım 7: ispatı job'a bağlayan `set_compliance_proof` tx'i (program sözleşmesi v0.2.0, yol A).
+// Adım 7: ispatı job'a bağlayan `set_compliance_proof` tx'i (program sözleşmesi v0.2.0, yol A). Kabulden önce
+// (ADR 0028) `set_preflight_proof` işin kendi koşullarıyla kurulmuş ön-ispatı bağlar.
 // Talimat ispatı ve üç sinyali taşır: refusal_code (0), net_amount (5), proof_timestamp (9); diğer
 // sinyalleri verifier hesaplardan kendisi kurar. Fiat işte (BC-37, ADR 0024) `verify_mpp_payment_proof`:
 // MPP authority'nin Ed25519 attestation'ı hemen önceki talimat, ispat makbuz commitment'ını (12) taşır.
@@ -13,6 +14,7 @@ import {
 } from '@squaresdk/solana-sdk';
 import type { ProveResponse } from '@squaresdk/solana-types';
 import BN from 'bn.js';
+import { preflightAccepts } from './release.js';
 
 /** Public sinyallerin sırası (release-circuit.md §2). */
 export const SIGNAL = Object.freeze({ refusalCode: 0, netAmount: 5, timestamp: 9, stripeReceiptHash: 12 });
@@ -59,6 +61,51 @@ export async function buildSetComplianceProofTx(
     .instruction();
   // Groth16 doğrulaması ~178 bin CU: talimat başına varsayılan 200 bine yakın olduğundan sınır profilden.
   return client.buildTx([ix], withComputeProfile(options, 'setComplianceProof'));
+}
+
+/**
+ * Kabul öncesi ön-ispatı (ADR 0028) job'a bağlayan `set_preflight_proof` tx'i. İspat `buildPreflightWitness`
+ * ile kurulur (net işin tutarı, payee agent cüzdanı, sayaç 0); talimat ispatı, ret kodunu (0) ve anı (9) taşır.
+ * Ret kodunda kalıcı bit ya da günlük tavan biti varsa verifier `PreflightRefused` döner; tx kurulmadan fırlatır.
+ */
+export async function buildSetPreflightProofTx(
+  client: SquareClient,
+  params: {
+    /** Kurumun yetkilisi (anahtar ya da bağlı Squads vault'u). */
+    authority: PublicKey;
+    /** square_policy `Institution` PDA'sı. */
+    institution: PublicKey;
+    policy: PublicKey;
+    job: PublicKey;
+    proof: ProveResponse;
+  },
+  options: BuildOptions,
+): Promise<BuiltTx> {
+  const refusalCode = signal(params.proof, SIGNAL.refusalCode);
+  if (refusalCode > 0xffffn) throw new Error(`refusal_code u16 değil: ${refusalCode}`);
+  if (!preflightAccepts(Number(refusalCode))) {
+    throw new Error(`ön-ispat kalıcı ya da günlük tavan kuralını çiğniyor (refusal_code ${refusalCode})`);
+  }
+  const ix = await client.verifier.program.methods
+    .setPreflightProof(
+      bytes(params.proof.proofA),
+      bytes(params.proof.proofB),
+      bytes(params.proof.proofC),
+      Number(refusalCode),
+      new BN(signal(params.proof, SIGNAL.timestamp).toString()),
+    )
+    .accountsStrict({
+      payer: options.feePayer,
+      authority: params.authority,
+      config: client.pda.verifierConfig()[0],
+      institution: params.institution,
+      policy: params.policy,
+      job: params.job,
+      preflightProof: client.pda.preflightProof(params.job)[0],
+      systemProgram: SystemProgram.programId,
+    })
+    .instruction();
+  return client.buildTx([ix], withComputeProfile(options, 'setPreflightProof'));
 }
 
 /**

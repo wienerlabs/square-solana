@@ -92,6 +92,10 @@ const hex = (bytes: Uint8Array | readonly number[]) => Buffer.from(bytes).toStri
 
 export interface JobState extends JobInfo {
   status: JobStatus;
+  /** Job'un politikası; policy'siz işte null. */
+  policy: PublicKey | null;
+  /** Policy'li işte kurumun kabul öncesi ön-ispatı (ADR 0028) bağlı mı; escrow `accept_job`'da onu ister. */
+  preflight: boolean;
   /** Teslim edilmişse `submit_work`'ün argümanları. */
   workHash: string;
   deliveryUri: string;
@@ -105,6 +109,13 @@ export async function readJob(
 ): Promise<JobState | null> {
   const account = await client.escrow.program.account.job.fetchNullable(address, commitment);
   if (!account) return null;
+  const policy = account.policy ?? null;
+  const preflight = policy
+    ? (await client.verifier.program.account.preflightProof.fetchNullable(
+        client.pda.preflightProof(address)[0],
+        commitment,
+      )) !== null
+    : false;
   return {
     address,
     institution: account.institution,
@@ -117,5 +128,7 @@ export async function readJob(
     status: Object.keys(account.status)[0] as JobStatus,
     workHash: hex(account.workHash),
     deliveryUri: account.deliveryUri,
+    policy,
+    preflight,
   };
 }

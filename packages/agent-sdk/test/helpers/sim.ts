@@ -42,6 +42,8 @@ export interface JobFields {
   specHash: string;
   status: JobStatus;
   deadline: number;
+  /** Policy'li iş: escrow `accept_job` kurumun ön-ispatını ister (ADR 0028). */
+  policy?: PublicKey;
 }
 
 class ProgramFailure extends Error {
@@ -133,10 +135,24 @@ export class SimChain {
       workHash: new Array(32).fill(0),
       deliveryUri: '',
       rail: { escrow: {} },
-      policy: null,
+      policy: fields.policy ?? null,
       dispute: { ...(sample.dispute as object), bond: new BN(0) },
     };
     await this.put(address, PROGRAM_IDS.escrow, this.escrow, 'job', data);
+  }
+
+  /** Kurumun kabul öncesi ön-ispatı (verifier `set_preflight_proof`, ADR 0028): job'un politikası ve snapshot'ı. */
+  async setPreflight(address: PublicKey): Promise<void> {
+    const job = this.job(address);
+    if (!job) throw new Error(`job hesabı yok: ${address.toBase58()}`);
+    const verifier = this.client.verifier.program as unknown as Program<Idl>;
+    const data = {
+      ...this.sample(verifier, 'preflightProof'),
+      job: address,
+      policy: job.policy,
+      policyCommitment: job.policyCommitment,
+    };
+    await this.put(this.client.pda.preflightProof(address)[0], PROGRAM_IDS.verifier, verifier, 'preflightProof', data);
   }
 
   /** Job hesabının alanlarını değiştirir (Anchor JS biçiminde). */
@@ -242,6 +258,8 @@ export class SimChain {
       if (status === 'open') return fail('JobNotFunded');
       if (status !== 'funded') return fail('InvalidStatus');
       if (hex(data.specHash as number[]) !== hex(job.specHash as number[])) return fail('SpecHashMismatch');
+      // Policy'li işte kurumun ön-ispatı (hesap 4: `["preflight_proof", job]`, verifier).
+      if (job.policy && !this.accounts.has(accounts[4]!.toBase58())) return fail('PreflightRequired');
       await this.put(address, PROGRAM_IDS.escrow, this.escrow, 'job', { ...job, status: { accepted: {} } });
     } else if (name === 'submitWork') {
       if (status !== 'accepted') return fail('InvalidStatus');

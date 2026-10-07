@@ -41,8 +41,10 @@ sequenceDiagram
 - **Job kabulü:** Agent ayrıca kendi koşullarını denetler; uymayan görev `REJECTED` olur ve tx gönderilmez:
   spec parçası var; spec'in `capability` alanı bilinen bir beceri (tek beceride isteğe bağlı); job fonlanmış;
   job'un agent cüzdanı `signer`; tutar becerinin fiyatından az değil; deadline'a teslim payından
-  (`retry.submitMarginSeconds`) fazla var; `admit` (verilirse, ör. kapasite) metin dönmüyor. Karar görev başına
-  bir kez verilir. Sonra `accept_job`.
+  (`retry.submitMarginSeconds`) fazla var; `admit` (verilirse, ör. kapasite) metin dönmüyor; policy'li işte kurumun
+  kabul öncesi ön-ispatı (`PreflightProof`, [ADR 0028](../../docs/decisions/0028-kabul-oncesi-on-ispat-ve-dispute-duzeltmeleri.md))
+  bağlı, değilse escrow kabulü `PreflightRequired` ile reddederdi. Karar görev başına bir kez verilir. Sonra
+  `accept_job`.
 - **Teslim:** İşleyicinin çıktısı yüklenir, makbuz yerelde doğrulanır (`workHash` içeriğin SHA-256'sı,
   `deliveryUri` en fazla 128 bayt), `submit_work` gönderilir; zincirdeki taahhütten sonra makbuz görevin
   `delivery` artefaktına yazılır ve görev `COMPLETED` olur. İçerik `submit_work`'ten önce çağırana gösterilmez.

@@ -44,6 +44,7 @@ describe('compute unit profili', () => {
         'setBuyerRoot',
         'setComplianceProof',
         'setPolicy',
+        'setPreflightProof',
         'submitWork',
         'syncAgentWallet',
         'updatePolicy',
