@@ -25,8 +25,8 @@ Yanıt zarfı API'ninkiyle aynıdır (`{ success, data, error, meta }`).
   ve `Retry-After` alır.
 - **Günlük bütçe:** Kullanıcı başına ve servis toplamında lamport bütçesi, UTC günü. Tx başına tavan
   `FEE_PAYER_MAX_LAMPORTS_PER_TX`. Bütçe `sponsored_txs` tablosundan, tek veritabanı işleminde ve advisory kilitle
-  denetlenir; eşzamanlı istekler ve servisin birden çok örneği bütçeyi birlikte aşamaz. Gönderimi başarısız olan
-  tx bütçeye sayılmaz.
+  denetlenir; eşzamanlı istekler ve servisin birden çok örneği bütçeyi birlikte aşamaz. Gönderimi hata veren tx
+  bütçede kalır: sponsorun imzası blockhash süresince geçerlidir ve tx yine de zincire girebilir.
 
 ## Politika
 
@@ -52,7 +52,7 @@ Tx imzalanmadan önce çözülür ve denetlenir ([`src/policy.ts`](src/policy.ts
 | `simulation_failed` | Simülasyon başarısız ya da blockhash geçersiz (422, `programError` IDL adıyla) |
 | `tx_cost_too_high` | Ücret + rent tx başına tavanın üstünde |
 | `daily_budget_exceeded` / `global_budget_exceeded` / `rate_limited` | Bütçe ve hız sınırı (429) |
-| `send_failed` | `submit: true` gönderimi RPC'de reddedildi (503) |
+| `send_failed` | `submit: true` gönderimi RPC'de hata verdi (503; maliyet bütçede kalır, aynı tx yeniden gönderilebilir) |
 
 Sponsorun durabileceği "ödeyici" yerleri: Square talimatlarının `payer` ve `rent_payer` hesapları, ATA
 açılışının `payer`'ı, Squads `multisig_create_v2`'nin `creator`'ı ve `vault_transaction_create` /
@@ -95,7 +95,10 @@ Servis öneri işleminde `vault_transaction_create`'in mesajını, yürütmede z
 
 Ücret `getFeeForMessage` (imza ücreti + priority fee); rent, sponsorun simülasyondan önceki bakiyesiyle
 simülasyonun döndürdüğü bakiyesi arasındaki farktan ücret düşülerek bulunur (Agave'de simülasyonun hesap durumu
-ücreti içerir; localnet testi ölçümün zincirdeki bakiye farkına eşit olduğunu denetler). Her tx `sponsored_txs`'e
+ücreti içerir; localnet testi ölçümün zincirdeki bakiye farkına eşit olduğunu denetler). Simülasyon bakiyenin
+okunduğu slottan eski olmayan bir bankada yapılır (`minContextSlot`). Sponsorun ödediği ve tx'te çalışan her ATA
+açılışı için simülasyonun rent'ine bir token hesabının rent'i eklenir ([ADR 0019](../../docs/decisions/0019-fee-payer-politikasi.md)
+madde 7). Her tx `sponsored_txs`'e
 yazılır: imza, cüzdan, API anahtarı, durum (`signed`, `submitted`, `failed`), ücret, rent, simülasyondaki compute
 unit, sınır, fiyat ve denetlenen talimatlar (`vault>` önekiyle iç talimatlar).
 

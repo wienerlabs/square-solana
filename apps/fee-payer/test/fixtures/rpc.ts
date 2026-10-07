@@ -48,6 +48,7 @@ export class FixtureRpc {
   sendError: string | null = null;
   /** Sonraki isteklere verilecek HTTP durumu; null normal yanıt. */
   failWith: number | null = null;
+  simulationLag = 0;
 
   reset(): void {
     this.accounts.clear();
@@ -58,6 +59,7 @@ export class FixtureRpc {
     this.sent.length = 0;
     this.sendError = null;
     this.failWith = null;
+    this.simulationLag = 0;
   }
 
   setAccount(address: PublicKey | string, account: FixtureAccount): void {
@@ -101,9 +103,13 @@ export class FixtureRpc {
       case 'getMinimumBalanceForRentExemption':
         return ((params[0] as number) + 128) * 3480 * 2;
       case 'simulateTransaction': {
+        const config = (params[1] ?? {}) as { accounts?: { addresses: string[] }; minContextSlot?: number };
+        const bank = { slot: this.slot - this.simulationLag };
+        if (config.minContextSlot !== undefined && config.minContextSlot > bank.slot) {
+          throw Object.assign(new Error('Minimum context slot has not been reached'), { code: -32016 });
+        }
         this.simulated.push(params[0] as string);
         const next = this.simulations.shift() ?? { err: null, logs: [], unitsConsumed: 12_345, rent: 0 };
-        const config = (params[1] ?? {}) as { accounts?: { addresses: string[] } };
         const accounts = config.accounts?.addresses.map((address) => ({
           data: ['', 'base64'],
           executable: false,
@@ -113,7 +119,7 @@ export class FixtureRpc {
           space: 0,
         }));
         return {
-          context,
+          context: bank,
           value: {
             err: next.err,
             logs: next.logs,

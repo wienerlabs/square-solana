@@ -169,6 +169,24 @@ describe('imza ve gönderim', () => {
     stack.rpc.simulations.push({ err: null, logs: [], unitsConsumed: 1_000, rent: ataRent + 1_000 });
     const larger = await sponsor(token, { transaction: encode(registerAgent(Keypair.generate().publicKey)) });
     expect(larger.body.data).toMatchObject({ rentLamports: String(ataRent + 1_000) });
+    const squareRent = 3_000_000;
+    stack.rpc.simulations.push({ err: null, logs: [], unitsConsumed: 1_000, rent: squareRent });
+    const mixed = v0(stack.sponsor.publicKey, [
+      createAssociatedTokenAccountIdempotentInstruction(stack.sponsor.publicKey, key(), user.publicKey, key()),
+      squareIx('registry', 'register_agent', { payer: stack.sponsor.publicKey, owner: Keypair.generate().publicKey }),
+    ]);
+    const both = await sponsor(token, { transaction: encode(mixed) });
+    expect(both.body.data).toMatchObject({ rentLamports: String(squareRent + ataRent) });
+  });
+
+  it('simülasyon bakiye okumasından eski bir bankada yapılmaz: maliyet eksik yazılmaz', async () => {
+    const token = await stack.session(user.publicKey);
+    stack.rpc.simulationLag = 3;
+    const response = await sponsor(token, { transaction: encode(registerAgent()) });
+    expect(response.status).toBe(503);
+    expect(response.body.error).toMatchObject({ code: 'rpc_unavailable' });
+    expect(stack.rpc.simulated).toHaveLength(0);
+    expect(await stack.db.sponsoredTx.count()).toBe(0);
   });
 
   it('aynı tx ikinci kez gelince ilk kayıt döner: ikinci ücret yok, ikinci gönderim yok', async () => {
@@ -185,17 +203,26 @@ describe('imza ve gönderim', () => {
     expect(usage.body.data).toMatchObject({ transactions: 1 });
   });
 
-  it('gönderim RPC’de reddedilirse 503, kayıt başarısız ve bütçeye sayılmaz', async () => {
+  it('gönderim RPC’de reddedilirse 503; tx yine de zincire girebileceği için maliyet bütçede kalır', async () => {
     const token = await stack.session(user.publicKey);
+    const tx = encode(signed(registerAgent(), user));
     stack.rpc.sendError = 'Blockhash not found';
-    const response = await sponsor(token, { transaction: encode(signed(registerAgent(), user)), submit: true });
+    const response = await sponsor(token, { transaction: tx, submit: true });
     expect(response.status).toBe(503);
     expect(response.body.error).toMatchObject({ code: 'rpc_unavailable', details: { reason: 'send_failed' } });
     const row = await stack.db.sponsoredTx.findFirstOrThrow();
-    expect(row.status).toBe('failed');
-    expect(row.error).toMatch(/Blockhash not found/);
+    expect(row).toMatchObject({ status: 'signed', error: null });
     const usage = await stack.request('GET', '/v1/sponsor/usage', { headers: bearer(token) });
-    expect(usage.body.data).toMatchObject({ spentLamports: '0', transactions: 0 });
+    expect(usage.body.data).toMatchObject({ spentLamports: String(FEE), transactions: 1 });
+
+    stack.rpc.sendError = null;
+    const retried = await sponsor(token, { transaction: tx, submit: true });
+    expect(retried.status).toBe(200);
+    expect(retried.body.data).toMatchObject({ signature: row.signature, submitted: true });
+    expect(stack.rpc.sent).toHaveLength(1);
+    expect(await stack.db.sponsoredTx.findFirstOrThrow()).toMatchObject({ status: 'submitted' });
+    const after = await stack.request('GET', '/v1/sponsor/usage', { headers: bearer(token) });
+    expect(after.body.data).toMatchObject({ spentLamports: String(FEE), transactions: 1 });
   });
 
   it('politika reddi 403, sebep `details.reason` ve metrikte', async () => {

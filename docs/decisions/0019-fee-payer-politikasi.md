@@ -73,23 +73,32 @@
    - Her tx imzadan önce simüle edilir. Düşecek tx imzalanmaz; blockhash'i geçersiz tx de imzalanmaz.
 7. **Maliyet ve limitler:**
    - Ücret `getFeeForMessage`'dır. Rent, sponsorun simülasyondan önceki ve simülasyondaki bakiyesinin farkından
-     ücret düşülerek bulunur.
-   - **Rent tabanı:** Sponsorun ödediği her ATA açılışı (`create`, `create_idempotent`; vault mesajının içi
-     dahil) bir token hesabının rent'i (`getMinimumBalanceForRentExemption(165)`) olarak sayılır. Simülasyon
-     daha büyük bir rent gösterirse o sayılır. `create_idempotent` hesap zaten varsa simülasyonda rent
-     göstermez; hesap simülasyonla tx'in zincire girmesi arasında kapatılırsa sponsor rent'i öder. Taban bu
-     farkı bütçeye yazar.
+     ücret düşülerek bulunur. Bakiye `getBalanceAndContext` ile okunur ve simülasyon `minContextSlot` ile en az o
+     slot'taki bir bankada yapılır. Daha eski bir bankadaki simülasyon aradaki sponsorlu tx'leri geri sayıp rent'i
+     eksik gösterirdi; RPC o slota ulaşmadıysa istek `rpc_unavailable` ile düşer.
+   - **ATA rent'i:** Sponsorun ödediği ve bu tx'te çalışan her ATA açılışı (`create`, `create_idempotent`; dış
+     talimat ya da yürütülen vault mesajı) simülasyonun rent'ine ek olarak bir token hesabının rent'i
+     (`getMinimumBalanceForRentExemption(165)`) olarak sayılır. `create_idempotent` hesap zaten varsa simülasyonda
+     rent göstermez; hesap simülasyonla tx'in zincire girmesi arasında kapatılırsa sponsor rent'i öder. Ek sayım
+     bu farkı her durumda bütçeye yazar. Hesap simülasyonda yeni açıldıysa rent iki kez yazılır; bu fazla
+     bilinçlidir. Öneri tx'indeki (`vault_transaction_create`) vault mesajı o tx'te çalışmaz; ATA'sı yürütmede
+     sayılır.
    - **Token-2022 hesabı:** Boyutu mint'in uzantılarına bağlıdır, rent'i önceden sınırlanamaz. Sponsor
      Token-2022 ATA'sının rent'ini ödemez (`sponsor_rent_unbounded`).
    - **Squads rent'i:** VaultTransaction ve Proposal hesaplarının rent'i kapanışta multisig'in
      `rent_collector`'ına döner. Sponsor `multisig_create_v2`'nin `creator`'ı ya da `vault_transaction_create` /
      `proposal_create`'in `rent_payer`'ı ise `rent_collector` yok ya da sponsor olmalıdır
      (`sponsor_rent_extractable`). Multisig zincirden okunur; aynı tx'te açılıyorsa açılışın argümanından.
+     Açılan multisig'in üyeleri ve `config_authority`'si sponsor olamaz (`sponsor_account_misuse`).
    - **Aynı tx'in tekrarı:** Sponsorun imzası tx'in kimliğidir. Aynı tx ikinci kez gelirse ilk kayıt döner:
      bütçeye ikinci kez yazılmaz, gönderilmişse yeniden gönderilmez. Başarısız kaydı olan tx yeniden ölçülür.
+   - **Gönderim hatası:** Servisin gönderimi hata verirse (zaman aşımı, RPC hatası) kayıt `signed` kalır ve
+     bütçeye sayılır: sponsorun imzası blockhash süresince geçerlidir, tx yine de zincire girebilir ve 503
+     yanıtı imzayı taşır. Aynı tx yeniden gönderilebilir; ikinci kez sayılmaz. Zincire hiç girmeyen tx'in
+     maliyeti bugün geri verilmez.
    - Tek tx `FEE_PAYER_MAX_LAMPORTS_PER_TX`'i aşamaz.
    - Kullanıcı (cüzdan) başına ve servis toplamında günlük lamport bütçesi vardır (UTC günü). Bütçe
-     `sponsored_txs` tablosundan, tek işlemde ve advisory kilitle denetlenir. Başarısız gönderim sayılmaz.
+     `sponsored_txs` tablosundan, tek işlemde ve advisory kilitle denetlenir.
    - Cüzdan başına hız sınırı Postgres sayacıyladır (`@squaresdk/solana-hardening`).
 8. **Sponsor anahtarının saklanması:**
    - Ayrı, yalnızca ücret ve rent için tutulan bir sıcak cüzdandır; programların hiçbirinde rolü yoktur.
@@ -150,6 +159,20 @@
 - **Kullanıcı başına farklı bütçeler:** Ör. kurum planına göre. Şimdilik tek bir kullanıcı bütçesi var.
 - **Kullanıcının kapatabildiği hesaplar:** ATA'nın sahibi hesabı kapatıp rent'i kendine alabilir. Sponsorun
   ödediği ATA rent'i bu yüzden kullanıcıya verilmiş sayılır; bütçeye yazılır, ama geri dönmez.
+- **Gönderilemeyen tx'in maliyeti:** Gönderim hatasındaki kayıt bütçede kalır. Blockhash'in
+  `lastValidBlockHeight`'ı geçtikten sonra imzası zincirde bulunmayan kayıtları `failed` yapacak bir uzlaştırıcı
+  yok.
+- **Squads rent'inin dönüşü:** `rent_collector` denetimi tx anındaki değeri okur. Multisig `rent_collector`'ı
+  sonradan değiştirebilir (`config_authority` ya da üyelerin config işlemi). Kapanışta sponsorun ödediği
+  VaultTransaction ve Proposal rent'i yeni adrese gider. Rent bütçeye yazılmıştır, ama sponsora dönmesi garanti
+  değildir.
+- **Bond vault'unun rent'i:** Sponsorlu `raise_dispute`'ta bond vault'unun rent'ini sponsor öder. Rent lapse ya
+  da karar ödemesinde `job.rent_payer`'a döner; job'u başka ödeyiciyle açan kurum bu rent'i alır. Rent bütçeye
+  yazılmıştır.
+- **Sponsora gelen SOL:** Bakiye okuması ile simülasyon arasında sponsora gönderilen lamport o isteğin rent'ini
+  eksik gösterir. Eksik, gönderilen tutar kadardır; saldırgan kazandığı bütçe kadar SOL öder.
+- **`/ready`'nin RPC çağrısı:** Hazırlık denetimi her istekte sponsorun bakiyesini RPC'den okur ve önbelleği
+  yoktur. Servisler ortak `createHealth`'i kullandığı için önbellek ya da hız sınırı ayrı bir iştir.
 - **Bütçe kimliğe bağlıdır:** Kullanıcı bütçesi oturumun ya da API anahtarının cüzdanına göredir ve cüzdan
   açmak ücretsizdir. Bir saldırgan çok sayıda cüzdanla kullanıcı bütçelerini toplayabilir; servisin bir günde
   kaybedebileceği en büyük tutar servis toplam bütçesidir (`FEE_PAYER_GLOBAL_DAILY_LAMPORTS`). Kayıtlı katılımcılara
