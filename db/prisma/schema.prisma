@@ -645,6 +645,7 @@ enum ApiKeyScope {
   prove
   disputesWrite   @map("disputes:write")
   x402Serve       @map("x402:serve")
+  fiatPay         @map("fiat:pay")
 }
 
 /// API anahtarı (`ApiKey`). Gizli değer saklanmaz, yalnızca SHA-256'sı; `prefix` listelemede gösterilir.
@@ -725,32 +726,81 @@ model X402Payment {
 
 // ---------------------------------------------------------------- ödeme rayları
 
-/// İmzası doğrulanmış Stripe webhook'undan gelen MPP (fiat) ödemesi (BE-25). Kaynak:
-/// Aperture compliance-api `verified_payment_intents` (apps/compliance-api, migration 005).
+/// Fiat ödemesinin Square'e ulaştığı yol (ADR 0026).
+enum FiatPaymentSource {
+  /// İmzalı Stripe webhook'u (`payment_intent.succeeded`).
+  webhook
+  /// Kurumun isteğiyle Stripe API'den okunan PaymentIntent (webhook gecikmesi ya da kaybı).
+  reconcile
+  /// MPP (`mppx`, Stripe SPT) 402 akışı; ödeme aynı istekte doğrulanır.
+  mpp
+}
+
+/// Fiat iş için açılan PaymentIntent'in nasıl açıldığı (ADR 0026).
+enum FiatPaymentVia {
+  /// Kurumun oturumuyla; tarayıcıda Stripe.js ya da kayıtlı kartla off-session onay.
+  intent
+  /// MPP 402 akışı (`mppx`).
+  mpp
+}
+
+/// Başarılı fiat ödemesi ve MPP authority'nin attestation'ı (BE-25, ADR 0024, ADR 0026). Job başına en fazla bir
+/// satır. Kaynak: Aperture compliance-api `verified_payment_intents` (apps/compliance-api, migration 005).
 model MppPayment {
-  stripePaymentIntentId String   @id @map("stripe_payment_intent_id") @db.Text
-  /// Webhook event kimliği; Stripe'ın yeniden gönderimi ikinci satır üretemez.
-  stripeEventId         String   @unique @map("stripe_event_id") @db.Text
-  amountMinor           BigInt   @map("amount_minor")
+  stripePaymentIntentId String            @id @map("stripe_payment_intent_id") @db.Text
+  /// Webhook event kimliği (webhook yolunda); Stripe'ın yeniden gönderimi ikinci satır üretemez.
+  stripeEventId         String?           @unique @map("stripe_event_id") @db.Text
+  amountMinor           BigInt            @map("amount_minor")
   /// ISO 4217, küçük harf.
-  currency              String   @db.Char(3)
-  /// Stripe PaymentIntent durumu; yalnızca `succeeded` satırlar kullanılabilir.
-  status                String   @db.Text
-  stripeCustomer        String?  @map("stripe_customer") @db.Text
-  /// Kanonik makbuzun Poseidon commitment'ı (devrenin `stripe_receipt_hash` girdisi).
-  receiptHash           String   @map("receipt_hash") @db.Char(64)
-  /// MPP authority'nin `receiptHash` üzerindeki Ed25519 imzası, base58.
-  authoritySignature    String   @map("authority_signature") @db.VarChar(88)
-  /// Ödemenin bağlandığı kurum ve job (BE-25 kararıyla doldurulur).
-  institution           String?  @db.VarChar(44)
-  job                   String?  @db.VarChar(44)
-  paidAt                DateTime @map("paid_at") @db.Timestamptz(3)
-  createdAt             DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  currency              String            @db.Char(3)
+  /// Stripe PaymentIntent durumu; satır yalnızca `succeeded` ödemeler için yazılır.
+  status                String            @db.Text
+  stripeCustomer        String?           @map("stripe_customer") @db.Text
+  /// Kanonik makbuzun Poseidon commitment'ı (devrenin `stripe_receipt_hash` girdisi), 32 bayt hex.
+  receiptHash           String            @map("receipt_hash") @db.Char(64)
+  /// MPP authority'nin `"square/mpp-attestation/v1" ‖ job ‖ receiptHash ‖ amount` üzerindeki Ed25519 imzası, base58.
+  authoritySignature    String            @map("authority_signature") @db.VarChar(88)
+  /// İmzalayan MPP authority (`VerifierConfig.mpp_authority` ile aynı olmalı).
+  authority             String            @db.VarChar(44)
+  /// Settlement mint'in taban biriminde tutar: attestation'daki ve job'daki `amount`.
+  amount                Decimal           @db.Decimal(20, 0)
+  source                FiatPaymentSource
+  /// Job'un kurumu (job'u açan cüzdan ya da vault).
+  institution           String            @db.VarChar(44)
+  job                   String            @unique @db.VarChar(44)
+  paidAt                DateTime          @map("paid_at") @db.Timestamptz(3)
+  createdAt             DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
 
   @@index([status])
   @@index([institution])
-  @@index([job])
   @@map("mpp_payments")
+}
+
+/// Fiat iş için açılan PaymentIntent (BE-25): job'un açık ödemesi yeniden kullanılır, webhook gelmezse kurum bu
+/// listeden mutabakat ister.
+model FiatPaymentIntent {
+  paymentIntent String         @id @map("payment_intent") @db.Text
+  job           String         @db.VarChar(44)
+  institution   String         @db.VarChar(44)
+  via           FiatPaymentVia
+  amountMinor   BigInt         @map("amount_minor")
+  createdAt     DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@index([job, createdAt])
+  @@map("fiat_payment_intents")
+}
+
+/// Kurumun Stripe müşterisi ve off-session ödeme yöntemi (BE-25, SetupIntent). Kart bilgisi Stripe'tadır.
+model StripeCustomer {
+  /// Job'ları açan kurum anahtarı (`Job.institution`: kurum anahtarı ya da Squads vault'u).
+  institution   String   @id @db.VarChar(44)
+  customer      String   @unique @db.Text
+  /// `setup_intent.succeeded` ile kaydedilen ödeme yöntemi; off-session ödemede kullanılır.
+  paymentMethod String?  @map("payment_method") @db.Text
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@map("stripe_customers")
 }
 
 enum CctpTransferStatus {

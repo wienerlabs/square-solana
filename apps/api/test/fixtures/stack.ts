@@ -18,7 +18,8 @@ import {
   type SquareApi,
   type SquareProgramIds,
 } from '@squaresdk/solana-sdk';
-import { Connection, PublicKey } from '@solana/web3.js';
+import { Connection, Keypair, PublicKey } from '@solana/web3.js';
+import Stripe from 'stripe';
 import { inject } from 'vitest';
 import { createApp } from '../../src/app.js';
 import { createAuthService } from '../../src/auth/service.js';
@@ -31,7 +32,11 @@ import { createArbitrators, type Arbitrators } from '../../src/disputes/arbitrat
 import { createEvidenceService } from '../../src/disputes/evidence.js';
 import { createParties } from '../../src/disputes/parties.js';
 import { createWebhookService } from '../../src/disputes/webhooks.js';
+import { createFiatChain } from '../../src/fiat/chain.js';
+import { createMppCharger } from '../../src/fiat/mpp.js';
+import { createFiatService } from '../../src/fiat/service.js';
 import { createInstitutionAuthority } from '../../src/institution-authority.js';
+import type { FiatDeps } from '../../src/routes/fiat.js';
 import type { OpenApiDocument } from '../../src/openapi.js';
 import { createPolicyMetaService } from '../../src/policy-meta.js';
 import { createProverProxy } from '../../src/prover.js';
@@ -40,6 +45,7 @@ import { createTravelRuleService, type TravelRuleService } from '../../src/trave
 import { createTxBuilder } from '../../src/tx.js';
 import { createX402EndpointService } from '../../src/x402.js';
 import { FixtureRpc, startRpc } from './rpc.js';
+import { StripeFixture, startStripe } from './stripe.js';
 
 /** IDL'lerin bildirdiği program kimlikleri. */
 export const PROGRAM_IDS: SquareProgramIds = {
@@ -58,6 +64,16 @@ export interface ProverFixture {
   readonly requests: { headers: Record<string, unknown>; body: string }[];
 }
 
+/** Fiat rayının test ortamı: fixture Stripe sunucusu ve çalışma anında üretilen sırlar. */
+export interface FiatFixture {
+  readonly stripe: StripeFixture;
+  /** Fixture'a yönlendirilmiş gerçek Stripe SDK'sı (webhook imzası üretmek için). */
+  readonly client: Stripe;
+  readonly webhookSecret: string;
+  readonly authority: Keypair;
+  readonly networkId: string | null;
+}
+
 export interface Stack {
   readonly url: string;
   readonly db: PrismaClient;
@@ -71,6 +87,8 @@ export interface Stack {
   readonly arbitrators: Arbitrators;
   /** İç ve bağımlılık hataları (alarm penceresi). */
   readonly errors: { count(): number };
+  /** Fiat rayı açıksa fixture'ı. */
+  readonly fiat: FiatFixture | null;
   api(auth?: { session?: string; apiKey?: string; smartAccount?: string }): SquareApi;
   close(): Promise<void>;
 }
@@ -98,6 +116,14 @@ export async function startStack(options: {
   cctp?: CctpSettings;
   /** API'yi çağıran web uygulamasının adresi: CORS'a girer, giriş mesajının alanı onun host'udur (web e2e testi). */
   webOrigin?: string;
+  /** Fiat rayı: fixture Stripe ya da gerçek Stripe test modu (`stripe` verilirse). */
+  fiat?: {
+    stripe?: { secretKey: string; publishableKey: string };
+    webhookSecret?: string;
+    authority?: Keypair;
+    /** MPP'nin Stripe profili; null MPP'yi kapatır. */
+    networkId?: string | null;
+  };
 }): Promise<Stack> {
   const webOrigin = options.webOrigin ?? 'https://app.square.test';
   const db = createDatabaseClient({ connectionString: options.databaseUrl ?? inject('databaseUrl') });
@@ -198,6 +224,49 @@ export async function startStack(options: {
     store: evidenceStore,
     parties: createParties({ db, connection, arbitrators }),
   });
+  const stripeFixture = options.fiat && !options.fiat.stripe ? new StripeFixture() : null;
+  const stripeServer = stripeFixture ? await startStripe(stripeFixture) : null;
+  let fiat: FiatDeps | null = null;
+  let fiatFixture: FiatFixture | null = null;
+  if (options.fiat) {
+    const stripe = stripeServer
+      ? new Stripe(`sk_test_${randomBytes(12).toString('hex')}`, {
+          host: '127.0.0.1',
+          port: stripeServer.port,
+          protocol: 'http',
+          maxNetworkRetries: 0,
+        })
+      : new Stripe(options.fiat.stripe!.secretKey);
+    const webhookSecret = options.fiat.webhookSecret ?? `whsec_${randomBytes(24).toString('hex')}`;
+    const mppAuthority = options.fiat.authority ?? Keypair.generate();
+    const networkId = options.fiat.networkId === undefined ? 'profile_test_fixture' : options.fiat.networkId;
+    fiat = {
+      service: createFiatService({
+        db,
+        stripe,
+        chain: createFiatChain({ client, connection }),
+        authority,
+        settings: {
+          publishableKey: options.fiat.stripe?.publishableKey ?? `pk_test_${randomBytes(12).toString('hex')}`,
+          webhookSecret,
+          mppAuthority,
+          networkId,
+        },
+        log,
+        ...(options.clock ? { clock: options.clock } : {}),
+      }),
+      mpp: networkId
+        ? createMppCharger({
+            stripe,
+            secretKey: randomBytes(32).toString('base64'),
+            networkId,
+            realm: new URL(PUBLIC_BASE_URL).host,
+          })
+        : null,
+      publicBaseUrl: PUBLIC_BASE_URL,
+    };
+    fiatFixture = { stripe: stripeFixture!, client: stripe, webhookSecret, authority: mppAuthority, networkId };
+  }
   const app = createApp({
     db,
     read,
@@ -240,6 +309,7 @@ export async function startStack(options: {
     x402: createX402EndpointService({ db }),
     travelRule,
     cctp,
+    fiat,
     limiters: { read: window(limits.read), write: window(limits.write) },
     openapi: options.openapi,
     health,
@@ -264,6 +334,7 @@ export async function startStack(options: {
     box,
     arbitrators,
     errors,
+    fiat: fiatFixture,
     api: (auth) => createApiClient({ baseUrl: url, ...(auth ? { auth } : {}) }),
     async close() {
       httpServer.closeAllConnections();
@@ -271,6 +342,7 @@ export async function startStack(options: {
       proverServer.closeAllConnections();
       proverServer.close();
       await rpcServer.close();
+      await stripeServer?.close();
       await db.$disconnect();
     },
   };

@@ -5,6 +5,7 @@
 import { parseCctpSettings, type CctpSettings } from '@squaresdk/solana-cctp';
 import { createSecretBox, parseSecretBoxKeys } from '@squaresdk/solana-hardening';
 import { parseObservabilityEnv, type ObservabilityConfig } from '@squaresdk/solana-observability';
+import { Keypair } from '@solana/web3.js';
 import { z } from 'zod';
 
 const nonEmpty = z.string().trim().min(1);
@@ -114,6 +115,21 @@ const EnvSchema = z.object({
   API_CCTP_TOKEN_MESSENGER_MINTER: optional(nonEmpty),
   API_CCTP_LOOKUP_TABLES: optional(nonEmpty),
 
+  /**
+   * Stripe MPP fiat rayı (BE-25, ADR 0026): Square'in Stripe hesabının gizli ve yayımlanabilir anahtarı, webhook
+   * imza sırrı ve attestation'ları imzalayan MPP authority keypair'i (`VerifierConfig.mpp_authority`, solana-keygen
+   * JSON'u). Dördü birlikte verilir; verilmezse fiat uçları 503 döner. MPP 402 yolu ayrıca challenge'ları bağlayan
+   * HMAC sırrını ve Stripe profil kimliğini ister (ikisi birlikte); verilmezse yalnızca MPP ucu 503 döner.
+   */
+  API_STRIPE_SECRET_KEY: optional(nonEmpty.regex(/^(sk|rk)_(test|live)_[A-Za-z0-9]+$/, 'sk_/rk_ anahtarı bekleniyor')),
+  API_STRIPE_PUBLISHABLE_KEY: optional(nonEmpty.regex(/^pk_(test|live)_[A-Za-z0-9]+$/, 'pk_ anahtarı bekleniyor')),
+  API_STRIPE_WEBHOOK_SECRET: optional(nonEmpty.regex(/^whsec_[A-Za-z0-9+/=]+$/, 'whsec_ sırrı bekleniyor')),
+  API_MPP_AUTHORITY_KEYPAIR: optional(nonEmpty),
+  API_MPP_SECRET_KEY: optional(nonEmpty.min(32, 'en az 32 karakter')),
+  API_MPP_NETWORK_ID: optional(
+    nonEmpty.regex(/^profile_[A-Za-z0-9_]+$/, 'Stripe profil kimliği (profile_…) bekleniyor'),
+  ),
+
   API_PROVER_URL: baseUrl(httpUrl),
   /** API'nin prover'a gönderdiği servis anahtarı. */
   API_PROVER_API_KEY: nonEmpty,
@@ -157,6 +173,83 @@ export interface NotifyConfig {
   readonly allowInsecure: boolean;
 }
 
+/** Stripe MPP fiat rayı (BE-25). */
+export interface FiatConfig {
+  readonly stripeSecretKey: string;
+  readonly publishableKey: string;
+  readonly webhookSecret: string;
+  /** `VerifierConfig.mpp_authority`'nin keypair'i. */
+  readonly authority: Keypair;
+  /** MPP 402 yolu; Stripe profili yoksa null. */
+  readonly mpp: { readonly secretKey: string; readonly networkId: string } | null;
+}
+
+const FIAT_VARIABLES = [
+  'API_STRIPE_SECRET_KEY',
+  'API_STRIPE_PUBLISHABLE_KEY',
+  'API_STRIPE_WEBHOOK_SECRET',
+  'API_MPP_AUTHORITY_KEYPAIR',
+] as const;
+const MPP_VARIABLES = ['API_MPP_SECRET_KEY', 'API_MPP_NETWORK_ID'] as const;
+
+const KeypairBytes = z.array(z.number().int().min(0).max(255)).length(64);
+
+/** solana-keygen JSON'u → Keypair; hata mesajı değeri içermez. */
+function parseKeypair(text: string, what: string): Keypair {
+  let value: unknown;
+  try {
+    value = JSON.parse(text);
+  } catch {
+    throw new Error(`${what}: JSON değil (solana-keygen biçiminde 64 baytlık dizi bekleniyor)`);
+  }
+  const bytes = KeypairBytes.safeParse(value);
+  if (!bytes.success) throw new Error(`${what}: 64 baytlık dizi bekleniyor`);
+  try {
+    return Keypair.fromSecretKey(Uint8Array.from(bytes.data));
+  } catch {
+    throw new Error(`${what}: açık anahtar gizli anahtarla tutarlı değil`);
+  }
+}
+
+/** Fiat grubu: dördü birlikte, MPP ikilisi birlikte ve yalnızca fiat grubuyla; anahtarların modu aynı olmalı. */
+function parseFiat(e: z.infer<typeof EnvSchema>, problems: string[]): FiatConfig | null {
+  const given = FIAT_VARIABLES.filter((name) => e[name] !== undefined);
+  const mppGiven = MPP_VARIABLES.filter((name) => e[name] !== undefined);
+  if (mppGiven.length > 0 && mppGiven.length !== MPP_VARIABLES.length) {
+    problems.push(`${MPP_VARIABLES.join(', ')}: MPP değişkenleri birlikte verilir`);
+  }
+  if (given.length === 0) {
+    if (mppGiven.length > 0) problems.push(`${MPP_VARIABLES.join(', ')}: Stripe değişkenleri olmadan verilemez`);
+    return null;
+  }
+  if (given.length !== FIAT_VARIABLES.length) {
+    const missing = FIAT_VARIABLES.filter((name) => e[name] === undefined);
+    problems.push(`${missing.join(', ')}: Stripe MPP değişkenleri birlikte verilir`);
+    return null;
+  }
+  const mode = (key: string) => (key.includes('_live_') ? 'live' : 'test');
+  if (mode(e.API_STRIPE_SECRET_KEY!) !== mode(e.API_STRIPE_PUBLISHABLE_KEY!)) {
+    problems.push('API_STRIPE_PUBLISHABLE_KEY: API_STRIPE_SECRET_KEY ile aynı modda (test / live) olmalı');
+  }
+  let authority: Keypair | null = null;
+  try {
+    authority = parseKeypair(e.API_MPP_AUTHORITY_KEYPAIR!, 'API_MPP_AUTHORITY_KEYPAIR');
+  } catch (error) {
+    problems.push((error as Error).message);
+  }
+  if (!authority) return null;
+  return Object.freeze({
+    stripeSecretKey: e.API_STRIPE_SECRET_KEY!,
+    publishableKey: e.API_STRIPE_PUBLISHABLE_KEY!,
+    webhookSecret: e.API_STRIPE_WEBHOOK_SECRET!,
+    authority,
+    mpp:
+      e.API_MPP_SECRET_KEY !== undefined && e.API_MPP_NETWORK_ID !== undefined
+        ? Object.freeze({ secretKey: e.API_MPP_SECRET_KEY, networkId: e.API_MPP_NETWORK_ID })
+        : null,
+  });
+}
+
 export interface ApiConfig {
   readonly databaseUrl: string;
   readonly port: number;
@@ -177,6 +270,8 @@ export interface ApiConfig {
   readonly prover: { readonly url: string; readonly apiKey: string; readonly timeoutMs: number };
   /** CCTP ile fonlama; yapılandırılmamışsa null. */
   readonly cctp: CctpSettings | null;
+  /** Stripe MPP fiat rayı; yapılandırılmamışsa null. */
+  readonly fiat: FiatConfig | null;
   readonly travelRule: {
     /** `kimlik → 32 bayt` (`parseSecretBoxKeys`). */
     readonly keys: Readonly<Record<string, Uint8Array>>;
@@ -196,8 +291,10 @@ export function loadConfig(env: Readonly<Record<string, string | undefined>>): A
     ...(observability.ok ? [] : observability.problems),
   ];
   let cctp: CctpSettings | null = null;
+  let fiat: FiatConfig | null = null;
   if (parsed.success) {
     const e = parsed.data;
+    fiat = parseFiat(e, problems);
     const settings = parseCctpSettings(
       {
         messageTransmitter: e.API_CCTP_MESSAGE_TRANSMITTER,
@@ -300,6 +397,7 @@ export function loadConfig(env: Readonly<Record<string, string | undefined>>): A
     tx: Object.freeze({ lookupTable: e.API_LOOKUP_TABLE ?? null, computeUnitPrice: e.API_COMPUTE_UNIT_PRICE }),
     prover: Object.freeze({ url: e.API_PROVER_URL, apiKey: e.API_PROVER_API_KEY, timeoutMs: e.API_PROVER_TIMEOUT_MS }),
     cctp,
+    fiat,
     travelRule: Object.freeze({
       keys: parseSecretBoxKeys(e.API_TRAVEL_RULE_KEYS),
       activeKeyId: e.API_TRAVEL_RULE_ACTIVE_KEY_ID,

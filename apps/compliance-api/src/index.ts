@@ -8,19 +8,16 @@ import { errorHandler } from './middleware/error-handler.js';
 import proofRouter from './routes/proof.js';
 import attestationRouter from './routes/attestation.js';
 import { createComplianceReportRouter } from './routes/compliance-report.js';
-import mppReportRouter from './routes/mpp-report.js';
 import healthRouter from './routes/health.js';
-import stripeWebhookRouter from './routes/stripe-webhook.js';
-import mppPublicConfigRouter from './routes/mpp-public-config.js';
-import agentStripeRouter from './routes/agent-stripe.js';
-import verifiedPaymentRouter from './routes/verified-payment.js';
 import unattestedPaymentsRouter from './routes/unattested-payments.js';
 import { startSolanaWatcher, stopSolanaWatcher } from './watchers/solana-watcher.js';
-import { startStripeReconciler, stopStripeReconciler } from './watchers/stripe-watcher.js';
 import { swaggerSpec } from './swagger.js';
 import { httpMetricsMiddleware } from '@squaresdk/solana-observability';
 import { alarms, createMetricsApp, metrics, routeLabel } from './observability.js';
-import { purgeExpiredReplayGuards, x402Paywall, x402Ready } from './x402.js';
+import { createRateLimiter } from '@squaresdk/solana-hardening';
+import { createPrismaRateLimitStore } from '@squaresdk/solana-hardening/prisma';
+import { apiKeyCheck, requireApiKey } from './middleware/access.js';
+import { databaseReady, purgeExpiredReplayGuards, x402Paywall, x402Ready } from './x402.js';
 
 const app = express();
 
@@ -31,21 +28,11 @@ app.use(
   cors({
     origin: [...config.corsOrigins],
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: [
-      'Content-Type',
-      'Authorization',
-      'PAYMENT-SIGNATURE',
-      'x-mpp-credential',
-      'x-aperture-proof-record',
-    ],
-    exposedHeaders: ['WWW-Authenticate', 'Payment-Receipt', 'PAYMENT-REQUIRED', 'PAYMENT-RESPONSE'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'PAYMENT-SIGNATURE', 'X-API-Key'],
+    exposedHeaders: ['PAYMENT-REQUIRED', 'PAYMENT-RESPONSE'],
     credentials: true,
   }),
 );
-// Stripe webhook MUST mount before express.json — Stripe-Signature is HMAC'd
-// over the unparsed request body, and the json parser would consume it.
-app.use('/api/v1/mpp', stripeWebhookRouter);
-
 app.use(express.json({ limit: '1mb' }));
 
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
@@ -53,18 +40,22 @@ app.get('/api-docs.json', (_req, res) => {
   res.json(swaggerSpec);
 });
 
+// Kayıt uçları anahtarla ve anahtar başına hız sınırıyla (BE-32, middleware/access.ts).
+const recordAccess = requireApiKey({
+  check: apiKeyCheck(config.access.apiKeySha256),
+  limiter: databaseReady.then((db) =>
+    createRateLimiter({ store: createPrismaRateLimitStore(db), rule: config.access.rateLimit }),
+  ),
+});
+
 app.use(healthRouter);
-app.use('/api/v1/proofs', proofRouter);
-app.use('/api/v1/attestations', attestationRouter);
+app.use('/api/v1/proofs', recordAccess, proofRouter);
+app.use('/api/v1/attestations', recordAccess, attestationRouter);
 app.use(
   '/api/v1/compliance',
   createComplianceReportRouter(x402Paywall(config.x402.reportPrice, 'Aperture Compliance Report')),
 );
-app.use('/api/v1/compliance', mppReportRouter);
-app.use('/api/v1/compliance', mppPublicConfigRouter);
-app.use('/api/v1', agentStripeRouter);
-app.use('/api/v1/compliance', verifiedPaymentRouter);
-app.use('/api/v1/unattested-payments', unattestedPaymentsRouter);
+app.use('/api/v1/unattested-payments', recordAccess, unattestedPaymentsRouter);
 
 app.use(errorHandler);
 
@@ -76,7 +67,6 @@ const server = app.listen(config.port, () => {
     alertWebhook: config.observability.webhook !== null,
   });
   startSolanaWatcher();
-  startStripeReconciler();
 });
 const metricsServer = createMetricsApp().listen(config.metricsPort);
 const stopAlarms = alarms.start(config.observability.alertEvaluationSeconds * 1000);
@@ -89,7 +79,6 @@ x402Ready.catch((error: unknown) => {
 function gracefulShutdown(signal: string): void {
   logger.info(`Received ${signal}, shutting down gracefully`);
   stopSolanaWatcher();
-  stopStripeReconciler();
   stopAlarms();
   stopReplayPurge();
   metricsServer.close();

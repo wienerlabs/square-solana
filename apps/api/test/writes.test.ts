@@ -45,6 +45,7 @@ describe('teslimat', () => {
     // Depodaki nesne kimliksiz okunur ve içerik hash'le doğrulanır.
     const fetched = await fetch(receipt.data.deliveryUri);
     expect(fetched.status).toBe(200);
+    expect(fetched.headers.get('content-disposition')).toBe('attachment');
     expect(sha256(new Uint8Array(await fetched.arrayBuffer()))).toBe(receipt.data.workHash);
 
     const ownerKey = await apiKey(stack, agentOwner, ['deliveries:write']);

@@ -16,6 +16,7 @@ import {
 import { createTransferStore } from '@squaresdk/solana-cctp';
 import { createSquareClient } from '@squaresdk/solana-sdk';
 import { Connection, PublicKey } from '@solana/web3.js';
+import Stripe from 'stripe';
 import { createApp, createMetricsApp } from './app.js';
 import { createAuthService } from './auth/service.js';
 import { createCallerAuthority } from './caller.js';
@@ -28,6 +29,9 @@ import { createEvidenceService } from './disputes/evidence.js';
 import { createNotifier, createNotifierMetrics } from './disputes/notifier.js';
 import { createParties } from './disputes/parties.js';
 import { createWebhookService } from './disputes/webhooks.js';
+import { createFiatChain } from './fiat/chain.js';
+import { createMppCharger } from './fiat/mpp.js';
+import { createFiatService } from './fiat/service.js';
 import { createInstitutionAuthority } from './institution-authority.js';
 import { startLoop } from './loop.js';
 import { loadOpenApi } from './openapi.js';
@@ -151,6 +155,34 @@ async function main(): Promise<void> {
     tx,
     computeUnitPrice: config.tx.computeUnitPrice,
   });
+  const stripe = config.fiat && new Stripe(config.fiat.stripeSecretKey);
+  const fiat =
+    config.fiat && stripe
+      ? {
+          service: createFiatService({
+            db,
+            stripe,
+            chain: createFiatChain({ client, connection }),
+            authority,
+            settings: {
+              publishableKey: config.fiat.publishableKey,
+              webhookSecret: config.fiat.webhookSecret,
+              mppAuthority: config.fiat.authority,
+              networkId: config.fiat.mpp?.networkId ?? null,
+            },
+            log,
+          }),
+          mpp:
+            config.fiat.mpp &&
+            createMppCharger({
+              stripe,
+              secretKey: config.fiat.mpp.secretKey,
+              networkId: config.fiat.mpp.networkId,
+              realm: new URL(config.publicBaseUrl).host,
+            }),
+          publicBaseUrl: config.publicBaseUrl,
+        }
+      : null;
   const app = createApp({
     db,
     read,
@@ -179,6 +211,7 @@ async function main(): Promise<void> {
     x402: createX402EndpointService({ db }),
     travelRule,
     cctp,
+    fiat,
     limiters: { read: window(config.rateLimit.read), write: window(config.rateLimit.write) },
     openapi,
     health,
@@ -237,6 +270,7 @@ async function main(): Promise<void> {
     metricsPort: config.metricsPort,
     chainRef,
     rpc: fetch.endpoint(),
+    fiat: config.fiat ? { mppAuthority: config.fiat.authority.publicKey.toBase58() } : null,
   });
 
   const shutdown = async (signal: string) => {

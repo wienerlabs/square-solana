@@ -22,7 +22,7 @@ Square'in SLO panosu ve alarm kuralları (BE-33). Tanımlar, hedefler ve burn-ra
 5. **Servis içi alarmlar:** Servislerin kendi alarmları Prometheus'tan bağımsızdır, `ALERT_WEBHOOK_URL`'e
    gider. Eşikleri docs/slo.md'deki "Servis içi alarmlar" tablosundaki değerlerle verilir.
 
-Ortamlar (devnet staging, mainnet) ve barındırma BE-05'tedir.
+Ortam (devnet; mainnet yok, [ADR 0027](../../docs/decisions/0027-yalnizca-devnet.md)) ve barındırma BE-05'tedir.
 
 ## Doğrulama
 

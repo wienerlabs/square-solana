@@ -52,12 +52,25 @@ export const createApiClient: CreateApiClient = (config: ApiClientConfig): Squar
     return target;
   };
 
-  async function request(method: string, path: string, init: { query?: Query; json?: unknown; form?: FormData } = {}) {
+  async function request(
+    method: string,
+    path: string,
+    init: {
+      query?: Query;
+      json?: unknown;
+      form?: FormData;
+      raw?: { body: string; headers: Record<string, string> };
+    } = {},
+  ) {
     const response = await send(url(path, init.query), {
       method,
-      headers: headers(init.json === undefined ? {} : { 'content-type': 'application/json' }),
+      headers: headers({
+        ...(init.json === undefined ? {} : { 'content-type': 'application/json' }),
+        ...init.raw?.headers,
+      }),
       ...(init.json === undefined ? {} : { body: JSON.stringify(init.json) }),
       ...(init.form ? { body: init.form } : {}),
+      ...(init.raw ? { body: init.raw.body } : {}),
     });
     const text = await response.text();
     let body: unknown = null;
@@ -187,6 +200,18 @@ export const createApiClient: CreateApiClient = (config: ApiClientConfig): Squar
     listCctpTransfers: (query = {}) => envelope('GET', '/v1/cctp/transfers', { query }),
     getCctpTransfer: (id) => envelope('GET', `/v1/cctp/transfers/${segment(id)}`),
     prepareCctpFundTx: (id, body) => envelope('POST', `/v1/cctp/transfers/${segment(id)}/tx`, { json: body }),
+
+    getFiatConfig: () => envelope('GET', '/v1/fiat/config'),
+    createFiatSetupIntent: (body) => envelope('POST', '/v1/fiat/setup-intents', { json: body }),
+    getFiatCustomer: (institution) => envelope('GET', `/v1/fiat/customers/${segment(institution)}`),
+    createFiatPayment: (job, body) => envelope('POST', `/v1/jobs/${segment(job)}/fiat/payment`, { json: body }),
+    payFiatJobMpp: (job) => envelope('POST', `/v1/jobs/${segment(job)}/fiat/mpp`),
+    getFiatAttestation: (job) => envelope('GET', `/v1/jobs/${segment(job)}/fiat/attestation`),
+    reconcileFiatPayment: (job) => envelope('POST', `/v1/jobs/${segment(job)}/fiat/attestation`),
+    receiveStripeWebhook: (payload, signature) =>
+      envelope('POST', '/v1/stripe/webhook', {
+        raw: { body: payload, headers: { 'content-type': 'application/json', 'stripe-signature': signature } },
+      }),
 
     prepareTx: (body) => envelope('POST', '/v1/tx', { json: body }),
     prove: (body) => envelope('POST', '/v1/prove', { json: body }),

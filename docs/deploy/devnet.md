@@ -35,8 +35,8 @@ Program sözleşmesi v0.5.0. Program keypair'leri secret store'dadır, repoda de
 | mehmethayirli | `EZggdp7BCPLU84UBz2WFw4yvEC6KM3ZH6mjPANYQRPmQ` | Initiate, Vote, Execute |
 | kh0ra | `4DepaL4Dqp6NKzz5oHFjMY3b6FCDvFrqABd62YsUohtE` | Initiate, Vote, Execute |
 
-Üye anahtarları yalnızca devnet için üretildi ve sahiplerine verildi. Mainnet multisig'i üyelerin kendi
-anahtarlarıyla BC-42'de (#98) kurulur.
+Üye anahtarları devnet için üretildi ve sahiplerine verildi. Mainnet ortamı yok
+([ADR 0027](../decisions/0027-yalnizca-devnet.md)).
 
 ## Deploy (BC-30, 2026-10-06)
 
@@ -85,8 +85,8 @@ zincirden okundu.
 | Travel Rule eşiği | 1 000 USDC (`1000000000`) |
 | Doğrulama anahtarı sürümü (`vk_version`) | 1 |
 
-Screener ve MPP authority anahtarları devnet için üretildi, secret store'dadır. Eşik ve süreler devnet içindir;
-mainnet değerleri BC-42'de (#98) verilir.
+Screener ve MPP authority anahtarları devnet için üretildi, secret store'dadır. Eşik ve süreler Square'in tek ağı
+olan devnet içindir ([ADR 0027](../decisions/0027-yalnizca-devnet.md)).
 
 ## Square ALT
 
@@ -262,6 +262,11 @@ alıcıya 1 USDC, deployer keeper'a 0,1 SOL gönderdi.
 
 8 adım `squaresdk-solana` komutlarıyla, 2026-10-06: [cli-devnet.md](cli-devnet.md). Kurum, agent, alıcı ve keeper
 smoke'unkiler; ücretleri deployer ödedi, ispatı yerelde çalışan prover servisi üretti.
+
+## Fiat ödeme (BE-25)
+
+Stripe test modunda ödeme → MPP attestation'ı → `verify_mpp_payment_proof` → `finalize_fiat_payment`, 2026-10-07:
+[fiat-devnet.md](fiat-devnet.md). Job `4jFcA9uD…` `Released`; MPP authority config'teki `CPwxS6VA…`.
 
 ## Yükseltmeler
 

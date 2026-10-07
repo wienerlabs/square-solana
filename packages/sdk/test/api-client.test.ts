@@ -149,6 +149,13 @@ describe('createApiClient', () => {
         'POST',
         '/api/v1/cctp/transfers/t-1/tx',
       ],
+      [() => api.getFiatConfig(), 'GET', '/api/v1/fiat/config'],
+      [() => api.createFiatSetupIntent({ institution: job }), 'POST', '/api/v1/fiat/setup-intents'],
+      [() => api.getFiatCustomer(job), 'GET', `/api/v1/fiat/customers/${job}`],
+      [() => api.createFiatPayment(job, { offSession: true }), 'POST', `/api/v1/jobs/${job}/fiat/payment`],
+      [() => api.payFiatJobMpp(job), 'POST', `/api/v1/jobs/${job}/fiat/mpp`],
+      [() => api.getFiatAttestation(job), 'GET', `/api/v1/jobs/${job}/fiat/attestation`],
+      [() => api.reconcileFiatPayment(job), 'POST', `/api/v1/jobs/${job}/fiat/attestation`],
       [() => api.prepareTx({} as never), 'POST', '/api/v1/tx'],
       [() => api.prove({} as never), 'POST', '/api/v1/prove'],
       [() => api.getHealth(), 'GET', '/api/health'],
@@ -174,6 +181,16 @@ describe('createApiClient', () => {
       expect([last().method, last().url]).toEqual([method, url]);
       expect(last().headers.authorization).toBeUndefined();
     }
+  });
+
+  it('Stripe webhook ham gövdesi ve imzasıyla iletilir', async () => {
+    const api = createApiClient({ baseUrl });
+    respond = () => ok({ event: 'evt_1', type: 'payment_intent.succeeded', recorded: true });
+    const payload = '{"id":"evt_1", "object":"event"}';
+    await api.receiveStripeWebhook(payload, 't=1,v1=ab');
+    expect(last()).toMatchObject({ method: 'POST', url: '/api/v1/stripe/webhook', body: payload });
+    expect(last().headers['stripe-signature']).toBe('t=1,v1=ab');
+    expect(last().headers['content-type']).toBe('application/json');
   });
 
   it('teslimat multipart olarak gider', async () => {

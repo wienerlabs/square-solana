@@ -47,6 +47,9 @@ const API_ERROR_TEXT: Readonly<Record<ApiErrorCode, string>> = {
   rpc_unavailable: "The API cannot reach the chain's RPC right now.",
   db_unavailable: 'The API cannot reach its database right now.',
   prover_unavailable: 'The prover is unavailable.',
+  payment_required: 'The API asks for a payment for this request (MPP).',
+  payment_failed: 'The card was declined or needs the customer to confirm the payment.',
+  payment_unavailable: 'Fiat payments are not available right now.',
   internal_error: 'The API failed with an internal error.',
 };
 

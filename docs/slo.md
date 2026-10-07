@@ -4,8 +4,8 @@ Square servislerinin "sağlıklı" tanımı sayılarla yazılır: her gösterge 
 yayımladığı bir seridir, hedef (SLO) o serinin 30 günlük kayan penceredeki payıdır. Panolar ve alarmlar bu
 tanımları uygular: [`infra/monitoring/`](../infra/monitoring/).
 
-> **Durum:** devnet. Hedefler mainnet'e taşınacak politikadır; sayılar başlangıç değeridir ve birkaç haftalık
-> üretim verisiyle ayarlanır. Değişiklik bu dosyada ve kural dosyasında birlikte yapılır.
+> **Durum:** devnet; Square yalnızca devnet'te çalışır ([ADR 0027](decisions/0027-yalnizca-devnet.md)). Sayılar
+> başlangıç değeridir ve birkaç haftalık devnet verisiyle ayarlanır. Değişiklik bu dosyada ve kural dosyasında birlikte yapılır.
 
 ## Göstergeler (SLI)
 

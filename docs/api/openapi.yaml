@@ -49,6 +49,11 @@ tags:
       CCTP ile cross-chain fonlama (BE-26, docs/design/cctp-funding.md). Kurum kaynak zincirdeki burn tx'ini bir
       job'a bağlar; relayer Circle'ın attestation'ını izler. Mesaj imzalanınca kurum mint ile fonlamayı tek tx'te
       imzalar; relayer mesajı önce teslim ettiyse yalnızca fonlamayı.
+  - name: fiat
+    description: |
+      Stripe MPP fiat rayı (BE-25, ADR 0024, ADR 0026). Kurum teslim edilmiş fiat işi Stripe ile öder: tarayıcıda,
+      kayıtlı kartla off-session ya da MPP 402 akışıyla. Square'in MPP authority'si başarılı ödemenin makbuz
+      commitment'ını işe ve tutara bağlayarak imzalar; kurum attestation'ı ispatla `verify_mpp_payment_proof`'a verir.
   - name: tx
     description: 8 adımın imzasız tx hazırlığı.
   - name: prover
@@ -1482,6 +1487,266 @@ paths:
         '429': { $ref: '#/components/responses/RateLimited' }
         '503': { $ref: '#/components/responses/Unavailable' }
 
+  /v1/fiat/config:
+    get:
+      tags: [fiat]
+      operationId: getFiatConfig
+      summary: Stripe.js'in yayımlanabilir anahtarı, MPP authority'si ve MPP profil kimliği.
+      description: Fiat rayı yapılandırılmamışsa 503 `payment_unavailable`.
+      responses:
+        '200':
+          description: Yapılandırma.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessBase'
+                  - properties:
+                      data: { $ref: '#/components/schemas/FiatConfig' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+
+  /v1/fiat/setup-intents:
+    post:
+      tags: [fiat]
+      operationId: createFiatSetupIntent
+      summary: Kurumun off-session ödemesi için kart kaydı (Stripe SetupIntent).
+      description: |
+        Çağıran `institution`'ın güncel yetkilisi olmalı (kurum anahtarı ya da Squads multisig'inde öneri açabilen
+        üye). Kurumun Stripe müşterisi ilk çağrıda açılır. Tarayıcı `stripe.confirmCardSetup(clientSecret)` ile
+        onaylar; kart `setup_intent.succeeded` webhook'uyla kaydedilir ve öncekinin yerini alır. Anahtarla gelen istek
+        `fiat:pay` kapsamı ister.
+      security:
+        - session: []
+        - apiKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/FiatSetupIntentCreate' }
+      responses:
+        '201':
+          description: SetupIntent.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessBase'
+                  - properties:
+                      data: { $ref: '#/components/schemas/FiatSetupIntent' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+
+  /v1/fiat/customers/{institution}:
+    get:
+      tags: [fiat]
+      operationId: getFiatCustomer
+      summary: Kurumun Stripe müşterisi ve kayıtlı kartı.
+      description: Yalnızca kurumun güncel yetkilisi; anahtarla gelen istek `fiat:pay` kapsamı ister.
+      security:
+        - session: []
+        - apiKey: []
+      parameters:
+        - name: institution
+          in: path
+          required: true
+          description: Job'ları açan kurum anahtarı (`Job.institution`).
+          schema: { $ref: './schemas/idl.json#/Address' }
+      responses:
+        '200':
+          description: Müşteri ve kart.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessBase'
+                  - properties:
+                      data: { $ref: '#/components/schemas/FiatCustomer' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+
+  /v1/jobs/{job}/fiat/payment:
+    post:
+      tags: [fiat]
+      operationId: createFiatPayment
+      summary: Teslim edilmiş fiat işin Stripe ödemesi (PaymentIntent).
+      description: |
+        Job fiat rayında ve `Delivered` olmalı, çağıran job'un kurumunun güncel yetkilisi olmalı, işin başarılı bir
+        ödemesi olmamalı (409). Tutar işin tutarıdır: settlement mint'inin taban biriminden sente çevrilir; tam sent
+        olmayan ya da Stripe'ın en düşük tutarının altındaki iş 400. Kurumun public günlük tavanı bu ödemeyle aşılıyorsa
+        400 (`details.dailyCeiling`). Kurumun gizli politikası ödemeden önce kurumda denetlenir (ADR 0026).
+
+        `offSession: false`: tarayıcıda `stripe.confirmCardPayment(clientSecret)` ile onaylanacak PaymentIntent döner;
+        işin açık PaymentIntent'i yeniden kullanılır. `offSession: true`: kurumun kayıtlı kartıyla hemen öder; ödeme
+        tamamlanırsa attestation aynı yanıttadır. Kart reddedilir ya da müşterinin onayı gerekirse 402
+        `payment_failed` (`details.paymentIntent`, `details.declineCode`). Anahtarla gelen istek `fiat:pay` kapsamı
+        ister.
+      security:
+        - session: []
+        - apiKey: []
+      parameters:
+        - $ref: '#/components/parameters/JobPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/FiatPaymentCreate' }
+      responses:
+        '201':
+          description: PaymentIntent (ve tamamlandıysa attestation).
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessBase'
+                  - properties:
+                      data: { $ref: '#/components/schemas/FiatPayment' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '402': { $ref: '#/components/responses/PaymentFailed' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+
+  /v1/jobs/{job}/fiat/mpp:
+    post:
+      tags: [fiat]
+      operationId: payFiatJobMpp
+      summary: Fiat işin MPP ile ödenmesi (402 challenge, Stripe Shared Payment Token).
+      description: |
+        Machine Payments Protocol: credential'sız istek 402 `payment_required` alır; challenge `WWW-Authenticate:
+        Payment` başlığındadır (yöntem `stripe`, niyet `charge`, tutar işin tutarı, `networkId` Square'in Stripe
+        profili). Ödeyen SPT'yi oluşturup isteği `Authorization: Payment <credential>` ile yineler (`mppx/client`).
+        Square PaymentIntent'i SPT ile onaylar; ödeme tamamlanınca yanıt attestation'dır ve `Payment-Receipt`
+        başlığını taşır. Kimlik `X-API-Key` (`fiat:pay`) ile gelir: `Authorization` credential'ındır. Job, yetki ve
+        tutar kuralları `createFiatPayment`'takilerdir. Stripe profili yapılandırılmamışsa 503 `payment_unavailable`.
+      security:
+        - apiKey: []
+      parameters:
+        - $ref: '#/components/parameters/JobPath'
+      responses:
+        '200':
+          description: Ödeme alındı; attestation.
+          headers:
+            Payment-Receipt:
+              description: MPP makbuzu (`reference` PaymentIntent kimliği).
+              schema: { type: string }
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessBase'
+                  - properties:
+                      data: { $ref: '#/components/schemas/FiatAttestation' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '402': { $ref: '#/components/responses/PaymentRequired' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+
+  /v1/jobs/{job}/fiat/attestation:
+    get:
+      tags: [fiat]
+      operationId: getFiatAttestation
+      summary: Fiat işin ödemesinin makbuzu ve MPP authority'nin attestation'ı.
+      description: |
+        Yalnızca job'un kurumunun güncel yetkilisi; anahtarla gelen istek `fiat:pay` kapsamı ister. Attestation
+        başka bir MPP authority anahtarıyla imzalanmışsa (rotasyon, upgrade runbook'u §7) güncel anahtarla yeniden
+        imzalanır. Ödeme yoksa 404.
+      security:
+        - session: []
+        - apiKey: []
+      parameters:
+        - $ref: '#/components/parameters/JobPath'
+      responses:
+        '200':
+          description: Attestation.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessBase'
+                  - properties:
+                      data: { $ref: '#/components/schemas/FiatAttestation' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+    post:
+      tags: [fiat]
+      operationId: reconcileFiatPayment
+      summary: Webhook gelmediyse işin PaymentIntent'lerini Stripe'tan okuyup attestation yazar.
+      description: |
+        İşin bu API'de açılmış PaymentIntent'leri Stripe'tan okunur; başarılı olan varsa attestation yazılır ve döner
+        (kaynak `reconcile`). Attestation zaten varsa o döner. Başarılı ödeme yoksa 404. Yetki `getFiatAttestation`'ınkidir.
+      security:
+        - session: []
+        - apiKey: []
+      parameters:
+        - $ref: '#/components/parameters/JobPath'
+      responses:
+        '200':
+          description: Attestation.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessBase'
+                  - properties:
+                      data: { $ref: '#/components/schemas/FiatAttestation' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+
+  /v1/stripe/webhook:
+    post:
+      tags: [fiat]
+      operationId: receiveStripeWebhook
+      summary: Stripe'ın imzalı olayları (`payment_intent.succeeded`, `setup_intent.succeeded`).
+      description: |
+        Stripe çağırır. Gövde ham baytlarıyla `Stripe-Signature`'a (HMAC-SHA256, webhook sırrı) karşı doğrulanır;
+        imzası tutmayan ya da zaman damgası 300 saniyeden eski olay 400 alır. `payment_intent.succeeded`, metadata'sında
+        Square job'u olan ödemenin attestation'ını yazar. Aynı olay ve aynı PaymentIntent yeniden gelirse kayıt
+        değişmez. Attestation'ı olan işe gelen ikinci başarılı ödeme iade edilir. Diğer olaylar kayıtsız alınır.
+      parameters:
+        - name: Stripe-Signature
+          in: header
+          required: true
+          description: '`t=<unix>,v1=<hex HMAC>`.'
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, description: Stripe olay nesnesi. }
+      responses:
+        '200':
+          description: Alındı.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessBase'
+                  - properties:
+                      data: { $ref: '#/components/schemas/StripeWebhookReceipt' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+
   /health:
     get:
       tags: [health]
@@ -1656,6 +1921,20 @@ components:
       content:
         application/json:
           schema: { $ref: '#/components/schemas/ErrorResponse' }
+    PaymentRequired:
+      description: 'MPP: ödeme gerekli (`payment_required`); challenge `WWW-Authenticate: Payment` başlığında.'
+      headers:
+        WWW-Authenticate:
+          description: MPP challenge'ı (yöntem `stripe`, niyet `charge`).
+          schema: { type: string }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    PaymentFailed:
+      description: Stripe ödemeyi reddetti ya da müşterinin onayını istiyor (`payment_failed`).
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
     Unavailable:
       description: Bağımlı servis kullanılamıyor.
       content:
@@ -1678,6 +1957,9 @@ components:
         - rpc_unavailable
         - db_unavailable
         - prover_unavailable
+        - payment_required
+        - payment_failed
+        - payment_unavailable
         - internal_error
     ProgramErrorRef:
       type: object
@@ -2027,7 +2309,7 @@ components:
         expiresAt: { type: integer, format: int64 }
     ApiKeyScope:
       type: string
-      enum: [read, 'tx:prepare', 'deliveries:write', 'agents:write', prove, 'disputes:write', 'x402:serve']
+      enum: [read, 'tx:prepare', 'deliveries:write', 'agents:write', prove, 'disputes:write', 'x402:serve', 'fiat:pay']
     ApiKey:
       type: object
       required: [id, label, prefix, scopes, createdAt, lastUsedAt]
@@ -2683,3 +2965,145 @@ components:
         step: { type: string, enum: [receiveAndFund, fund] }
         transfer: { $ref: '#/components/schemas/CctpTransfer' }
         tx: { $ref: '#/components/schemas/UnsignedTx' }
+
+    # ------------------------------------------------------------ fiat (BE-25, ADR 0024, ADR 0026)
+    FiatCurrency:
+      type: string
+      enum: [usd]
+    FiatPaymentStatus:
+      type: string
+      enum:
+        - requires_payment_method
+        - requires_confirmation
+        - requires_action
+        - processing
+        - requires_capture
+        - canceled
+        - succeeded
+    FiatPaymentVia:
+      type: string
+      enum: [intent, mpp]
+    FiatAttestationSource:
+      type: string
+      enum: [webhook, reconcile, mpp]
+    FiatConfig:
+      type: object
+      required: [currency, publishableKey, mppAuthority, mppNetworkId, minimumAmountMinor]
+      additionalProperties: false
+      properties:
+        currency: { $ref: '#/components/schemas/FiatCurrency' }
+        publishableKey: { type: string, pattern: '^pk_(test|live)_[A-Za-z0-9]+$' }
+        mppAuthority:
+          allOf:
+            - $ref: './schemas/idl.json#/Address'
+          description: '`VerifierConfig.mpp_authority`.'
+        mppNetworkId:
+          type: [string, 'null']
+          minLength: 1
+          description: MPP challenge'ındaki Stripe profil kimliği; MPP kapalıysa null.
+        minimumAmountMinor: { type: integer, minimum: 1, description: Stripe'ın en düşük kart ödemesi (sent). }
+    FiatSetupIntentCreate:
+      type: object
+      required: [institution]
+      additionalProperties: false
+      properties:
+        institution: { $ref: './schemas/idl.json#/Address' }
+    FiatSetupIntent:
+      type: object
+      required: [institution, customer, setupIntent, clientSecret]
+      additionalProperties: false
+      properties:
+        institution: { $ref: './schemas/idl.json#/Address' }
+        customer: { type: string, pattern: '^cus_[A-Za-z0-9]+$' }
+        setupIntent: { type: string, pattern: '^seti_[A-Za-z0-9]+$' }
+        clientSecret: { type: string, minLength: 1 }
+    FiatCard:
+      type: object
+      required: [paymentMethod, brand, last4, expMonth, expYear]
+      additionalProperties: false
+      properties:
+        paymentMethod: { type: string, pattern: '^pm_[A-Za-z0-9]+$' }
+        brand: { type: string, minLength: 1 }
+        last4: { type: string, pattern: '^[0-9]{4}$' }
+        expMonth: { type: integer, minimum: 1, maximum: 12 }
+        expYear: { type: integer, minimum: 2000 }
+    FiatCustomer:
+      type: object
+      required: [institution, customer, card]
+      additionalProperties: false
+      properties:
+        institution: { $ref: './schemas/idl.json#/Address' }
+        customer: { type: string, pattern: '^cus_[A-Za-z0-9]+$' }
+        card:
+          oneOf:
+            - $ref: '#/components/schemas/FiatCard'
+            - type: 'null'
+    FiatPaymentCreate:
+      type: object
+      required: [offSession]
+      additionalProperties: false
+      properties:
+        offSession: { type: boolean, description: true ise kayıtlı kartla hemen öder. }
+    FiatAttestation:
+      type: object
+      description: |
+        Kanonik Stripe makbuzu ve MPP authority'nin attestation'ı. `receiptHash` = Poseidon(alan(paymentIntent),
+        amountMinor, alan(currency), alan(customer ?? ""), paidAt); alan(s) = Poseidon(s'nin 32'ye sıfırla doldurulmuş
+        UTF-8 baytlarının iki 16 baytlık yarısı). `signature`, `"square/mpp-attestation/v1" ‖ job ‖ receiptHash ‖
+        amount (u64 LE)` mesajının ed25519 imzasıdır (ADR 0024 §3).
+      required:
+        - job
+        - institution
+        - amount
+        - paymentIntent
+        - amountMinor
+        - currency
+        - customer
+        - paidAt
+        - receiptHash
+        - authority
+        - signature
+        - source
+      additionalProperties: false
+      properties:
+        job: { $ref: './schemas/idl.json#/Address' }
+        institution: { $ref: './schemas/idl.json#/Address' }
+        amount:
+          allOf:
+            - $ref: './schemas/idl.json#/U64'
+          description: Job'un tutarı, settlement mint'inin taban biriminde.
+        paymentIntent: { type: string, pattern: '^pi_[A-Za-z0-9]+$' }
+        amountMinor: { type: integer, minimum: 1 }
+        currency: { $ref: '#/components/schemas/FiatCurrency' }
+        customer: { type: [string, 'null'], pattern: '^cus_[A-Za-z0-9]+$' }
+        paidAt: { type: integer, format: int64 }
+        receiptHash: { $ref: './schemas/idl.json#/Hex32' }
+        authority: { $ref: './schemas/idl.json#/Address' }
+        signature: { type: string, pattern: '^[1-9A-HJ-NP-Za-km-z]{64,88}$' }
+        source: { $ref: '#/components/schemas/FiatAttestationSource' }
+    FiatPayment:
+      type: object
+      required: [job, paymentIntent, via, status, amountMinor, currency, clientSecret, attestation]
+      additionalProperties: false
+      properties:
+        job: { $ref: './schemas/idl.json#/Address' }
+        paymentIntent: { type: string, pattern: '^pi_[A-Za-z0-9]+$' }
+        via: { $ref: '#/components/schemas/FiatPaymentVia' }
+        status: { $ref: '#/components/schemas/FiatPaymentStatus' }
+        amountMinor: { type: integer, minimum: 1 }
+        currency: { $ref: '#/components/schemas/FiatCurrency' }
+        clientSecret: { type: [string, 'null'], minLength: 1 }
+        attestation:
+          oneOf:
+            - $ref: '#/components/schemas/FiatAttestation'
+            - type: 'null'
+    StripeWebhookReceipt:
+      type: object
+      required: [event, type, recorded]
+      additionalProperties: false
+      properties:
+        event: { type: string, pattern: '^evt_[A-Za-z0-9]+$' }
+        type: { type: string, minLength: 1 }
+        recorded:
+          type: boolean
+          description: Olay bir kaydı değiştirdi (attestation ya da kart).

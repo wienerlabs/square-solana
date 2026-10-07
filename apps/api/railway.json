@@ -13,6 +13,7 @@
       "/packages/hardening/**",
       "/packages/identity/**",
       "/packages/observability/**",
+      "/packages/policy/**",
       "/packages/sdk/**",
       "/packages/types/**",
       "/packages/x402/**",
