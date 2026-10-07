@@ -169,9 +169,10 @@ export async function inspectTransaction(
     }
     checkSponsorSlots(ctx, kind, known, ix.accounts, position);
     countTokenAccount(ctx, kind, known, ix, position, false, rent);
+    if (kind === 'squads' && known.name === 'multisig_create_v2') checkCreatedMultisigRoles(ctx, ix, position);
     if (kind === 'squads') await checkRentCollector(ctx, known, ix, instructions, position);
     if (kind === 'squads' && known.name === 'vault_transaction_create') {
-      names.push(...inspectVaultMessage(createdMessage(ix.data, position), ctx, rent));
+      names.push(...inspectVaultMessage(createdMessage(ix.data, position), ctx, null));
     }
   }
   if (!squareOrSquads) {
@@ -324,7 +325,7 @@ function countTokenAccount(
   ix: Resolved,
   position: number,
   inner: boolean,
-  rent: { tokenAccounts: number },
+  rent: { tokenAccounts: number } | null,
 ): void {
   if (kind !== 'ata' || (known.name !== 'create' && known.name !== 'create_idempotent')) return;
   if (!ix.accounts[0]?.equals(ctx.sponsor)) return;
@@ -335,7 +336,7 @@ function countTokenAccount(
       { instruction: `${kind}:${known.name}`, position, inner },
     );
   }
-  rent.tokenAccounts += 1;
+  if (rent) rent.tokenAccounts += 1;
 }
 
 function decoded<T>(decode: () => T, details: Record<string, unknown>): T {
@@ -349,10 +350,23 @@ function decoded<T>(decode: () => T, details: Record<string, unknown>): T {
   }
 }
 
-const createdRentCollector = (data: Uint8Array, position: number) =>
-  decoded(() => sqds.generated.multisigCreateV2Struct.deserialize(Buffer.from(data))[0].args.rentCollector, {
+const createdMultisig = (data: Uint8Array, position: number) =>
+  decoded(() => sqds.generated.multisigCreateV2Struct.deserialize(Buffer.from(data))[0].args, {
     instruction: position,
   });
+
+const createdRentCollector = (data: Uint8Array, position: number) => createdMultisig(data, position).rentCollector;
+
+function checkCreatedMultisigRoles(ctx: PolicyContext, ix: Resolved, position: number): void {
+  const args = createdMultisig(ix.data, position);
+  const roles = [args.configAuthority, ...args.members.map((member) => member.key)];
+  if (roles.some((role) => role?.equals(ctx.sponsor) ?? false)) {
+    throw new PolicyRejection('sponsor_account_misuse', 'sponsor multisig’in üyesi ya da config yetkilisi olamaz', {
+      instruction: 'squads:multisig_create_v2',
+      position,
+    });
+  }
+}
 
 async function checkRentCollector(
   ctx: PolicyContext,
@@ -408,7 +422,11 @@ async function multisigRentCollector(
 }
 
 /** Vault tx mesajının talimatları dış talimatlarla aynı kurallarla; lookup table kullanılamaz. */
-function inspectVaultMessage(message: VaultMessage, ctx: PolicyContext, rent: { tokenAccounts: number }): string[] {
+function inspectVaultMessage(
+  message: VaultMessage,
+  ctx: PolicyContext,
+  rent: { tokenAccounts: number } | null,
+): string[] {
   if (message.addressTableLookups.length > 0) {
     throw new PolicyRejection('inner_lookup_table', 'vault tx mesajı address lookup table kullanamaz');
   }

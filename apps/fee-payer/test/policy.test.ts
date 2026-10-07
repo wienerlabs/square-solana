@@ -588,10 +588,39 @@ describe('Squads vault tx’leri', () => {
     await expectReject(inspect(v0(S, [open(U), ...propose])), 'sponsor_rent_extractable');
   });
 
-  it('vault mesajında sponsorun ödediği ATA da rent tabanına sayılır', async () => {
+  it('vault mesajında sponsorun ödediği ATA yürütmede sayılır, öneride sayılmaz', async () => {
     const vault = squadsVaultAddress(multisig, 0)[0];
     const ata = createAssociatedTokenAccountIdempotentInstruction(S, key(), vault, key());
-    const result = await inspect(v0(S, [...plan([ata, registerAgent()]).propose]), onChain());
-    expect(result.sponsoredTokenAccounts).toBe(1);
+    const p = plan([ata, registerAgent()]);
+    expect((await inspect(v0(S, [...p.propose]), onChain())).sponsoredTokenAccounts).toBe(0);
+    const chain = onChain([
+      [p.transaction.toBase58(), vaultTransactionData({ multisig, creator: M, index: 1n, message: p.message })],
+    ]);
+    expect((await inspect(v0(S, [p.execute]), chain)).sponsoredTokenAccounts).toBe(1);
+    expect((await inspect(v0(S, [...p.propose, p.execute]), onChain())).sponsoredTokenAccounts).toBe(1);
+  });
+
+  it('sponsor_account_misuse: sponsor açılan multisig’in üyesi ya da config yetkilisi', async () => {
+    const open = (members: PublicKey[], configAuthority: PublicKey | null) => {
+      const createKey = Keypair.generate().publicKey;
+      return sqds.instructions.multisigCreateV2({
+        treasury: key(),
+        creator: M,
+        multisigPda: sqds.getMultisigPda({ createKey })[0],
+        configAuthority,
+        threshold: 1,
+        members: members.map((memberKey) => ({ key: memberKey, permissions: { mask: 7 } })),
+        timeLock: 0,
+        createKey,
+        rentCollector: null,
+      });
+    };
+    await expect(inspect(v0(S, [open([M], null)]))).resolves.toBeTruthy();
+    await expectReject(inspect(v0(S, [open([M, S], null)])), 'sponsor_account_misuse', {
+      instruction: 'squads:multisig_create_v2',
+    });
+    await expectReject(inspect(v0(S, [open([M], S)])), 'sponsor_account_misuse', {
+      instruction: 'squads:multisig_create_v2',
+    });
   });
 });
