@@ -7,6 +7,8 @@
 mod escrow_world;
 mod release_world;
 
+use anchor_lang::prelude::Pubkey;
+use anchor_lang::AccountSerialize;
 use escrow_world::*;
 use release_world::*;
 use solana_signer::Signer;
@@ -18,6 +20,7 @@ use square_escrow::{
     DisputeRaised, DisputeResolved, MissingProofEscalated, ReleaseRefused, ReleaseVerified,
 };
 use square_program_tests::{anchor_error, compute_unit_limit, cu, event, Outcome};
+use square_verifier::state::ReleaseProof;
 
 const LAMPORTS: u64 = 1_000_000_000;
 
@@ -281,6 +284,42 @@ fn escalation_waits_while_a_bound_proof_can_settle_the_job_today() {
     r.bind(&job, &r.proof("refused_time_window"))
         .expect("geçici ret");
     r.w.escalate(&wallet, &job).expect("geçici retle başvuru");
+}
+
+#[test]
+fn a_proof_for_another_net_or_mint_does_not_block_the_escalation() {
+    // Verifier neti doğrulamaz (kurumun beyanı); finalize başka bir net ya da mint için yapılmış ispatı bayat
+    // sayar (`StaleReleaseProof`). Böyle bir ispat işi kapatamaz, başvuruyu da engellemez (BC-39 P-07).
+    for change in ["net", "mint"] {
+        let mut r = ReleaseWorld::new(false);
+        let mut p = params();
+        p.proof_timeout_secs = 0;
+        let admin = r.w.admin.insecure_clone();
+        let ix = r.w.update_params_ix(&admin.pubkey(), p);
+        r.w.h.send(&[ix], &[&admin]).expect("update_params");
+        let job = r.delivered_job("a");
+        let wallet = r.agent.wallet.insecure_clone();
+        r.w.h.set_time(r.proof_time());
+        r.bind(&job, &r.proof("compliant")).expect("uyumlu ispat");
+        r.w.escalate(&wallet, &job)
+            .expect_err("ispat işi kapatabilir")
+            .assert_error(anchor_error(EscrowError::InvalidStatus));
+
+        let address = release_proof_address(&job);
+        let mut proof: ReleaseProof = r.w.h.account(&address).expect("ReleaseProof");
+        match change {
+            "net" => proof.net_amount -= 1,
+            _ => proof.mint = Pubkey::new_unique(),
+        }
+        let mut account = r.w.h.raw_account(&address).expect("ReleaseProof hesabı");
+        account.data.clear();
+        proof
+            .try_serialize(&mut account.data)
+            .expect("ReleaseProof");
+        r.w.h.set_account(address, account);
+        r.w.escalate(&wallet, &job).expect(change);
+        assert_eq!(r.w.job(&job).status, JobStatus::Disputed);
+    }
 }
 
 #[test]
