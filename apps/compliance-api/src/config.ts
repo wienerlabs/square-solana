@@ -49,23 +49,6 @@ const EnvSchema = z
     POSTGRES_PASSWORD: nonEmpty,
     POSTGRES_DB: nonEmpty,
 
-    STRIPE_SECRET_KEY: nonEmpty,
-    STRIPE_API_VERSION: nonEmpty,
-    /// Signing secret (whsec_…) for /api/v1/mpp/webhook.
-    STRIPE_WEBHOOK_SECRET: optionalSecret,
-    /// pk_test_… / pk_live_…, surfaced by /mpp/public-config for Stripe Elements.
-    STRIPE_PUBLISHABLE_KEY: optionalSecret,
-    /// 64-byte Solana keypair (base58 or JSON array) that signs canonical
-    /// Stripe receipts for the verifier's ed25519 check.
-    MPP_AUTHORITY_KEYPAIR_BASE58: optionalSecret,
-    MPP_SECRET_KEY: nonEmpty,
-    MPP_REALM: nonEmpty,
-    MPP_REPORT_PRICE_CENTS: intFromEnv(1),
-    MPP_REPORT_CURRENCY: z
-      .string()
-      .trim()
-      .regex(/^[a-z]{3}$/, 'must be a lowercase ISO 4217 code'),
-
     SOLANA_RPC_URL: z.string().url(),
     VERIFIER_PROGRAM: base58Pubkey,
 
@@ -101,7 +84,6 @@ const EnvSchema = z
     COMPLIANCE_WATCHER_INTERVAL_MS: intFromEnv(5_000),
     /// Mint allow list; unset watches every SPL transfer Helius returns.
     COMPLIANCE_WATCHER_MINTS: commaList(base58Pubkey).optional(),
-    COMPLIANCE_STRIPE_RECONCILE_DELAY_MS: intFromEnv(0),
 
     /// `compliance_errors` alarm: more error log lines than this ...
     COMPLIANCE_ALERT_ERRORS: intFromEnv(0),
@@ -162,21 +144,6 @@ export const config = {
     password: env.POSTGRES_PASSWORD,
     database: env.POSTGRES_DB,
   },
-  stripe: {
-    secretKey: env.STRIPE_SECRET_KEY,
-    apiVersion: env.STRIPE_API_VERSION,
-    webhookSecret: env.STRIPE_WEBHOOK_SECRET,
-    publishableKey: env.STRIPE_PUBLISHABLE_KEY,
-  },
-  mppAuthority: {
-    keypairBase58: env.MPP_AUTHORITY_KEYPAIR_BASE58,
-  },
-  mpp: {
-    secretKey: env.MPP_SECRET_KEY,
-    realm: env.MPP_REALM,
-    reportPriceCents: env.MPP_REPORT_PRICE_CENTS,
-    reportCurrency: env.MPP_REPORT_CURRENCY,
-  },
   solana: {
     rpcUrl: env.SOLANA_RPC_URL,
     verifierProgram: env.VERIFIER_PROGRAM,
@@ -199,7 +166,6 @@ export const config = {
   watcher: {
     intervalMs: env.COMPLIANCE_WATCHER_INTERVAL_MS,
     mintAllowList: env.COMPLIANCE_WATCHER_MINTS ?? [],
-    stripeReconcileDelayMs: env.COMPLIANCE_STRIPE_RECONCILE_DELAY_MS,
   },
   alerts: {
     errors: env.COMPLIANCE_ALERT_ERRORS,

@@ -6,7 +6,7 @@ import type { ProveResponse } from '@squaresdk/solana-types';
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { createRemoteProver, type Prover } from '../src/prover.js';
 import { buildSetComplianceProofTx, buildVerifyMppPaymentProofTx } from '../src/tx.js';
-import { watchJobProof } from '../src/watch.js';
+import { watchJobProof, type MppAttestation } from '../src/watch.js';
 import { dayStart } from '../src/release.js';
 import { buildReleaseWitness, type ReleaseWitness } from '../src/witness.js';
 import { localProver, verify } from './helpers/artifacts.js';
@@ -280,7 +280,7 @@ describe('createRemoteProver', () => {
 
 describe('watchJobProof (bayatlamada otomatik yenileme)', () => {
   /** İzleyiciyi çalıştırır; yenileme, hata, kendiliğinden bitiş ya da `quietMs` sessizlik sonrası durur. */
-  function run(quietMs = 150, now = TIMESTAMP) {
+  function run(quietMs = 150, now = TIMESTAMP, mppAttestation?: () => Promise<MppAttestation>) {
     const submitted: BuiltTx[] = [];
     const errors: unknown[] = [];
     const reasons: string[] = [];
@@ -307,6 +307,7 @@ describe('watchJobProof (bayatlamada otomatik yenileme)', () => {
         onRefreshed: ({ reason }) => (reasons.push(reason), stop(), resolve()),
         onDone: (reason) => (done.push(reason), resolve()),
         now: () => now,
+        ...(mppAttestation && { mppAttestation }),
       });
       setTimeout(() => (stop(), resolve()), quietMs);
     });
@@ -401,6 +402,39 @@ describe('watchJobProof (bayatlamada otomatik yenileme)', () => {
     const failing = run(30_000);
     await failing.done;
     expect(String(failing.errors[0])).toMatch(/job bulunamadı/);
+  });
+
+  it('fiat iş: attestation verilmezse izlenmez; verilirse ispat verify_mpp_payment_proof ile bağlanır', async () => {
+    const amount = 30_000_000n;
+    await state.job({ rail: { fiat: {} }, amount: new BN(amount.toString()) });
+    const mpp = Keypair.generate();
+    await state.verifierConfig(mpp.publicKey);
+    const missing = run(30_000);
+    await missing.done;
+    expect(String(missing.errors[0])).toMatch(/attestation'sız/);
+
+    const receiptHash = Buffer.from('062426892f0128f3ebafebd760832d8d50bd69034e2cec2ca7089303a0574e34', 'hex');
+    const message = mppAttestationMessage({ job: world.job, stripeReceiptHash: receiptHash, amount });
+    const signed = Ed25519Program.createInstructionWithPrivateKey({ privateKey: mpp.secretKey, message });
+    let reads = 0;
+    const attestation = async () => {
+      reads += 1;
+      return { receiptHash, signature: signed.data.subarray(48, 112) };
+    };
+    const watch = run(30_000, TIMESTAMP, attestation);
+    await watch.done;
+    expect(watch.errors).toEqual([]);
+    expect(watch.reasons).toEqual(['ispat yok']);
+    expect(reads).toBe(1);
+    expect(watch.proving[0]!.inputs.stripe_receipt_hash_in).toBe(BigInt(`0x${receiptHash.toString('hex')}`).toString());
+    const { name, args } = decodeComplianceTx(watch.submitted[0]!);
+    expect(name).toBe('verifyMppPaymentProof');
+    expect(Buffer.from(args.stripeReceiptHash as number[])).toEqual(receiptHash);
+    const message0 = watch.submitted[0]!.transaction.message;
+    const keys = message0.staticAccountKeys;
+    const programs = message0.compiledInstructions.map((ix) => keys[ix.programIdIndex]!);
+    const at = programs.findIndex((p) => p.equals(state.client.verifier.program.programId));
+    expect(Buffer.from(message0.compiledInstructions[at - 1]!.data)).toEqual(Buffer.from(signed.data));
   });
 
   it('yenilenen ispat release anahtarıyla doğrulanıyor', async () => {

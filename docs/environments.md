@@ -38,7 +38,7 @@ Her servis bir Railway servisidir; derleme ve sağlık denetimi `apps/<servis>/r
 
 ### api
 
-`apps/api/.env.example` · 56 değişken, 8 secret
+`apps/api/.env.example` · 62 değişken, 12 secret
 
 | Değişken | Bölüm | Secret | Not |
 |---|---|---|---|
@@ -84,6 +84,12 @@ Her servis bir Railway servisidir; derleme ve sağlık denetimi `apps/<servis>/r
 | `API_CCTP_MESSAGE_TRANSMITTER` | CCTP ile fonlama (BE-26; isteğe bağlı, üçü birlikte) |  | Circle'ın Solana programları (MessageTransmitterV2, TokenMessengerMinterV2) ve kaynak domain başına CCTP ALT'ı: virgülle domain:adres (scripts/deploy/networks/<ağ>.json, cctp). Verilmezse CCTP kaydı ve tx'i reddedilir. |
 | `API_CCTP_TOKEN_MESSENGER_MINTER` | CCTP ile fonlama (BE-26; isteğe bağlı, üçü birlikte) |  |  |
 | `API_CCTP_LOOKUP_TABLES` | CCTP ile fonlama (BE-26; isteğe bağlı, üçü birlikte) |  |  |
+| `API_STRIPE_SECRET_KEY` | Stripe MPP fiat rayı (BE-25, ADR 0026; isteğe bağlı, dördü birlikte) | **secret** | Square'in Stripe hesabının gizli anahtarı (sk_test_… / sk_live_…; kısıtlı rk_ de olur) |
+| `API_STRIPE_PUBLISHABLE_KEY` | Stripe MPP fiat rayı (BE-25, ADR 0026; isteğe bağlı, dördü birlikte) |  | Stripe.js'e verilen yayımlanabilir anahtar (gizli anahtarla aynı mod) |
+| `API_STRIPE_WEBHOOK_SECRET` | Stripe MPP fiat rayı (BE-25, ADR 0026; isteğe bağlı, dördü birlikte) | **secret** | Webhook ucunun (POST /v1/stripe/webhook) imza sırrı (whsec_…); olaylar: payment_intent.succeeded, setup_intent.succeeded |
+| `API_MPP_AUTHORITY_KEYPAIR` | Stripe MPP fiat rayı (BE-25, ADR 0026; isteğe bağlı, dördü birlikte) | **secret** | Attestation'ları imzalayan MPP authority keypair'i: solana-keygen JSON'u (VerifierConfig.mpp_authority) |
+| `API_MPP_SECRET_KEY` | MPP 402 yolu (BE-25; isteğe bağlı, ikisi birlikte ve yalnızca Stripe değişkenleriyle) | **secret** | Stripe profili hesabın canlı aktivasyonunu ister; verilmezse yalnızca POST /v1/jobs/{job}/fiat/mpp 503 döner. MPP challenge'larını bağlayan HMAC sırrı (en az 32 karakter) |
+| `API_MPP_NETWORK_ID` | MPP 402 yolu (BE-25; isteğe bağlı, ikisi birlikte ve yalnızca Stripe değişkenleriyle) |  | MPP challenge'ındaki Stripe profil kimliği (profile_… / profile_test_…; Stripe panelinde Profile) |
 | `API_PROVER_URL` | Prover vekili (zorunlu) |  |  |
 | `API_PROVER_API_KEY` | Prover vekili (zorunlu) | **secret** | API'nin prover'a gönderdiği servis anahtarı (prover'ın PROVER_API_KEY_SHA256 listesinde) |
 | `API_PROVER_TIMEOUT_MS` | Prover vekili (zorunlu) |  |  |
@@ -101,7 +107,7 @@ Her servis bir Railway servisidir; derleme ve sağlık denetimi `apps/<servis>/r
 
 ### compliance-api
 
-`apps/compliance-api/.env.example` · 42 değişken, 11 secret
+`apps/compliance-api/.env.example` · 32 değişken, 7 secret
 
 | Değişken | Bölüm | Secret | Not |
 |---|---|---|---|
@@ -115,15 +121,6 @@ Her servis bir Railway servisidir; derleme ve sağlık denetimi `apps/<servis>/r
 | `POSTGRES_USER` | PostgreSQL (zorunlu) |  |  |
 | `POSTGRES_PASSWORD` | PostgreSQL (zorunlu) | **secret** |  |
 | `POSTGRES_DB` | PostgreSQL (zorunlu) |  |  |
-| `STRIPE_SECRET_KEY` | Stripe / MPP (zorunlu) | **secret** |  |
-| `STRIPE_API_VERSION` | Stripe / MPP (zorunlu) |  |  |
-| `MPP_SECRET_KEY` | Stripe / MPP (zorunlu) | **secret** |  |
-| `MPP_REALM` | Stripe / MPP (zorunlu) |  |  |
-| `MPP_REPORT_PRICE_CENTS` | Stripe / MPP (zorunlu) |  | /api/v1/compliance/mpp-report fiyatı (en küçük birim) ve ISO 4217 para birimi (küçük harf) |
-| `MPP_REPORT_CURRENCY` | Stripe / MPP (zorunlu) |  |  |
-| `STRIPE_WEBHOOK_SECRET` | Stripe / MPP (isteğe bağlı; tanımlı değilse ilgili uç 503 döner) | **secret** | Webhook imza anahtarı (whsec_…) |
-| `STRIPE_PUBLISHABLE_KEY` | Stripe / MPP (isteğe bağlı; tanımlı değilse ilgili uç 503 döner) |  | Tarayıcıya verilen yayımlanabilir anahtar (pk_test_… / pk_live_…) |
-| `MPP_AUTHORITY_KEYPAIR_BASE58` | Stripe / MPP (isteğe bağlı; tanımlı değilse ilgili uç 503 döner) | **secret** | Kanonik makbuzları imzalayan 64 baytlık Solana keypair'i (base58 ya da JSON dizi) |
 | `SOLANA_RPC_URL` | Solana (zorunlu) | **secret** |  |
 | `VERIFIER_PROGRAM` | Solana (zorunlu) |  | square-verifier program kimliği |
 | `X402_NETWORK` | x402 (zorunlu; @squaresdk/solana-x402, BE-24) |  | CAIP-2 kimliği ya da v1 adı: solana \| solana-devnet (CAIP-2'ye çevrilir) |
@@ -139,7 +136,6 @@ Her servis bir Railway servisidir; derleme ve sağlık denetimi `apps/<servis>/r
 | `HELIUS_API_URL` | Kayıtsız ödeme izleyicisi |  |  |
 | `COMPLIANCE_WATCHER_INTERVAL_MS` | Kayıtsız ödeme izleyicisi |  | Zorunlu (ms; en az 5000) |
 | `COMPLIANCE_WATCHER_MINTS` | Kayıtsız ödeme izleyicisi |  | İsteğe bağlı: virgülle ayrılmış mint listesi; tanımlı değilse tüm SPL transferleri izlenir |
-| `COMPLIANCE_STRIPE_RECONCILE_DELAY_MS` | Kayıtsız ödeme izleyicisi |  | Zorunlu (ms) |
 | `HEALTH_CHECK_TIMEOUT_MS` | Gözlemlenebilirlik (@squaresdk/solana-observability) |  | Zorunlu: tek bir hazırlık denetiminin süre sınırı (ms) |
 | `ALERT_EVALUATION_SECONDS` | Gözlemlenebilirlik (@squaresdk/solana-observability) |  | Zorunlu: alarm kurallarının değerlendirilme aralığı (saniye) |
 | `ALERT_WEBHOOK_URL` | Gözlemlenebilirlik (@squaresdk/solana-observability) | **secret** | İsteğe bağlı: alarm olaylarının gönderileceği JSON ucu; tanımlıysa ALERT_WEBHOOK_TIMEOUT_MS zorunludur |

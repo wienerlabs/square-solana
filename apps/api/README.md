@@ -1,7 +1,7 @@
 # @squaresdk/solana-api
 
-Square'in REST API servisi (BE-18; Travel Rule kaydı BE-23, uyuşmazlık araçları BE-22, x402 uç nokta tanımları FE-22). Sözleşme
-[`docs/api/openapi.yaml`](../../docs/api/openapi.yaml)'dır (52 operasyon); servis `GET /openapi.json`'da sözleşmenin derlenmiş halini yayımlar. Web uygulaması ve
+Square'in REST API servisi (BE-18; Travel Rule kaydı BE-23, uyuşmazlık araçları BE-22, x402 uç nokta tanımları FE-22, Stripe MPP fiat ödemesi BE-25). Sözleşme
+[`docs/api/openapi.yaml`](../../docs/api/openapi.yaml)'dır (60 operasyon); servis `GET /openapi.json`'da sözleşmenin derlenmiş halini yayımlar. Web uygulaması ve
 entegrasyonlar SDK'nın `createApiClient`'ıyla bağlanır.
 
 | Etiket | Uygulama |
@@ -15,6 +15,7 @@ entegrasyonlar SDK'nın `createApiClient`'ıyla bağlanır.
 | politika meta | Herkese açık ad, açıklama ve etiketler; yazan kurumun güncel yetkilisi |
 | travel rule | Kaydın şifreli saklanması, commitment'ı, izinli okuma ve erişim kaydı ([Travel Rule](#travel-rule)) |
 | cctp | Burn'ün job'a kaydı, transferin durumu, kurumun mint + fonlama tx'i ([CCTP](#cctp)) |
+| fiat | Fiat işin Stripe ödemesi (tarayıcı, kayıtlı kart, MPP), imzalı webhook, makbuz ve MPP attestation'ı ([Fiat ödeme](#fiat-ödeme)) |
 | prover | `POST /v1/prove`, prover servisine (apps/prover) vekil |
 | uyuşmazlık | Dispute kanıtı (özel depo), arbitrator kuyruğu, ön denetimli oy tx'i, arbitrator webhook bildirimleri ([Uyuşmazlık](#uyuşmazlık)) |
 
@@ -234,6 +235,48 @@ Geliştirici portalının (FE-22, web `/app/developers`) arka ucu. Karar:
 - **Kullanım** (`getX402EndpointUsage`): ödemeli çağrı sayısı, ağ ve mint başına toplam, son ödeme zamanı, son
   20 ödeme. Tanım silinince kullanım kaydı da silinir.
 
+## Fiat ödeme
+
+Stripe MPP fiat rayının ödeme tarafı (BE-25). Karar: [ADR 0026](../../docs/decisions/0026-stripe-mpp-fiat-odemesi.md);
+zincir tarafı [ADR 0024](../../docs/decisions/0024-stripe-mpp-fiat-rayi.md). Kod `src/fiat/` ve `src/routes/fiat.ts`.
+
+- **Hesap:** Ödeme Square'in Stripe hesabına yapılır, USD'dir. Tutar işin tutarıdır; settlement mint'inin taban
+  biriminden sente çevrilir (1 sent = 10^(decimals − 2)). Tam sent olmayan ya da 50 sentin altındaki iş ödenmez.
+- **Ön koşul (her yol):**
+  - job fiat rayında ve `Delivered`;
+  - çağıran job'un kurumunun güncel yetkilisi;
+  - işin attestation'ı yok (409);
+  - ödeme kurumun public günlük tavanını bugünkü sayaçla aşmıyor (400, `details.dailyCeiling`).
+- **Yollar:**
+  - `createFiatPayment` `offSession: false`: tarayıcıda Stripe.js ile onaylanacak PaymentIntent; işin açık
+    PaymentIntent'i yeniden kullanılır.
+  - `createFiatPayment` `offSession: true`: kurumun kayıtlı kartıyla hemen öder, attestation yanıttadır. Red ya da
+    müşterinin onayı gerekirse 402 `payment_failed`.
+  - `payFiatJobMpp`: MPP 402 akışı (`mppx` Stripe `charge`, Shared Payment Token). Kimlik yalnızca `fiat:pay`
+    kapsamlı `X-API-Key`'dir; `Authorization` MPP credential'ını taşır. İstemci `mppx/client`'ın `fetch`'ini
+    `createApiClient({ fetch })`'e verir.
+- **Kart:** `createFiatSetupIntent` (off-session SetupIntent); kart `setup_intent.succeeded` webhook'uyla kaydedilir,
+  öncekinin yerini alır. `getFiatCustomer` kartın markasını ve son dört hanesini döner.
+- **Attestation:** Makbuz PaymentIntent Stripe'tan yeniden okunarak kurulur. Poseidon commitment'ı ve ADR 0024
+  mesajının MPP authority imzası `mpp_payments`'a yazılır. Üç kaynak:
+  - imzalı webhook (`POST /v1/stripe/webhook`, `Stripe-Signature`, 300 saniye tolerans);
+  - kurumun mutabakat isteği (`reconcileFiatPayment`);
+  - MPP isteğinin kendisi.
+
+  Aynı olay ya da ödeme kaydı değiştirmez. Attestation'ı olan işe gelen ikinci başarılı ödeme iade edilir.
+  İmzalayan anahtar değişmişse (rotasyon) attestation okunurken yeniden imzalanır.
+- **Webhook ve MPP** genel kimlik ara katmanından ve `express.json`'dan önce bağlanır: imza ham gövde üzerindedir.
+- **Yapılandırma:**
+  - Dört değişken birlikte verilir; verilmezse fiat uçları 503 `payment_unavailable` döner: `API_STRIPE_SECRET_KEY`,
+    `API_STRIPE_PUBLISHABLE_KEY`, `API_STRIPE_WEBHOOK_SECRET`, `API_MPP_AUTHORITY_KEYPAIR`.
+  - MPP için `API_MPP_SECRET_KEY` ve `API_MPP_NETWORK_ID` (Stripe profili) birlikte verilir; yoksa yalnızca MPP
+    ucu 503 döner.
+
+  Stripe panelinde webhook ucu `<API_PUBLIC_BASE_URL>/v1/stripe/webhook`, olaylar `payment_intent.succeeded` ve
+  `setup_intent.succeeded`.
+- **Kurum tarafı:** Attestation ispatla `@squaresdk/solana-policy` `buildVerifyMppPaymentProofTx`'e verilir; iş
+  `finalize_fiat_payment` ile kapanır. `watchJobProof` (`mppAttestation`) bayatlayan ispatı yeniler.
+
 ## Çalıştırma
 
 Migration'lar ve `programs` tablosunun seed'i API'den önce uygulanır (indexer'la aynı; [apps/indexer](../indexer/README.md#çalıştırma)).
@@ -252,7 +295,7 @@ Ortam değişkenleri [`.env.example`](.env.example)'dadır; varsayılan değer y
 
 `pnpm --filter @squaresdk/solana-api test`. Testler Postgres ve S3 uyumlu depo (SeaweedFS) konteynerleri açar
 (Docker gerekir). Zincir ve prover yerel fixture sunucularıdır. Uçlar SDK'nın `createApiClient`'ıyla denenir.
-Sözleşmedeki 52 operasyonun hepsi ve yetkisiz erişim yolları test edilir. Bildirim outbox'ı yerel bir alıcıya
+Sözleşmedeki 60 operasyonun hepsi ve yetkisiz erişim yolları test edilir. Bildirim outbox'ı yerel bir alıcıya
 imzalı teslimle denenir (`test/notifier.test.ts`).
 
 **x402 kabulü (FE-22):** `test/x402.test.ts` ücretli uç nokta yönetimini uçtan uca dener:

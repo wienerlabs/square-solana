@@ -1,13 +1,16 @@
 // Teslim edilmiş job'un ispatını taze tutar (proof freshness). Escrow, ispat release anındaki zincir
 // durumuyla (payee, net, mint, günlük sayaç) eşleşmiyorsa ya da release ispatın UTC gününde değilse
 // ödemez (ADR 0012 §4, `checkFresh`); izleyici bunlardan biri değişince ispatı yeniden üretip bağlar.
+// Fiat işte (ADR 0024) ispat MPP attestation'ıyla `verify_mpp_payment_proof`'a bağlanır; `finalize_fiat_payment`
+// aynı tazelik kuralını uygular. Attestation API'den okunur (`getFiatAttestation`, BE-25); izleyici her
+// yenilemede yeniden okur, MPP authority rotasyonundan sonra yeni imzayı kullanır.
 import type { PublicKey } from '@solana/web3.js';
 import type { BuildOptions, BuiltTx, SquareClient, VerifierAccounts } from '@squaresdk/solana-sdk';
 import type { PolicyDocument } from '@squaresdk/solana-types';
 import type { PolicySalts } from './policy.js';
 import type { Prover } from './prover.js';
 import { checkFresh, type Staleness } from './release.js';
-import { buildSetComplianceProofTx } from './tx.js';
+import { buildSetComplianceProofTx, buildVerifyMppPaymentProofTx } from './tx.js';
 import { buildReleaseWitness, type ReleaseWitness } from './witness.js';
 
 /** İzlemenin bittiği job durumları. */
@@ -33,7 +36,20 @@ export interface WatchJobProofParams {
   onDone?: (reason: string) => void;
   /** Saat (unix saniyesi); verilmezse sistem saati. */
   now?: () => number;
+  /**
+   * Fiat iş: ödemenin attestation'ı (makbuz commitment'ı ve MPP authority imzası). Verilmezse fiat iş izlenmez.
+   * `@squaresdk/solana-sdk` `createApiClient(...).getFiatAttestation(job)` yanıtından kurulur.
+   */
+  mppAttestation?: () => Promise<MppAttestation>;
 }
+
+/** Fiat ödemesinin attestation'ı: makbuz commitment'ı (32 bayt) ve imza (64 bayt). */
+export interface MppAttestation {
+  receiptHash: Uint8Array;
+  signature: Uint8Array;
+}
+
+const bytes32ToBigInt = (bytes: Uint8Array) => BigInt(`0x${Buffer.from(bytes).toString('hex') || '0'}`);
 
 const STALE_REASON: Readonly<Record<Staleness, string>> = {
   payee: 'payee değişti',
@@ -91,14 +107,16 @@ export function watchJobProof(params: WatchJobProofParams): () => void {
   async function tick(): Promise<void> {
     const account = await client.escrow.fetch('job', job);
     if (!account) throw new Error(`job bulunamadı: ${job.toBase58()}`);
-    // Fiat işin ispatını MPP attestation'ıyla `buildVerifyMppPaymentProofTx` bağlar (ADR 0024).
-    if ('fiat' in account.rail)
-      throw new Error(`fiat iş izlenmez, ispatı verify_mpp_payment_proof bağlar: ${job.toBase58()}`);
+    const fiat = 'fiat' in account.rail;
+    if (fiat && !params.mppAttestation) {
+      throw new Error(`fiat iş attestation'sız izlenmez (mppAttestation): ${job.toBase58()}`);
+    }
     const status = Object.keys(account.status)[0]!;
     if (TERMINAL.has(status)) return finish(`job ${status}`);
     if (status !== 'delivered') return;
     const proof = await client.verifier.fetch('releaseProof', client.pda.releaseProof(job)[0]);
     if (proof?.consumed) return finish('ispat tüketildi');
+    const attestation = fiat ? await params.mppAttestation!() : null;
     const witness = await buildReleaseWitness({
       client,
       job,
@@ -106,22 +124,26 @@ export function watchJobProof(params: WatchJobProofParams): () => void {
       salts: params.salts,
       paymentCategory: params.paymentCategory,
       ...(params.now && { now: params.now() }),
+      ...(attestation && { stripeReceiptHash: bytes32ToBigInt(attestation.receiptHash) }),
     });
     const onChainPolicy = await client.policy.fetch('policy', account.policy!);
     if (!onChainPolicy) throw new Error(`politika hesabı bulunamadı: ${account.policy!.toBase58()}`);
     const reason = await staleness(client, proof, onChainPolicy.institution, witness);
     if (!reason) return;
-    const tx = await buildSetComplianceProofTx(
-      client,
-      {
-        authority: params.authority,
-        institution: onChainPolicy.institution,
-        policy: account.policy!,
-        job,
-        proof: await params.prover.prove(witness),
-      },
-      params.buildOptions,
-    );
+    const binding = {
+      authority: params.authority,
+      institution: onChainPolicy.institution,
+      policy: account.policy!,
+      job,
+      proof: await params.prover.prove(witness),
+    };
+    const tx = attestation
+      ? await buildVerifyMppPaymentProofTx(
+          client,
+          { ...binding, attestationSignature: attestation.signature },
+          params.buildOptions,
+        )
+      : await buildSetComplianceProofTx(client, binding, params.buildOptions);
     const signature = await params.submit(tx);
     params.onRefreshed?.({ signature, witness, reason });
   }

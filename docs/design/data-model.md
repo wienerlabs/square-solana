@@ -75,7 +75,9 @@ Notlar:
 | `users`, `auth_challenges`, `sessions`, `api_keys` | Cüzdan Ed25519 oturumu ve API anahtarları | API | BE-18 |
 | `x402_endpoints` | Geliştiricinin x402 ücretli uç nokta tanımı: cüzdan, ad, yol (cüzdan başına tekil), fiyat (`amount` > 0, mint'in taban birimi), mint, ağ (`X402Network`, CAIP-2), alıcı, açıklama, etkin / pasif ([ADR 0023](../decisions/0023-x402-ucretli-uc-nokta-tanimlari.md)) | API (geliştirici portalı) | FE-22 |
 | `x402_payments` | Geliştiricinin sunucusunun bildirdiği uzlaştırılmış ödeme: `fingerprint` (ödeme yükünün tekrar koruması kimliği) ve `transaction` (makbuzun işlem imzası) ağ başına tekil; mint, tutar, ödeyen, alıcı, uzlaştırma ve bildirim zamanı. Tanım silinince silinir | API (`recordX402Payment`) | FE-22 |
-| `mpp_payments` | İmzası doğrulanmış Stripe webhook'undan gelen fiat ödemesi; makbuzun Poseidon commitment'ı ve MPP authority imzası | MPP rayı | BE-25 |
+| `mpp_payments` | Fiat işin başarılı Stripe ödemesi ve attestation'ı: PaymentIntent (tekil), olay kimliği (webhook yolunda, tekil), sent ve para birimi, müşteri, kanonik makbuzun Poseidon commitment'ı, MPP authority ve imzası, job'un tutarı (settlement birimi), kaynak (`webhook` / `reconcile` / `mpp`), kurum ve job (tekil: iş başına bir ödeme), ödeme anı ([ADR 0026](../decisions/0026-stripe-mpp-fiat-odemesi.md)) | API (webhook, mutabakat, MPP) | BE-25 |
+| `fiat_payment_intents` | Fiat iş için açılan PaymentIntent'ler: job, kurum, yol (`intent` / `mpp`), sent; açık PaymentIntent yeniden kullanılır, mutabakat bu listeyi Stripe'tan okur | API (`createFiatPayment`, MPP) | BE-25 |
+| `stripe_customers` | Kurum anahtarının (`Job.institution`) Stripe müşterisi ve off-session ödemenin kayıtlı kartı (`setup_intent.succeeded`); kart bilgisi Stripe'tadır | API (`createFiatSetupIntent`, webhook) | BE-25 |
 | `cctp_transfers` | Job'a bağlanan burn (kaynak domain + burn tx'i, tekil), kurum ve beklenen mint alıcısı; attestation'dan sonra mesaj, nonce (V2, 32 bayt), tutar ve ücret; Solana'da receive ve fund imzaları; relayer'ın denemesi ve bir sonraki bakışı ([cctp-funding.md](cctp-funding.md#relayer-be-26)) | API (kayıt), keeper'daki CCTP relayer'ı (güncelleme) | BE-26 |
 | `travel_rule_records` | Job başına Travel Rule kaydı: commitment, kaydın özeti, zarf şifrelemesiyle şifreli `{ kayıt, salt }` (sarılmış veri anahtarı, ana anahtar kimliği), yazan, saklama sonu, silinme | API (`putTravelRule`) | BE-23 |
 | `travel_rule_grants` | Kaydı okuma izni: `(job, grantee)` tekil, amaç, veren, süre, geri alınma | API (`createTravelRuleGrant`) | BE-23 |
@@ -159,7 +161,7 @@ Bir servis testlerinde bunu kullanacaksa `@testcontainers/postgresql`'i devDepen
 | Kaynak | Ne oldu |
 |---|---|
 | Covenant `app/prisma/schema.prisma` (Neon) | Kopyalanmadı: `app/` LGPL-2.1 ve yeniden lisanslama onayları (BC-03) bekleniyor. Şema Square sözleşmesinden (IDL + OpenAPI) baştan yazıldı. Covenant'ın gamification ve arena tabloları zaten kapsam dışı. |
-| Aperture compliance-api (ham `pg`) | `verified_payment_intents` alanları `mpp_payments`'a uyarlandı (Aperture MIT). compliance-api BE-25'e kadar kendi migration'larıyla çalışır. |
+| Aperture compliance-api (ham `pg`) | `verified_payment_intents` alanları `mpp_payments`'a uyarlandı (Aperture MIT). BE-25 Stripe/MPP akışını Square API'ye taşıdı ([ADR 0026](../decisions/0026-stripe-mpp-fiat-odemesi.md)); compliance-api'nin kalan proof, attestation ve Solana izleyicisi tabloları kendi migration'larıyla çalışır. |
 | AIP Supabase (`scripts/schema.sql`) | `tasks`, `escrows`, `automations`, `agent_memory`, `hosted_agents` … AIP uygulamasına ait ve kapsam dışı. A2A görev deposu `a2a_tasks` ve `a2a_messages` (BE-17). |
 
 ## 8. Şema review'u
@@ -173,6 +175,6 @@ Bir servis testlerinde bunu kullanacaksa `@testcontainers/postgresql`'i devDepen
 ## 9. Açık noktalar
 
 1. **Postgres sürümü (BE-05):** Test imajı `postgres:17-alpine`. Railway'deki sürüm farklıysa `TEST_POSTGRES_IMAGE` buna eşitlenir.
-2. **MPP ↔ job bağı (BE-25):** `mpp_payments.institution` ve `job` alanları ADR ile kesinleşir.
+2. **MPP ↔ job bağı (BE-25):** Kesinleşti ([ADR 0026](../decisions/0026-stripe-mpp-fiat-odemesi.md)): `institution` ve `job` zorunlu, job tekil.
 3. **Event şeması (BC-16):** Normatif event şeması ayna tablolara sütun ekleyebilir. Ekleme yeni bir migration ile yapılır.
 4. **Travel Rule (BE-23):** Kesinleşti ([ADR 0017](../decisions/0017-travel-rule-saklama-erisim-ve-paylasim.md)). Ana anahtarlar ortamdan gelir (`API_TRAVEL_RULE_KEYS`). Bir KMS kullanılırsa sarma ve açma KMS'e taşınır.

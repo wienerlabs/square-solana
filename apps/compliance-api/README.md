@@ -2,6 +2,11 @@
 
 REST API for managing proof records and batch attestations. Receives individual payment proof records and aggregates them into operator attestations by time period.
 
+The Stripe MPP flow that lived here (Stripe webhook, canonical receipt signing, off-session agent card, MPP-paid
+report) moved to the Square API in BE-25: see `apps/api` (`fiat` endpoints) and
+[ADR 0026](../../docs/decisions/0026-stripe-mpp-fiat-odemesi.md). Its attestation signed only the receipt hash, which
+the verifier no longer accepts (ADR 0024 §3).
+
 ## Endpoints
 
 | Method | Path | Description |
@@ -20,7 +25,7 @@ REST API for managing proof records and batch attestations. Receives individual 
 
 Logging, metrics, health and alerting come from
 [`@squaresdk/solana-observability`](../../packages/observability/) (BE-12). Log lines are JSON; secrets
-(Stripe keys, the database password, RPC keys, keypairs) are masked before they are written.
+(the database password, RPC keys, keypairs) are masked before they are written.
 
 - **Alarms:**
   - `compliance_errors`: more error log lines than `COMPLIANCE_ALERT_ERRORS` within
@@ -75,8 +80,7 @@ See `.env.example` for the full list. No variable has a built-in default:
 deployment-specific values (ports, URLs, program/wallet/mint addresses,
 prices) must be set explicitly. The shared observability variables (`LOG_LEVEL`, `HEALTH_CHECK_TIMEOUT_MS`,
 `ALERT_EVALUATION_SECONDS`, `ALERT_WEBHOOK_URL`, `ALERT_WEBHOOK_TIMEOUT_MS`) are described in the
-[package README](../../packages/observability/README.md). Optional variables (`STRIPE_WEBHOOK_SECRET`,
-`STRIPE_PUBLISHABLE_KEY`, `MPP_AUTHORITY_KEYPAIR_BASE58`, `HELIUS_API_KEY`,
+[package README](../../packages/observability/README.md). Optional variables (`HELIUS_API_KEY`,
 `COMPLIANCE_WATCHER_MINTS`) switch a feature on when present.
 
 ## API Documentation

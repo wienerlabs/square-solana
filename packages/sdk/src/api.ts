@@ -28,6 +28,13 @@ import type {
   DisputeEvidence,
   DisputeView,
   DisputeVoteRequest,
+  FiatAttestation,
+  FiatConfig,
+  FiatCustomer,
+  FiatPayment,
+  FiatPaymentCreate,
+  FiatSetupIntent,
+  FiatSetupIntentCreate,
   Health,
   IndexedEvent,
   InstitutionView,
@@ -38,6 +45,7 @@ import type {
   PolicyView,
   ProveRequest,
   ProveResponse,
+  StripeWebhookReceipt,
   ScreeningView,
   Session,
   SessionRequest,
@@ -191,6 +199,30 @@ export interface SquareApi {
   /** Kurumun imzalayacağı tx: mesaj teslim edilmediyse mint ile fonlama tek tx'te, edildiyse yalnızca fonlama. */
   prepareCctpFundTx(id: string, body: CctpFundTxRequest): Promise<ApiEnvelope<CctpFundTx>>;
 
+  /** `GET /v1/fiat/config`: Stripe.js'in yayımlanabilir anahtarı, MPP authority'si ve profil kimliği (BE-25). */
+  getFiatConfig(): Promise<ApiEnvelope<FiatConfig>>;
+  /** `POST /v1/fiat/setup-intents`: kurumun off-session ödemesi için kart kaydı (SetupIntent). */
+  createFiatSetupIntent(body: FiatSetupIntentCreate): Promise<ApiEnvelope<FiatSetupIntent>>;
+  /** `GET /v1/fiat/customers/{institution}`: kurumun Stripe müşterisi ve kayıtlı kartı. */
+  getFiatCustomer(institution: Address): Promise<ApiEnvelope<FiatCustomer>>;
+  /** `POST /v1/jobs/{job}/fiat/payment`: teslim edilmiş fiat işin PaymentIntent'i ya da kayıtlı kartla ödemesi. */
+  createFiatPayment(job: Address, body: FiatPaymentCreate): Promise<ApiEnvelope<FiatPayment>>;
+  /**
+   * `POST /v1/jobs/{job}/fiat/mpp`: MPP ile ödeme. Credential'sız istek 402 `payment_required` alır; 402'yi
+   * karşılayan fetch (`mppx/client` `Mppx.create(...).fetch`) `ApiClientConfig.fetch` olarak verilir. Kimlik
+   * `fiat:pay` kapsamlı API anahtarıdır.
+   */
+  payFiatJobMpp(job: Address): Promise<ApiEnvelope<FiatAttestation>>;
+  /** `GET /v1/jobs/{job}/fiat/attestation`: ödemenin makbuzu ve MPP authority'nin attestation'ı. */
+  getFiatAttestation(job: Address): Promise<ApiEnvelope<FiatAttestation>>;
+  /** `POST /v1/jobs/{job}/fiat/attestation`: webhook gelmediyse ödemeyi Stripe'tan okuyup attestation yazar. */
+  reconcileFiatPayment(job: Address): Promise<ApiEnvelope<FiatAttestation>>;
+  /**
+   * `POST /v1/stripe/webhook`: Stripe'ın çağırdığı uç. Olayı ham gövdesi ve `Stripe-Signature` başlığıyla yeniden
+   * ileten araçlar içindir; gövde değiştirilirse imza tutmaz.
+   */
+  receiveStripeWebhook(payload: string, signature: string): Promise<ApiEnvelope<StripeWebhookReceipt>>;
+
   /** `POST /v1/tx`: IDL'den bir instruction için imzasız, simüle edilmiş v0 tx. */
   prepareTx(body: TxRequest): Promise<ApiEnvelope<UnsignedTx>>;
   /** `POST /v1/prove`: release devresi için Groth16 ispatı (prover vekili; `prove` kapsamlı anahtar). */
@@ -251,6 +283,14 @@ export const API_OPERATIONS = [
   'listCctpTransfers',
   'getCctpTransfer',
   'prepareCctpFundTx',
+  'getFiatConfig',
+  'createFiatSetupIntent',
+  'getFiatCustomer',
+  'createFiatPayment',
+  'payFiatJobMpp',
+  'getFiatAttestation',
+  'reconcileFiatPayment',
+  'receiveStripeWebhook',
   'prepareTx',
   'prove',
   'getHealth',
