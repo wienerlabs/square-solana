@@ -195,6 +195,11 @@ edilemez; arayüz ödemeyi buna göre açar.
   zaman kilidi yok) gönderilebilir; öneri açılmadan reddedilir.
 - **Bu sürümde yok:** Agent'a USD ödemesi (Stripe Connect, ADR 0026 madde 1). MPP 402 yolu (`payFiatJobMpp`)
   `fiat:pay` kapsamlı API anahtarıyla ödeme ajanları içindir; arayüzde yoktur.
+- **Uçtan uca:** [`apps/api/test/web-fiat.e2e.test.ts`](../api/test/web-fiat.e2e.test.ts), localnet ve gerçek
+  tarayıcı. Stripe test modu anahtarlarıyla (`SQUARE_FIAT_E2E_STRIPE_SECRET_KEY`,
+  `SQUARE_FIAT_E2E_STRIPE_PUBLISHABLE_KEY`) kart alanından ve kayıtlı kartla öder. Anahtarsız koşuda API testlerinin
+  fixture Stripe'ıyla yalnızca kayıtlı kart yolunu dener. `SQUARE_SQUADS_CLONE_URL` verilirse aynı akışı smart
+  account'lu kurumla da koşar.
 
 ## Denetim görünümü (FE-12)
 
