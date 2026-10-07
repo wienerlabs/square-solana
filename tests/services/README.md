@@ -34,6 +34,8 @@ Gerekenler: Agave CLI (`solana-test-validator`, sürüm `Anchor.toml [toolchain]
 
 Validator portları standart localnet portlarından (8899, 9900, 8001) ayrıdır; test smoke'un ve API'nin localnet
 testleriyle aynı anda koşabilir. Servislerin HTTP ve metrik portları işletim sisteminin verdiği boş portlardır.
+Validator açılmadan önce RPC, faucet ve gossip portları denetlenir; biri zaten bağlantı kabul ediyorsa (başka bir
+validator ya da servis) koşu o portu adıyla bildirerek durur.
 Test başarısız olursa günlüklerin son satırları yazdırılır ve günlük dizini silinmez.
 
 ## Kurulum
@@ -50,7 +52,8 @@ Test başarısız olursa günlüklerin son satırları yazdırılır ve günlük
    kuralı değişmez.
 6. **Servisler:** Ortamları [`src/env.ts`](src/env.ts)'tedir. Süreçlere yalnızca `PATH`, `HOME`, `TMPDIR` ve kendi
    değişkenleri verilir. Her servisin `/ready`'si 200 olana kadar beklenir. Açılırken çıkan servis, günlüğüyle hemen
-   hata verir.
+   hata verir. Koşu sırasında çıkan servis de bekleme döngülerini (`world.until`: keeper, indexer, uzlaştırma) ilk
+   turda, adı ve günlüğünün son satırlarıyla düşürür.
    - Keeper'ın cüzdanı smoke'un `keeper`'ıdır; screener authority smoke'un `screener`'ıdır.
    - Keeper kuru `KEEPER_MINT_UNITS_PER_SOL=1000000`'dur: localnet işinin ücreti (25 birim × 50 bps) açılan
      hesapların rent'ini karşılar, kârlılık eşiği finalize'ı durdurmaz.

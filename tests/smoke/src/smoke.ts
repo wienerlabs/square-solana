@@ -97,6 +97,10 @@ export interface SmokeOptions {
   finalize?: (job: PublicKey, expectError?: string) => Promise<void>;
 }
 
+export function proverFor(options: Pick<SmokeOptions, 'prover' | 'provers'>, section: Section): Prover {
+  return options.provers?.[section] ?? options.prover;
+}
+
 export async function runSmoke(context: Context, options: SmokeOptions): Promise<SmokeReport> {
   const { client, connection, config } = context;
   const values = requireSection(config, 'smoke', ['payer', 'screener', 'institution', 'agent', 'buyer', 'keeper']);
@@ -383,7 +387,7 @@ export async function runSmoke(context: Context, options: SmokeOptions): Promise
       paymentCategory: values.paymentCategory,
       now: timestamp,
     });
-    const proof = await (options.provers?.[section] ?? options.prover).prove(witness);
+    const proof = await proverFor(options, section).prove(witness);
     await send(
       '7',
       '`setComplianceProof` (Groth16)',
@@ -698,7 +702,7 @@ export async function runSmoke(context: Context, options: SmokeOptions): Promise
       amount,
       paymentCategory: values.paymentCategory,
       deadlineSecs: values.deadlineSecs,
-      prover: options.prover,
+      prover: proverFor(options, 'fiat'),
       send,
       check,
       recordProof: (job, verdict, refusalCode, provingMs) =>

@@ -3,7 +3,10 @@ export const sleep = (ms: number): Promise<void> => new Promise((done) => setTim
 export interface UntilOptions {
   readonly intervalMs?: number;
   readonly describe?: () => Promise<string>;
+  readonly guard?: () => Promise<void>;
 }
+
+const noGuard = async (): Promise<void> => {};
 
 export async function until<T>(
   what: string,
@@ -12,8 +15,16 @@ export async function until<T>(
   options: UntilOptions = {},
 ): Promise<T> {
   const end = Date.now() + timeoutMs;
+  const guard = options.guard ?? noGuard;
   for (;;) {
-    const value = await probe();
+    await guard();
+    let value: T | null | undefined | false;
+    try {
+      value = await probe();
+    } catch (error) {
+      await guard();
+      throw error;
+    }
     if (value) return value;
     if (Date.now() > end) {
       const detail = options.describe ? `\n${await options.describe()}` : '';

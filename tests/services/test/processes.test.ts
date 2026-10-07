@@ -1,18 +1,43 @@
-import { spawn } from 'node:child_process';
+import { spawn, type ChildProcess } from 'node:child_process';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
-import { allocatePorts, baseEnv, freePorts, logTail, startService, stopChild, waitReady } from '../src/processes.js';
+import {
+  allocatePorts,
+  assertRunning,
+  baseEnv,
+  freePorts,
+  logTail,
+  startService,
+  stopChild,
+  waitReady,
+} from '../src/processes.js';
+import { until } from '../src/wait.js';
 
 const dir = mkdtempSync(join(tmpdir(), 'square-services-test-'));
 afterAll(() => rmSync(dir, { recursive: true, force: true }));
+
+function printed(child: ChildProcess, line: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    let output = '';
+    child.stdout!.setEncoding('utf8').on('data', (chunk: string) => {
+      output += chunk;
+      if (output.split('\n').includes(line)) resolve();
+    });
+    child.once('exit', (code) => reject(new Error(`süreç "${line}" satırını yazmadan çıktı (kod ${code})`)));
+  });
+}
 
 const SERVER = `
 const http = require('node:http');
 const readyAt = Date.now() + Number(process.env.READY_AFTER_MS ?? 0);
 http
   .createServer((req, res) => {
+    if (req.url === '/exit') {
+      res.end('', () => process.stderr.write('beklenmedik hata\\n', () => process.exit(4)));
+      return;
+    }
     res.statusCode = req.url === '/ready' ? (Date.now() >= readyAt ? 200 : 503) : 404;
     res.end(String(res.statusCode));
   })
@@ -74,11 +99,40 @@ describe('servis süreçleri', () => {
     }
   });
 
-  it('SIGTERM yok sayılırsa süre sonunda SIGKILL', async () => {
-    const child = spawn(process.execPath, ['-e', "process.on('SIGTERM', () => {}); setInterval(() => {}, 1000)"], {
-      stdio: 'ignore',
+  it('koşu sırasında çıkan servis bekleme döngüsünü günlüğüyle hemen düşürür', async () => {
+    const [ports] = await allocatePorts(1);
+    const service = startService({
+      name: 'olen',
+      command: process.execPath,
+      args: ['-e', SERVER],
+      env: { SERVICE_PORT: String(ports!.port) },
+      ports: ports!,
+      logDir: dir,
     });
-    await new Promise((resolve) => setTimeout(resolve, 300));
+    try {
+      await waitReady(service, 10_000);
+      await expect(assertRunning([service])).resolves.toBeUndefined();
+      const started = Date.now();
+      await fetch(`${service.url}/exit`);
+      await expect(
+        until('hiç gelmeyecek değer', 120_000, async () => null, {
+          intervalMs: 20,
+          guard: () => assertRunning([service]),
+        }),
+      ).rejects.toThrow(/olen koşu sırasında çıktı \(kod 4\); günlük .*olen\.log:\n[\s\S]*beklenmedik hata/);
+      expect(Date.now() - started).toBeLessThan(10_000);
+    } finally {
+      await service.stop();
+    }
+  });
+
+  it('SIGTERM yok sayılırsa süre sonunda SIGKILL', async () => {
+    const child = spawn(
+      process.execPath,
+      ['-e', "process.on('SIGTERM', () => {}); console.log('SIGTERM yok sayılıyor'); setInterval(() => {}, 1000)"],
+      { stdio: ['ignore', 'pipe', 'ignore'] },
+    );
+    await printed(child, 'SIGTERM yok sayılıyor');
     await stopChild(child, 200);
     expect(child.signalCode).toBe('SIGKILL');
     await stopChild(child);

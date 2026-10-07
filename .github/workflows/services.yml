@@ -87,12 +87,13 @@ jobs:
         run: pnpm turbo run build --filter @squaresdk/solana-services-e2e...
 
       - name: Servisler localnet'te
+        timeout-minutes: 30
         env:
           SQUARE_SERVICES_LOG_DIR: ${{ runner.temp }}/services-logs
         run: pnpm --filter @squaresdk/solana-services-e2e test:localnet
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        if: failure()
+        if: failure() || cancelled()
         with:
           name: services-logs
           path: ${{ runner.temp }}/services-logs

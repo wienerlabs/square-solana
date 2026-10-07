@@ -9,6 +9,7 @@
 //     [--faucet-port 9900] [--gossip-port 8001] [--dynamic-port-range 8100-8200] [--report <rapor.md>]
 import { spawn, spawnSync, type ChildProcess } from 'node:child_process';
 import { createWriteStream, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { connect } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
@@ -235,12 +236,45 @@ export function validatorArgs(
   ];
 }
 
+const PORT_PROBE_TIMEOUT_MS = 1_000;
+
+export function acceptsConnections(port: number, host = '127.0.0.1'): Promise<boolean> {
+  return new Promise((resolve) => {
+    const socket = connect({ port, host });
+    const settle = (accepted: boolean) => {
+      socket.destroy();
+      resolve(accepted);
+    };
+    socket.setTimeout(PORT_PROBE_TIMEOUT_MS, () => settle(false));
+    socket.once('connect', () => settle(true));
+    socket.once('error', () => settle(false));
+  });
+}
+
+export async function assertValidatorPortsFree(
+  args: Pick<ValidatorArgs, 'rpcPort' | 'faucetPort' | 'gossipPort'>,
+): Promise<void> {
+  for (const [name, port] of [
+    ['RPC', args.rpcPort],
+    ['faucet', args.faucetPort],
+    ['gossip', args.gossipPort],
+  ] as const) {
+    if (await acceptsConnections(port)) {
+      throw new Error(
+        `validator başlatılmadı: ${name} portu ${port} zaten bağlantı kabul ediyor (127.0.0.1:${port}); ` +
+          'o portta başka bir validator ya da servis çalışıyor olabilir',
+      );
+    }
+  }
+}
+
 export async function startValidator(params: {
   args: ValidatorArgs;
   programIds: LocalnetProgramIds;
   upgradeAuthority: PublicKey;
   logPath: string;
 }): Promise<LocalValidator> {
+  await assertValidatorPortsFree(params.args);
   const version = spawnSync('solana-test-validator', ['--version'], { encoding: 'utf8' });
   if (version.status !== 0) throw new Error("solana-test-validator bulunamadı (Agave CLI PATH'te olmalı)");
   const agave = /^solana-test-validator\s+(\S+)/.exec(version.stdout.trim())?.[1] ?? version.stdout.trim();

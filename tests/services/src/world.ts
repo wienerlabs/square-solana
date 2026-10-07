@@ -36,11 +36,11 @@ import {
   type ServiceName,
 } from './env.js';
 import { REPO_ROOT, type WorldOptions } from './options.js';
-import { allocatePorts, logTail, startService, waitReady, type ServiceProcess } from './processes.js';
+import { allocatePorts, assertRunning, logTail, startService, waitReady, type ServiceProcess } from './processes.js';
 import { sdnXml } from './sdn.js';
 import { startObjectStore } from './storage.js';
 import { selfSignedCertificate, serveOverHttps } from './tls.js';
-import { until } from './wait.js';
+import { until, type UntilOptions } from './wait.js';
 
 export const PIPELINE_ONLY_RECONCILE_SECONDS = 86_400;
 const READY_TIMEOUT_MS = 180_000;
@@ -78,6 +78,12 @@ export interface World {
   keeperActions(job: PublicKey): Promise<KeeperAction[]>;
   waitForKeeper(job: PublicKey, reason?: string): Promise<KeeperAction>;
   restartIndexer(reconcileIntervalSeconds: number): Promise<ServiceProcess>;
+  until<T>(
+    what: string,
+    timeoutMs: number,
+    probe: () => Promise<T | null | undefined | false>,
+    options?: UntilOptions,
+  ): Promise<T>;
   logTails(): string;
   close(options: { keepLogs: boolean }): Promise<void>;
 }
@@ -244,6 +250,12 @@ export async function startWorld(options: WorldOptions): Promise<World> {
     for (const name of SERVICE_NAMES) running.set(name, launch(name, name, plan[name].ports, plan[name].env));
     await Promise.all([...running.values()].map((service) => waitReady(service, READY_TIMEOUT_MS)));
     const service = (name: ServiceName) => running.get(name)!;
+    const poll = <T>(
+      what: string,
+      timeoutMs: number,
+      probe: () => Promise<T | null | undefined | false>,
+      pollOptions: UntilOptions = {},
+    ) => until(what, timeoutMs, probe, { ...pollOptions, guard: () => assertRunning(running.values()) });
     stderr(`servisler hazır: ${SERVICE_NAMES.map((name) => `${name} ${service(name).url}`).join(', ')}`);
 
     const api = (auth?: ApiAuth) => createApiClient({ baseUrl: service('api').url, ...(auth ? { auth } : {}) });
@@ -300,7 +312,7 @@ export async function startWorld(options: WorldOptions): Promise<World> {
         const wanted = (action: KeeperAction) =>
           action.action === 'finalizePayment' &&
           (reason === undefined ? action.outcome === 'confirmed' : action.reason === reason);
-        return until(
+        return poll(
           `keeper ${reason ?? 'finalize onayı'}: ${job.toBase58()}`,
           KEEPER_TIMEOUT_MS,
           async () => (await keeperActions(job)).find(wanted),
@@ -311,13 +323,16 @@ export async function startWorld(options: WorldOptions): Promise<World> {
         );
       },
       async restartIndexer(reconcileIntervalSeconds) {
-        await service('indexer').stop();
+        const previous = service('indexer');
+        running.delete('indexer');
+        await previous.stop();
         const [ports] = await allocatePorts(1);
         const restarted = launch('indexer', 'indexer-restart', ports!, indexerFor(ports!, reconcileIntervalSeconds));
         running.set('indexer', restarted);
         await waitReady(restarted, READY_TIMEOUT_MS);
         return restarted;
       },
+      until: poll,
       logTails: () =>
         readdirSync(logDir)
           .filter((file) => file.endsWith('.log'))

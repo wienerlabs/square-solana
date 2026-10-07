@@ -10,7 +10,6 @@ import { SERVICE_NAMES } from '../src/env.js';
 import { diffEvents, eventNames } from '../src/events.js';
 import { matching, metricSum, parseMetrics } from '../src/metrics.js';
 import { worldOptions } from '../src/options.js';
-import { until } from '../src/wait.js';
 import { startWorld, type World } from '../src/world.js';
 
 const ENABLED = process.env['SQUARE_LOCALNET'] === '1';
@@ -190,9 +189,9 @@ describe.skipIf(!ENABLED)('localnet: 8 adım servisler üzerinden (BE-36)', () =
   it("indexer zincirdeki bütün Square event'lerini yazar; API job görünümleri servislerin sonucunu gösterir", async () => {
     const { connection, client } = world.context;
     const tip = await connection.getSlot('confirmed');
-    await until('son tx kesinleşti', 180_000, async () => (await connection.getSlot('finalized')) >= tip);
+    await world.until('son tx kesinleşti', 180_000, async () => (await connection.getSlot('finalized')) >= tip);
     const expected = await chainEventKeys(connection, client, world.programs);
-    const stored = await until(
+    const stored = await world.until(
       "indexer'ın event'leri",
       180_000,
       async () => {
@@ -294,7 +293,7 @@ describe.skipIf(!ENABLED)('localnet: 8 adım servisler üzerinden (BE-36)', () =
 
   it('indexer uzlaştırması: yeniden açılan indexer zincir ile veritabanı arasında sapma bulmaz', async () => {
     const indexer = await world.restartIndexer(1);
-    const samples = await until('ilk uzlaştırma', 120_000, async () => {
+    const samples = await world.until('ilk uzlaştırma', 120_000, async () => {
       const parsed = await metrics(indexer.metricsUrl);
       return metricSum(parsed, 'indexer_reconcile_runs_total') >= 1 ? parsed : null;
     });

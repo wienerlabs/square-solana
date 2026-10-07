@@ -16,4 +16,43 @@ describe('until', () => {
       'zaman aşımı (0 s): açıklamasız',
     );
   });
+
+  it('her turda koruma denetlenir; koruma hata verirse süre dolmadan düşer', async () => {
+    let rounds = 0;
+    const started = Date.now();
+    await expect(
+      until(
+        'sonsuz bekleme',
+        60_000,
+        async () => {
+          rounds += 1;
+          return null;
+        },
+        {
+          intervalMs: 1,
+          guard: async () => {
+            if (rounds >= 3) throw new Error('keeper koşu sırasında çıktı');
+          },
+        },
+      ),
+    ).rejects.toThrow('keeper koşu sırasında çıktı');
+    expect(rounds).toBe(3);
+    expect(Date.now() - started).toBeLessThan(5_000);
+  });
+
+  it('sorgu hata verirse koruma yeniden denetlenir; koruma geçerse sorgunun hatası döner', async () => {
+    let exited = false;
+    const probe = async () => {
+      exited = true;
+      throw new Error('fetch failed');
+    };
+    await expect(
+      until('api', 1_000, probe, {
+        guard: async () => {
+          if (exited) throw new Error('api koşu sırasında çıktı');
+        },
+      }),
+    ).rejects.toThrow('api koşu sırasında çıktı');
+    await expect(until('api', 1_000, probe, { guard: async () => {} })).rejects.toThrow('fetch failed');
+  });
 });

@@ -73,17 +73,26 @@ export function logTail(path: string, lines = 30): string {
   }
 }
 
+async function exitError(service: ServiceProcess, code: number, when: string): Promise<Error> {
+  await service.closed();
+  return new Error(
+    `${service.name} ${when} çıktı (kod ${code}); günlük ${service.logPath}:\n${logTail(service.logPath)}`,
+  );
+}
+
+export async function assertRunning(services: Iterable<ServiceProcess>): Promise<void> {
+  for (const service of [...services]) {
+    const code = service.exitCode();
+    if (code !== null) throw await exitError(service, code, 'koşu sırasında');
+  }
+}
+
 export async function waitReady(service: ServiceProcess, timeoutMs: number, path = '/ready'): Promise<void> {
   const end = Date.now() + timeoutMs;
   let last: string;
   for (;;) {
     const code = service.exitCode();
-    if (code !== null) {
-      await service.closed();
-      throw new Error(
-        `${service.name} açılırken çıktı (kod ${code}); günlük ${service.logPath}:\n${logTail(service.logPath)}`,
-      );
-    }
+    if (code !== null) throw await exitError(service, code, 'açılırken');
     try {
       const response = await fetch(`${service.url}${path}`, { signal: AbortSignal.timeout(5_000) });
       if (response.ok) return;
