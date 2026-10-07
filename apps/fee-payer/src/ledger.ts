@@ -46,8 +46,6 @@ export interface Ledger {
   /** Bütçe yetiyorsa tx'i `signed` olarak kaydeder; yetmiyorsa kaydetmez. */
   reserve(entry: SponsoredEntry): Promise<Reservation>;
   markSubmitted(signature: string): Promise<void>;
-  /** Gönderilemeyen tx bütçeye sayılmaz. */
-  markFailed(signature: string, error: string): Promise<void>;
   usage(wallet: string): Promise<Usage>;
 }
 
@@ -132,10 +130,6 @@ export function createLedger(deps: {
 
     async markSubmitted(signature) {
       await db.sponsoredTx.update({ where: { signature }, data: { status: 'submitted' } });
-    },
-
-    async markFailed(signature, error) {
-      await db.sponsoredTx.update({ where: { signature }, data: { status: 'failed', error } });
     },
 
     async usage(wallet) {

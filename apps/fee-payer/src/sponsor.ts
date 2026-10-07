@@ -128,6 +128,12 @@ export function createSponsorService(deps: {
     return lamports;
   }
 
+  async function balanceWithSlot(): Promise<{ lamports: bigint; slot: number }> {
+    const { context, value } = await rpc(() => connection.getBalanceAndContext(sponsorKey, 'confirmed'));
+    metrics.balance.set(value);
+    return { lamports: BigInt(value), slot: context.slot };
+  }
+
   return {
     balance,
 
@@ -143,15 +149,19 @@ export function createSponsorService(deps: {
         throw error;
       }
 
-      const before = BigInt(await balance());
-      const { value: simulation } = await rpc(() =>
+      const before = await balanceWithSlot();
+      const { context: simulatedAt, value: simulation } = await rpc(() =>
         connection.simulateTransaction(tx, {
           sigVerify: false,
           replaceRecentBlockhash: false,
           commitment: 'confirmed',
+          minContextSlot: before.slot,
           accounts: { encoding: 'base64', addresses: [sponsorKey.toBase58()] },
         }),
       );
+      if (simulatedAt.slot < before.slot) {
+        throw rpcUnavailable(new Error('simülasyonun bankası bakiye okumasından eski'));
+      }
       if (simulation.err !== null) {
         const programError = deps.programError(simulation.logs ?? []);
         return reject(
@@ -177,13 +187,13 @@ export function createSponsorService(deps: {
       const after = simulation.accounts?.[0]?.lamports;
       if (after === undefined) throw rpcUnavailable(new Error('simülasyon sponsor hesabını döndürmedi'));
       const feeLamports = BigInt(fee);
-      const delta = before - BigInt(after);
+      const delta = before.lamports - BigInt(after);
       const simulatedRent = delta > feeLamports ? delta - feeLamports : 0n;
-      const rentFloor =
+      const tokenAccountsRent =
         inspection.sponsoredTokenAccounts > 0
           ? BigInt(inspection.sponsoredTokenAccounts) * (await tokenAccountRentLamports())
           : 0n;
-      const rentLamports = simulatedRent > rentFloor ? simulatedRent : rentFloor;
+      const rentLamports = simulatedRent + tokenAccountsRent;
       const cost = feeLamports + rentLamports;
       if (cost > deps.maxLamportsPerTx) {
         return reject(
@@ -222,14 +232,20 @@ export function createSponsorService(deps: {
         );
       }
 
+      if (reservation.replayed === null) {
+        metrics.feeLamports.inc(Number(feeLamports));
+        metrics.rentLamports.inc(Number(rentLamports));
+        metrics.txCost.observe(Number(cost));
+        metrics.userDailySpend.observe(Number(reservation.userSpent));
+        if (computeUnits !== null) metrics.computeUnits.observe(computeUnits);
+      }
+
       const serialized = tx.serialize();
       let submitted = reservation.replayed === 'submitted';
       if (request.submit && !submitted) {
         try {
           await connection.sendRawTransaction(serialized, { skipPreflight: true });
         } catch (error) {
-          const message = error instanceof Error ? error.message : String(error);
-          await ledger.markFailed(signature, message);
           metrics.requests.inc({ outcome: 'failed' });
           throw new HttpError(
             503,
@@ -245,13 +261,6 @@ export function createSponsorService(deps: {
       }
 
       metrics.requests.inc({ outcome: submitted ? 'submitted' : 'signed' });
-      if (reservation.replayed === null) {
-        metrics.feeLamports.inc(Number(feeLamports));
-        metrics.rentLamports.inc(Number(rentLamports));
-        metrics.txCost.observe(Number(cost));
-        metrics.userDailySpend.observe(Number(reservation.userSpent));
-        if (computeUnits !== null) metrics.computeUnits.observe(computeUnits);
-      }
       return {
         transaction: Buffer.from(serialized).toString('base64'),
         signature,

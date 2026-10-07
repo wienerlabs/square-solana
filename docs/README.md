@@ -23,9 +23,9 @@ Proje belgeleri. Mevcut olanlar bağlantılı; diğerleri ilgili issue ile eklen
 | [`design/`](design/) | [program arayüz sözleşmesi](design/program-interface.md), [API ve SDK sözleşmesi](design/api-sdk-contract.md), [veri modeli](design/data-model.md), [normatif event şeması](design/events.md), [işlem bütçesi](design/tx-budget.md), [CCTP ile fonlama](design/cctp-funding.md) | [BC-44], [BE-35], [BE-04], [BC-16], [BC-28], [BC-36] |
 | [`protocol.md`](protocol.md) | Protokolün özeti: roller, sekiz adım, job durum makinesi, event'ler, `did:aip`, uyum | [BE-31] |
 | [`cli.md`](cli.md) | Komut satırı `squaresdk-solana`: komut referansı (komut tablosundan üretilir), yapılandırma, çıktı ve çıkış kodları | [BE-30] |
-| [`api/`](api/) | [OpenAPI 3.1 spec](api/openapi.yaml) (52 operasyon); [`schemas/idl.json`](api/schemas/idl.json) IDL'den üretilen JSON Schema'lar, elle düzenlenmez | [BE-35] |
+| [`api/`](api/) | [OpenAPI 3.1 spec](api/openapi.yaml) (60 operasyon); [`schemas/idl.json`](api/schemas/idl.json) IDL'den üretilen JSON Schema'lar, elle düzenlenmez | [BE-35] |
 | [`provenance/`](provenance/) | taşınan dizinlerin kaynak repo, commit ve yöntem kayıtları (issue başına bir dosya) | [BC-04], [BC-05], [BC-06], [BC-07], [BE-02] |
-| [`environments.md`](environments.md) | ortamlar (PR preview, staging, production), secret politikası ve servislerin ortam değişkeni envanteri (üretilir) | [BE-05] |
+| [`environments.md`](environments.md) | ortamlar (PR preview ve devnet; mainnet yok, [ADR 0027](decisions/0027-yalnizca-devnet.md)), secret politikası ve servislerin ortam değişkeni envanteri (üretilir) | [BE-05] |
 | [`ci.md`](ci.md) | CI kontrolleri, program durum listesi, sır taraması, verifiable build ve merge kuralı | [BE-03], [BC-12], [BC-13] |
 | [`slo.md`](slo.md) | SLO'lar, hata bütçesi ve burn-rate politikası; panolar ve alarm kuralları [`infra/monitoring/`](../infra/monitoring/)'da | [BE-33] |
 | [`licensing.md`](licensing.md) | lisans politikası: proje lisansı, taşınan kodun bildirimleri, bağımlılık lisansları | [BC-02] |
@@ -33,6 +33,7 @@ Proje belgeleri. Mevcut olanlar bağlantılı; diğerleri ilgili issue ile eklen
 | `legal/relicensing/` | Covenant LGPL kodu için yazılı yeniden lisanslama onayları | [BC-03] |
 | [`deploy/`](deploy/) | ağ bazında deploy kayıtları ([`devnet.md`](deploy/devnet.md)) ve smoke raporları ([`smoke-localnet.md`](deploy/smoke-localnet.md), [`smoke-devnet.md`](deploy/smoke-devnet.md); üreten [`tests/smoke`](../tests/smoke/)), CLI'nin devnet kabul koşusu ([`cli-devnet.md`](deploy/cli-devnet.md)) | [BC-30], [BC-31], [BE-30] |
 | [`runbooks/`](runbooks/README.md) | operasyon runbook'ları: [program deploy ve upgrade](runbooks/upgrade.md), [servisler](runbooks/services.md), [keeper](runbooks/keeper.md), [screener](runbooks/screener.md) | [BC-09], [BE-31] |
+| [`security/`](security/) | off-chain güvenlik: [threat model](security/threat-model.md), [iç inceleme ve bulgular](security/review-be-32.md), [pen-test listesi](security/pentest-checklist.md) | [BE-32] |
 
 [BC-02]: https://github.com/wienerlabs/square-solana/issues/2
 [BC-03]: https://github.com/wienerlabs/square-solana/issues/3
@@ -60,3 +61,4 @@ Proje belgeleri. Mevcut olanlar bağlantılı; diğerleri ilgili issue ile eklen
 [BE-31]: https://github.com/wienerlabs/square-solana/issues/90
 [BE-05]: https://github.com/wienerlabs/square-solana/issues/19
 [BE-30]: https://github.com/wienerlabs/square-solana/issues/89
+[BE-32]: https://github.com/wienerlabs/square-solana/issues/94

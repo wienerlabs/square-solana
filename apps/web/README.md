@@ -305,7 +305,7 @@ Servis ayarları (bir kez, Railway panelinden; hesap erişimi gerekir):
 |---|---|
 | Source | Bu repo; Root Directory **boş** (build bağlamı repo kökü) |
 | Railway Config File | `/apps/web/railway.json` (Root Directory'ye göre değil, mutlak yol) |
-| Variables | `SQUARE_SOLANA_CLUSTER`, `SQUARE_SOLANA_RPC_URL`; her environment (staging / devnet, production) için ayrı |
+| Variables | `SQUARE_SOLANA_CLUSTER`, `SQUARE_SOLANA_RPC_URL`; her environment (devnet `staging`, PR preview) için ayrı; mainnet ortamı yok ([ADR 0027](../../docs/decisions/0027-yalnizca-devnet.md)) |
 | Networking | Public domain; port Railway'in verdiği `PORT` |
 | PR Environments | Proje ayarlarında açık; izlenen yollar sayesinde yalnızca web'i etkileyen PR'lar için web deploy'u kurulur |
 

@@ -61,7 +61,7 @@ reddeder. Örneğin engelli payee için yanıt 200'dür, `publicInputs[0]` 8'dir
 
 Servis açılışta wasm ve zkey'in SHA-256'sını manifest'le karşılaştırır; uymazsa açılmaz. Artefakt
 sürümü zkey'in SHA-256'sıdır. Doğrulama anahtarı zkey'den çıkarılır ve her ispat dönmeden önce onunla
-doğrulanır. zkey tek katılımcılı bir geliştirme setup'ıdır; mainnet öncesi kamusal ceremony BC-38'de.
+doğrulanır. zkey tek katılımcılı bir geliştirme setup'ıdır; kamusal ceremony BC-38'de.
 
 ## Yapılandırma
 

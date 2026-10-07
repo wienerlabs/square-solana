@@ -101,7 +101,6 @@ pnpm license:write
 | `bn.js` | npm | MIT | runtime | `@squaresdk/solana-cli`, `@squaresdk/solana-fee-payer`, `@squaresdk/solana-policy`, `@squaresdk/solana-sdk`, `@squaresdk/solana-smoke`, `@squaresdk/solana-web` | ✓ |
 | `bs58` | npm | MIT | runtime | `@squaresdk/solana-api`, `@squaresdk/solana-cctp`, `@squaresdk/solana-compliance-api`, `@squaresdk/solana-db`, `@squaresdk/solana-fee-payer`, `@squaresdk/solana-hardening`, `@squaresdk/solana-hosted`, `@squaresdk/solana-identity`, `@squaresdk/solana-indexer`, `@squaresdk/solana-keeper`, `@squaresdk/solana-mcp`, `@squaresdk/solana-screener`, `@squaresdk/solana-web` | ✓ |
 | `busboy` | npm | MIT | runtime | `@squaresdk/solana-api` | ✓ |
-| `circomlibjs` | npm | GPL-3.0 | runtime | `@squaresdk/solana-compliance-api` | ⚠️ inceleme |
 | `cors` | npm | MIT | runtime | `@squaresdk/solana-api`, `@squaresdk/solana-compliance-api`, `@squaresdk/solana-fee-payer`, `@squaresdk/solana-prover` | ✓ |
 | `dotenv` | npm | BSD-2-Clause | runtime | `@squaresdk/solana-compliance-api` | ✓ |
 | `eslint` | npm | MIT | dev | `@squaresdk/solana-monorepo` | ✓ |
@@ -110,9 +109,9 @@ pnpm license:write
 | `globals` | npm | MIT | runtime | `@squaresdk/solana-config` | ✓ |
 | `helmet` | npm | MIT | runtime | `@squaresdk/solana-api`, `@squaresdk/solana-compliance-api`, `@squaresdk/solana-fee-payer`, `@squaresdk/solana-prover`, `@squaresdk/solana-screener` | ✓ |
 | `jsdom` | npm | MIT | dev | `@squaresdk/solana-web` | ✓ |
+| `mppx` | npm | MIT | runtime | `@squaresdk/solana-api` | ✓ |
 | `next` | npm | MIT | runtime | `@squaresdk/solana-web` | ✓ |
 | `next-themes` | npm | MIT | runtime | `@squaresdk/solana-web` | ✓ |
-| `node-cache` | npm | MIT | runtime | `@squaresdk/solana-compliance-api` | ✓ |
 | `pg` | npm | MIT | runtime | `@squaresdk/solana-compliance-api`, `@squaresdk/solana-db` | ✓ |
 | `playwright-core` | npm | Apache-2.0 | dev | `@squaresdk/solana-api` | ✓ |
 | `poseidon-lite` | npm | MIT | runtime | `@squaresdk/solana-policy` | ✓ |
@@ -121,28 +120,26 @@ pnpm license:write
 | `react` | npm | MIT | runtime | `@squaresdk/solana-web` | ✓ |
 | `react-dom` | npm | MIT | runtime | `@squaresdk/solana-web` | ✓ |
 | `snarkjs` | npm | GPL-3.0 | runtime | `@squaresdk/solana-fee-payer`, `@squaresdk/solana-policy`, `@squaresdk/solana-prover`, `@squaresdk/solana-smoke` | ⚠️ inceleme |
-| `stripe` | npm | MIT | runtime | `@squaresdk/solana-compliance-api` | ✓ |
+| `stripe` | npm | MIT | runtime | `@squaresdk/solana-api` | ✓ |
 | `swagger-jsdoc` | npm | MIT | runtime | `@squaresdk/solana-compliance-api` | ✓ |
 | `swagger-ui-express` | npm | MIT | runtime | `@squaresdk/solana-compliance-api` | ✓ |
 | `tailwindcss` | npm | MIT | dev | `@squaresdk/solana-web` | ✓ |
 | `testcontainers` | npm | MIT | dev | `@squaresdk/solana-api` | ✓ |
 | `tsx` | npm | MIT | dev | `@squaresdk/solana-compliance-api` | ✓ |
 | `turbo` | npm | MIT | dev | `@squaresdk/solana-monorepo` | ✓ |
-| `tweetnacl` | npm | Unlicense | runtime | `@squaresdk/solana-compliance-api` | ✓ |
 | `typedoc` | npm | Apache-2.0 | dev | `@squaresdk/solana-monorepo` | ✓ |
 | `typescript` | npm | Apache-2.0 | dev | `@squaresdk/solana-monorepo`, `@squaresdk/solana-web` | ✓ |
 | `typescript-eslint` | npm | MIT | runtime | `@squaresdk/solana-config` | ✓ |
 | `undici` | npm | MIT | runtime | `@squaresdk/solana-hardening` | ✓ |
 | `uuid` | npm | MIT | runtime | `@squaresdk/solana-compliance-api` | ✓ |
-| `viem` | npm | MIT | runtime | `@squaresdk/solana-cctp`, `@squaresdk/solana-monorepo`, `@squaresdk/solana-web` | ✓ |
+| `viem` | npm | MIT | runtime | `@squaresdk/solana-api`, `@squaresdk/solana-cctp`, `@squaresdk/solana-monorepo`, `@squaresdk/solana-web` | ✓ |
 | `vitest` | npm | MIT | dev | `@squaresdk/solana-a2a`, `@squaresdk/solana-agent-sdk`, `@squaresdk/solana-api`, `@squaresdk/solana-cctp`, `@squaresdk/solana-cli`, `@squaresdk/solana-compliance-api`, `@squaresdk/solana-db`, `@squaresdk/solana-fee-payer`, `@squaresdk/solana-hardening`, `@squaresdk/solana-hosted`, `@squaresdk/solana-identity`, `@squaresdk/solana-indexer`, `@squaresdk/solana-keeper`, `@squaresdk/solana-mcp`, `@squaresdk/solana-observability`, `@squaresdk/solana-policy`, `@squaresdk/solana-prover`, `@squaresdk/solana-screener`, `@squaresdk/solana-sdk`, `@squaresdk/solana-smoke`, `@squaresdk/solana-types`, `@squaresdk/solana-web`, `@squaresdk/solana-x402` | ✓ |
 | `yaml` | npm | ISC | runtime | `@squaresdk/solana-hosted`, `@squaresdk/solana-monorepo`, `@squaresdk/solana-sdk`, `@squaresdk/solana-types` | ✓ |
 | `zod` | npm | MIT | runtime | `@squaresdk/solana-a2a`, `@squaresdk/solana-api`, `@squaresdk/solana-cli`, `@squaresdk/solana-compliance-api`, `@squaresdk/solana-fee-payer`, `@squaresdk/solana-hosted`, `@squaresdk/solana-indexer`, `@squaresdk/solana-keeper`, `@squaresdk/solana-mcp`, `@squaresdk/solana-observability`, `@squaresdk/solana-prover`, `@squaresdk/solana-screener`, `@squaresdk/solana-smoke`, `@squaresdk/solana-types`, `@squaresdk/solana-web` | ✓ |
 
-**Özet:** 90 npm, 26 Cargo doğrudan bağımlılık; lisans dağılımı: 61× MIT, 45× Apache-2.0, 3× MIT OR Apache-2.0, 2× GPL-3.0, 1× BSD-2-Clause, 1× ISC, 1× MPL-2.0, 1× OFL-1.1, 1× Unlicense.
+**Özet:** 88 npm, 26 Cargo doğrudan bağımlılık; lisans dağılımı: 61× MIT, 45× Apache-2.0, 3× MIT OR Apache-2.0, 1× BSD-2-Clause, 1× GPL-3.0, 1× ISC, 1× MPL-2.0, 1× OFL-1.1.
 
 **Mainnet öncesi hukuki inceleme gerektirenler:**
-- `circomlibjs` (npm) — GPL-3.0. Poseidon hash (devreyle aynı sabitler); yalnızca apps/compliance-api (BE-02). Yayınlanan bir pakette yok; snarkjs ile aynı onay kapsamında.
 - `snarkjs` (npm) — GPL-3.0. Groth16 ispatı üretimi; çalışma zamanında yalnızca apps/prover (BE-11). @squaresdk/solana-policy (BE-10) yalnızca testlerde kullanır: createLocalProver snarkjs içermez, çağıranın kurduğu groth16 nesnesini alır. tests/smoke (BC-31, private, yayımlanmaz) operatör makinesinde ve CI'da in-process ispat için kullanır. Servis imajı dağıtılmadan önce hukuki onay gerekir.
 <!-- license-inventory:end -->
 

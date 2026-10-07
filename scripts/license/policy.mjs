@@ -60,8 +60,9 @@ export const ASSESSED = {
   'npm:circomlibjs': {
     status: 'review',
     note:
-      'GPL-3.0. Poseidon hash (devreyle aynı sabitler); yalnızca apps/compliance-api (BE-02). ' +
-      'Yayınlanan bir pakette yok; snarkjs ile aynı onay kapsamında.',
+      'GPL-3.0. Poseidon hash (devreyle aynı sabitler); yalnızca circuits/payment-compliance (private, devre ' +
+      "testleri). apps/compliance-api'nin makbuz hash'i BE-25'te Square API'ye taşındı ve MIT poseidon-lite'a " +
+      'geçti. Yayınlanan bir pakette yok; snarkjs ile aynı onay kapsamında.',
   },
 };
 

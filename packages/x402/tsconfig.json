@@ -2,7 +2,12 @@
   "extends": "@squaresdk/solana-config/tsconfig.base.json",
   "compilerOptions": {
     "rootDir": ".",
-    "outDir": "dist"
+    "outDir": "dist",
+    // `@x402/express`'in tipleri de bu paketin `@types/express` 4'üyle çözülür; kökte hoist edilen sürüm
+    // (swagger-ui-express'in 5'i) Express 4 tipleriyle uyuşmaz.
+    "paths": {
+      "express": ["./node_modules/@types/express/index.d.ts"]
+    }
   },
   "include": ["src", "test"]
 }

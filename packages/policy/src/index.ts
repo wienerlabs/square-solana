@@ -65,4 +65,4 @@ export {
   type Staleness,
 } from './release.js';
 export { SIGNAL, buildSetComplianceProofTx, buildVerifyMppPaymentProofTx } from './tx.js';
-export { watchJobProof, type WatchJobProofParams } from './watch.js';
+export { watchJobProof, type MppAttestation, type WatchJobProofParams } from './watch.js';
