@@ -201,7 +201,7 @@ async function main(): Promise<void> {
     policyMeta: createPolicyMetaService({ db, authority }),
     tx,
     evidence,
-    arbitration: createArbitrationService({ db, read, client, tx, arbitrators, evidence }),
+    arbitration: createArbitrationService({ db, read, client, tx, arbitrators }),
     webhooks: createWebhookService({ db, box, arbitrators, urlPolicy }),
     evidenceMaxBytes: config.evidence.maxBytes,
     prover: createProverProxy(config.prover),

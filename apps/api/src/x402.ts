@@ -3,9 +3,9 @@
 // (`recordX402Payment`). Square ödeme yolunda değildir: kayıt geliştiricinin bildirimidir, ödeme işlemi
 // (`transaction`) zincirde doğrulanabilir.
 // - Yol cüzdan başına tekildir; aynı yolda ikinci tanım 409.
-// - Ödeme ödeme yükünün kimliğiyle (`fingerprint`, tekrar korumasının kimliği) ve işlem imzasıyla ağ başına bir
-//   kez sayılır. Aynı ödemenin aynı tanıma yeniden bildirimi ilk kaydı döner; başka bir tanıma ya da farklı
-//   işlemle bildirimi 409.
+// - Ödeme ödeme yükünün kimliğiyle (`fingerprint`, tekrar korumasının kimliği) ve işlem imzasıyla cüzdan ve ağ
+//   başına bir kez sayılır. Aynı ödemenin aynı tanıma yeniden bildirimi ilk kaydı döner; aynı cüzdanın başka bir
+//   tanımına ya da farklı işlemle bildirimi 409.
 // - Bildirilen ödemenin ağı, mint'i ve alıcısı tanımınkiyle aynı olmalıdır; tutar bildirildiği gibidir (fiyat
 //   sonradan değişmiş olabilir).
 import type { Prisma, PrismaClient, X402Network as DbNetwork } from '@squaresdk/solana-db';

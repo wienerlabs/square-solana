@@ -313,6 +313,27 @@ describe('bildirim', () => {
     expect(remaining.every((ms) => ms > 0)).toBe(true);
   });
 
+  it('başka bir örneğin ilerlettiği satır eski kopyayla kiralanmaz: geri çekilme ve deneme sayısı korunur', async () => {
+    await subscribe(panel[0]!, '/a');
+    await subscribe(panel[1]!, '/b');
+    await notifier().runOnce();
+    const job = await disputedJob();
+    await world.chainEvent(job.address, 'DisputeDecided', { resolution: { favorAgent: {} } });
+    const sent: string[] = [];
+    onDelivery = async (id) => {
+      sent.push(id);
+      if (sent.length > 1) return;
+      await stack.db.notificationDelivery.updateMany({
+        where: { id: { not: id }, state: 'pending' },
+        data: { attempts: { increment: 1 }, nextAttemptAt: new Date(clock + 60_000), lockedUntil: null },
+      });
+    };
+    expect(await notifier().runOnce()).toMatchObject({ delivered: 1 });
+    expect(sent).toHaveLength(1);
+    const other = await stack.db.notificationDelivery.findFirstOrThrow({ where: { state: 'pending' } });
+    expect(other.attempts).toBe(1);
+  });
+
   it('iki gönderici aynı satırı bir kez teslim eder (kiralama)', async () => {
     await subscribe(panel[0]!, '/a');
     await subscribe(panel[1]!, '/b');

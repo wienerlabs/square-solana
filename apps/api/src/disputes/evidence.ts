@@ -12,7 +12,6 @@ import type { JobParties, Parties } from './parties.js';
 export interface EvidenceService {
   upload(params: { wallet: string; job: string; content: Buffer; contentType: string }): Promise<DisputeEvidence>;
   list(params: { wallet: string; job: string }): Promise<DisputeEvidence[]>;
-  listForArbitrator(job: string): Promise<DisputeEvidence[]>;
   content(params: { wallet: string; job: string; id: string }): Promise<{ contentType: string; content: Buffer }>;
 }
 
@@ -36,6 +35,14 @@ export function evidenceView(row: EvidenceRow, disputeReasonHash: string | null)
     isDisputeReason: row.contentHash === disputeReasonHash,
     createdAt: seconds(row.createdAt),
   });
+}
+
+export async function evidenceOf(db: PrismaClient, job: string): Promise<DisputeEvidence[]> {
+  const [rows, dispute] = await Promise.all([
+    db.disputeEvidence.findMany({ where: { job }, orderBy: [{ createdAt: 'asc' }, { id: 'asc' }] }),
+    db.dispute.findUnique({ where: { job }, select: { reasonHash: true } }),
+  ]);
+  return rows.map((row) => evidenceView(row, dispute?.reasonHash ?? null));
 }
 
 export function createEvidenceService(deps: {
@@ -105,19 +112,7 @@ export function createEvidenceService(deps: {
 
     async list({ wallet, job }) {
       await reader(wallet, job);
-      const [rows, reasonHash] = await Promise.all([
-        db.disputeEvidence.findMany({ where: { job }, orderBy: [{ createdAt: 'asc' }, { id: 'asc' }] }),
-        reasonHashOf(job),
-      ]);
-      return rows.map((row) => evidenceView(row, reasonHash));
-    },
-
-    async listForArbitrator(job) {
-      const [rows, reasonHash] = await Promise.all([
-        db.disputeEvidence.findMany({ where: { job }, orderBy: [{ createdAt: 'asc' }, { id: 'asc' }] }),
-        reasonHashOf(job),
-      ]);
-      return rows.map((row) => evidenceView(row, reasonHash));
+      return evidenceOf(db, job);
     },
 
     async content({ wallet, job, id }) {

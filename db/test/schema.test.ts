@@ -313,6 +313,48 @@ describe('ilişkiler ve sorgular', () => {
   });
 });
 
+describe('önceki sürümün yazımları', () => {
+  it('dispute sayaçları verilmezse 0 olur', async () => {
+    const job = address();
+    await db.client.$executeRaw`
+      INSERT INTO "disputes" ("job", "institution", "agent_record", "job_status", "challenger", "bond", "reason_hash",
+        "raised_at", "deadline", "resolution", "lapsed", "slot", "indexed_at")
+      VALUES (${job}, ${address()}, ${address()}, 'disputed', ${address()}, 1000, ${hex32()}, 1, 2, 'pending', false, 1,
+        now())`;
+    expect(await db.client.dispute.findUniqueOrThrow({ where: { job } })).toMatchObject({
+      decidedAt: 0n,
+      closedAt: 0n,
+      approvalMask: 0,
+      approvalCount: 0,
+      arbitratorSetVersion: 0n,
+    });
+  });
+
+  it('x402 ödemesinin cüzdanı verilmezse tanımın sahibinden dolar', async () => {
+    const wallet = address();
+    await db.client.user.create({ data: { wallet } });
+    const endpoint = await db.client.x402Endpoint.create({
+      data: {
+        wallet,
+        name: 'Rapor',
+        path: '/v1/report',
+        amount: '250000',
+        mint: address(),
+        network: 'devnet',
+        payTo: address(),
+        enabled: true,
+      },
+    });
+    await db.client.$executeRaw`
+      INSERT INTO "x402_payments" ("id", "endpoint_id", "fingerprint", "transaction", "network", "asset", "amount",
+        "payer", "pay_to", "settled_at")
+      VALUES (gen_random_uuid(), ${endpoint.id}::uuid, ${`svm:${hex32()}`}, ${signature()},
+        'solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1', ${endpoint.mint}, 250000, ${address()}, ${endpoint.payTo}, now())`;
+    const [payment] = await db.client.x402Payment.findMany();
+    expect(payment?.wallet).toBe(wallet);
+  });
+});
+
 describe('seed', () => {
   it('program kimliklerini ortamdan yazar ve tekrar çalıştırılabilir', async () => {
     const env = Object.fromEntries(

@@ -243,6 +243,8 @@ export function createNotifier(deps: {
         where: {
           id: row.id,
           state: 'pending',
+          attempts: row.attempts,
+          nextAttemptAt: { lte: new Date(leasedAt) },
           OR: [{ lockedUntil: null }, { lockedUntil: { lt: new Date(leasedAt) } }],
         },
         data: { lockedUntil: new Date(leasedAt + deps.leaseSeconds * 1000) },

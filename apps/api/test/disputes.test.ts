@@ -175,6 +175,39 @@ describe('dispute kanıtı', () => {
     expect(uploaded).toMatchObject({ success: true, data: { role: 'institution' } });
   });
 
+  it('Squads vault’lu kurumun multisig’i okunamasa da agent ve arbitrator kanıtı okur ve yükler', async () => {
+    const member = wallet();
+    const multisig = world.squadsMultisig([{ key: member.address, permissions: PERMISSION_INITIATE }]);
+    const institutionPda = await world.institution(wallet().address, { multisig });
+    const vault = (await stack.db.institution.findUniqueOrThrow({ where: { address: institutionPda } })).multisigVault!;
+    const job = await world.job({
+      institution: vault,
+      agentRecord,
+      agentWallet: agentWallet.address,
+      disputed: true,
+      status: 'disputed',
+      amount: AMOUNT,
+      dispute: { deadline: new BN(DEADLINE), arbitratorSetVersion: 4, approvalMask: 0, approvalCount: 0 },
+    });
+    const byMember = await session(member);
+    const uploaded = await byMember.uploadDisputeEvidence(job.address, new Blob(['kurumun gerekçesi']));
+    if (!uploaded.success) throw new Error(uploaded.error.message);
+    expect(uploaded.data.role).toBe('institution');
+    stack.rpc.accounts.delete(multisig.toBase58());
+
+    const byArbitrator = await session(panel[0]!);
+    const content = await byArbitrator.getDisputeEvidenceContent(job.address, uploaded.data.id);
+    expect(await content.text()).toBe('kurumun gerekçesi');
+    expect(await byArbitrator.uploadDisputeEvidence(job.address, new Blob(['arbitrator notu']))).toMatchObject({
+      success: true,
+      data: { role: 'arbitrator' },
+    });
+    const listed = await (await session(agentWallet)).listDisputeEvidence(job.address);
+    if (!listed.success) throw new Error(listed.error.message);
+    expect(listed.data.map((e) => e.role)).toEqual(['institution', 'arbitrator']);
+    expect(await byMember.listDisputeEvidence(job.address)).toMatchObject({ error: { code: 'forbidden' } });
+  });
+
   it('yetki, kapsam, boyut ve bilinmeyen job', async () => {
     const job = await disputedJob();
     expect(await stack.api().uploadDisputeEvidence(job.address, new Blob(['x']))).toMatchObject({

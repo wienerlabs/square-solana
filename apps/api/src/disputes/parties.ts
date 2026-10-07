@@ -20,11 +20,12 @@ export interface Parties {
   roleOf(wallet: string, job: JobParties): Promise<EvidenceRole | null>;
 }
 
+const ROLES: readonly EvidenceRole[] = ['institution', 'agent', 'arbitrator'];
+
 export function createParties(deps: { db: PrismaClient; connection: Connection; arbitrators: Arbitrators }): Parties {
   const { db } = deps;
 
-  async function isInstitution(wallet: string, job: JobParties): Promise<boolean> {
-    if (wallet === job.institution) return true;
+  async function isVaultInitiator(wallet: string, job: JobParties): Promise<boolean> {
     const institution = await db.institution.findFirst({ where: { multisigVault: job.institution } });
     const multisig = (institution?.account as { multisig?: string | null } | undefined)?.multisig ?? null;
     return multisig !== null && isMultisigInitiator(deps.connection, multisig, wallet);
@@ -38,9 +39,19 @@ export function createParties(deps: { db: PrismaClient; connection: Connection; 
 
   return {
     async roleOf(wallet, job) {
-      if (await isInstitution(wallet, job)) return 'institution';
-      if (await isAgent(wallet, job)) return 'agent';
-      if ((await deps.arbitrators.indexOf(wallet)) !== null) return 'arbitrator';
+      if (wallet === job.institution) return 'institution';
+      const checks = await Promise.allSettled([
+        isVaultInitiator(wallet, job),
+        isAgent(wallet, job),
+        deps.arbitrators.indexOf(wallet).then((index) => index !== null),
+      ]);
+      const matched = ROLES.find((_, i) => {
+        const check = checks[i]!;
+        return check.status === 'fulfilled' && check.value;
+      });
+      if (matched) return matched;
+      const failed = checks.find((check): check is PromiseRejectedResult => check.status === 'rejected');
+      if (failed) throw failed.reason;
       return null;
     },
   };

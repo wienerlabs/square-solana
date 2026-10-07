@@ -19,6 +19,16 @@ ALTER TABLE "x402_payments" ADD COLUMN     "wallet" VARCHAR(44);
 UPDATE "x402_payments" AS "payment" SET "wallet" = "endpoint"."wallet" FROM "x402_endpoints" AS "endpoint" WHERE "endpoint"."id" = "payment"."endpoint_id";
 ALTER TABLE "x402_payments" ALTER COLUMN "wallet" SET NOT NULL;
 
+CREATE FUNCTION "x402_payments_fill_wallet"() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  SELECT "wallet" INTO NEW."wallet" FROM "x402_endpoints" WHERE "id" = NEW."endpoint_id";
+  RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER "x402_payments_fill_wallet" BEFORE INSERT ON "x402_payments"
+FOR EACH ROW WHEN (NEW."wallet" IS NULL) EXECUTE FUNCTION "x402_payments_fill_wallet"();
+
 -- CreateIndex
 CREATE UNIQUE INDEX "x402_payments_wallet_network_fingerprint_key" ON "x402_payments"("wallet", "network", "fingerprint");
 

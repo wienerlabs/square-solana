@@ -74,8 +74,8 @@ Tüm `/v1` yanıtları `{ success, data, error, meta }` biçimindedir. `meta.req
 | policies | `getInstitution`, `listPolicies`, `getPolicy`, `putPolicyMeta` | Meta yazımı kurumun güncel yetkilisi |
 | agents | `listAgents`, `getAgent`, `putAgentCard`, `getWellKnownAgentCard` | Kart barındırma kayıt sahibi |
 | claims / disputes | `listClaims`, `getClaim`, `listDisputes`, `getDispute` | Açık |
-| disputes (BE-22) | `uploadDisputeEvidence`, `listDisputeEvidence`, `getDisputeEvidenceContent`, `prepareDisputeVote` | Oturum ya da anahtar (`disputes:write`, `read`, `tx:prepare`). Kanıtı kurum, agent cüzdanı / sahibi ve aktif arbitrator'lar yükler ve okur; oyu aktif arbitrator hazırlar |
-| arbitration | `getArbitrationQueue`, `listArbitrationWebhooks`, `createArbitrationWebhook`, `deleteArbitrationWebhook` | Aktif arbitrator; kuyruk oturum ya da `read` anahtarı, abonelikler oturum |
+| disputes (BE-22) | `uploadDisputeEvidence`, `listDisputeEvidence`, `getDisputeEvidenceContent`, `prepareDisputeVote` | Oturum ya da anahtar (`disputes:write`, `disputes:read`, `tx:prepare`). Kanıtı kurum, agent cüzdanı / sahibi ve aktif arbitrator'lar yükler ve okur; oyu aktif arbitrator hazırlar |
+| arbitration | `getArbitrationQueue`, `listArbitrationWebhooks`, `createArbitrationWebhook`, `deleteArbitrationWebhook` | Aktif arbitrator; kuyruk oturum ya da `disputes:read` anahtarı, abonelikler oturum |
 | screening / events / keeper | `getScreening`, `listEvents`, `listKeeperActions` | Açık |
 | travel-rule | `putTravelRule`, `getTravelRule`, `createTravelRuleGrant`, `deleteTravelRuleGrant`, `listTravelRuleAccess` | Yalnızca oturum: yazma, izin ve erişim kaydı kurumun güncel yetkilisi; okuma yetkili ya da izinli cüzdan ([ADR 0017](../decisions/0017-travel-rule-saklama-erisim-ve-paylasim.md)) |
 | cctp | `registerCctpTransfer`, `listCctpTransfers`, `getCctpTransfer`, `prepareCctpFundTx` | Kayıt ve tx oturum ya da anahtar (`tx:prepare`), job'un kurumu adına; okuma açık ([cctp-funding.md](cctp-funding.md#relayer-be-26)) |
