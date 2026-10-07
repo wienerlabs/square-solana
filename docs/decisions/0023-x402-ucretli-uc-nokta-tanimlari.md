@@ -52,8 +52,13 @@ cüzdan o servisin gizli değişkenidir ve ödeme alıcısından (`payTo`) ayrı
    - `fingerprint` ödeme yükünün tekrar koruması kimliğidir (`paymentFingerprint`; `ReplayStore`'daki
      `(x402:<ağ>, kimlik)`);
    - `transaction` uzlaştırma makbuzunun (`PAYMENT-RESPONSE`) işlem imzasıdır.
-   - İkisi de ağ başına tekildir: aynı ödeme iki kez sayılmaz. Aynı bildirimin tekrarı ilk kaydı döner, başka
-     tanıma ya da farklı işlemle bildirimi 409 alır.
+   - İkisi de cüzdan (tanımın sahibi) ve ağ başına tekildir: aynı ödeme bir cüzdanın kullanımında iki kez
+     sayılmaz. Aynı bildirimin tekrarı ilk kaydı döner, aynı cüzdanın başka tanımına ya da farklı işlemle bildirimi
+     409 alır. Başka bir cüzdanın aynı ödemeyi bildirmesi engellenmez.
+   - 2026-10-07 değişikliği: tekillik önce yalnızca ağ başınaydı. Bir cüzdan kurbanın `payTo`'suyla tanım açıp onun
+     ödeme imzalarını önce bildirerek sahibinin kaydını kalıcı olarak 409'a düşürebiliyordu. Ödeme satırı tanım
+     sahibinin cüzdanını taşır (`x402_payments.wallet`); migration mevcut satırları tanım sahibinden doldurur ve
+     cüzdanı vermeyen önceki API sürümünün yazımını da tanım sahibinden tamamlar.
 6. Bildirilen ödemenin ağı, mint'i ve alıcısı tanımınkiyle aynı olmalıdır (400). Tutar bildirildiği gibi
    kaydedilir, çünkü fiyat sonradan değişmiş olabilir.
 7. Kullanım (`getX402EndpointUsage`) ödemeli çağrı sayısı, ağ ve mint başına toplam, son ödeme zamanı ve son 20

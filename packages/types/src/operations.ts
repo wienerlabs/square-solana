@@ -38,6 +38,7 @@ export const ApiKeyScopeSchema = z.enum([
   'x402:serve',
   /** Kurumun ödeme ajanı: fiat işi kayıtlı kartla ya da MPP ile öder, attestation'ı okur (BE-25). */
   'fiat:pay',
+  'disputes:read',
 ]);
 export type ApiKeyScope = z.infer<typeof ApiKeyScopeSchema>;
 
