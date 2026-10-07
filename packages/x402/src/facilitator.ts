@@ -62,6 +62,12 @@ function rpcFor(network: SolanaNetwork, url: string): FacilitatorRpcClient {
   }
 }
 
+export const SELF_FACILITATOR_LIMITS: Readonly<ExactSvmSchemeOptions> = Object.freeze({
+  maxComputeUnits: 100_000,
+  maxPriorityFeeMicroLamports: 50_000,
+  maxRequiredSignatures: 2,
+});
+
 /** Resmi `x402Facilitator`: exact şeması verilen ağlar için ücret ödeyen cüzdanla kaydedilir. */
 export function createSelfFacilitator(options: SelfFacilitatorOptions): x402Facilitator {
   const rpcs: Record<string, FacilitatorRpcClient> = {};
@@ -73,7 +79,7 @@ export function createSelfFacilitator(options: SelfFacilitatorOptions): x402Faci
   const signer = toFacilitatorSvmSigner(options.feePayer, rpcs);
   return new x402Facilitator().register(
     networks as `${string}:${string}`[],
-    new ExactSvmScheme(signer, undefined, options.scheme),
+    new ExactSvmScheme(signer, undefined, { ...SELF_FACILITATOR_LIMITS, ...options.scheme }),
   );
 }
 

@@ -49,7 +49,13 @@ export type X402Event =
       readonly transaction: string;
       readonly payer: string;
     }
-  | { readonly type: 'settle_failed'; readonly fingerprint: string; readonly network: string; readonly reason: string }
+  | {
+      readonly type: 'settle_failed';
+      readonly fingerprint: string;
+      readonly network: string;
+      readonly reason: string;
+      readonly transaction?: string;
+    }
   | { readonly type: 'settled_callback_error'; readonly fingerprint: string; readonly error: unknown }
   | { readonly type: 'idempotent_replay'; readonly key: string; readonly network: string }
   | { readonly type: 'idempotency_error'; readonly error: unknown };
@@ -113,6 +119,8 @@ export interface X402Gateway {
 interface RequestState {
   payment?: X402Payment;
   readonly onSettled?: (payment: X402SettledPayment) => void;
+  readonly response?: Response;
+  readonly headersBeforeHandler?: ReadonlySet<string>;
 }
 
 const LOCALS_KEY = 'squareX402';
@@ -127,7 +135,13 @@ type Claim = 'ok' | 'replayed' | 'error';
 export function createX402Gateway(options: X402GatewayOptions): X402Gateway {
   const clock = options.clock ?? Date.now;
   const ttlMs = (options.replayTtlSeconds ?? DEFAULT_REPLAY_TTL_SECONDS) * 1000;
-  const emit = (event: X402Event) => options.onEvent?.(event);
+  const emit = (event: X402Event): void => {
+    try {
+      options.onEvent?.(event);
+    } catch {
+      return;
+    }
+  };
   const storage = new AsyncLocalStorage<RequestState>();
 
   const server = new x402ResourceServer(options.facilitator);
@@ -184,14 +198,25 @@ export function createX402Gateway(options: X402GatewayOptions): X402Gateway {
     if (claimed !== 'ok') return abort(claimed);
   });
 
+  const discardHandlerHeaders = () => {
+    const state = storage.getStore();
+    const response = state?.response;
+    if (!response || !state.headersBeforeHandler || response.headersSent) return;
+    for (const name of response.getHeaderNames()) {
+      if (!state.headersBeforeHandler.has(name)) response.removeHeader(name);
+    }
+  };
+
   server.onAfterSettle(async ({ paymentPayload, requirements, result, phase }) => {
     const fingerprint = paymentFingerprint(paymentPayload);
     if (!result.success) {
+      discardHandlerHeaders();
       emit({
         type: 'settle_failed',
         fingerprint,
         network: requirements.network,
         reason: result.errorReason ?? 'unknown',
+        ...(result.transaction ? { transaction: result.transaction } : {}),
       });
       return;
     }
@@ -212,11 +237,14 @@ export function createX402Gateway(options: X402GatewayOptions): X402Gateway {
   });
 
   server.onSettleFailure(async ({ paymentPayload, requirements, error }) => {
+    discardHandlerHeaders();
+    const transaction = (error as { transaction?: unknown }).transaction;
     emit({
       type: 'settle_failed',
       fingerprint: paymentFingerprint(paymentPayload),
       network: requirements.network,
       reason: error.message,
+      ...(typeof transaction === 'string' && transaction ? { transaction } : {}),
     });
   });
 
@@ -239,7 +267,11 @@ export function createX402Gateway(options: X402GatewayOptions): X402Gateway {
       };
       const middleware = paymentMiddleware(config, server);
       const handler: RequestHandler = (req, res, next) => {
-        const state: RequestState = route.onSettled ? { onSettled: route.onSettled } : {};
+        const state: RequestState = {
+          ...(route.onSettled ? { onSettled: route.onSettled } : {}),
+          response: res,
+          headersBeforeHandler: new Set(res.getHeaderNames()),
+        };
         res.locals[LOCALS_KEY] = state;
         storage.run(state, () => {
           middleware(req, res, next).catch(next);

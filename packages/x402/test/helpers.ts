@@ -70,7 +70,7 @@ export const PRICE_BASE_UNITS = '250000';
 export interface PaidApp extends Listening {
   readonly events: X402Event[];
   /** İşleyicinin kaç kez çalıştığı (route adına göre). */
-  readonly calls: { report: number; upfront: number; broken: number };
+  readonly calls: { report: number; upfront: number; broken: number; cookie: number };
 }
 
 /**
@@ -83,7 +83,7 @@ export async function startPaidApp(
   overrides: Partial<X402GatewayOptions> & Pick<X402GatewayOptions, 'replay'>,
 ): Promise<PaidApp> {
   const events: X402Event[] = [];
-  const calls = { report: 0, upfront: 0, broken: 0 };
+  const calls = { report: 0, upfront: 0, broken: 0, cookie: 0 };
   const gateway = createX402Gateway({
     facilitator: createFacilitatorClient({ feePayer: wallets.feePayer, rpcUrls: { [SOLANA_DEVNET]: rpc.url } }),
     networks: [SOLANA_DEVNET],
@@ -108,6 +108,11 @@ export async function startPaidApp(
       res.json({ ok: true, payment: getX402Payment(res) });
     },
   );
+  app.get('/cookie', gateway.paidRoute({ price, payTo: wallets.payTo, network: SOLANA_DEVNET }), (_req, res) => {
+    calls.cookie += 1;
+    res.set('Set-Cookie', 'session=paid-content').set('X-Report-Id', 'rapor-7').set('ETag', '"paid-etag"');
+    res.json({ ok: true, report: 'ücretli içerik' });
+  });
   app.get('/broken', gateway.paidRoute({ price, payTo: wallets.payTo, network: SOLANA_DEVNET }), (_req, res) => {
     calls.broken += 1;
     res.status(500).json({ ok: false });

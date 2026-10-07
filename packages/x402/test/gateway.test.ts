@@ -120,10 +120,46 @@ describe('ödeme ve makbuz', () => {
       const response = await fetch(`${app.url}/report`, { headers });
       expect(response.status).toBe(402);
       expect(app.calls.report).toBe(1);
-      expect(app.events.map((event) => event.type)).toContain('settle_failed');
+      const failed = app.events.find((event) => event.type === 'settle_failed');
+      expect(failed).toMatchObject({ transaction: expect.stringMatching(/^[1-9A-HJ-NP-Za-km-z]{64,88}$/) });
     } finally {
       rpc.setConfirmationError(null);
     }
+  });
+
+  it('uzlaştırma düşerse işleyicinin başlıkları 402 yanıtına sızmaz', async () => {
+    rpc.setConfirmationError({ InstructionError: [2, { Custom: 1 }] });
+    try {
+      const headers = await paymentHeaderFor('/cookie');
+      const response = await fetch(`${app.url}/cookie`, { headers });
+      expect(response.status).toBe(402);
+      expect(app.calls.cookie).toBe(1);
+      expect(response.headers.get('set-cookie')).toBeNull();
+      expect(response.headers.get('x-report-id')).toBeNull();
+      expect(response.headers.get('etag')).not.toBe('"paid-etag"');
+      expect(await response.text()).not.toContain('ücretli içerik');
+    } finally {
+      rpc.setConfirmationError(null);
+    }
+  });
+
+  it('olay işleyicisi hata verse de tekrar koruması kapalı kalır', async () => {
+    await app.close();
+    app = await startPaidApp(wallets, rpc, {
+      replay: {
+        claim: async () => {
+          throw new Error('veritabanı yok');
+        },
+      },
+      onEvent: () => {
+        throw new Error('günlük yok');
+      },
+    });
+    const headers = await paymentHeaderFor('/report');
+    const response = await fetch(`${app.url}/report`, { headers });
+    expect(response.status).toBe(402);
+    expect(paymentRequiredOf(response).error).toBe('replay_guard_unavailable');
+    expect(app.calls.report).toBe(0);
   });
 
   it('makbuzsuz yanıtta readPaymentReceipt null döner', async () => {
