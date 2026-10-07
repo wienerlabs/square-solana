@@ -101,4 +101,4 @@
 - Kararı verilmiş dispute'ta (`Resolved`) ispatın bağlanması: sözleşme bağlamayı `Delivered` ve
   `Disputed` işlere izin verir; Split'te agent tarafının tutarı karardan sonra bilinir (§8 açık nokta 3).
   BC-24'te kesinleşir.
-- Toleransın mainnet değeri: kamusal tören (BC-38) ve audit öncesinde ölçümlerle gözden geçirilir.
+- Tolerans devnet ölçümleriyle gözden geçirilir; mainnet ortamı yok ([ADR 0027](0027-yalnizca-devnet.md)).

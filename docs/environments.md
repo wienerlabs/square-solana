@@ -9,8 +9,7 @@ Bu belgenin tabloları `node scripts/ci/env-inventory.mjs` ile üretilir ve CI'd
 | Ortam | Railway environment | Küme | Not |
 |---|---|---|---|
 | PR preview | PR Environments (PR başına, kapanınca silinir) | devnet | yalnızca web ve API; secret'lar staging'den, ayrı anahtarlarla |
-| Staging | `staging` | devnet | bütün servisler ([runbook](runbooks/upgrade.md), BC-30) |
-| Production | `production` | mainnet | dış audit sonrası (BE-34, BC-42) |
+| Devnet | `staging` | devnet | bütün servisler; Square'in kalıcı ortamı ([runbook](runbooks/upgrade.md), BC-30). Mainnet ortamı yok ([ADR 0027](decisions/0027-yalnizca-devnet.md)) |
 
 Her servis bir Railway servisidir; derleme ve sağlık denetimi `apps/<servis>/railway.json`'dadır
 (`node scripts/ci/railway.mjs` üretir, CI denetler).
@@ -22,8 +21,8 @@ Her servis bir Railway servisidir; derleme ve sağlık denetimi `apps/<servis>/r
    anahtarlarını yakalar ([docs/ci.md](ci.md#sır-taraması)).
 2. **Secret'lar Railway'de "sealed" değişkendir.** Değer bir kez yazılır, arayüzde ve API'de okunamaz; yalnızca
    servisin süreci görür. Aşağıda **secret** işaretli her değişken böyle tutulur; diğerleri normal değişkendir.
-3. **Ortam başına ayrı değer.** Staging ve production aynı anahtarı, veritabanını ya da RPC sağlayıcı anahtarını
-   paylaşmaz; PR ortamları staging'in secret'larını değil kendi kısıtlı anahtarlarını kullanır.
+3. **Ortam başına ayrı değer.** PR ortamları devnet ortamının (`staging`) secret'larını değil kendi kısıtlı
+   anahtarlarını kullanır; iki ortam aynı veritabanını ya da RPC sağlayıcı anahtarını paylaşmaz.
 4. **İmzalayan anahtarlar** (keeper, screener authority, fee payer sponsoru, MPP authority, x402 fee payer)
    yalnızca kendi rolünü taşır ve ücret için gereken SOL'den fazlasını tutmaz. Program upgrade authority'si ve
    config admin'i hiçbir servis anahtarı değildir: 2-of-3 Squads vault'udur ([ADR 0008](decisions/0008-upgrade-authority-2-of-3-squads.md)).
