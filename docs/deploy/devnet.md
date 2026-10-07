@@ -263,6 +263,11 @@ alıcıya 1 USDC, deployer keeper'a 0,1 SOL gönderdi.
 8 adım `squaresdk-solana` komutlarıyla, 2026-10-06: [cli-devnet.md](cli-devnet.md). Kurum, agent, alıcı ve keeper
 smoke'unkiler; ücretleri deployer ödedi, ispatı yerelde çalışan prover servisi üretti.
 
+## Fiat ödeme (BE-25)
+
+Stripe test modunda ödeme → MPP attestation'ı → `verify_mpp_payment_proof` → `finalize_fiat_payment`, 2026-10-07:
+[fiat-devnet.md](fiat-devnet.md). Job `4jFcA9uD…` `Released`; MPP authority config'teki `CPwxS6VA…`.
+
 ## Yükseltmeler
 
 ### Escrow v0.6.0: dispute (BC-32, BC-33), 2026-10-06

@@ -360,6 +360,11 @@ Koşu kaydı: [deploy kaydı](../../docs/deploy/devnet.md#uyuşmazlık-be-22).
 - **Ortam:** `X402_PORTAL_E2E_DEVELOPER`, `X402_PORTAL_E2E_PAYER`, `X402_PORTAL_E2E_FEE_PAYER`, `X402_PORTAL_E2E_PAY_TO`.
 - **Kayıt:** [deploy kaydı](../../docs/deploy/devnet.md#geliştirici-portalı-fe-22).
 
+**Devnet + Stripe test modu: fiat ödeme (BE-25):** `test/fiat-devnet.e2e.test.ts` yalnızca `FIAT_E2E_*` ortamıyla
+çalışır. Akış: fiat iş → PaymentIntent → test kartıyla onay → mutabakat → attestation → ispat (makbuz commitment'ı) →
+`verify_mpp_payment_proof` → `finalize_fiat_payment`. `FIAT_E2E_NETWORK_ID` (Stripe profili) verilirse ikinci iş
+MPP'yle ödenir. Koşu kaydı: [fiat-devnet.md](../../docs/deploy/fiat-devnet.md).
+
 ## Kaynak
 
 Covenant `app/app/api/{jobs,escrow,claims,disputes,agents,auth,keys,openapi}` ve `app/lib/{wallet-auth,session,api-response}.ts`
