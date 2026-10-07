@@ -169,6 +169,18 @@ kurulumu kullanır, yeniden kurmaz. Kayıt deploy'la oluşur: `docs/deploy/smoke
 Birim testleri zincirsizdir. Zincirle çalışan akışlar (`runSmoke`, localnet koşucusunun süreç yönetimi,
 prover) `smoke:localnet` koşusunda gerçek işlemlerle sınanır ve kapsam ölçümünün dışındadır.
 
+Modüller `@squaresdk/solana-smoke/<modül>` olarak dışa açıktır. Servis entegrasyon testi
+([`tests/services`](../services/), BE-36) localnet koşucusunun parçalarını (`startValidator`, `fundLocalnet`,
+`assertDeployedPrograms`), `runInit`'i ve `runSmoke`'u kullanır. `runSmoke`'un isteğe bağlı üç kancası vardır;
+verilmezse smoke tx'leri kendisi gönderir:
+- `screen(wallet)`: adım 3'ün screening kaydını yazar (servis testinde screener servisi).
+- `finalize(job, expectError)`: challenge bittikten sonra finalize'ı yapar ya da beklenen bekletmeyi bekler (servis
+  testinde keeper servisi).
+- `provers`: bölüme özel prover (servis testinde ispat-yok ispatı API ve prover servisinden).
+
+Keeper finalize'ı ispat bağlandığı anda yapabileceği için bakiye ve itibar karşılaştırmalarının "önce" değerleri
+ispattan önce okunur.
+
 ## Devnet koşusu
 
 [`docs/deploy/smoke-devnet.md`](../../docs/deploy/smoke-devnet.md): 2026-10-06, 8 adım ve iki varyant, 28 tx. Roller

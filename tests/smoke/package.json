@@ -5,6 +5,12 @@
   "description": "Küme kurulumu ve uçtan uca smoke: config'lerin init'i (Squads talimatları dahil), Square ALT'ı, kayıt satırları; 8 adım, ispat-ret, ispat-yok ve fiat (Stripe MPP) varyantları gerçek işlemlerle, tx / CU / ücret raporu; localnet koşucusu (BC-30, BC-31, BC-37)",
   "license": "Apache-2.0",
   "type": "module",
+  "exports": {
+    "./*": {
+      "types": "./dist/*.d.ts",
+      "default": "./dist/*.js"
+    }
+  },
   "files": [
     "dist"
   ],

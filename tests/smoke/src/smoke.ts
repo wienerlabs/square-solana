@@ -92,6 +92,9 @@ export interface SmokeOptions {
   banner?: readonly string[];
   /** Aynı koşuda üretilen init kaydı (localnet). */
   init?: InitRecord | null;
+  provers?: Partial<Record<Section, Prover>>;
+  screen?: (wallet: PublicKey) => Promise<void>;
+  finalize?: (job: PublicKey, expectError?: string) => Promise<void>;
 }
 
 export async function runSmoke(context: Context, options: SmokeOptions): Promise<SmokeReport> {
@@ -380,7 +383,7 @@ export async function runSmoke(context: Context, options: SmokeOptions): Promise
       paymentCategory: values.paymentCategory,
       now: timestamp,
     });
-    const proof = await options.prover.prove(witness);
+    const proof = await (options.provers?.[section] ?? options.prover).prove(witness);
     await send(
       '7',
       '`setComplianceProof` (Groth16)',
@@ -412,7 +415,11 @@ export async function runSmoke(context: Context, options: SmokeOptions): Promise
 
   async function finalize(job: { address: PublicKey; challengeEnd: number }, expectError?: string) {
     await waitForChainTime(connection, job.challengeEnd);
-    return send(
+    if (options.finalize) {
+      await options.finalize(job.address, expectError);
+      return;
+    }
+    await send(
       '6 + 8',
       '`finalizePayment` (keeper)',
       () =>
@@ -499,26 +506,30 @@ export async function runSmoke(context: Context, options: SmokeOptions): Promise
     ['agent', key.agent.publicKey],
     ['alıcı', key.buyer.publicKey],
   ] as const) {
-    const ix = await client.registry.program.methods
-      .recordScreening(
-        wallet,
-        { clear: {} },
-        Array.from(sha256(enc(`square-smoke/${runId}/screening/${wallet.toBase58()}`))),
-      )
-      .accountsStrict({
-        payer: key.payer.publicKey,
-        screenerAuthority: key.screener.publicKey,
-        config: pda.registryConfig()[0],
-        screeningRecord: pda.screeningRecord(wallet)[0],
-        systemProgram: SystemProgram.programId,
-      })
-      .instruction();
-    await send(
-      '3',
-      `\`recordScreening\` (${role})`,
-      () => client.buildTx([ix], withComputeProfile(opts(key.payer), 'recordScreening')),
-      [key.payer, key.screener],
-    );
+    if (options.screen) {
+      await options.screen(wallet);
+    } else {
+      const ix = await client.registry.program.methods
+        .recordScreening(
+          wallet,
+          { clear: {} },
+          Array.from(sha256(enc(`square-smoke/${runId}/screening/${wallet.toBase58()}`))),
+        )
+        .accountsStrict({
+          payer: key.payer.publicKey,
+          screenerAuthority: key.screener.publicKey,
+          config: pda.registryConfig()[0],
+          screeningRecord: pda.screeningRecord(wallet)[0],
+          systemProgram: SystemProgram.programId,
+        })
+        .instruction();
+      await send(
+        '3',
+        `\`recordScreening\` (${role})`,
+        () => client.buildTx([ix], withComputeProfile(opts(key.payer), 'recordScreening')),
+        [key.payer, key.screener],
+      );
+    }
     const screening = await client.registry.fetch('screeningRecord', pda.screeningRecord(wallet)[0]);
     check(
       screening !== null &&
@@ -569,6 +580,9 @@ export async function runSmoke(context: Context, options: SmokeOptions): Promise
     `agent fiyatı aldı: ${units(values.claimPrice)}`,
   );
 
+  const buyerBefore = await balance(key.buyer.publicKey);
+  const keeperBefore = await balance(key.keeper.publicKey);
+  const reputationBefore = await reputation();
   const mainProof = await bindProof(mainJob, okPolicy);
   check(
     variantOf(mainProof.bound.verdict) === 'compliant' &&
@@ -576,10 +590,6 @@ export async function runSmoke(context: Context, options: SmokeOptions): Promise
       big(mainProof.bound.netAmount) === net,
     `\`ReleaseProof\`: uyumlu, payee alıcı, net ${units(net)}`,
   );
-
-  const buyerBefore = await balance(key.buyer.publicKey);
-  const keeperBefore = await balance(key.keeper.publicKey);
-  const reputationBefore = await reputation();
   await finalize(mainJob);
   check((await jobStatus(mainJob.address)) === 'released', 'job `Released`');
   check((await balance(key.buyer.publicKey)) - buyerBefore === net, `alıcıya ödendi: ${units(net)}`);
@@ -615,6 +625,9 @@ export async function runSmoke(context: Context, options: SmokeOptions): Promise
   );
   await confirmPolicy(strictPolicy, null);
   const refusedJob = await openJob('ispat-ret', strictPolicy);
+  const institutionBefore = await balance(key.institution.publicKey);
+  const keeperBeforeRefusal = await balance(key.keeper.publicKey);
+  const reputationBeforeRefusal = await reputation();
   const refused = await bindProof(refusedJob, strictPolicy);
   check(
     variantOf(refused.bound.verdict) === 'refused' &&
@@ -622,9 +635,6 @@ export async function runSmoke(context: Context, options: SmokeOptions): Promise
       isFinalRefusal(refused.bound.refusalCode, big(refused.bound.dailySpentBefore)),
     `\`ReleaseProof\`: ret, kod ${refused.bound.refusalCode} (${refusalRules(refused.bound.refusalCode).join(', ')}), kesin ret`,
   );
-  const institutionBefore = await balance(key.institution.publicKey);
-  const keeperBeforeRefusal = await balance(key.keeper.publicKey);
-  const reputationBeforeRefusal = await reputation();
   await finalize(refusedJob);
   check((await jobStatus(refusedJob.address)) === 'refunded', 'job `Refunded`');
   check(
@@ -662,12 +672,12 @@ export async function runSmoke(context: Context, options: SmokeOptions): Promise
     (await connection.getAccountInfo(pda.releaseProof(waitingJob.address)[0])) === null,
     '`ReleaseProof` hesabı yok',
   );
+  const agentBeforeRelease = await balance(key.agent.publicKey);
   const waitingProof = await bindProof(waitingJob, okPolicy);
   check(
     variantOf(waitingProof.bound.verdict) === 'compliant' && waitingProof.bound.payee.equals(key.agent.publicKey),
     '`ReleaseProof`: uyumlu, payee agent (alacak satılmadı)',
   );
-  const agentBeforeRelease = await balance(key.agent.publicKey);
   await finalize(waitingJob);
   check((await jobStatus(waitingJob.address)) === 'released', 'ispat bağlandıktan sonra job `Released`');
   check((await balance(key.agent.publicKey)) - agentBeforeRelease === net, `agent'a ödendi: ${units(net)}`);
