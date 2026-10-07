@@ -58,7 +58,7 @@ flowchart TB
   I -- create_job + fund --> ESC
   A -- submit_work --> ESC
   B[Alıcı] -- buy_claim + Merkle kanıtı --> ESC
-  I -- set_compliance_proof --> VER
+  I -- set_preflight_proof + set_compliance_proof --> VER
   K[Keeper] -- finalize --> ESC
   ESC -. okur .-> REG & POL & VER
   VER -. okur .-> POL

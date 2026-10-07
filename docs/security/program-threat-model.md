@@ -83,6 +83,7 @@ olmayan ya da yetersiz olan tehdit bir bulgudur.
 | T | Durum makinesini atlama | Her talimat durum ve zaman koşulunu denetler ([program arayüzü §6](../design/program-interface.md#6-escrow-durum-makinesi)); fuzz izinli kenarların dışındaki geçişi yakalar |
 | R | Kararın ya da ödemenin inkârı | Her geçiş event yazar; release `ValidationRecord` bırakır (job başına bir) |
 | I | Kişisel verinin zincire çıkması | Travel Rule kaydı zincirde yalnızca 32 baytlık commitment'tır (ADR 0015) |
+| E | Kurumun teslimden sonra kalıcı retle neti geri alması (BC-39 P-01) | <ul><li>Policy'li işte `accept_job` kurumun ön-ispatını ister: işin kendi koşulları (net tutar, agent cüzdanı, sayaç 0) kalıcı ya da günlük tavan kuralını çiğnemez ([ADR 0028](../decisions/0028-kabul-oncesi-on-ispat-ve-dispute-duzeltmeleri.md)).</li><li>Public tavanı aşan iş açılmaz (`AmountAboveDailyCeiling`).</li><li>Kalan tek kesin ret yolu alacağın politikanın engelli listesindeki alıcıya satılmasıdır; alıcının riskidir.</li><li>Testler: `preflight.rs`.</li></ul> |
 | D | Dispute ile ödemeyi süresiz geciktirme | <ul><li>İş başına bir dispute; lapse'tan sonra yenisi açılmaz.</li><li>Dispute'un son tarihi (`dispute_timeout_secs`) dolunca `lapse_dispute` bond'u iade eder ve iş normal finalize'a döner.</li></ul> |
 | D | Sınırdaki saniyede yarış | Pencere ve son tarih karşılaştırmaları tek yönlüdür (son saniye testleri: `finalize.rs`, `dispute.rs`) |
 | E | Admin'in parametreleri kötüye kullanması | <ul><li>Admin upgrade authority'dir (`program_data` ile doğrulanır).</li><li>`config_rules.rs` pencere, ücret ve arbitrator setini sınırlar.</li><li>Üst sınırı olmayan parametreler: [review-bc-39.md](review-bc-39.md).</li></ul> |
@@ -93,6 +94,7 @@ olmayan ya da yetersiz olan tehdit bir bulgudur.
 |---|---|---|
 | S | Sahte release ispatı | Groth16 doğrulaması (alt_bn128 syscall'ları) ve release devresinin doğrulama anahtarı; ispat job'un policy snapshot'ına (commitment, günlük tavan, sürüm) karşı doğrulanır |
 | T | İspatın başka işe, payee'ye ya da güne taşınması | <ul><li>`["release_proof", job]`; payee ve mint `Job` / `ClaimListing`'den bağlanır.</li><li>Escrow release anında payee, net tutar, mint ve `daily_spent_before`'u karşılaştırır (`StaleReleaseProof`).</li><li>İspat bir kez tüketilir.</li></ul> |
+| T | Ön-ispatın başka işe ya da koşula taşınması | `["preflight_proof", job]`; sinyaller işin kendisinden (net `job.amount`, payee `job.agent_wallet`, sayaç 0, job'un policy snapshot'ı); yalnızca `Open` / `Funded`; escrow `accept_job`'da job, politika ve commitment'ı karşılaştırır |
 | T | Sahte fiat attestation'ı | Önceki talimat Ed25519 precompile, tek imza ve kendi verisinde; imzacı `config.mpp_authority`; mesaj işe, Stripe makbuzunun hash'ine ve tutara bağlı (ADR 0024) |
 | E | `record_release`'in escrow dışında çağrılması | İmzacı escrow'un `["escrow_authority"]` PDA'sı; program kimliği config'ten |
 | E | Günlük sayacın kurcalanması | `OperatorState` yalnızca `record_release` CPI'ıyla ilerler; ret release'i sayacı ilerletmez |
