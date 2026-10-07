@@ -2,8 +2,9 @@
 
 import Link from 'next/link';
 import type { ReactNode } from 'react';
-import { useWallet } from '@solana/wallet-adapter-react';
 import { AIP_V1_PROGRAM_ID } from '@squaresdk/solana-identity/constants';
+import { useActor } from '@/components/actor';
+import { ActorNotice } from '@/components/actor-notice';
 import { useWebConfig } from '@/components/providers';
 import { useRole } from '@/components/role-provider';
 import { PROGRAM_ID_ENV } from '@/lib/config';
@@ -14,13 +15,15 @@ function Notice({ children }: { children: ReactNode }) {
   return <p className="rounded-card border border-border bg-surface p-6 text-sm text-muted">{children}</p>;
 }
 
-// Kaydı agent'ın sahibi imzalar; AgentRecord PDA'sı square_registry'nin kimliğinden ve sahibin anahtarından türetilir.
+// Kaydı agent'ın sahibi imzalar: cüzdan ya da agent'ın smart account vault'u (FE-21). AgentRecord PDA'sı
+// square_registry'nin kimliğinden ve sahibin anahtarından türetilir.
 export function AgentPage() {
-  const { publicKey } = useWallet();
+  const actor = useActor('agent');
+  const owner = actor.address;
   const { programIds } = useWebConfig();
   const { role } = useRole();
 
-  if (!publicKey) return <Notice>Connect the wallet that will own the agent to register it.</Notice>;
+  if (!owner) return <Notice>Connect the wallet that will own the agent to register it.</Notice>;
   if (!programIds.registry) {
     return (
       <Notice>
@@ -52,5 +55,10 @@ export function AgentPage() {
       </Notice>
     );
   }
-  return <AgentRegistration owner={publicKey.toBase58()} registryProgramId={programIds.registry} />;
+  return (
+    <>
+      <ActorNotice actor={actor} />
+      <AgentRegistration key={owner.toBase58()} owner={owner.toBase58()} registryProgramId={programIds.registry} />
+    </>
+  );
 }

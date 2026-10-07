@@ -24,6 +24,7 @@
     "@solana/wallet-adapter-solflare": "^0.6.34",
     "@solana/wallet-standard-chains": "^1.1.2",
     "@solana/web3.js": "^1.99.0",
+    "@sqds/multisig": "2.1.4",
     "@squaresdk/solana-identity": "workspace:*",
     "@squaresdk/solana-policy": "workspace:*",
     "@squaresdk/solana-sdk": "workspace:*",

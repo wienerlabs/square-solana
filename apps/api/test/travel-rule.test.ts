@@ -3,6 +3,7 @@
 import { randomBytes, randomUUID } from 'node:crypto';
 import { PublicKey, VersionedTransaction } from '@solana/web3.js';
 import { travelRule } from '@squaresdk/solana-sdk';
+import { squadsVaultAddress } from '@squaresdk/solana-sdk/squads';
 import type { TravelRuleRecord } from '@squaresdk/solana-types';
 import { afterAll, beforeAll, beforeEach, describe, expect, inject, it } from 'vitest';
 import { createSecretBox } from '@squaresdk/solana-hardening';
@@ -257,6 +258,36 @@ describe('yazma kuralları', () => {
       });
     }
   });
+
+  it('kurum smart account vault’uyla açıldıysa üye X-Square-Smart-Account ile yazar; kayıtlarda üyenin cüzdanı', async () => {
+    const [proposer, voter] = [wallet(), wallet()];
+    const multisig = world.squadsMultisig([
+      { key: proposer.address, permissions: PERMISSION_INITIATE | 2 },
+      { key: voter.address, permissions: 2 },
+    ]);
+    const vault = squadsVaultAddress(multisig, 0)[0].toBase58();
+    await world.institution(vault);
+    const job = await openJob(vault);
+    const record = recordFor(job);
+    const via = async (who: Wallet) =>
+      stack.api({ session: await login(stack.api(), who), smartAccount: multisig.toBase58() });
+
+    expect(await (await as(proposer)).putTravelRule(job.address, { record })).toMatchObject({
+      error: { code: 'forbidden' },
+    });
+    const stored = await (await via(proposer)).putTravelRule(job.address, { record });
+    if (!stored.success) throw new Error(stored.error.message);
+    expect(stored.data.storedBy).toBe(proposer.address);
+    expect((await (await via(proposer)).getTravelRule(job.address)).success).toBe(true);
+    expect(await (await via(voter)).getTravelRule(job.address)).toMatchObject({ error: { code: 'forbidden' } });
+    const access = await (await via(proposer)).listTravelRuleAccess(job.address);
+    if (!access.success) throw new Error(access.error.message);
+    // Test saati sabit: iki girdinin zamanı aynı, sıraları belirsiz.
+    expect(access.data.map((entry) => `${entry.action}:${entry.actor}`).sort()).toEqual([
+      `read:${proposer.address}`,
+      `store:${proposer.address}`,
+    ]);
+  });
 });
 
 describe('saklama süresi ve anahtar döndürme', () => {
@@ -311,7 +342,7 @@ describe('saklama süresi ve anahtar döndürme', () => {
         retentionSeconds: RETENTION,
         clock: () => now,
       });
-    const actor = { wallet: owner.address, requestId: randomUUID() };
+    const actor = { wallet: owner.address, smartAccount: null, requestId: randomUUID() };
     const rotated = service(KEYS, 'k2');
     expect(await rotated.maintain()).toEqual({ purged: 0, rewrapped: 1 });
     expect(await rotated.maintain()).toEqual({ purged: 0, rewrapped: 0 });

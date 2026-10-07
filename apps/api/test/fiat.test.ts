@@ -1,6 +1,7 @@
 // Stripe MPP fiat rayı (BE-25): kart kaydı, tarayıcı ve off-session ödeme, imzalı webhook (imza, zaman damgası,
-// tekrar), mutabakat, kopya ödemenin iadesi, attestation'ın yeniden imzalanması ve MPP 402 akışı (gerçek
-// `mppx/client`). Stripe yerel fixture sunucusudur; API gerçek `stripe` SDK'sıyla konuşur.
+// tekrar), mutabakat, kopya ödemenin iadesi, attestation'ın yeniden imzalanması, MPP 402 akışı (gerçek
+// `mppx/client`) ve kurum anahtarı smart account vault'u olan kurum (FE-21). Stripe yerel fixture sunucusudur; API
+// gerçek `stripe` SDK'sıyla konuşur.
 import { randomBytes } from 'node:crypto';
 import { ed25519 } from '@noble/curves/ed25519.js';
 import { BN } from '@anchor-lang/core';
@@ -8,12 +9,14 @@ import { MINT_SIZE, MintLayout, TOKEN_PROGRAM_ID } from '@solana/spl-token';
 import { Keypair, PublicKey } from '@solana/web3.js';
 import { dayStart } from '@squaresdk/solana-policy';
 import { createApiClient, mppAttestationMessage } from '@squaresdk/solana-sdk';
+import { squadsVaultAddress } from '@squaresdk/solana-sdk/squads';
 import type { FiatAttestation } from '@squaresdk/solana-types';
 import bs58 from 'bs58';
 import { Mppx as MppxClient, stripe as mppStripe } from 'mppx/client';
 import { afterAll, beforeAll, beforeEach, describe, expect, inject, it } from 'vitest';
 import { receiptHash } from '../src/fiat/receipt.js';
 import { loadOpenApi } from '../src/openapi.js';
+import { PERMISSION_INITIATE } from '../src/squads.js';
 import { apiKey, login } from './fixtures/login.js';
 import { sample } from './fixtures/sample.js';
 import { PUBLIC_BASE_URL, startStack, truncate, type FiatFixture, type Stack } from './fixtures/stack.js';
@@ -60,7 +63,9 @@ beforeEach(async () => {
   stack.rpc.setAccount(MINT.toBase58(), { owner: TOKEN_PROGRAM_ID.toBase58(), data });
 });
 
-const as = async (who: Wallet) => stack.api({ session: await login(stack.api(), who) });
+/** Oturumlu istemci; `smartAccount` verilirse istekler `X-Square-Smart-Account` taşır. */
+const as = async (who: Wallet, smartAccount?: string) =>
+  stack.api({ session: await login(stack.api(), who), ...(smartAccount ? { smartAccount } : {}) });
 
 interface FiatJobOptions {
   amount?: bigint;
@@ -70,8 +75,8 @@ interface FiatJobOptions {
   spentToday?: bigint;
 }
 
-/** Kurumu indexlenmiş, politikalı, teslim edilmiş fiat iş; `owner` job'u açan kurum anahtarı. */
-async function fiatJob(owner: Wallet, options: FiatJobOptions = {}) {
+/** Kurumu indexlenmiş, politikalı, teslim edilmiş fiat iş; `owner` job'u açan kurum anahtarı (cüzdan ya da vault). */
+async function fiatJob(owner: { readonly address: string }, options: FiatJobOptions = {}) {
   const institutionPda = new PublicKey(await world.institution(owner.address));
   const agentWallet = wallet();
   const agent = await world.agent(wallet().address, agentWallet.address);
@@ -549,6 +554,97 @@ describe('MPP (402)', () => {
     }).payFiatJobMpp(job2.address);
     expect(!declined.success && declined.error.code).toBe('payment_required');
     expect(await stack.db.mppPayment.count()).toBe(1);
+  });
+});
+
+describe('smart account (X-Square-Smart-Account, FE-21)', () => {
+  /** Kurum anahtarı vault olan kurum: üyeler zincirde (fikstür RPC'si), vault `squadsVaultAddress(multisig, 0)`. */
+  const smartAccount = (members: readonly { key: string; permissions: number }[]) => {
+    const multisig = world.squadsMultisig(members);
+    return { multisig: multisig.toBase58(), vault: squadsVaultAddress(multisig, 0)[0].toBase58() };
+  };
+
+  it('Initiate yetkili üye başlıkla vault kurumun kartını kaydeder ve öder; diğerleri 403', async () => {
+    const [proposer, voter, stranger] = [wallet(), wallet(), wallet()];
+    const account = smartAccount([
+      { key: proposer.address, permissions: PERMISSION_INITIATE | 2 | 4 },
+      { key: voter.address, permissions: 2 },
+    ]);
+    const job = await fiatJob({ address: account.vault });
+    const session = await as(proposer, account.multisig);
+
+    const setup = await session.createFiatSetupIntent({ institution: account.vault });
+    if (!setup.success) throw new Error(setup.error.message);
+    const customer = await session.getFiatCustomer(account.vault);
+    expect(customer.success && customer.data).toMatchObject({ institution: account.vault, card: null });
+
+    // Yalnızca oy yetkili üye, üye olmayan cüzdan ve başlıksız istek vault adına ödeyemez ve okuyamaz.
+    const denied = [await as(voter, account.multisig), await as(stranger, account.multisig), await as(proposer)];
+    for (const api of denied) {
+      const payment = await api.createFiatPayment(job.address, { offSession: false });
+      expect(!payment.success && payment.error.code).toBe('forbidden');
+      const card = await api.getFiatCustomer(account.vault);
+      expect(!card.success && card.error.code).toBe('forbidden');
+    }
+    expect(fx.stripe.paymentIntents.size).toBe(0);
+
+    const created = await session.createFiatPayment(job.address, { offSession: false });
+    if (!created.success) throw new Error(created.error.message);
+    expect(fx.stripe.paymentIntents.get(created.data.paymentIntent)!['metadata']).toEqual({
+      square_job: job.address,
+      square_institution: account.vault,
+    });
+    fx.stripe.confirmPayment(created.data.paymentIntent);
+    const reconciled = await session.reconcileFiatPayment(job.address);
+    if (!reconciled.success) throw new Error(reconciled.error.message);
+    expectValidAttestation(reconciled.data, job.address);
+    expect(reconciled.data.institution).toBe(account.vault);
+    const attestation = await session.getFiatAttestation(job.address);
+    expect(attestation.success && attestation.data.paymentIntent).toBe(created.data.paymentIntent);
+    for (const api of denied) {
+      const read = await api.getFiatAttestation(job.address);
+      expect(!read.success && read.error.code).toBe('forbidden');
+      const reconcile = await api.reconcileFiatPayment(job.address);
+      expect(!reconcile.success && reconcile.error.code).toBe('forbidden');
+    }
+  });
+
+  it('MPP: üyenin anahtarı başlıkla vault kurumun işini öder; başlıksız ve oy yetkili 403, geçersiz başlık 400', async () => {
+    const [proposer, voter] = [wallet(), wallet()];
+    const account = smartAccount([
+      { key: proposer.address, permissions: PERMISSION_INITIATE | 2 },
+      { key: voter.address, permissions: 2 },
+    ]);
+    const job = await fiatJob({ address: account.vault });
+    const key = await apiKey(stack, proposer, ['fiat:pay']);
+    const challenge = (headers: Record<string, string>) =>
+      fetch(`${stack.url}/v1/jobs/${job.address}/fiat/mpp`, { method: 'POST', headers });
+
+    expect((await challenge({ 'x-api-key': key })).status).toBe(403);
+    const voterKey = await apiKey(stack, voter, ['fiat:pay']);
+    expect((await challenge({ 'x-api-key': voterKey, 'x-square-smart-account': account.multisig })).status).toBe(403);
+    const invalid = await challenge({ 'x-api-key': key, 'x-square-smart-account': 'vault' });
+    expect(((await invalid.json()) as { error: { code: string } }).error.code).toBe('invalid_input');
+    expect(invalid.status).toBe(400);
+    expect((await challenge({ 'x-api-key': key, 'x-square-smart-account': account.multisig })).status).toBe(402);
+
+    const payer = MppxClient.create({
+      methods: [
+        mppStripe.charge({
+          paymentMethod: 'pm_card_visa',
+          createToken: async () => `spt_fx${randomBytes(6).toString('hex')}`,
+        }),
+      ],
+      polyfill: false,
+    });
+    const paid = await createApiClient({
+      baseUrl: stack.url,
+      auth: { apiKey: key, smartAccount: account.multisig },
+      fetch: payer.fetch as typeof fetch,
+    }).payFiatJobMpp(job.address);
+    if (!paid.success) throw new Error(paid.error.message);
+    expect(paid.data).toMatchObject({ source: 'mpp', institution: account.vault });
+    expectValidAttestation(paid.data, job.address);
   });
 });
 

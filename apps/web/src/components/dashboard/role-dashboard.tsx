@@ -2,6 +2,8 @@
 
 import dynamic from 'next/dynamic';
 import type { ComponentType } from 'react';
+import { useActor } from '@/components/actor';
+import { ActorNotice } from '@/components/actor-notice';
 import { useRole } from '@/components/role-provider';
 import type { Role } from '@/lib/roles';
 
@@ -12,10 +14,20 @@ const DASHBOARDS: Partial<Record<Role, ComponentType<{ owner: string }>>> = {
   buyer: dynamic(() => import('./buyer-dashboard')),
 };
 
-/** Bağlı cüzdanın seçtiği rolün paneli (FE-11); rol seçilmemişse rol seçici yol gösterir. */
+/**
+ * Bağlı cüzdanın seçtiği rolün paneli (FE-11); rol seçilmemişse rol seçici yol gösterir. Panel rolün adresini
+ * gösterir: cüzdan ya da rolün smart account vault'u (FE-21).
+ */
 export function RoleDashboard() {
-  const { address, role } = useRole();
+  const { role } = useRole();
+  const actor = useActor(role);
+  const owner = actor.address?.toBase58() ?? null;
   const Dashboard = role ? DASHBOARDS[role] : undefined;
-  if (!address || !Dashboard) return null;
-  return <Dashboard owner={address} />;
+  if (!owner || !Dashboard) return null;
+  return (
+    <>
+      <ActorNotice actor={actor} />
+      <Dashboard key={owner} owner={owner} />
+    </>
+  );
 }

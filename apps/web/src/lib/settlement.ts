@@ -11,7 +11,8 @@ export interface SettlementToken {
 
 /** Sahibin settlement token'ı için associated token account adresi. */
 export function settlementAccount(owner: PublicKey, token: SettlementToken): PublicKey {
-  return getAssociatedTokenAddressSync(token.mint, owner, false, token.tokenProgram);
+  // Sahip bir smart account'un vault'u (PDA, eğri dışı) olabilir (FE-21); ATA türetmesi aynıdır.
+  return getAssociatedTokenAddressSync(token.mint, owner, true, token.tokenProgram);
 }
 
 /** Token hesabının bakiyesi (taban birim). Hesap yoksa ya da kapatılmışsa null. */

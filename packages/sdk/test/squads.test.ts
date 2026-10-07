@@ -77,6 +77,20 @@ describe('adresler', () => {
     expect(b58(squadsProgramConfigAddress()[0])).toBe(b58(sqds.getProgramConfigPda({})[0]));
   });
 
+  it('u64 indeksli türetme Buffer’ın BigInt yöntemlerine dayanmaz (tarayıcı polyfill’i)', () => {
+    // Next.js'in tarayıcı Buffer'ı (`buffer` 5) `writeBigUInt64LE` taşımaz; türetme yine aynı adresi vermeli.
+    const multisig = squadsMultisigAddress(key())[0];
+    const expected = b58(sqds.getTransactionPda({ multisigPda: multisig, index: 2n ** 63n + 5n })[0]);
+    const prototype = Buffer.prototype as unknown as Record<string, unknown>;
+    const original = prototype['writeBigUInt64LE'];
+    delete prototype['writeBigUInt64LE'];
+    try {
+      expect(b58(squadsTransactionAddress(multisig, 2n ** 63n + 5n)[0])).toBe(expected);
+    } finally {
+      prototype['writeBigUInt64LE'] = original;
+    }
+  });
+
   it('geçersiz indeksler reddedilir', () => {
     expect(() => squadsVaultAddress(key(), 256)).toThrow(/0–255/);
     expect(() => squadsVaultAddress(key(), 1.5)).toThrow(/0–255/);

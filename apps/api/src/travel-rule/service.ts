@@ -25,12 +25,16 @@ import {
 } from '@squaresdk/solana-types';
 import { PublicKey } from '@solana/web3.js';
 import { z } from 'zod';
+import type { Caller } from '../caller.js';
 import { HttpError, badRequest, forbidden, notFound, parse } from '../http.js';
 import type { InstitutionAuthority, InstitutionKeys } from '../institution-authority.js';
 import { open, rewrap, seal, type Sealed } from './crypto.js';
 
-export interface TravelRuleActor {
-  readonly wallet: string;
+/**
+ * Uçları çağıran: cüzdanın oturumu. Kurum bir smart account'un vault'uyla açıldıysa üye `X-Square-Smart-Account`
+ * başlığıyla yetkili sayılır (caller.ts); erişim kaydına ve okuma iznine her zaman cüzdan yazılır.
+ */
+export interface TravelRuleActor extends Caller {
   readonly requestId: string;
 }
 
@@ -108,8 +112,8 @@ export function createTravelRuleService(deps: {
     return institution;
   }
 
-  async function requireAuthority(onChain: ChainJob, wallet: string, what: string): Promise<void> {
-    if (!(await authority.isAuthority(await institutionOf(onChain), wallet))) {
+  async function requireAuthority(onChain: ChainJob, actor: TravelRuleActor, what: string): Promise<void> {
+    if (!(await authority.isAuthority(await institutionOf(onChain), actor))) {
       throw forbidden(`${what} yalnızca job’u açan kurumun güncel yetkilisi yapabilir`);
     }
   }
@@ -160,7 +164,7 @@ export function createTravelRuleService(deps: {
     async put(actor, job, body) {
       const { record } = parse(TravelRulePutSchema, body, 'Travel Rule kaydı');
       const onChain = await chainJob(job);
-      await requireAuthority(onChain, actor.wallet, 'Travel Rule kaydını');
+      await requireAuthority(onChain, actor, 'Travel Rule kaydını');
       // Fonlamadan sonra zincirdeki commitment değişmez (ADR 0015); kayıt da değişmez.
       if (onChain.status !== 'open') {
         throw new HttpError(409, 'conflict', 'job fonlanmış ya da kapanmış; Travel Rule kaydı değişmez', {
@@ -201,7 +205,7 @@ export function createTravelRuleService(deps: {
       const row = await db.travelRuleRecord.findUnique({ where: { job } });
       if (!row) throw notFound('job’un Travel Rule kaydı yok');
       const onChain = await chainJob(job);
-      if (!(await activeGrant(job, actor.wallet, now))) await requireAuthority(onChain, actor.wallet, 'Kaydı okumayı');
+      if (!(await activeGrant(job, actor.wallet, now))) await requireAuthority(onChain, actor, 'Kaydı okumayı');
       if (row.purgedAt !== null) throw notFound('saklama süresi doldu; Travel Rule kaydı silindi');
       // Erişim kaydı açmadan önce yazılır: yazılamazsa kayıt açılmaz.
       await db.travelRuleAccess.create({
@@ -223,7 +227,7 @@ export function createTravelRuleService(deps: {
       const now = new Date(clock());
       if (request.expiresAt * 1000 <= now.getTime()) throw badRequest('izin süresi gelecekte olmalı');
       const onChain = await chainJob(job);
-      await requireAuthority(onChain, actor.wallet, 'İzin vermeyi');
+      await requireAuthority(onChain, actor, 'İzin vermeyi');
       const record = await db.travelRuleRecord.findUnique({ where: { job }, select: { purgedAt: true } });
       if (!record || record.purgedAt !== null) throw notFound('job’un okunabilir bir Travel Rule kaydı yok');
       const data = {
@@ -256,7 +260,7 @@ export function createTravelRuleService(deps: {
     async revoke(actor, job, grantee) {
       const now = new Date(clock());
       const onChain = await chainJob(job);
-      await requireAuthority(onChain, actor.wallet, 'İzni geri almayı');
+      await requireAuthority(onChain, actor, 'İzni geri almayı');
       await db.$transaction(async (tx) => {
         const revoked = await tx.travelRuleGrant.updateMany({
           where: { job, grantee, revokedAt: null },
@@ -271,7 +275,7 @@ export function createTravelRuleService(deps: {
 
     async listAccess(actor, job, page) {
       const onChain = await chainJob(job);
-      await requireAuthority(onChain, actor.wallet, 'Erişim kaydını okumayı');
+      await requireAuthority(onChain, actor, 'Erişim kaydını okumayı');
       const [rows, total] = await Promise.all([
         db.travelRuleAccess.findMany({
           where: { job },

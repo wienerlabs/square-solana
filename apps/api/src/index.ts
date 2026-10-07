@@ -19,6 +19,7 @@ import { Connection, PublicKey } from '@solana/web3.js';
 import Stripe from 'stripe';
 import { createApp, createMetricsApp } from './app.js';
 import { createAuthService } from './auth/service.js';
+import { createCallerAuthority } from './caller.js';
 import { createCardService } from './cards.js';
 import { loadConfig } from './config.js';
 import { createDeliveryService } from './deliveries.js';
@@ -75,6 +76,7 @@ async function main(): Promise<void> {
   const client = createSquareClient({ connection, programIds, commitment: 'confirmed' });
   const store = createDeliveryStore(config.deliveries.store);
   const authority = createInstitutionAuthority({ db, connection });
+  const callers = createCallerAuthority({ connection });
   const travelRule = createTravelRuleService({
     db,
     client,
@@ -190,13 +192,14 @@ async function main(): Promise<void> {
       challengeTtlSeconds: config.auth.challengeTtlSeconds,
       sessionTtlSeconds: config.auth.sessionTtlSeconds,
     }),
-    deliveries: createDeliveryService({ db, store }),
+    deliveries: createDeliveryService({ db, store, callers }),
     cards: createCardService({
       db,
       pda: client.pda,
       registryProgramId: programIds.registry,
       chainRef,
       publicBaseUrl: config.publicBaseUrl,
+      callers,
     }),
     policyMeta: createPolicyMetaService({ db, authority }),
     tx,

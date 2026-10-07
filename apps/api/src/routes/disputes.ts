@@ -3,6 +3,7 @@
 import { Address, DisputeVoteRequestSchema, PageQuerySchema } from '@squaresdk/solana-types';
 import { Router, type Request, type RequestHandler } from 'express';
 import { requireActor, requireSession } from '../auth/middleware.js';
+import { callerOf } from '../caller.js';
 import type { ArbitrationService } from '../disputes/arbitration.js';
 import type { EvidenceService } from '../disputes/evidence.js';
 import type { WebhookService } from '../disputes/webhooks.js';
@@ -28,14 +29,14 @@ export function disputeRoutes(deps: {
     writeLimit,
     route(async (req, res) => {
       // Yetki ve yol gövde okunmadan denetlenir: yetkisiz istek dosyayı belleğe almaz.
-      const principal = requireActor(res, 'disputes:write');
+      const caller = callerOf(res, requireActor(res, 'disputes:write'));
       const job = pathAddress(req, 'job');
       const file = await readUpload(req, deps.evidenceMaxBytes);
       if (file.mimeType.length > 120) throw badRequest('dosyanın içerik tipi 120 karakteri aşıyor');
       sendOk(
         res,
         await deps.evidence.upload({
-          wallet: principal.wallet,
+          caller,
           job,
           content: file.content,
           contentType: file.mimeType,
@@ -50,7 +51,7 @@ export function disputeRoutes(deps: {
     readLimit,
     route(async (req, res) => {
       const principal = requireActor(res, 'disputes:read');
-      sendOk(res, await deps.evidence.list({ wallet: principal.wallet, job: pathAddress(req, 'job') }));
+      sendOk(res, await deps.evidence.list({ caller: callerOf(res, principal), job: pathAddress(req, 'job') }));
     }),
   );
 
@@ -60,7 +61,7 @@ export function disputeRoutes(deps: {
     route(async (req, res) => {
       const principal = requireActor(res, 'disputes:read');
       const { contentType, content } = await deps.evidence.content({
-        wallet: principal.wallet,
+        caller: callerOf(res, principal),
         job: pathAddress(req, 'job'),
         id: String(req.params['id']),
       });
