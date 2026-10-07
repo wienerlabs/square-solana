@@ -2,7 +2,7 @@
 
 **Issue:** [BC-38 (#92)](https://github.com/wienerlabs/square-solana/issues/92) · **Araç:** [`circuits/payment-compliance/scripts/ceremony.mjs`](../../circuits/payment-compliance/scripts/ceremony.mjs) · **Adımlar:** [running.md](running.md) · **Doğrulama:** [verifying.md](verifying.md) · **Beacon:** [beacon.md](beacon.md)
 
-Release ispatının (`payment.circom`) Groth16 anahtarı bugün bir **geliştirme** anahtarıdır. Phase-2'si tek katkılıdır, kamusal bir tören değildir ve hiçbir güvence iddia etmez ([devrenin README'si → Disclosure](../../circuits/payment-compliance/README.md#disclosure)). Anahtarı kuran taraf toksik atığı saklamış olsaydı, sahte bir ispatla kurala uymayan bir release'i uyumlu gösterebilirdi. Mainnet'e (BC-42) bu törenin anahtarıyla çıkılır.
+Release ispatının (`payment.circom`) Groth16 anahtarı bugün bir **geliştirme** anahtarıdır. Phase-2'si tek katkılıdır, kamusal bir tören değildir ve hiçbir güvence iddia etmez ([devrenin README'si → Disclosure](../../circuits/payment-compliance/README.md#disclosure)). Anahtarı kuran taraf toksik atığı saklamış olsaydı, sahte bir ispatla kurala uymayan bir release'i uyumlu gösterebilirdi. Törenin anahtarı devnet verifier'ına geliştirme anahtarının yerine konur; Square yalnızca devnet'te çalışır ([ADR 0027](../decisions/0027-yalnizca-devnet.md) madde 6).
 
 Phase-1 yeniden yapılmaz: Perpetual Powers of Tau'nun 80. katkısı benimsenmiştir ve hash'iyle doğrulanır ([fetch-ptau.mjs](../../circuits/payment-compliance/scripts/fetch-ptau.mjs)). Tören yalnızca devreye özgü yarıyı, phase-2'yi üretir.
 
