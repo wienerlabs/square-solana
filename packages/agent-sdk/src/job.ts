@@ -269,7 +269,9 @@ export function createJobExecutor(deps: JobExecutorDeps): TaskExecutor {
             return;
           }
           if (job.status === 'open') {
-            if (gateAhead()) throw new Error('zincir okuması geride: job open, görev kapısı fonlanmış gördü');
+            if ((gateAhead() || decided) && job.deadline - retry.submitMarginSeconds > deps.now()) {
+              throw new Error('zincir okuması geride: job open, fonlanmış görülmüştü');
+            }
             await context.reject('job fonlanmamış: kurum fund_job’dan sonra görevi yeniden açmalı');
             return;
           }

@@ -322,6 +322,54 @@ describe('geçici hatalar ve kabul kapısı', () => {
     expect(recorded.calls.at(-1)).toMatch(/^complete:teslim edildi: submit_work /);
   });
 
+  it('kapı fonlanmış gördüyse onaylı okumada henüz olmayan job beklenir', async () => {
+    const address = await job('funded');
+    const key = address.toBase58();
+    let missing = 2;
+    sim.readHook = (seen, info, commitment) => {
+      if (seen !== key || commitment !== 'confirmed' || missing === 0) return info;
+      missing -= 1;
+      return null;
+    };
+    const recorded = fakeContext(address, specParts);
+    await executor().onTask(recorded.context);
+    expect(missing).toBe(0);
+    expect(kinds()).toEqual(['acceptJob', 'submitWork']);
+  });
+
+  it('kapı fonlanmış gördü ama teslim payı kalmadıysa açık job hemen reddedilir', async () => {
+    const address = await job('funded');
+    await sim.patchJob(address, { status: { open: {} } });
+    const recorded = fakeContext(address, specParts);
+    await executor({ now: () => Math.floor(Date.now() / 1000) + 590 }).onTask(recorded.context);
+    expect(recorded.calls).toEqual(['reject:job fonlanmamış: kurum fund_job’dan sonra görevi yeniden açmalı']);
+  });
+
+  it('bu çalışmada fonlanmış okunan job sonradan açık okunursa okuma geride sayılır', async () => {
+    const address = await job('funded');
+    const key = address.toBase58();
+    const funded = sim.accounts.get(key)!;
+    await sim.patchJob(address, { status: { open: {} } });
+    const open = sim.accounts.get(key)!;
+    sim.accounts.set(key, funded);
+    let clock = Math.floor(Date.now() / 1000);
+    let confirms = 0;
+    let served = false;
+    sim.confirmFailure = () => (++confirms === 1 ? new Error('confirm zaman aşımı') : null);
+    sim.readHook = (seen, info, commitment) => {
+      if (seen !== key || commitment !== 'confirmed') return info;
+      clock += 61;
+      if (served || sim.jobStatus(address) !== 'accepted') return info;
+      served = true;
+      return open;
+    };
+    const recorded = fakeContext(address, specParts);
+    await executor({ now: () => clock }).onTask(recorded.context);
+    expect(served).toBe(true);
+    expect(kinds()).toEqual(['acceptJob', 'submitWork']);
+    expect(recorded.calls.at(-1)).toMatch(/^complete:teslim edildi: submit_work /);
+  });
+
   it('kapının gördüğü fonlama süre içinde görünmezse görev fonlanmamış diye reddedilir', async () => {
     const address = await job('funded');
     await sim.patchJob(address, { status: { open: {} } });

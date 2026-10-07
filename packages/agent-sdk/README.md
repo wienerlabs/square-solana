@@ -61,8 +61,7 @@ sequenceDiagram
   kalmayınca görev `FAILED`
   olur; job zincirde `accepted` kalır (kurum deadline'dan sonra `cancel_job` ile parasını geri alır).
   Job kabul edilmiş ya da daha ileri bir durumda okunduktan sonra gerisinde kalan okuma geçici sayılır. Görev kapısı
-  job'u fonlanmış gördüyse ve kararı veren okuma job'u açık ya da yok gösteriyorsa bu da 60 saniye boyunca geçici
-  sayılır; sonra görev fonlanmamış diye reddedilir ya da düşer. Gönderilen tx zincirde inmiş görünürse sıradaki adım
+  job'u fonlanmış gördüyse ve kararı veren okuma job'u açık ya da yok gösteriyorsa bu da 60 saniye boyunca geçici sayılır; sonra görev fonlanmamış diye reddedilir ya da düşer. Bu çalışmada fonlanmış okunan job'un sonradan açık görünmesi de deadline'a teslim payı kalana kadar geçicidir; pay kalmadıysa açık job hemen reddedilir. Gönderilen tx zincirde inmiş görünürse sıradaki adım
   bu okumayla seçilir, geride kalan bir okumayla tx yeniden gönderilmez.
 - **Alacak satışı:** `autoListClaim: { discountBps }` teslimden sonra alacağı nominal değerin
   `discountBps / 10000` altında listeler (`list_claim`). Listeleme hatası görevi değiştirmez, `onError`'a gider.
