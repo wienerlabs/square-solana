@@ -160,7 +160,7 @@ async function waitForRpc(connection: Connection, validator: ChildProcess, timeo
   }
 }
 
-async function airdrop(connection: Connection, to: PublicKey, sol: number): Promise<void> {
+export async function airdrop(connection: Connection, to: PublicKey, sol: number): Promise<void> {
   const signature = await connection.requestAirdrop(to, sol * LAMPORTS_PER_SOL);
   const latest = await connection.getLatestBlockhash('confirmed');
   await connection.confirmTransaction({ signature, ...latest }, 'confirmed');
