@@ -150,7 +150,7 @@ export function createSponsorService(deps: {
       }
 
       const before = await balanceWithSlot();
-      const { value: simulation } = await rpc(() =>
+      const { context: simulatedAt, value: simulation } = await rpc(() =>
         connection.simulateTransaction(tx, {
           sigVerify: false,
           replaceRecentBlockhash: false,
@@ -159,6 +159,9 @@ export function createSponsorService(deps: {
           accounts: { encoding: 'base64', addresses: [sponsorKey.toBase58()] },
         }),
       );
+      if (simulatedAt.slot < before.slot) {
+        throw rpcUnavailable(new Error('simülasyonun bankası bakiye okumasından eski'));
+      }
       if (simulation.err !== null) {
         const programError = deps.programError(simulation.logs ?? []);
         return reject(
@@ -229,6 +232,14 @@ export function createSponsorService(deps: {
         );
       }
 
+      if (reservation.replayed === null) {
+        metrics.feeLamports.inc(Number(feeLamports));
+        metrics.rentLamports.inc(Number(rentLamports));
+        metrics.txCost.observe(Number(cost));
+        metrics.userDailySpend.observe(Number(reservation.userSpent));
+        if (computeUnits !== null) metrics.computeUnits.observe(computeUnits);
+      }
+
       const serialized = tx.serialize();
       let submitted = reservation.replayed === 'submitted';
       if (request.submit && !submitted) {
@@ -250,13 +261,6 @@ export function createSponsorService(deps: {
       }
 
       metrics.requests.inc({ outcome: submitted ? 'submitted' : 'signed' });
-      if (reservation.replayed === null) {
-        metrics.feeLamports.inc(Number(feeLamports));
-        metrics.rentLamports.inc(Number(rentLamports));
-        metrics.txCost.observe(Number(cost));
-        metrics.userDailySpend.observe(Number(reservation.userSpent));
-        if (computeUnits !== null) metrics.computeUnits.observe(computeUnits);
-      }
       return {
         transaction: Buffer.from(serialized).toString('base64'),
         signature,

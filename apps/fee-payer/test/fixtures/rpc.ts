@@ -49,6 +49,7 @@ export class FixtureRpc {
   /** Sonraki isteklere verilecek HTTP durumu; null normal yanıt. */
   failWith: number | null = null;
   simulationLag = 0;
+  ignoreMinContextSlot = false;
 
   reset(): void {
     this.accounts.clear();
@@ -60,6 +61,7 @@ export class FixtureRpc {
     this.sendError = null;
     this.failWith = null;
     this.simulationLag = 0;
+    this.ignoreMinContextSlot = false;
   }
 
   setAccount(address: PublicKey | string, account: FixtureAccount): void {
@@ -105,7 +107,7 @@ export class FixtureRpc {
       case 'simulateTransaction': {
         const config = (params[1] ?? {}) as { accounts?: { addresses: string[] }; minContextSlot?: number };
         const bank = { slot: this.slot - this.simulationLag };
-        if (config.minContextSlot !== undefined && config.minContextSlot > bank.slot) {
+        if (!this.ignoreMinContextSlot && config.minContextSlot !== undefined && config.minContextSlot > bank.slot) {
           throw Object.assign(new Error('Minimum context slot has not been reached'), { code: -32016 });
         }
         this.simulated.push(params[0] as string);

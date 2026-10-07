@@ -99,7 +99,7 @@ simülasyonun döndürdüğü bakiyesi arasındaki farktan ücret düşülerek b
 okunduğu slottan eski olmayan bir bankada yapılır (`minContextSlot`). Sponsorun ödediği ve tx'te çalışan her ATA
 açılışı için simülasyonun rent'ine bir token hesabının rent'i eklenir ([ADR 0019](../../docs/decisions/0019-fee-payer-politikasi.md)
 madde 7). Her tx `sponsored_txs`'e
-yazılır: imza, cüzdan, API anahtarı, durum (`signed`, `submitted`, `failed`), ücret, rent, simülasyondaki compute
+yazılır: imza, cüzdan, API anahtarı, durum (`signed`, `submitted`; `failed` yalnızca eski kayıtlarda), ücret, rent, simülasyondaki compute
 unit, sınır, fiyat ve denetlenen talimatlar (`vault>` önekiyle iç talimatlar).
 
 | Metrik | Açıklama |

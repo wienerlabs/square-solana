@@ -91,7 +91,8 @@
      (`sponsor_rent_extractable`). Multisig zincirden okunur; aynı tx'te açılıyorsa açılışın argümanından.
      Açılan multisig'in üyeleri ve `config_authority`'si sponsor olamaz (`sponsor_account_misuse`).
    - **Aynı tx'in tekrarı:** Sponsorun imzası tx'in kimliğidir. Aynı tx ikinci kez gelirse ilk kayıt döner:
-     bütçeye ikinci kez yazılmaz, gönderilmişse yeniden gönderilmez. Başarısız kaydı olan tx yeniden ölçülür.
+     bütçeye ikinci kez yazılmaz, gönderilmişse yeniden gönderilmez. Önceki sürümün `failed` yaptığı kayıt
+     yeniden ölçülür.
    - **Gönderim hatası:** Servisin gönderimi hata verirse (zaman aşımı, RPC hatası) kayıt `signed` kalır ve
      bütçeye sayılır: sponsorun imzası blockhash süresince geçerlidir, tx yine de zincire girebilir ve 503
      yanıtı imzayı taşır. Aynı tx yeniden gönderilebilir; ikinci kez sayılmaz. Zincire hiç girmeyen tx'in

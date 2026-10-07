@@ -187,6 +187,10 @@ describe('imza ve gönderim', () => {
     expect(response.body.error).toMatchObject({ code: 'rpc_unavailable' });
     expect(stack.rpc.simulated).toHaveLength(0);
     expect(await stack.db.sponsoredTx.count()).toBe(0);
+    stack.rpc.ignoreMinContextSlot = true;
+    const ignored = await sponsor(token, { transaction: encode(registerAgent()) });
+    expect(ignored.status).toBe(503);
+    expect(await stack.db.sponsoredTx.count()).toBe(0);
   });
 
   it('aynı tx ikinci kez gelince ilk kayıt döner: ikinci ücret yok, ikinci gönderim yok', async () => {
@@ -214,6 +218,14 @@ describe('imza ve gönderim', () => {
     expect(row).toMatchObject({ status: 'signed', error: null });
     const usage = await stack.request('GET', '/v1/sponsor/usage', { headers: bearer(token) });
     expect(usage.body.data).toMatchObject({ spentLamports: String(FEE), transactions: 1 });
+    expect(await metric('square_fee_payer_fee_lamports_total')).toEqual([expect.stringMatching(/ 5000$/)]);
+    expect(
+      stack.logs.some(
+        (record) =>
+          record.msg === 'dependency_error' &&
+          (record['details'] as { signature?: string } | undefined)?.signature === row.signature,
+      ),
+    ).toBe(true);
 
     stack.rpc.sendError = null;
     const retried = await sponsor(token, { transaction: tx, submit: true });
