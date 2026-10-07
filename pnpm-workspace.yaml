@@ -3,6 +3,7 @@ packages:
   - 'apps/*'
   - 'db'
   - 'tests/smoke'
+  - 'tests/services'
 
 # Kurulum script'leri çalıştırılmaz (pnpm 10 varsayılanını açık karar olarak kaydeder):
 # - bufferutil, utf-8-validate: @solana/web3.js → ws'nin isteğe bağlı native hızlandırıcıları; JS yedekleri var.
