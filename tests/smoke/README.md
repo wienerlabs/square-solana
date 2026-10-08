@@ -173,8 +173,10 @@ Validator'ın port ön denetimi ise birim testindedir: port doluysa `child_proce
 
 Modüller `@squaresdk/solana-smoke/<modül>` olarak dışa açıktır. Servis entegrasyon testi
 ([`tests/services`](../services/), BE-36) localnet koşucusunun parçalarını (`startValidator`, `fundLocalnet`,
-`assertDeployedPrograms`), `runInit`'i ve `runSmoke`'u kullanır. `runSmoke`'un isteğe bağlı üç kancası vardır;
-verilmezse smoke tx'leri kendisi gönderir:
+`assertDeployedPrograms`), `runInit`'i ve `runSmoke`'u kullanır. Demo paketi ([`apps/demo`](../../apps/demo/), BE-21)
+`startValidator`, `writeRoleKeys`, `airdrop` ve `assertDeployedPrograms`'ı, `runInit`'i, yapılandırma şemalarını
+(`Address`, `U64`, `PositiveSecs`, `KeyPath`), anahtar, gönderici ve prover modüllerini kullanır. `runSmoke`'un isteğe
+bağlı üç kancası vardır; verilmezse smoke tx'leri kendisi gönderir:
 - `screen(wallet)`: adım 3'ün screening kaydını yazar (servis testinde screener servisi).
 - `finalize(job, expectError)`: challenge bittikten sonra finalize'ı yapar ya da beklenen bekletmeyi bekler (servis
   testinde keeper servisi).
