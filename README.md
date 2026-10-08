@@ -181,7 +181,7 @@ Square runs on **Solana devnet** ([deploy record](docs/deploy/devnet.md)).
 - The eight-step smoke test has run on devnet with real transactions ([report](docs/deploy/smoke-devnet.md)).
 - There is no mainnet environment ([ADR 0027](docs/decisions/0027-yalnizca-devnet.md)); network-independent code
   (CAIP-2, `did:aip`, cluster options) is kept.
-- Contracts: program interface v0.7.0, HTTP API v0.26.0 ([API and SDK contract](docs/design/api-sdk-contract.md)).
+- Contracts: program interface v0.7.1, HTTP API v0.26.1 ([API and SDK contract](docs/design/api-sdk-contract.md)).
 
 ## Quick start
 
