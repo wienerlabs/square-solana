@@ -7,6 +7,7 @@
 '@squaresdk/solana-fee-payer': minor
 '@squaresdk/solana-web': minor
 '@squaresdk/solana-smoke': minor
+'@squaresdk/solana-demo': minor
 ---
 
 Kabul öncesi uyum ön-ispatı (BC-39 P-01, ADR 0028; program sözleşmesi v0.8.0, API sözleşmesi v0.27.0).
@@ -19,3 +20,4 @@ Kabul öncesi uyum ön-ispatı (BC-39 P-01, ADR 0028; program sözleşmesi v0.8.
 - Fee payer: varsayılan izin listesine `verifier:set_preflight_proof`.
 - Web: iş sayfasında "Pre-acceptance proof" bölümü (kurum üretir ve bağlar; agent'ın kabulü o zamana kadar kapalı; başka cüzdan için bağlanmış ön-ispat söylenir), zaman çizelgesinde `PreflightProofSet`; iş açmada public tavanı aşan tutar reddedilir.
 - Smoke: her policy'li işte ön-ispat; ispat-ret varyantı onaylı alıcının gizli engelli listede olduğu alacak satışıyla.
+- Demo: senaryo koşucusu kabulden önce ön-ispatı bağlar; politikaya `blockedPayees` (`buyer` rolü ya da adres); ret senaryosu engelli alıcıya satılan alacakla (`claimSale: true`, `refusalRules` `payeeBlocked`'ı içerir).

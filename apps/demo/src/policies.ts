@@ -83,6 +83,8 @@ export function demoPolicyDocument(params: {
   institutionPda: PublicKey;
   policyId: Uint8Array;
   mint: PublicKey;
+  /** Seed'in alıcısı: `blockedPayees`'teki `buyer` rolü bu adrese çözülür. */
+  buyer: PublicKey;
   values: DemoPolicyValues;
   version: number;
 }): PolicyDocument {
@@ -95,7 +97,7 @@ export function demoPolicyDocument(params: {
     maxDaily: values.maxDaily.toString(),
     maxPerTx: values.maxPerTx.toString(),
     tokenWhitelist: [params.mint.toBase58()],
-    blockedPayees: [],
+    blockedPayees: values.blockedPayees.map((payee) => (payee === 'buyer' ? params.buyer : payee).toBase58()),
     allowedCategories: [...values.categories],
     timeWindow: values.timeWindow === null ? null : { ...values.timeWindow, days: [...values.timeWindow.days] },
   };
@@ -105,6 +107,7 @@ export function demoPolicies(params: {
   secret: Uint8Array;
   institutionPda: PublicKey;
   mint: PublicKey;
+  buyer: PublicKey;
   pda: SquarePda;
   policies: Readonly<Record<string, DemoPolicyValues>>;
 }): DemoPolicy[] {
@@ -114,6 +117,7 @@ export function demoPolicies(params: {
       institutionPda: params.institutionPda,
       policyId,
       mint: params.mint,
+      buyer: params.buyer,
       values,
       version: 1,
     });

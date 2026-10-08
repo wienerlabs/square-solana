@@ -11,7 +11,7 @@ koşar ve küme bir JSON yapılandırmasıyla seçilir.
 | Komut | Ne yapar |
 |---|---|
 | `seed` | Kümeye demo verisini kurar: SOL ve devnet USDC dağıtımı, screening kayıtları, kurum, politikalar ve alıcı listesi, agent kaydı. Tekrar koşulduğunda değişiklik yapmaz (`changes: 0`). Adresleri JSON olarak yazar |
-| `scenario` | Seçilen senaryoları koşar: kurum job açıp fonlar, işi A2A ile demo agent'a gönderir, agent kabul edip teslim eder, (isteğe bağlı) alacak satılır, kurum ispatı bağlar, keeper finalize eder; her adım zincirden doğrulanır |
+| `scenario` | Seçilen senaryoları koşar: kurum job açıp fonlar ve kabul öncesi ön-ispatı bağlar, işi A2A ile demo agent'a gönderir, agent kabul edip teslim eder, (isteğe bağlı) alacak satılır, kurum release ispatını bağlar, keeper finalize eder; her adım zincirden doğrulanır |
 | `agent` | Demo agent'ı tek başına çalıştırır (kart, A2A uç noktası, teslimatlar); kaydını kartla eşler. Yalnızca agent anahtarını taşıyan bir yapılandırmayla çalışır |
 | `demo:localnet` | Geçici bir `solana-test-validator` açar, smoke'un `init`'ini, `seed`'i iki kez (ikincisi değişiklik yapmamalı) ve bütün senaryoları süreç içi agent'la koşar, her şeyi kapatır |
 
@@ -102,9 +102,10 @@ zincirdeki durumunu RPC'den okur ve JSON rapor olarak teslim eder.
   yarım kalan görev sürdürülmez. Kalıcı depo gereken dağıtımda agent-sdk'nın Postgres deposu kullanılır.
 - **Alacak listeleme:** Agent alacağı yalnızca açıkça istenince listeler (`list_claim`, indirim
   `demo.agent.autoListClaimBps`). Süreç içi agent yalnızca `claimSale: true` olan senaryoda listeler; tek başına çalışan
-  agent yalnızca `--list-claims` ile listeler. Listeleme agent geneline uygulanır: `--list-claims` açıkken ret senaryosunun
-  alacağı da listelenir ve onaylı bir alıcı onu challenge penceresinde alırsa iadede alıcıya ödeme yapılmaz. Bu yüzden
-  alacak satışı denenmeyecekse tek başına agent `--list-claims` olmadan çalıştırılır.
+  agent yalnızca `--list-claims` ile listeler. Listeleme agent geneline uygulanır: `--list-claims` açıkken satışsız
+  senaryonun alacağı da listelenir. Onaylı bir alıcı onu challenge penceresinde alırsa payee alıcı olur ve senaryonun
+  "payee agent" denetimi tutmaz. Bu yüzden satışsız senaryolar tek başına agent `--list-claims` olmadan çalışırken
+  koşulur.
 
 ## Senaryolar
 
@@ -114,15 +115,23 @@ rolündedir; agent tarafındaki her tx'i agent kendisi imzalar. Süreç içi age
 | Adım | Koşucunun yaptığı | Zincirden doğrulanan |
 |---|---|---|
 | Ön koşul | Küme koruması, politikayı sırdan kurar, agent'ın kartını indirir | Commitment zincirdekiyle aynı; agent kaydının cüzdanı yapılandırmadaki; kartın SHA-256'sı `agent_card_hash` |
-| 3 | `createJob` (politikalı) + `fundJob` | Vault'ta tutar, kurumdan düştü |
+| 3 | `createJob` (politikalı) + `fundJob`; kabul öncesi ön-ispat süreç içinde, `setPreflightProof` ([ADR 0028](../../docs/decisions/0028-kabul-oncesi-on-ispat-ve-dispute-duzeltmeleri.md)) | Vault'ta tutar, kurumdan düştü; `PreflightProof` bu job'un ve politikanın, payee agent cüzdanı, ret kodunda kalıcı ya da günlük tavan biti yok |
 | 4 | A2A `SendMessage`, görev bitene kadar `GetTask` (`demo.timing.taskTimeoutSecs`) | Görev `COMPLETED`; job `Delivered`; makbuz, `work_hash` ve `delivery_uri` aynı; teslimatın SHA-256'sı `work_hash`; agent aynı baytları sunuyor; rapor bu job'un |
 | 5 | `claimSale: true` ise agent'ın listelediği alacağı (`demo.timing.claimListingTimeoutSecs` içinde) seed'deki alıcı listesinin Merkle kanıtıyla alır | Listeleme `Bought`, agent fiyatı aldı |
-| 7 | Groth16 ispatı süreç içinde, `setComplianceProof` | `approved`: uyumlu, payee agent (satıldıysa alıcı), net tutar; `refused`: ret kodu tam olarak `refusalRules`'un kodu ve kesin ret |
-| 6 + 8 | Challenge bitince `finalizePayment` (keeper); başka bir keeper önce kapattıysa yalnızca okur | `approved`: `Released`, `ValidationRecord` `Verified`, payee'ye net, keeper'a ücret; `refused`: `Refunded`, net kuruma |
+| 7 | Release ispatı süreç içinde, `setComplianceProof` | `approved`: uyumlu, payee agent (satıldıysa alıcı), net tutar; `refused`: payee alıcı, ret kodu tam olarak `refusalRules`'un kodu ve kesin ret |
+| 6 + 8 | Challenge bitince `finalizePayment` (keeper); başka bir keeper önce kapattıysa yalnızca okur | `approved`: `Released`, `ValidationRecord` `Verified`, payee'ye net, keeper'a ücret; `refused`: `Refunded`, `ValidationRecord` `Refused`, net kuruma, alacak `Defaulted`, alıcıya ödeme yok |
 
-- **Ret varyantı:** işlem başı tavanı job tutarının altında olan bir politikayla kurulur ve `refusalRules: ["perTx"]`
-  ister: ret kodu tam olarak 1 olmalı ve ret kesin olmalı; escrow kuruma iade edilir. Ret senaryosunda alacak satılmaz.
-  Tutar Travel Rule eşiğinin altında olmalıdır.
+- **Ret varyantı:** Kabul öncesi ön-ispat işin tam tutarını, mint'ini ve agent cüzdanını kabulden önce denetler. Bu
+  yüzden kesin ret yalnızca alacak, politikanın engelli payee listesindeki onaylı bir alıcıya satılınca çıkar
+  (ADR 0028). Ret senaryosu buna göre kurulur:
+  - alacak satışlıdır (`claimSale: true`);
+  - politikasının `blockedPayees`'i `buyer`'ı içerir; alıcı yine alıcı listesindedir, alacağı alabilir;
+  - `refusalRules` `payeeBlocked`'ı içerir. `perTx` ve `mintNotAllowed` ön-ispattan geçmiş işte çıkamaz, yapılandırma
+    onları reddeder.
+
+  Ret kodu tam olarak `refusalRules`'un kodu olmalı ve ret kesin olmalı. Escrow neti kuruma iade eder; alıcı alacağa
+  ödediği fiyatı geri almaz (alıcının fiyata kattığı risk, ADR 0014). Alıcıyı engelleyen politikada alacak satışlı onay
+  senaryosu kurulamaz. Tutar Travel Rule eşiğinin altında olmalıdır.
 - **Hata olursa:** `createJob`'dan sonraki herhangi bir adım düşerse koşucu job'u okur. Job `Open` ya da `Funded` ise
   `cancel_job` gönderir ve vault'taki tutar kuruma döner. `Accepted` ise iptal deadline'dan sonra mümkündür; koşucu
   deadline'ı yazar, kurum o zaman `squaresdk-solana job cancel --job <job>` ile tutarı geri alır. `Delivered` iş normal
@@ -147,13 +156,13 @@ doğrulanır; eksikse komut başlamaz.
 |---|---|
 | `seed.institutionName` | Kurumun zincirdeki adı (en fazla 64 bayt) |
 | `seed.policySecret`, `seed.output` | Politika sırrının yolu (repo dışı, dizini var), seed çıktısının yolu (isteğe bağlı) |
-| `seed.policies.<ad>` | `maxPerTx`, `maxDaily`, `dailyCeiling` (settlement mint'in atomik birimi), `categories`, `timeWindow` (`{ days, startHourUtc, endHourUtc }` ya da her an için açıkça `null`). Ad `[a-z0-9-]`, en fazla 8 politika |
+| `seed.policies.<ad>` | `maxPerTx`, `maxDaily`, `dailyCeiling` (settlement mint'in atomik birimi), `categories`, `timeWindow` (`{ days, startHourUtc, endHourUtc }` ya da her an için açıkça `null`), `blockedPayees` (isteğe bağlı, varsayılan boş: politikanın engelli payee listesi, en çok 10; `buyer` rolü ya da adres). Ad `[a-z0-9-]`, en fazla 8 politika |
 | `seed.extraBuyers` | Alıcı listesine `buyer`'ın yanında eklenen adresler (en fazla 15) |
 | `seed.funding` | `institutionUsdc`, `buyerUsdc` (token hedefleri), `agentLamports`, `keeperLamports` (SOL hedefleri) |
 | `seed.screening.minRemainingSecs` | Kaydın yeniden yazılması için kalan süre eşiği |
 | `demo.agent` | `agentId` (registry `agent_id`), `name`, `description`, `version`, `publicUrl` (https; teslimat adresi 128 baytı aşmamalı), `price`, `maxReportAccounts` (1-100), `maxReportSignatures` (0-1000), `retry` (`minDelayMs`, `maxDelayMs`, `submitMarginSecs`), `autoListClaimBps` (isteğe bağlı, 1-9999; listeleme yalnızca istenince), `institutions` (A2A anahtarının adına iş açabileceği kurum cüzdanları, açık adres), `wallet` (agent cüzdanının açık adresi; `--agent-url` ile zorunlu) |
 | `demo.timing` | `taskTimeoutSecs` (A2A görevinin bitmesi), `claimListingTimeoutSecs` (agent'ın alacağı listelemesi), `a2aRequestTimeoutSecs` (tek A2A isteği), `pollIntervalMs` (görev, listeleme ve zincir saati yoklaması), `proofDayMarginSecs` (ispatın aynı UTC gününde kalma payı) |
-| `demo.scenarios.<ad>` | `policy` (seed'deki ad), `expect` (`approved` / `refused`), `refusalRules` (`refused`'da zorunlu, `approved`'da verilmez; ör. `["perTx"]`), `amount` (agent'ın fiyatından az olamaz), `paymentCategory`, `challengePeriodSecs`, `deadlineSecs`, `claimSale` (varsayılan `false`), `report.targets` (en çok `maxReportAccounts`; rol: `payer`, `institution`, `agent`, `buyer`, `keeper`; rolün token hesabı: `<rol>:usdc`; `institution:pda`; `mint`; ya da adres), `report.signatures` (en çok `maxReportSignatures`) |
+| `demo.scenarios.<ad>` | `policy` (seed'deki ad), `expect` (`approved` / `refused`), `refusalRules` (`refused`'da zorunlu, `approved`'da verilmez; `payeeBlocked`'ı içerir, ör. `["payeeBlocked"]`), `amount` (agent'ın fiyatından az olamaz), `paymentCategory`, `challengePeriodSecs`, `deadlineSecs`, `claimSale` (varsayılan `false`; `refused`'da `true` olmalı), `report.targets` (en çok `maxReportAccounts`; rol: `payer`, `institution`, `agent`, `buyer`, `keeper`; rolün token hesabı: `<rol>:usdc`; `institution:pda`; `mint`; ya da adres), `report.signatures` (en çok `maxReportSignatures`) |
 
 `agent` komutunun yapılandırması bu dosyanın bir alt kümesidir: `cluster`, `rpcUrl`, `commitment`, `programIds`,
 isteğe bağlı `lookupTable` ve `computeUnitPrice`, `keys.agent` ve `demo.agent`. Tam yapılandırma da verilebilir; o
@@ -170,8 +179,8 @@ Programlar `target/deploy/*.so`'dan yüklenir (derlenmez) ve zincirdeki executab
 karşılaştırılır. Rol anahtarları, upgrade authority ve 6 ondalıklı mint koşu için geçici bir dizinde üretilir. Bu geçici
 zincirin musluğu olarak `payer`'a 100 SOL, admin'e 10 SOL airdrop edilir ve faucet yerine `payer`'a seed'in dağıtacağı
 USDC (`funding.institutionUsdc + funding.buyerUsdc`) basılır. Localnet yapılandırması
-([`src/localnet.ts`](src/localnet.ts)): `standard` (işlem başı 10 USDC) ve `strict` (işlem başı 1 USDC) politikaları
-(ikisi de her gün 00-23 UTC), üç alıcılı liste, agent fiyatı 1 USDC, `autoListClaimBps` 300, en çok 8 hesap ve 10 imza,
+([`src/localnet.ts`](src/localnet.ts)): `standard` ve `blocked-buyer` politikaları (ikisi de işlem başı 10 USDC, her gün
+00-23 UTC; `blocked-buyer` alıcıyı engelli payee listesine koyar), üç alıcılı liste, agent fiyatı 1 USDC, `autoListClaimBps` 300, en çok 8 hesap ve 10 imza,
 `retry` 1 sn / 30 sn / 30 sn, `timing` 120 sn görev, 60 sn listeleme, 30 sn istek, 500 ms yoklama, 180 sn gün payı ve üç
 senaryo:
 
@@ -179,7 +188,7 @@ senaryo:
 |---|---|---|---|
 | `approved` | `standard` | 5 USDC | ispat uyumlu, `Released`, agent'a 4,975 USDC |
 | `approved-claim` | `standard` | 4 USDC, alacak satışı | alıcı 3,88 USDC'ye alır; ispat uyumlu, `Released`, alıcıya 3,98 USDC |
-| `refused` | `strict` | 5 USDC, `refusalRules: ["perTx"]` | ret kodu 1 (`perTx`), `Refunded`, kuruma 4,975 USDC |
+| `refused` | `blocked-buyer` | 5 USDC, alacak satışı, `refusalRules: ["payeeBlocked"]` | alıcı 4,85 USDC'ye alır; ret kodu 8 (`payeeBlocked`), `Refunded`, kuruma 4,975 USDC, alacak `Defaulted`, alıcıya ödeme yok |
 
 Çıktı: iki seed satırı (ilki değişiklik sayısı, ikincisi `0 değişiklik`) ve senaryo başına bir satır; `--out` bütün
 sonucu (seed çıktıları, senaryoların job, görev, teslimat, rapor, ispat ve ödeme ayrıntıları, tx imzaları) JSON olarak
@@ -251,9 +260,10 @@ kullanır, yeniden kurmaz. Bir anahtar sahibi şu adımlarla koşar:
            "maxPerTx": "2000000", "maxDaily": "20000000", "dailyCeiling": "50000000", "categories": ["research"],
            "timeWindow": { "days": ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"], "startHourUtc": 0, "endHourUtc": 23 }
          },
-         "strict": {
-           "maxPerTx": "500000", "maxDaily": "20000000", "dailyCeiling": "50000000", "categories": ["research"],
-           "timeWindow": { "days": ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"], "startHourUtc": 0, "endHourUtc": 23 }
+         "blocked-buyer": {
+           "maxPerTx": "2000000", "maxDaily": "20000000", "dailyCeiling": "50000000", "categories": ["research"],
+           "timeWindow": { "days": ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"], "startHourUtc": 0, "endHourUtc": 23 },
+           "blockedPayees": ["buyer"]
          }
        },
        "funding": { "institutionUsdc": "5000000", "buyerUsdc": "2000000", "agentLamports": "100000000", "keeperLamports": "50000000" },
@@ -280,7 +290,7 @@ kullanır, yeniden kurmaz. Bir anahtar sahibi şu adımlarla koşar:
        "scenarios": {
          "approved": { "policy": "standard", "expect": "approved", "amount": "1000000", "paymentCategory": "research", "challengePeriodSecs": 60, "deadlineSecs": 3600, "report": { "targets": ["institution", "institution:usdc", "mint"], "signatures": 5 } },
          "approved-claim": { "policy": "standard", "expect": "approved", "amount": "1000000", "paymentCategory": "research", "challengePeriodSecs": 60, "deadlineSecs": 3600, "claimSale": true, "report": { "targets": ["buyer", "buyer:usdc", "agent:usdc"], "signatures": 3 } },
-         "refused": { "policy": "strict", "expect": "refused", "refusalRules": ["perTx"], "amount": "1000000", "paymentCategory": "research", "challengePeriodSecs": 60, "deadlineSecs": 3600, "report": { "targets": ["agent", "keeper"], "signatures": 2 } }
+         "refused": { "policy": "blocked-buyer", "expect": "refused", "refusalRules": ["payeeBlocked"], "amount": "1000000", "paymentCategory": "research", "challengePeriodSecs": 60, "deadlineSecs": 3600, "claimSale": true, "report": { "targets": ["agent", "keeper"], "signatures": 2 } }
        }
      }
    }
@@ -336,11 +346,11 @@ kullanır, yeniden kurmaz. Bir anahtar sahibi şu adımlarla koşar:
    export SQUARE_DEMO_A2A_KEY=$(openssl rand -hex 32)
    pnpm --filter @squaresdk/solana-demo agent --config ~/agent/agent.json --host 0.0.0.0 --port 8787   # sunucu
    pnpm --filter @squaresdk/solana-demo scenario --config ~/square-devnet/demo.json --agent-url https://<agent'ın adresi> \
-     --scenario approved --scenario refused
+     --scenario approved
    ```
 
    Ayrı agent'ın listeleme kipi açılışta sabittir, bu yüzden senaryolar iki koşuya bölünür: önce listeleme kapalıyken
-   `approved` ve `refused`, sonra agent `--list-claims` ile yeniden başlatılıp yalnızca `--scenario approved-claim`
+   `approved`, sonra agent `--list-claims` ile yeniden başlatılıp `--scenario approved-claim --scenario refused`
    (yukarıdaki risk). Listeleme beklenirken koşu düşerse job `delivered` kalır; koşucu job'u ve çözüm yolunu günlüğe
    yazar. Her senaryo challenge penceresini (60 sn) bekler. Devnet'te keeper servisi (BE-15) çalışıyorsa
    finalize'ı o yapabilir; koşucu bunu görür ve yalnızca sonucu doğrular.

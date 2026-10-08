@@ -49,6 +49,16 @@ export const scenario = (overrides: Record<string, unknown> = {}) => ({
   ...overrides,
 });
 
+export const refusedScenario = (overrides: Record<string, unknown> = {}) =>
+  scenario({
+    policy: 'blocked-buyer',
+    expect: 'refused',
+    refusalRules: ['payeeBlocked'],
+    claimSale: true,
+    report: { targets: ['agent', 'keeper'], signatures: 2 },
+    ...overrides,
+  });
+
 export function rawDemoConfig(
   overrides: {
     seed?: Record<string, unknown>;
@@ -76,7 +86,7 @@ export function rawDemoConfig(
       institutionName: 'Square demo kurumu',
       policySecret: 'state/policy-secret',
       output: 'state/seed-devnet.json',
-      policies: { standard: policy(), strict: policy({ maxPerTx: '1000000' }) },
+      policies: { standard: policy(), 'blocked-buyer': policy({ blockedPayees: ['buyer'] }) },
       funding: {
         institutionUsdc: '20000000',
         buyerUsdc: '5000000',
@@ -103,7 +113,7 @@ export function rawDemoConfig(
       timing: TIMING,
       scenarios: {
         approved: scenario(),
-        refused: scenario({ policy: 'strict', expect: 'refused', refusalRules: ['perTx'] }),
+        refused: refusedScenario(),
       },
       ...overrides.demo,
     },

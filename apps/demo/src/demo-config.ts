@@ -24,6 +24,11 @@ export const MAX_EXTRA_BUYERS = 15;
 export const MAX_CALLER_INSTITUTIONS = 8;
 const WORK_HASH_HEX_LENGTH = 64;
 const REFUSAL_RULES = Object.keys(REFUSAL) as [RefusalRule, ...RefusalRule[]];
+/**
+ * Ön-ispat işin tam tutarını ve mint'ini denetler; release'in neti tutarı aşmaz, mint aynıdır. Bu yüzden ön-ispattan
+ * geçmiş işin release ispatında bu kurallar çiğnenemez (ADR 0028).
+ */
+const PREFLIGHT_PASSED_RULES: readonly RefusalRule[] = ['perTx', 'mintNotAllowed'];
 
 const ROLE_TARGET = new RegExp(`^(${REPORT_ROLES.join('|')})(:usdc)?$`);
 const NAME = /^[a-z0-9][a-z0-9-]{0,31}$/;
@@ -56,6 +61,9 @@ const distinct = (items: readonly unknown[]) => new Set(items.map(String)).size 
 const Name = z.string().regex(NAME, 'küçük harf, rakam ve tire (en fazla 32)');
 const Positive = U64.refine((value) => value > 0n, { message: 'sıfır olamaz' });
 
+/** Politikanın engelli payee'si: seed'in alıcısı (`buyer` rolü) ya da açık adres. */
+const BlockedPayee = z.union([z.literal('buyer'), Address]);
+
 const PolicySchema = z.object({
   maxPerTx: Positive,
   maxDaily: Positive,
@@ -66,6 +74,11 @@ const PolicySchema = z.object({
     .max(POLICY_CIRCUIT_LIMITS.allowedCategories)
     .refine((items) => new Set(items).size === items.length, { message: 'kategori tekrar edemez' }),
   timeWindow: TimeWindowSchema.nullable(),
+  blockedPayees: z
+    .array(BlockedPayee)
+    .max(POLICY_CIRCUIT_LIMITS.blockedPayees)
+    .refine(distinct, { message: 'engelli payee tekrar edemez' })
+    .default([]),
 });
 export type DemoPolicyValues = z.infer<typeof PolicySchema>;
 
@@ -160,14 +173,26 @@ const ScenarioSchema = z
     message: 'deadline challenge süresinden uzun olmalı',
     path: ['deadlineSecs'],
   })
-  .refine((s) => !(s.claimSale && s.expect === 'refused'), {
-    message: 'ret senaryosunda alacak satılmaz (alıcıya ödenmez)',
+  .refine((s) => s.expect !== 'refused' || s.claimSale, {
+    message:
+      'ret senaryosunda alacak satılır: kabul öncesi ön-ispattan sonra kesin ret yalnızca payee engelli alıcıyken çıkar (ADR 0028)',
     path: ['claimSale'],
   })
   .refine((s) => (s.expect === 'refused') === (s.refusalRules !== undefined), {
     message: 'refusalRules ret senaryosunda zorunlu, onay senaryosunda verilmez',
     path: ['refusalRules'],
-  });
+  })
+  .refine(
+    (s) =>
+      s.refusalRules === undefined ||
+      (s.refusalRules.includes('payeeBlocked') &&
+        !s.refusalRules.some((rule) => PREFLIGHT_PASSED_RULES.includes(rule))),
+    {
+      message:
+        'ret kuralları payeeBlocked içerir; perTx ve mintNotAllowed kabul öncesi ön-ispattan geçmiş işte çıkamaz (ADR 0028)',
+      path: ['refusalRules'],
+    },
+  );
 export type ScenarioValues = z.infer<typeof ScenarioSchema>;
 
 const DemoSchema = z.object({
@@ -189,6 +214,21 @@ const SectionsSchema = z
           code: 'custom',
           path: ['demo', 'scenarios', name, 'policy'],
           message: `seed.policies içinde yok: ${scenario.policy}`,
+        });
+      }
+      const blocksBuyer = seed?.policies[scenario.policy]?.blockedPayees.includes('buyer');
+      if (blocksBuyer === false && scenario.expect === 'refused') {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['demo', 'scenarios', name, 'policy'],
+          message: `politika ${scenario.policy} alıcıyı engellemiyor: ret senaryosunun politikasının blockedPayees'i "buyer" içermeli`,
+        });
+      }
+      if (blocksBuyer === true && scenario.expect === 'approved' && scenario.claimSale) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['demo', 'scenarios', name, 'policy'],
+          message: `politika ${scenario.policy} alıcıyı engelliyor: alacak satışlı onay senaryosunda ispat reddeder`,
         });
       }
       if (scenario.amount < demo.agent.price) {

@@ -194,11 +194,11 @@ describe('outcomeLine', () => {
       outcomeLine(
         outcome({
           claim: { price: '3880000', buyer: 'B' },
-          proof: { verdict: 'refused', refusalCode: 1, rules: ['perTx'] } as never,
+          proof: { verdict: 'refused', refusalCode: 8, rules: ['payeeBlocked'] } as never,
         }),
       ),
     ).toContain(
-      'ispat refused kod 1 (perTx); teslimat abababababababab…, rapor 3 hesap slot 9; alacak 3880000 ile alıcıya satıldı',
+      'ispat refused kod 8 (payeeBlocked); teslimat abababababababab…, rapor 3 hesap slot 9; alacak 3880000 ile alıcıya satıldı',
     );
   });
 });
@@ -253,11 +253,17 @@ describe('localnet koşucusu', () => {
       ...demoLocalnetSections({ extraBuyers: [key().toBase58()], escrowProgram: IDS.escrow }),
     };
     const config = parseDemoConfig(raw, '/tmp/demo', {});
-    expect(Object.keys(requireSeed(config).policies)).toEqual(['standard', 'strict']);
+    expect(Object.keys(requireSeed(config).policies)).toEqual(['standard', 'blocked-buyer']);
+    expect(requireSeed(config).policies['blocked-buyer']!.blockedPayees).toEqual(['buyer']);
     const scenarios = requireDemo(config).scenarios;
     expect(Object.keys(scenarios)).toEqual(['approved', 'approved-claim', 'refused']);
     expect(scenarios['approved-claim']!.claimSale).toBe(true);
-    expect(scenarios.refused).toMatchObject({ expect: 'refused', policy: 'strict', refusalRules: ['perTx'] });
+    expect(scenarios.refused).toMatchObject({
+      expect: 'refused',
+      policy: 'blocked-buyer',
+      refusalRules: ['payeeBlocked'],
+      claimSale: true,
+    });
   });
 });
 

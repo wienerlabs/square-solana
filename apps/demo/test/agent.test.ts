@@ -14,7 +14,7 @@ import {
 import { createDeliveryStore } from '../src/delivery.js';
 import { parseDemoConfig, requireDemo } from '../src/demo-config.js';
 import { ACCOUNT_REPORT_ID } from '../src/report.js';
-import { IDS, rawDemoConfig } from './helpers.js';
+import { IDS, rawDemoConfig, scenario } from './helpers.js';
 
 describe('callerGrants', () => {
   it("anahtarın yalnızca SHA-256'sı kurum adresleriyle verilir", () => {
@@ -30,8 +30,8 @@ describe('callerGrants', () => {
 });
 
 describe('demoAgentOptions', () => {
-  const settings = (agent: Record<string, unknown> = {}) =>
-    requireDemo(parseDemoConfig(rawDemoConfig({ agent }), '/srv/demo', {})).agent;
+  const settings = (agent: Record<string, unknown> = {}, demo: Record<string, unknown> = {}) =>
+    requireDemo(parseDemoConfig(rawDemoConfig({ agent, demo }), '/srv/demo', {})).agent;
   const params = (overrides: Partial<DemoAgentParams> = {}): DemoAgentParams => ({
     settings: settings(),
     signer: Keypair.generate(),
@@ -54,8 +54,14 @@ describe('demoAgentOptions', () => {
     expect(demoAgentOptions(params(), deliveries).autoListClaim).toBeUndefined();
     expect(demoAgentOptions(params({ listClaims: true }), deliveries).autoListClaim).toEqual({ discountBps: 300 });
     expect(
-      demoAgentOptions(params({ listClaims: true, settings: settings({ autoListClaimBps: undefined }) }), deliveries)
-        .autoListClaim,
+      demoAgentOptions(
+        params({
+          listClaims: true,
+          // Alacak satışlı senaryo (ret senaryosu dahil) indirim ister; burada yalnızca onay senaryosu var.
+          settings: settings({ autoListClaimBps: undefined }, { scenarios: { approved: scenario() } }),
+        }),
+        deliveries,
+      ).autoListClaim,
     ).toBeUndefined();
   });
 

@@ -4,10 +4,13 @@ import { PublicKey, type Keypair } from '@solana/web3.js';
 import { createA2aClient } from '@squaresdk/solana-a2a';
 import { claimPrice } from '@squaresdk/solana-agent-sdk';
 import {
+  buildPreflightWitness,
   buildReleaseWitness,
   buildSetComplianceProofTx,
+  buildSetPreflightProofTx,
   getBuyerProof,
   isFinalRefusal,
+  preflightAccepts,
   refusalRules,
   releaseNetAmount,
   type Prover,
@@ -63,6 +66,7 @@ export interface ScenarioOutcome {
     document: AccountReport;
   };
   claim: { price: string; buyer: string } | null;
+  preflight: { refusalCode: number; rules: string[]; provingMs: number; payee: string };
   proof: {
     verdict: string;
     refusalCode: number;
@@ -203,9 +207,14 @@ export async function runScenario(params: {
 
   const institutionPda = pda.institution(key.institution.publicKey)[0];
   const secret = readPolicySecret(seed.policySecret);
-  const policy = demoPolicies({ secret, institutionPda, mint, pda, policies: seed.policies }).find(
-    (item) => item.name === scenario.policy,
-  )!;
+  const policy = demoPolicies({
+    secret,
+    institutionPda,
+    mint,
+    buyer: key.buyer.publicKey,
+    pda,
+    policies: seed.policies,
+  }).find((item) => item.name === scenario.policy)!;
   const policyAccount = await client.policy.fetch('policy', policy.address);
   if (!policyAccount || hex(policyAccount.commitment) !== hex(policy.commitment)) {
     throw new Error(`politika ${scenario.policy} zincirde yerel belgeyle eşleşmiyor: önce seed`);
@@ -330,6 +339,45 @@ export async function runScenario(params: {
       BigInt(vault.value.amount) === amount &&
         institutionBefore - (await balance(key.institution.publicKey)) === amount,
       `job ${jobAddress.toBase58()} fonlandı: vault ${amount}`,
+    );
+
+    // Kabul öncesi ön-ispat (ADR 0028): işin kendi koşullarıyla (tam tutar, agent cüzdanı, sayaç 0); agent ancak
+    // bundan sonra kabul eder.
+    const preflightWitness = await buildPreflightWitness({
+      client,
+      job: jobAddress,
+      policy: policy.document,
+      salts: policy.salts,
+      paymentCategory: scenario.paymentCategory,
+      now: await chainTime(connection),
+    });
+    const preflightProof = await params.prover.prove(preflightWitness);
+    await send(
+      '3',
+      '`setPreflightProof` (Groth16, kabul öncesi)',
+      () =>
+        buildSetPreflightProofTx(
+          client,
+          {
+            authority: key.institution.publicKey,
+            institution: institutionPda,
+            policy: policy.address,
+            job: jobAddress,
+            proof: preflightProof,
+          },
+          opts(key.payer),
+        ),
+      [key.payer, key.institution],
+    );
+    const preflight = await client.verifier.fetch('preflightProof', pda.preflightProof(jobAddress)[0]);
+    if (!preflight) throw new Error('PreflightProof yazılmadı');
+    check(
+      preflight.job.equals(jobAddress) &&
+        preflight.policy.equals(policy.address) &&
+        preflight.payee.equals(agentWallet) &&
+        preflightAccepts(preflight.refusalCode) &&
+        preflight.proofTimestamp.toNumber() === preflightWitness.timestamp,
+      `\`PreflightProof\`: işin kendi koşullarıyla, payee agent cüzdanı, ret kodu ${preflight.refusalCode} (kalıcı ya da günlük tavan biti yok)`,
     );
 
     const a2a = createA2aClient({
@@ -500,14 +548,15 @@ export async function runScenario(params: {
     } else {
       const expectedCode = expectedRefusalCode(scenario.refusalRules ?? []);
       check(
-        verdict === 'refused' && bound.refusalCode === expectedCode && final,
-        `ispat reddetti: kod ${bound.refusalCode} (${rules.join(', ') || '-'}), beklenen ${expectedCode}, kesin ret`,
+        verdict === 'refused' && bound.payee.equals(expectedPayee) && bound.refusalCode === expectedCode && final,
+        `ispat reddetti: payee ${claim ? 'alıcı' : 'agent'}, kod ${bound.refusalCode} (${rules.join(', ') || '-'}), beklenen ${expectedCode}, kesin ret`,
       );
     }
 
     await waitForChainTime(connection, challengeEnd, timing.pollIntervalMs);
     const recipient = scenario.expect === 'approved' ? expectedPayee : key.institution.publicKey;
     const recipientBefore = await balance(recipient);
+    const buyerBefore = await balance(key.buyer.publicKey);
     const keeperBefore = await balance(key.keeper.publicKey);
     let finalizedBy: ScenarioOutcome['settlement']['finalizedBy'] = 'other';
     const current = await client.escrow.fetch('job', jobAddress);
@@ -544,11 +593,18 @@ export async function runScenario(params: {
           validation.refusalCode === bound.refusalCode,
         `\`ValidationRecord\` \`Refused\`, ret kodu ${bound.refusalCode}`,
       );
+      if (claim) {
+        const defaulted = await client.escrow.fetch('claimListing', pda.claimListing(jobAddress)[0]);
+        check(defaulted !== null && variantOf(defaulted.status) === 'defaulted', 'alacak `Defaulted`');
+      }
     }
     if (finalizedBy === 'scenario') {
       const role = scenario.expect === 'approved' ? (claim ? 'alıcıya' : "agent'a") : 'kuruma';
       check((await balance(recipient)) - recipientBefore === net, `${role} net ${net} ödendi`);
       check((await balance(key.keeper.publicKey)) - keeperBefore === keeperFee, `keeper ücreti ${keeperFee}`);
+      if (claim && scenario.expect === 'refused') {
+        check((await balance(key.buyer.publicKey)) === buyerBefore, 'alıcıya ödeme yok');
+      }
     }
 
     return {
@@ -574,6 +630,12 @@ export async function runScenario(params: {
         document: report,
       },
       claim,
+      preflight: {
+        refusalCode: preflight.refusalCode,
+        rules: refusalRules(preflight.refusalCode),
+        provingMs: preflightProof.provingMs,
+        payee: preflight.payee.toBase58(),
+      },
       proof: {
         verdict,
         refusalCode: bound.refusalCode,

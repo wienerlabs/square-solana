@@ -317,11 +317,17 @@ describe('buildAccountReport', () => {
 describe('squareAccountTypes', () => {
   it("dört programın bütün hesap tiplerini discriminator'la eşler", () => {
     const types = squareAccountTypes(PROGRAM_IDS);
-    expect(types.size).toBe(13);
+    expect(types.size).toBe(14);
     expect([...types.values()].filter((t) => t.program === 'square_registry').map((t) => t.account)).toEqual([
       'AgentRecord',
       'RegistryConfig',
       'ScreeningRecord',
+    ]);
+    expect([...types.values()].filter((t) => t.program === 'square_verifier').map((t) => t.account)).toEqual([
+      'OperatorState',
+      'PreflightProof',
+      'ReleaseProof',
+      'VerifierConfig',
     ]);
   });
 });
