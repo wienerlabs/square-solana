@@ -150,6 +150,7 @@ through [`crates/square-common`](crates/).
 | [`apps/fee-payer`](apps/fee-payer/) | Sponsored transactions: decodes and policy-checks v0 transactions (allowed programs and instructions, compute budget, per-transaction and daily caps). |
 | [`apps/compliance-api`](apps/compliance-api/) | Proof records and batch attestations, an unattested-payment watcher and an x402-paid compliance report. |
 | [`apps/web`](apps/web/) | Next.js app: institution and agent flows, jobs, claims, policies, arbitration console, developer portal, `did:aip` resolver and network status. |
+| [`apps/demo`](apps/demo/) | Demo data and agent: a one-command, idempotent seed (funding, screening, policies, agent registration), a demo agent that does real work over A2A, and a scenario runner that checks every step on chain. |
 
 ### Packages
 
@@ -233,6 +234,15 @@ pnpm --filter @squaresdk/solana-services-e2e test:localnet
 This brings up the validator, Postgres, an S3-compatible store and the five core services (API, indexer, keeper,
 prover, screener), runs the eight steps through them and checks that the indexer's reconciliation finds zero drift
 ([services](tests/services/)).
+
+### Run the demo on localnet
+
+```bash
+pnpm --filter @squaresdk/solana-demo demo:localnet
+```
+
+This seeds a throwaway validator twice (the second run must change nothing), starts the demo agent and runs the
+approved, claim-sale and refused scenarios, checking every payout and refund on chain ([demo](apps/demo/)).
 
 ## Repository layout
 
