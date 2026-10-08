@@ -895,8 +895,9 @@ export type SquareEscrowContract = {
       "name": "escalateMissingProof",
       "docs": [
         "The agent's recourse when a policy job's release cannot settle: `proof_timeout_secs` after",
-        "`challenge_end` (or after a lapsed dispute closed) with no bound proof, a temporary refusal or",
-        "a proof evaluated on another UTC day, it opens a dispute without bond."
+        "`challenge_end` (or after a lapsed dispute closed) with no bound proof, a temporary refusal, a",
+        "proof evaluated on another UTC day or a proof for another net amount or mint, it opens a dispute",
+        "without bond."
       ],
       "discriminator": [
         79,

@@ -234,6 +234,30 @@ fn the_admin_rotates_the_authority_without_an_upgrade() {
 }
 
 #[test]
+fn a_zero_authority_closes_the_fiat_rail() {
+    // Sıfır anahtar fiat rayını kapatır; program bunu precompile'ın sıkı doğrulamasına bırakmaz (BC-39 P-20).
+    // Sıfır anahtarlı bir precompile talimatı tx'i programdan önce düşürdüğü için burada geçerli bir
+    // attestation'la denenir.
+    let mut f = FiatWorld::new();
+    let job = f.delivered();
+    f.r.w.h.set_time(f.r.proof_time());
+    let admin = f.r.w.admin.insecure_clone();
+    let ix = f.update_authority_ix(&admin.pubkey(), anchor_lang::prelude::Pubkey::default());
+    f.r.w
+        .h
+        .send(&[ix], &[&admin])
+        .expect("update_mpp_authority");
+    let config: VerifierConfig = f.r.w.h.account(&verifier_config_address()).unwrap();
+    assert_eq!(
+        config.mpp_authority,
+        anchor_lang::prelude::Pubkey::default()
+    );
+    f.verify(&job)
+        .expect_err("sıfır anahtar")
+        .assert_error(anchor_error(VerifierError::InvalidMppAttestation));
+}
+
+#[test]
 fn escrow_paths_do_not_apply_to_fiat_jobs_and_fiat_paths_not_to_escrow_jobs() {
     let mut f = FiatWorld::new();
     let job = f.delivered();

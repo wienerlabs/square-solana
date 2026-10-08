@@ -15,7 +15,7 @@ IDL'iyle (`idl/square_verifier_contract.json`) aynıdır. Stripe MPP fiat rayı 
 | `set_compliance_proof` | İspatı release devresinin 13 sinyaline karşı doğrular ve `ReleaseProof`'u yazar (ret kodu 0 ise `Compliant`, değilse `Refused` + kod). Tüketilene kadar yeniden bağlanabilir |
 | `record_release` | Yalnızca escrow'un `["escrow_authority"]` PDA'sıyla (CPI): ispatı tüketir, `Compliant` ise günlük sayacı net tutar kadar ilerletir |
 | `verify_mpp_payment_proof` | Fiat işin Stripe ödemesini bağlar. Hemen önceki talimat, `config.mpp_authority`'nin `"square/mpp-attestation/v1" ‖ job ‖ stripe_receipt_hash ‖ amount` üzerindeki imzasını doğrulayan Ed25519 precompile talimatıdır (tek imza, kendi verisinde). İspat aynı 13 sinyale karşı: `refusal_code` 0, net işin tutarı, payee agent, sinyal 12 makbuz commitment'ı. `Compliant` `ReleaseProof`, `MppPaymentVerified` |
-| `update_mpp_authority` | Config admin'i (Squads vault'u) MPP attestation anahtarını program upgrade'i olmadan değiştirir; sıfır anahtar fiat rayını kapatır |
+| `update_mpp_authority` | Config admin'i (Squads vault'u) MPP attestation anahtarını program upgrade'i olmadan değiştirir; sıfır anahtar fiat rayını kapatır; `verify_mpp_payment_proof` sıfır anahtarı Ed25519 talimatını okumadan reddeder (BC-39 P-20) |
 
 - **Sinyaller** ([`src/signals.rs`](src/signals.rs), [release-circuit.md](../../docs/design/release-circuit.md)
   §2, §6 yol A): 10'unu program hesaplardan kurar. Bunlar:
