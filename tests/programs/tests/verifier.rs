@@ -74,7 +74,11 @@ fn a_valid_proof_writes_a_compliant_release_proof() {
     r.w.h.set_time(r.proof_time());
     let p = r.proof("compliant");
     let executed = r.bind(&job, &p).expect("set_compliance_proof");
-    cu::within("verifier.set_compliance_proof", &executed, 300_000);
+    cu::within_profile(
+        "verifier.set_compliance_proof",
+        &executed,
+        "setComplianceProof",
+    );
 
     let proof = r.release_proof(&job);
     assert_eq!(

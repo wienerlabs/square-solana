@@ -25,7 +25,7 @@ fn fund_job_locks_the_amount_from_the_institution() {
 
     let ix = w.fund_job_ix(&institution, &job);
     let executed = w.h.send(&[ix], &[&institution.key]).expect("fund_job");
-    cu::within("escrow.fund_job", &executed, 50_000);
+    cu::within_profile("escrow.fund_job", &executed, "fundJob");
     assert_eq!(w.balance(&vault_address(&job)), Some(AMOUNT));
     assert_eq!(w.balance(&institution.token_account), Some(9 * AMOUNT));
     let funded = w.job(&job);
@@ -220,7 +220,7 @@ fn only_the_bound_agent_wallet_accepts_with_the_committed_spec() {
 
     let ix = w.accept_ix(&agent.wallet.pubkey(), &job, agent.record, SPEC);
     let executed = w.h.send(&[ix], &[&agent.wallet]).expect("accept_job");
-    cu::within("escrow.accept_job", &executed, 20_000);
+    cu::within_profile("escrow.accept_job", &executed, "acceptJob");
     assert_eq!(w.job(&job).status, JobStatus::Accepted);
     let accepted: JobAccepted = event(&executed);
     assert_eq!(
@@ -277,7 +277,7 @@ fn only_the_bound_registered_agent_submits_and_the_challenge_window_opens() {
     let uri = "x".repeat(128);
     let ix = w.submit_ix(&agent.wallet.pubkey(), &job, agent.record, &uri);
     let executed = w.h.send(&[ix], &[&agent.wallet]).expect("submit_work");
-    cu::within("escrow.submit_work", &executed, 20_000);
+    cu::within_profile("escrow.submit_work", &executed, "submitWork");
     let delivered = w.job(&job);
     let now = NOW + HOUR;
     assert_eq!(delivered.status, JobStatus::Delivered);
@@ -370,7 +370,7 @@ fn cancel_refunds_the_vault_and_returns_its_rent_to_the_payer() {
         rent_payer,
     );
     let executed = w.h.send(&[ix], &[&institution.key]).expect("cancel_job");
-    cu::within("escrow.cancel_job", &executed, 30_000);
+    cu::within_profile("escrow.cancel_job", &executed, "cancelJob");
     assert_eq!(w.balance(&institution.token_account), Some(10 * AMOUNT));
     assert_eq!(w.balance(&vault), None, "vault kapandı");
     let fee = 2 * 5_000; // payer ve kurum imzası

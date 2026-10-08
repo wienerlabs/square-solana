@@ -80,10 +80,11 @@ fn favor_agent_on_a_policy_job_pays_the_full_amount_against_a_fresh_proof() {
     r.bind(&job, &r.proof("dispute_favor_agent"))
         .expect("Resolved işe ispat");
     let executed = execute(&mut r, &caller, &job, settlement).expect("execute_resolution");
+    // Profilde yok: 200 ölçümün en yükseğinin (95 989) iki katı, 10 bine yukarı yuvarlanmış (profilin kuralı).
     cu::within(
         "escrow.execute_resolution (ispat kapısı)",
         &executed,
-        140_000,
+        200_000,
     );
 
     let bond = min_bond(amount);
@@ -198,7 +199,8 @@ fn the_agent_escalates_a_missing_proof_after_the_timeout() {
     let executed = w
         .escalate(&agent.wallet, &job)
         .expect("escalate_missing_proof");
-    cu::within("escrow.escalate_missing_proof", &executed, 30_000);
+    // Profilde yok: 200 ölçümün en yükseğinin (23 540) iki katı, 10 bine yukarı yuvarlanmış (profilin kuralı).
+    cu::within("escrow.escalate_missing_proof", &executed, 50_000);
     let escalated: MissingProofEscalated = event(&executed);
     assert_eq!(
         (escalated.job, escalated.agent_wallet),
