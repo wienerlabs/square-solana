@@ -40,7 +40,13 @@ import {
 } from '@/lib/job-detail';
 import { ENV_VARS } from '@/lib/config';
 import { escrowErrorMessage, formatDuration, readEscrowSetup, type EscrowSetupLookup } from '@/lib/job-wizard';
-import { readPreflight, readReleaseState, type PreflightView, type ReleaseState } from '@/lib/release-proof';
+import {
+  preflightBoundFor,
+  readPreflight,
+  readReleaseState,
+  type PreflightView,
+  type ReleaseState,
+} from '@/lib/release-proof';
 import { sendErrorText } from '@/lib/sponsored-send';
 import { formatUnits } from '@/lib/settlement';
 import { JOB_STATUS_TONE, statusLabel } from '@/lib/status';
@@ -313,7 +319,10 @@ export function JobDetail({ jobAddress, escrowProgramId }: { jobAddress: string;
   const uriProblem = deliveryUri === '' ? null : deliveryUriProblem(deliveryUri);
   const beforeDeadline = chainNow !== null && chainNow < deadline;
   // Policy'li işte escrow kurumun ön-ispatını ister (ADR 0028); o bağlanmadan kabul gönderilmez.
-  const awaitingPreflight = account.policy !== null && !(preflight.state === 'ready' && preflight.value !== null);
+  const awaitingPreflight =
+    account.policy !== null &&
+    !(preflight.state === 'ready' && preflightBoundFor(preflight.value, account.agentWallet));
+  const preflightForOtherWallet = preflight.state === 'ready' && preflight.value !== null && awaitingPreflight;
   const pending =
     signature !== null && status?.stage !== 'confirmed' && status?.stage !== 'finalized' && status?.stage !== 'failed';
 
@@ -491,9 +500,11 @@ export function JobDetail({ jobAddress, escrowProgramId }: { jobAddress: string;
                   Accept the job
                 </Button>
                 <p className="text-caption text-muted">
-                  {awaitingPreflight
-                    ? 'The institution has not bound its pre-acceptance proof yet; the job can be accepted after it.'
-                    : 'Accepting commits you to deliver before the deadline.'}
+                  {preflightForOtherWallet
+                    ? "The pre-acceptance proof was bound for another agent wallet; the institution binds it again for this job's wallet before it can be accepted."
+                    : awaitingPreflight
+                      ? 'The institution has not bound its pre-acceptance proof yet; the job can be accepted after it.'
+                      : 'Accepting commits you to deliver before the deadline.'}
                 </p>
               </div>
             )}

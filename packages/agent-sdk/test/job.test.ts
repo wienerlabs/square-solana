@@ -569,7 +569,18 @@ describe('policy’li job (ADR 0028)', () => {
     await executor().onTask(recorded.context);
     expect(sim.sent).toEqual([]);
     expect(recorded.calls).toEqual([
-      'reject:kurum kabul öncesi ön-ispatı bağlamamış (ADR 0028): set_preflight_proof’tan sonra görevi yeniden açmalı',
+      'reject:kurum kabul öncesi ön-ispatı bu işin agent cüzdanı için bağlamamış (ADR 0028): set_preflight_proof’tan sonra görevi yeniden açmalı',
+    ]);
+  });
+
+  it('ön-ispat başka bir cüzdan için bağlıysa (cüzdan sonra taşındı) görev kabulden önce reddedilir', async () => {
+    const address = await job('funded', Keypair.generate().publicKey);
+    await sim.setPreflight(address, Keypair.generate().publicKey);
+    const recorded = fakeContext(address, specParts);
+    await executor().onTask(recorded.context);
+    expect(sim.sent).toEqual([]);
+    expect(recorded.calls).toEqual([
+      'reject:kurum kabul öncesi ön-ispatı bu işin agent cüzdanı için bağlamamış (ADR 0028): set_preflight_proof’tan sonra görevi yeniden açmalı',
     ]);
   });
 

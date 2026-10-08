@@ -8,7 +8,8 @@
     "claimBuyer": "claim buyer",
     "settlementMint": "settlement mint",
     "otherMint": "other mint",
-    "blockedWallet": "sanctioned wallet"
+    "blockedWallet": "sanctioned wallet",
+    "rotatedWallet": "rotated agent wallet"
   },
   "specs": {
     "a": "job spec: market research report",
@@ -268,6 +269,20 @@
       "proof_a": "2ac80c5583983569d203026231a70f726cbfa00a50da5a0decf51a663dffccf61f833631c1c4608d8af19d24e5b80c92bd14c76d70f8f8fc9bee1f20e2b3807b",
       "proof_b": "2a3c0725f2e81005d287c962f299e0bbf731e56312bc59a1f8b1026c56f30b1b2fa21c33f5dec6702c178b19ee18187ea293671dd3493d2b7ffa5c1d36a6410f16437c9df7c7d8fb3251eac1c2c14608b5c0376d8742ea749f22dbee7225ebca1cffbce5462b0d2e4cbfe16f41b21b7366a28daa8f32d9befa3ac51b335aca18",
       "proof_c": "25d37e313e70b47b8c18268feba2a6e43960a9f4757ab4fce0e26c69e7482e8510823c31ed5363fc5cf77f93c0ac217cfc82e40aeba3c3dc6c3414ec085cde1e"
+    },
+    {
+      "name": "preflight_a_rotated",
+      "job": "a",
+      "payee": "rotatedWallet",
+      "mint": "settlementMint",
+      "net_amount": "25000000",
+      "refusal_code": 0,
+      "daily_spent_before": "0",
+      "timestamp": 1789992800,
+      "policy_commitment": "187d65241c9a9bda93f1a7510506d85e50ed9da5fe91cb88e25f0db2d90082f5",
+      "proof_a": "0a35604c72d3b54187f97ad871d5a082975bd3dea9029a24db202c932d738a71000287621083fde2addae7d9fe2d4b01ff4e98a632325cbce81d7d21792c3f73",
+      "proof_b": "0f88d8f7024f8482a4ab4170995fac3f4c972c91ecb1b4e71402239d62ad8f0224dbd664f36a6debe3f8dda19056b55bc5257f7d819af9063bcc8c19dea09d8204b6cca6d1de900de65bd0dd8976e20d3c84566c2a820abc132005a9b074c90d2238ffe38366527ecfc65518ef93bd7afbcc5309358f4ba6b947c11d299ab077",
+      "proof_c": "0a9cfba34cad2fb9df9011991fc5578704b2a897feac98503b401d2fc0fe22ea02a81138b34c429c6280cb1e6a17eae448f8d47aae0f1133558ca866a641937a"
     }
   ]
 }

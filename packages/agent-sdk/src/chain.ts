@@ -94,7 +94,10 @@ export interface JobState extends JobInfo {
   status: JobStatus;
   /** Job'un politikası; policy'siz işte null. */
   policy: PublicKey | null;
-  /** Policy'li işte kurumun kabul öncesi ön-ispatı (ADR 0028) bağlı mı; escrow `accept_job`'da onu ister. */
+  /**
+   * Policy'li işte kurumun kabul öncesi ön-ispatı (ADR 0028) işin güncel agent cüzdanı için bağlı mı; escrow
+   * `accept_job`'da onu ister. Cüzdan ön-ispattan sonra değiştiyse (`sync_agent_wallet`) false: kurum yeniden bağlar.
+   */
   preflight: boolean;
   /** Teslim edilmişse `submit_work`'ün argümanları. */
   workHash: string;
@@ -110,12 +113,13 @@ export async function readJob(
   const account = await client.escrow.program.account.job.fetchNullable(address, commitment);
   if (!account) return null;
   const policy = account.policy ?? null;
-  const preflight = policy
-    ? (await client.verifier.program.account.preflightProof.fetchNullable(
+  const proof = policy
+    ? await client.verifier.program.account.preflightProof.fetchNullable(
         client.pda.preflightProof(address)[0],
         commitment,
-      )) !== null
-    : false;
+      )
+    : null;
+  const preflight = proof !== null && proof.payee.equals(account.agentWallet);
   return {
     address,
     institution: account.institution,

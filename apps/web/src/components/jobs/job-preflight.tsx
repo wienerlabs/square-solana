@@ -24,6 +24,7 @@ import { formatDuration, type EscrowSetup } from '@/lib/job-wizard';
 import { loadDrafts, loadSecret } from '@/lib/policy-local';
 import {
   policyMaterialFor,
+  preflightBoundFor,
   proverErrorMessage,
   refusalReasons,
   RELEASE_ARTIFACT_VERSION,
@@ -74,7 +75,10 @@ export function JobPreflight({
   const institution = useActor('institution').address;
   const status = Object.keys(account.status)[0];
   if (account.policy === null || (status !== 'open' && status !== 'funded')) return null;
-  const bound = preflight.state === 'ready' ? preflight.value : null;
+  const stored = preflight.state === 'ready' ? preflight.value : null;
+  // Kabul yalnızca işin güncel agent cüzdanı için bağlanmış ön-ispatla geçer (ADR 0028).
+  const bound = stored && preflightBoundFor(stored, account.agentWallet) ? stored : null;
+  const otherWallet = stored !== null && bound === null;
   const isInstitution = Boolean(institution?.equals(account.institution));
 
   return (
@@ -84,7 +88,9 @@ export function JobPreflight({
           Pre-acceptance proof
         </h2>
         {preflight.state === 'ready' && (
-          <StatusBadge tone={bound ? 'success' : 'warning'}>{bound ? 'Bound' : 'Missing'}</StatusBadge>
+          <StatusBadge tone={bound ? 'success' : 'warning'}>
+            {bound ? 'Bound' : otherWallet ? 'Bound for another wallet' : 'Missing'}
+          </StatusBadge>
         )}
       </div>
       {preflight.state === 'loading' && <p className="mt-3 text-sm text-muted">Reading the preflight proof…</p>}
@@ -104,6 +110,13 @@ export function JobPreflight({
               {bound.refusalCode === 0
                 ? '; the job satisfies the policy.'
                 : `; temporary rules may still hold the release: ${refusalReasons(bound.refusalCode).join('; ')}.`}
+            </p>
+          )}
+          {otherWallet && (
+            <p className="rounded-lg bg-tone-warning-bg p-3 text-tone-fg">
+              It was bound for the agent wallet <span className="font-mono">{stored.payee.toBase58()}</span>; the job
+              has moved to <span className="font-mono">{account.agentWallet.toBase58()}</span> since. The institution
+              binds it again for this wallet before the agent can accept.
             </p>
           )}
           {!bound && !isInstitution && <p className="text-muted">Waiting for the institution to bind it.</p>}

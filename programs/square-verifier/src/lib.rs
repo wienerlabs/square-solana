@@ -116,8 +116,8 @@ pub mod square_verifier {
     /// side), payee = `Job.agent_wallet`, mint, daily counter 0, the job address and a zero
     /// `stripe_receipt_hash`; the policy snapshot is the job's. `refusal_code` must have no permanent
     /// bit and no daily-ceiling bit (time window and category are temporary); otherwise
-    /// `PreflightRefused`. Writes `PreflightProof`, which escrow `accept_job` requires; can be re-bound
-    /// until acceptance. Arguments: `refusal_code` is public signal 0; `proof_timestamp` is public
+    /// `PreflightRefused`. Writes `PreflightProof` with the payee, which escrow `accept_job` requires while
+    /// the job's agent wallet is unchanged; can be re-bound until acceptance. Arguments: `refusal_code` is public signal 0; `proof_timestamp` is public
     /// signal 9 (Unix seconds), within the clock tolerance.
     pub fn set_preflight_proof(
         ctx: Context<SetPreflightProof>,

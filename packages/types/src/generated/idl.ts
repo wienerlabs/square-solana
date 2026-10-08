@@ -472,6 +472,7 @@ export type PolicyUpdated = z.infer<typeof PolicyUpdatedSchema>;
 export const PreflightProofSchema = z.object({
   job: Address,
   policy: Address,
+  payee: Address,
   policyCommitment: Hex32,
   refusalCode: z.number().int().min(0).max(65535),
   proofTimestamp: I64,

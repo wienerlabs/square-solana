@@ -301,7 +301,7 @@ export function createJobExecutor(deps: JobExecutorDeps): TaskExecutor {
             // Policy'li işte kurum kabulden önce ön-ispatı bağlar (ADR 0028); yoksa escrow kabulü reddeder.
             if (job.policy && !job.preflight) {
               await context.reject(
-                'kurum kabul öncesi ön-ispatı bağlamamış (ADR 0028): set_preflight_proof’tan sonra görevi yeniden açmalı',
+                'kurum kabul öncesi ön-ispatı bu işin agent cüzdanı için bağlamamış (ADR 0028): set_preflight_proof’tan sonra görevi yeniden açmalı',
               );
               return;
             }

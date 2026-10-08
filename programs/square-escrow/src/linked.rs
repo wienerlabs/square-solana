@@ -38,13 +38,15 @@ pub fn bound_agent(info: &AccountInfo) -> Result<AgentRecord> {
 }
 
 /// Policy'li işin kabul öncesi ön-ispatı (ADR 0028): verifier'ın `["preflight_proof", job]` hesabı (adres
-/// talimatın kısıtıyla bağlı), bu işin ve job'un policy anlık görüntüsünün. Hesap yoksa ya da başka bir işe veya
-/// commitment'a aitse `PreflightRequired`; owner verifier değilse `LinkedProgramMismatch`.
+/// talimatın kısıtıyla bağlı), bu işin, job'un policy anlık görüntüsünün ve güncel agent cüzdanının. Hesap yoksa ya
+/// da başka bir işe, commitment'a veya cüzdana aitse `PreflightRequired`; owner verifier değilse
+/// `LinkedProgramMismatch`.
 pub fn require_preflight(
     info: &AccountInfo,
     job: &Pubkey,
     policy: &Pubkey,
     policy_commitment: &[u8; 32],
+    agent_wallet: &Pubkey,
     verifier_program: &Pubkey,
 ) -> Result<()> {
     if info.data_is_empty() {
@@ -55,10 +57,13 @@ pub fn require_preflight(
             AccountReadError::WrongOwner => error!(EscrowError::LinkedProgramMismatch),
             _ => error!(EscrowError::PreflightRequired),
         })?;
+    // Ön-ispat bağlandığı andaki agent cüzdanı için kanıtlar; cüzdan sonra değiştiyse (`sync_agent_wallet`) kurum
+    // yeniden bağlar.
     require!(
         proof.job == *job
             && proof.policy == *policy
-            && proof.policy_commitment == *policy_commitment,
+            && proof.policy_commitment == *policy_commitment
+            && proof.payee == *agent_wallet,
         EscrowError::PreflightRequired
     );
     Ok(())

@@ -1573,6 +1573,7 @@
     "required": [
       "job",
       "policy",
+      "payee",
       "policyCommitment",
       "refusalCode",
       "proofTimestamp",
@@ -1585,6 +1586,10 @@
       },
       "policy": {
         "$ref": "#/Address"
+      },
+      "payee": {
+        "$ref": "#/Address",
+        "description": "`job.agent_wallet` when the proof was bound: the payee the proof was checked against. Escrow `accept_job` requires it to still be the job's agent wallet."
       },
       "policyCommitment": {
         "$ref": "#/Hex32",
@@ -3953,7 +3958,7 @@
   },
   "SetPreflightProofCall": {
     "type": "object",
-    "description": "Pre-acceptance compliance proof (ADR 0028): before the agent accepts a policy job (Open or Funded), the institution's authority proves the job against its own terms. The program builds the signals from the job: net = `job.amount` (the upper bound of every release to the agent side), payee = `Job.agent_wallet`, mint, daily counter 0, the job address and a zero `stripe_receipt_hash`; the policy snapshot is the job's. `refusal_code` must have no permanent bit and no daily-ceiling bit (time window and category are temporary); otherwise `PreflightRefused`. Writes `PreflightProof`, which escrow `accept_job` requires; can be re-bound until acceptance. Arguments: `refusal_code` is public signal 0; `proof_timestamp` is public signal 9 (Unix seconds), within the clock tolerance.",
+    "description": "Pre-acceptance compliance proof (ADR 0028): before the agent accepts a policy job (Open or Funded), the institution's authority proves the job against its own terms. The program builds the signals from the job: net = `job.amount` (the upper bound of every release to the agent side), payee = `Job.agent_wallet`, mint, daily counter 0, the job address and a zero `stripe_receipt_hash`; the policy snapshot is the job's. `refusal_code` must have no permanent bit and no daily-ceiling bit (time window and category are temporary); otherwise `PreflightRefused`. Writes `PreflightProof` with the payee, which escrow `accept_job` requires while the job's agent wallet is unchanged; can be re-bound until acceptance. Arguments: `refusal_code` is public signal 0; `proof_timestamp` is public signal 9 (Unix seconds), within the clock tolerance.",
     "required": [
       "program",
       "instruction",
@@ -4078,7 +4083,7 @@
   },
   "AcceptJobCall": {
     "type": "object",
-    "description": "The job's agent wallet accepts a funded job (a fiat job while Open); the agent record must be Active. On a policy job the institution's `PreflightProof` (verifier `set_preflight_proof`, ADR 0028) must be bound to this job and its policy snapshot. `spec_hash` guards against a swapped spec.",
+    "description": "The job's agent wallet accepts a funded job (a fiat job while Open); the agent record must be Active. On a policy job the institution's `PreflightProof` (verifier `set_preflight_proof`, ADR 0028) must be bound to this job, its policy snapshot and its current agent wallet (bound again after `sync_agent_wallet`). `spec_hash` guards against a swapped spec.",
     "required": [
       "program",
       "instruction",

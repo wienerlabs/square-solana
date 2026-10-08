@@ -101,6 +101,7 @@ pub fn handler(
     ctx.accounts.preflight_proof.set_inner(PreflightProof {
         job: job_key,
         policy,
+        payee: job.agent_wallet,
         policy_commitment: job.policy_commitment,
         refusal_code,
         proof_timestamp,

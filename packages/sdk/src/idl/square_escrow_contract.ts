@@ -18,8 +18,8 @@ export type SquareEscrowContract = {
       "docs": [
         "The job's agent wallet accepts a funded job (a fiat job while Open); the agent record must be",
         "Active. On a policy job the institution's `PreflightProof` (verifier `set_preflight_proof`,",
-        "ADR 0028) must be bound to this job and its policy snapshot. `spec_hash` guards against a",
-        "swapped spec."
+        "ADR 0028) must be bound to this job, its policy snapshot and its current agent wallet (bound",
+        "again after `sync_agent_wallet`). `spec_hash` guards against a swapped spec."
       ],
       "discriminator": [
         43,
@@ -95,7 +95,8 @@ export type SquareEscrowContract = {
         {
           "name": "preflightProof",
           "docs": [
-            "job (ADR 0028): bound to this job and its policy snapshot. Not read on a job without a policy."
+            "job (ADR 0028): bound to this job, its policy snapshot and its current agent wallet. Not read on a",
+            "job without a policy."
           ],
           "pda": {
             "seeds": [
