@@ -55,6 +55,7 @@ fn a_policy_job_is_accepted_only_after_the_institutions_preflight_proof() {
         (
             stored.job,
             stored.policy,
+            stored.payee,
             stored.policy_commitment,
             stored.refusal_code,
             stored.proof_timestamp
@@ -62,6 +63,7 @@ fn a_policy_job_is_accepted_only_after_the_institutions_preflight_proof() {
         (
             job,
             r.policy.policy,
+            r.agent.wallet.pubkey(),
             snapshot.policy_commitment,
             0,
             p.timestamp
@@ -183,9 +185,60 @@ fn escrow_reads_only_the_verifiers_preflight_for_this_job_and_snapshot() {
     accept(&mut r, &job, "a")
         .expect_err("başka iş")
         .assert_error(anchor_error(EscrowError::PreflightRequired));
+    let other_payee = PreflightProof {
+        payee: Pubkey::new_unique(),
+        ..stored.clone()
+    };
+    write(&mut r, &other_payee, square_verifier::ID);
+    accept(&mut r, &job, "a")
+        .expect_err("başka payee")
+        .assert_error(anchor_error(EscrowError::PreflightRequired));
 
     write(&mut r, &stored, square_verifier::ID);
     accept(&mut r, &job, "a").expect("accept_job");
+}
+
+#[test]
+fn a_wallet_moved_after_the_preflight_needs_a_new_preflight() {
+    // Ön-ispat bağlandığı andaki agent cüzdanı için kanıtlar. Kayıt sahibi cüzdanı değiştirip işi taşırsa
+    // (`sync_agent_wallet`) release'in payee'si ön-ispatın kanıtlamadığı bir cüzdan olurdu: kabul yeni bir
+    // ön-ispat ister.
+    let mut r = ReleaseWorld::new(true);
+    let job = r.funded_job("a");
+    r.preflight(&job, "a");
+    let rotated = keypair(&r.fx, "rotatedWallet");
+    let agent = Agent {
+        owner: r.agent.owner.insecure_clone(),
+        wallet: r.agent.wallet.insecure_clone(),
+        record: r.agent.record,
+    };
+    r.w.rotate_wallet(&agent, rotated.pubkey())
+        .expect("update_agent");
+    let owner = agent.owner.insecure_clone();
+    let ix = r.w.sync_ix(&owner.pubkey(), &job, agent.record);
+    r.w.h.send(&[ix], &[&owner]).expect("sync_agent_wallet");
+    assert_eq!(r.w.job(&job).agent_wallet, rotated.pubkey());
+
+    let accept_as = |r: &mut ReleaseWorld| {
+        let ix =
+            r.w.accept_ix(&rotated.pubkey(), &job, agent.record, r.spec("a"));
+        r.w.h.send(&[ix], &[&rotated])
+    };
+    accept_as(&mut r)
+        .expect_err("eski cüzdanın ön-ispatı")
+        .assert_error(anchor_error(EscrowError::PreflightRequired));
+
+    // Kurum ön-ispatı yeni cüzdanla yeniden bağlar; kabul geçer.
+    let p = r.proof("preflight_a_rotated");
+    r.w.h.set_time(p.timestamp);
+    r.bind_preflight(&job, &p).expect("yeni cüzdanla ön-ispat");
+    let stored: PreflightProof =
+        r.w.h
+            .account(&preflight_address(&job))
+            .expect("PreflightProof");
+    assert_eq!(stored.payee, rotated.pubkey());
+    accept_as(&mut r).expect("accept_job");
+    assert_eq!(r.w.job(&job).status, JobStatus::Accepted);
 }
 
 #[test]

@@ -23,7 +23,8 @@ pub struct AcceptJob<'info> {
     #[account(seeds = [CONFIG_SEED], bump = config.bump)]
     pub config: Box<Account<'info, EscrowConfig>>,
     /// CHECK: square_verifier `PreflightProof` (owner = `config.verifier_program`). Required on a policy
-    /// job (ADR 0028): bound to this job and its policy snapshot. Not read on a job without a policy.
+    /// job (ADR 0028): bound to this job, its policy snapshot and its current agent wallet. Not read on a
+    /// job without a policy.
     #[account(
         seeds = [PREFLIGHT_PROOF_SEED, job.key().as_ref()],
         bump,
@@ -57,6 +58,7 @@ pub fn handler(ctx: Context<AcceptJob>, spec_hash: [u8; 32]) -> Result<()> {
             &job.key(),
             &policy,
             &job.policy_commitment,
+            &job.agent_wallet,
             &ctx.accounts.config.verifier_program,
         )?;
     }

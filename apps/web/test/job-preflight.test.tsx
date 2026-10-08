@@ -78,18 +78,29 @@ describe('pre-acceptance proof section', () => {
   });
 
   it('tells when it is bound and which temporary rules may still hold the release', async () => {
-    await mount('open', { refusalCode: 0, proofTimestamp: NOW - 60 });
+    await mount('open', { payee: agent, refusalCode: 0, proofTimestamp: NOW - 60 });
     expect(screen.getByText('Bound')).toBeTruthy();
     expect(screen.getByText(/the job satisfies the policy/)).toBeTruthy();
     cleanup();
-    await mount('funded', { refusalCode: 32, proofTimestamp: NOW - 60 });
+    await mount('funded', { payee: agent, refusalCode: 32, proofTimestamp: NOW - 60 });
     expect(
       screen.getByText(/temporary rules may still hold the release: The release is outside the allowed time window/),
     ).toBeTruthy();
   });
 
+  it('asks for a new proof when the job moved to another agent wallet after binding', async () => {
+    const previous = key();
+    const { container } = await mount('funded', { payee: previous, refusalCode: 0, proofTimestamp: NOW - 60 });
+    expect(screen.getByText('Bound for another wallet')).toBeTruthy();
+    expect(screen.queryByText('Bound')).toBeNull();
+    expect(screen.getByText(previous.toBase58())).toBeTruthy();
+    expect(screen.getByText(agent.toBase58())).toBeTruthy();
+    expect(screen.getByText(/binds it again for this wallet before the agent can accept/)).toBeTruthy();
+    expect(await a11y(container)).toEqual([]);
+  });
+
   it('is gone once the job is accepted, and on a job without a policy', async () => {
-    const { container } = await mount('accepted', { refusalCode: 0, proofTimestamp: NOW - 60 });
+    const { container } = await mount('accepted', { payee: agent, refusalCode: 0, proofTimestamp: NOW - 60 });
     expect(container.querySelector('section')).toBeNull();
     cleanup();
     const plain = await mount('funded', null, null);

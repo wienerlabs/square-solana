@@ -326,9 +326,10 @@ export async function runSmoke(context: Context, options: SmokeOptions): Promise
     check(
       bound.job.equals(job) &&
         bound.policy.equals(policy.address) &&
+        bound.payee.equals(key.agent.publicKey) &&
         preflightAccepts(bound.refusalCode) &&
         bound.proofTimestamp.toNumber() === witness.timestamp,
-      `\`PreflightProof\`: işin kendi koşullarıyla, ret kodu ${bound.refusalCode} (kalıcı ya da günlük tavan biti yok)`,
+      `\`PreflightProof\`: işin kendi koşullarıyla, payee agent cüzdanı, ret kodu ${bound.refusalCode} (kalıcı ya da günlük tavan biti yok)`,
     );
   }
 

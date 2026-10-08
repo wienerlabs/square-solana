@@ -70,6 +70,8 @@ Bu ispat geçince teslimden sonra kesin ret yalnızca payee değişirse çıkabi
 - sayaç 0 iken bit 1 ve 6 tutarın tamamıyla geçtiği için, sayaç 0 iken daha küçük netle de geçer; sayaç 0 değilse ret geçicidir;
 - bit 3 yalnızca alacak, politikanın engelli listesindeki bir alıcıya satılırsa çıkar. Alıcı listesi kurumundur, engelli listesi gizlidir; bu alıcının kendi riskidir.
 
+Ön-ispat bağlamadaki agent cüzdanını (`PreflightProof.payee`) saklar ve `accept_job` onun işin güncel cüzdanı olmasını ister. Cüzdan kabulden önce `sync_agent_wallet` ile taşınırsa kurum ön-ispatı yeniden bağlar. Kabulden sonraki taşıma agent'ın kendi eylemidir; ön-ispatın güvencesi yeni cüzdanı kapsamaz, yeni cüzdan engelli listedeyse bit 3 kesin ret verir.
+
 ## 4. Kurallar
 
 | # | Kural | Private girdiler | Public sinyaller |

@@ -50,6 +50,8 @@ const LABELS = Object.freeze({
   otherMint: 'other mint',
   // Politikanın engelli adresi (release-input.mjs `blockedWallet`): alacağı alırsa release kesin ret olur.
   blockedWallet: 'sanctioned wallet',
+  // Kayıt sahibinin ön-ispattan sonra taşıdığı agent cüzdanı (`sync_agent_wallet`): kurum yeniden bağlar.
+  rotatedWallet: 'rotated agent wallet',
 });
 const SPECS = Object.freeze({
   a: 'job spec: market research report',
@@ -117,6 +119,8 @@ function scenarios() {
       ['preflight_b', 'b', preflight('b')],
       ['preflight_c', 'c', preflight('c')],
       ['preflight_d', 'd', preflight('d')],
+      // Cüzdan ön-ispattan sonra değişti: yeni cüzdan için yeniden bağlanan ön-ispat.
+      ['preflight_a_rotated', 'a', { ...preflight('a'), payee: keys.rotatedWallet }],
     ].map(([name, spec, overrides]) => ({
       name,
       spec,
@@ -280,7 +284,9 @@ async function scenarioRecord({ name, spec, overrides }, proof, publicSignals) {
         ? 'claimBuyer'
         : overrides.payee === keyFromLabel(LABELS.blockedWallet)
           ? 'blockedWallet'
-          : 'agentWallet',
+          : overrides.payee === keyFromLabel(LABELS.rotatedWallet)
+            ? 'rotatedWallet'
+            : 'agentWallet',
     mint: overrides.mint === keyFromLabel(LABELS.otherMint) ? 'otherMint' : 'settlementMint',
     net_amount: signals.net_amount,
     refusal_code: Number(signals.refusal_code),

@@ -94,7 +94,7 @@ olmayan ya da yetersiz olan tehdit bir bulgudur.
 |---|---|---|
 | S | Sahte release ispatı | Groth16 doğrulaması (alt_bn128 syscall'ları) ve release devresinin doğrulama anahtarı; ispat job'un policy snapshot'ına (commitment, günlük tavan, sürüm) karşı doğrulanır |
 | T | İspatın başka işe, payee'ye ya da güne taşınması | <ul><li>`["release_proof", job]`; payee ve mint `Job` / `ClaimListing`'den bağlanır.</li><li>Escrow release anında payee, net tutar, mint ve `daily_spent_before`'u karşılaştırır (`StaleReleaseProof`).</li><li>İspat bir kez tüketilir.</li></ul> |
-| T | Ön-ispatın başka işe ya da koşula taşınması | `["preflight_proof", job]`; sinyaller işin kendisinden (net `job.amount`, payee `job.agent_wallet`, sayaç 0, job'un policy snapshot'ı); yalnızca `Open` / `Funded`; escrow `accept_job`'da job, politika ve commitment'ı karşılaştırır |
+| T | Ön-ispatın başka işe ya da koşula taşınması | `["preflight_proof", job]`; sinyaller işin kendisinden (net `job.amount`, payee `job.agent_wallet`, sayaç 0, job'un policy snapshot'ı); yalnızca `Open` / `Funded`; escrow `accept_job`'da job, politika, commitment ve payee'yi (işin güncel agent cüzdanı) karşılaştırır; cüzdan taşınınca kurum yeniden bağlar |
 | T | Sahte fiat attestation'ı | Önceki talimat Ed25519 precompile, tek imza ve kendi verisinde; imzacı `config.mpp_authority`; mesaj işe, Stripe makbuzunun hash'ine ve tutara bağlı (ADR 0024) |
 | E | `record_release`'in escrow dışında çağrılması | İmzacı escrow'un `["escrow_authority"]` PDA'sı; program kimliği config'ten |
 | E | Günlük sayacın kurcalanması | `OperatorState` yalnızca `record_release` CPI'ıyla ilerler; ret release'i sayacı ilerletmez |

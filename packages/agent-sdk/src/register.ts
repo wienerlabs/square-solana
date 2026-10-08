@@ -1,11 +1,11 @@
 // Kayıt yardımcısı (Arc adım 2): kartın adresi ve hash'i `register_agent`'a yazılır; kayıt varsa ve kart,
 // adres ya da cüzdan değiştiyse `update_agent`. Kart ya agent'ın kendi well-known yolundadır (`self`) ya da
 // Square API'sinde barındırılır (`api`, `putAgentCard`); iki durumda da hash kartın RFC 8785 baytlarınındır.
-import type { PublicKey } from '@solana/web3.js';
+import { PublicKey } from '@solana/web3.js';
 import type { BuildOptions, SquareApi, SquareClient, WalletLike } from '@squaresdk/solana-sdk';
 import type { AgentCard } from '@squaresdk/solana-types';
 import { toWallet, type TxSender } from './chain.js';
-import type { RegisterOptions, RegistrationResult, TxOptions } from './types.js';
+import type { AgentLogger, RegisterOptions, RegistrationResult, TxOptions } from './types.js';
 
 /** Registry `MAX_AGENT_CARD_URI_LEN`. */
 export const AGENT_CARD_URI_MAX_BYTES = 200;
@@ -22,6 +22,20 @@ export interface RegisterDeps {
   cardUrl: string;
   api: SquareApi | null;
   tx: TxOptions;
+  logger?: AgentLogger;
+}
+
+/** Kapanmış işin durumları; geri kalanların ön-ispatı ve ödemesi agent cüzdanına bağlıdır. */
+const SETTLED = new Set(['released', 'refunded', 'cancelled']);
+
+/** Kaydın kapanmamış policy'li işleri (`Job.agent_record`, discriminator'dan sonraki ikinci alan). */
+async function openPolicyJobs(client: SquareClient, agentRecord: PublicKey): Promise<PublicKey[]> {
+  const jobs = await client.escrow.program.account.job.all([
+    { memcmp: { offset: 8 + 32, bytes: agentRecord.toBase58() } },
+  ]);
+  return jobs
+    .filter(({ account }) => account.policy !== null && !SETTLED.has(Object.keys(account.status)[0] ?? ''))
+    .map(({ publicKey }) => new PublicKey(publicKey));
 }
 
 const hex = (bytes: Uint8Array | readonly number[]) => Buffer.from(bytes).toString('hex');
@@ -64,12 +78,17 @@ export async function registerAgent(deps: RegisterDeps, options: RegisterOptions
     ...(deps.tx.computeUnitPrice !== undefined ? { computeUnitPrice: deps.tx.computeUnitPrice } : {}),
     ...(deps.tx.addressLookupTables ? { addressLookupTables: deps.tx.addressLookupTables } : {}),
   };
-  const result = (status: RegistrationResult['status'], signature: string | null): RegistrationResult => ({
+  const result = (
+    status: RegistrationResult['status'],
+    signature: string | null,
+    open: PublicKey[] = [],
+  ): RegistrationResult => ({
     status,
     agentRecord: deps.agentRecord,
     agentCardUri: uri,
     agentCardHash: hash,
     signature,
+    openPolicyJobs: open,
   });
 
   const existing = await client.registry.fetch('agentRecord', deps.agentRecord);
@@ -96,10 +115,20 @@ export async function registerAgent(deps: RegisterDeps, options: RegisterOptions
   ) {
     return result('unchanged', null);
   }
+  // Cüzdan değişince kapanmamış policy'li işler eski cüzdanda kalır; ön-ispatları o cüzdan içindir (ADR 0028).
+  const open = existing.wallet.equals(wallet.publicKey) ? [] : await openPolicyJobs(client, deps.agentRecord);
   const ix = await client.registry.instructions.updateAgent(
     [uri, Array.from(Buffer.from(hash, 'hex')), wallet.publicKey],
     { owner: deps.owner, agentRecord: deps.agentRecord },
   );
   const built = await client.buildTx([ix], buildOptions);
-  return result('updated', await sender.send('update_agent', built, signers));
+  const signature = await sender.send('update_agent', built, signers);
+  if (open.length > 0) {
+    deps.logger?.info(
+      `register: agent cüzdanı değişti; ${open.length} kapanmamış policy'li iş eski cüzdanda kalır ` +
+        `(${open.map((job) => job.toBase58()).join(', ')}). sync_agent_wallet ile taşınan işte kabulden önce kurum ` +
+        'ön-ispatı yeni cüzdan için yeniden bağlamalı; kabulden sonra ön-ispatın güvencesi yeni cüzdanı kapsamaz (ADR 0028)',
+    );
+  }
+  return result('updated', signature, open);
 }

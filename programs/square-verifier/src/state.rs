@@ -61,6 +61,9 @@ pub struct ReleaseProof {
 pub struct PreflightProof {
     pub job: Pubkey,
     pub policy: Pubkey,
+    /// `job.agent_wallet` when the proof was bound: the payee the proof was checked against. Escrow
+    /// `accept_job` requires it to still be the job's agent wallet.
+    pub payee: Pubkey,
     /// The job's policy commitment snapshot the proof was checked against; escrow compares it at
     /// `accept_job`.
     pub policy_commitment: [u8; 32],

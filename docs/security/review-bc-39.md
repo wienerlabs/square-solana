@@ -159,7 +159,9 @@ kodunun beklenen hata olarak denetlenmesini sayar. Bu yüzden kritik bir kısıt
   ve 2, program sözleşmesi v0.8.0):
   - Verifier `set_preflight_proof`: kurum, agent kabul etmeden önce işin kendi koşullarıyla (net `job.amount`,
     payee agent cüzdanı, sayaç 0) bir ispat bağlar. Ret kodunda kalıcı bit ya da günlük tavan biti varsa bağlanmaz.
-    Escrow `accept_job` policy'li işte (fiat dahil) bu `PreflightProof`'u ister.
+    Escrow `accept_job` policy'li işte (fiat dahil) bu `PreflightProof`'u ister. Ön-ispat bağlamadaki agent
+    cüzdanını saklar; cüzdan kabulden önce `sync_agent_wallet` ile taşınırsa kurum yeniden bağlar
+    (`preflight.rs::a_wallet_moved_after_the_preflight_needs_a_new_preflight`).
   - `create_job` / `create_fiat_job` public günlük tavanı aşan tutarı reddeder.
   - Commitment iş açılışında sabit olduğu için aynı iş, net ve payee için kalıcı bitler değişmez. Kesin ret yalnızca
     alacak, politikanın gizli engelli listesindeki bir alıcıya satılınca çıkabilir; bu alıcının kendi riskidir

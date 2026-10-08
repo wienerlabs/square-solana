@@ -599,6 +599,7 @@ impl World {
         let proof = square_verifier::state::PreflightProof {
             job: *job,
             policy: account.policy.expect("policy'li iş"),
+            payee: account.agent_wallet,
             policy_commitment: account.policy_commitment,
             refusal_code: 0,
             proof_timestamp: self.h.now(),

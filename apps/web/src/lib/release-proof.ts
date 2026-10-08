@@ -78,6 +78,8 @@ export interface ReleaseState {
 
 /** Kabul öncesi ön-ispat (ADR 0028): bağlıysa ret kodu (yalnızca zaman penceresi ve kategori bitleri) ve anı. */
 export interface PreflightView {
+  /** Bağlamadaki agent cüzdanı; escrow `accept_job` işin güncel cüzdanıyla aynı olmasını ister. */
+  payee: PublicKey;
   refusalCode: number;
   proofTimestamp: number;
 }
@@ -85,8 +87,17 @@ export interface PreflightView {
 /** Policy'li işin ön-ispatı; bağlanmamışsa null. */
 export async function readPreflight(setup: EscrowSetup, jobKey: PublicKey): Promise<PreflightView | null> {
   const proof = await setup.client.verifier.fetch('preflightProof', setup.client.pda.preflightProof(jobKey)[0]);
-  return proof && { refusalCode: proof.refusalCode, proofTimestamp: proof.proofTimestamp.toNumber() };
+  return (
+    proof && { payee: proof.payee, refusalCode: proof.refusalCode, proofTimestamp: proof.proofTimestamp.toNumber() }
+  );
 }
+
+/**
+ * Ön-ispat işin güncel agent cüzdanı için mi (`accept_job`'ın kuralı, ADR 0028)? Cüzdan bağlamadan sonra
+ * `sync_agent_wallet` ile taşındıysa değildir: kurum yeniden bağlar.
+ */
+export const preflightBoundFor = (view: PreflightView | null, agentWallet: PublicKey): boolean =>
+  view !== null && view.payee.equals(agentWallet);
 
 /** Job'un release ispatı, kurumun sayacı ve escrow'un keeper ücreti. Job politikaya bağlı olmalı. */
 export async function readReleaseState(setup: EscrowSetup, jobKey: PublicKey, job: JobAccount): Promise<ReleaseState> {

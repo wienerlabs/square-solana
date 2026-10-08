@@ -149,7 +149,7 @@ Politikalı işte (fiat dahil) escrow, agent'ın kabulünden önce kurumun ön-i
 
 | Parça | Davranış |
 |---|---|
-| Durum | Herkese açık: ön-ispat bağlı mı (`Bound` / `Missing`), anı (zincir saati) ve kalan geçici ret sebepleri. Bağlı değilse agent'ın "Accept the job" düğmesi kapalıdır ve sebebi yazılır |
+| Durum | Herkese açık: ön-ispat bağlı mı (`Bound` / `Missing`), anı (zincir saati) ve kalan geçici ret sebepleri. Bağlı değilse agent'ın "Accept the job" düğmesi kapalıdır ve sebebi yazılır. Ön-ispat başka bir agent cüzdanı için bağlanmışsa (iş sonra `sync_agent_wallet` ile taşındı) sayfa iki cüzdanı da gösterir (`Bound for another wallet`), kabul kapalı kalır ve kurum yeniden bağlar |
 | Üretme | Bağlı cüzdan işi açan kurumsa. Politika, sır ve prover FE-09'daki gibidir. Witness işin kendi koşullarıyla, zincir saatinde kurulur (`buildPreflightWitness`: net işin tutarı, payee agent cüzdanı, sayaç 0). Kalıcı bir kural ya da günlük tavan çiğneniyorsa sayfa sebepleri yazar ve bağlamayı açmaz; iş kabul edilemez, iptal edilmelidir |
 | Bağlama | `set_preflight_proof` (`buildSetPreflightProofTx`); ispatın anı bağlamada zincir saatine en fazla 600 s uzak olmalı, sayfa 540 s içinde bağlatır. Smart account'lu kurumda vault işlemidir (FE-21); sonradan multisig bağlamış kurumda sayfa bunu söyler. Verifier hata kodu IDL mesajıyla (`PreflightRefused`) |
 | Zaman çizelgesi | `PreflightProofSet` (API'den): bağlandı, kalan geçici sebepler |

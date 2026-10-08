@@ -4,7 +4,7 @@
 // durum kurallarıyla (escrow `agent_job.rs`, `list_claim.rs`; registry `state.rs`) uygulanır. Kural ihlali,
 // gerçek RPC gibi `Program <id> failed: custom program error` loglu bir gönderim hatası verir. Gerçek
 // programlarla uçtan uca akış test/localnet.e2e.test.ts'dedir.
-import { BN, type Idl, type Program } from '@anchor-lang/core';
+import { BN, utils, type Idl, type Program } from '@anchor-lang/core';
 import { ed25519 } from '@noble/curves/ed25519.js';
 import {
   ComputeBudgetProgram,
@@ -141,8 +141,11 @@ export class SimChain {
     await this.put(address, PROGRAM_IDS.escrow, this.escrow, 'job', data);
   }
 
-  /** Kurumun kabul öncesi ön-ispatı (verifier `set_preflight_proof`, ADR 0028): job'un politikası ve snapshot'ı. */
-  async setPreflight(address: PublicKey): Promise<void> {
+  /**
+   * Kurumun kabul öncesi ön-ispatı (verifier `set_preflight_proof`, ADR 0028): job'un politikası, snapshot'ı ve
+   * bağlamadaki agent cüzdanı (`payee`; verilmezse job'unki).
+   */
+  async setPreflight(address: PublicKey, payee?: PublicKey): Promise<void> {
     const job = this.job(address);
     if (!job) throw new Error(`job hesabı yok: ${address.toBase58()}`);
     const verifier = this.client.verifier.program as unknown as Program<Idl>;
@@ -150,6 +153,7 @@ export class SimChain {
       ...this.sample(verifier, 'preflightProof'),
       job: address,
       policy: job.policy,
+      payee: payee ?? job.agentWallet,
       policyCommitment: job.policyCommitment,
     };
     await this.put(this.client.pda.preflightProof(address)[0], PROGRAM_IDS.verifier, verifier, 'preflightProof', data);
@@ -258,8 +262,15 @@ export class SimChain {
       if (status === 'open') return fail('JobNotFunded');
       if (status !== 'funded') return fail('InvalidStatus');
       if (hex(data.specHash as number[]) !== hex(job.specHash as number[])) return fail('SpecHashMismatch');
-      // Policy'li işte kurumun ön-ispatı (hesap 4: `["preflight_proof", job]`, verifier).
-      if (job.policy && !this.accounts.has(accounts[4]!.toBase58())) return fail('PreflightRequired');
+      // Policy'li işte kurumun ön-ispatı (hesap 4: `["preflight_proof", job]`, verifier), işin güncel cüzdanı için.
+      if (job.policy) {
+        const info = this.accounts.get(accounts[4]!.toBase58());
+        const verifier = this.client.verifier.program as unknown as Program<Idl>;
+        const proof = info
+          ? (verifier.coder.accounts.decode('preflightProof', info.data) as { payee: PublicKey })
+          : null;
+        if (!proof || !proof.payee.equals(job.agentWallet as PublicKey)) return fail('PreflightRequired');
+      }
       await this.put(address, PROGRAM_IDS.escrow, this.escrow, 'job', { ...job, status: { accepted: {} } });
     } else if (name === 'submitWork') {
       if (status !== 'accepted') return fail('InvalidStatus');
@@ -350,6 +361,21 @@ export class SimChain {
         value: read(address, commitment),
       }),
       getMultipleAccountsInfo: async (addresses: PublicKey[]) => addresses.map((address) => read(address)),
+      // Anchor `account.<ad>.all(filters)`: owner'a, `memcmp`'e (base58) ve `dataSize`'a göre.
+      getProgramAccounts: async (
+        programId: PublicKey,
+        config?: { filters?: ({ memcmp: { offset: number; bytes: string } } | { dataSize: number })[] },
+      ) =>
+        [...accounts.entries()]
+          .filter(([, info]) => info.owner.equals(programId))
+          .filter(([, info]) =>
+            (config?.filters ?? []).every((filter) => {
+              if ('dataSize' in filter) return info.data.length === filter.dataSize;
+              const bytes = Buffer.from(utils.bytes.bs58.decode(filter.memcmp.bytes));
+              return info.data.subarray(filter.memcmp.offset, filter.memcmp.offset + bytes.length).equals(bytes);
+            }),
+          )
+          .map(([pubkey, account]) => ({ pubkey: new PublicKey(pubkey), account })),
       sendRawTransaction: async (raw: Uint8Array) => {
         await this.execute(VersionedTransaction.deserialize(raw));
         this.signatures += 1;

@@ -68,8 +68,8 @@ pub mod square_escrow {
 
     /// The job's agent wallet accepts a funded job (a fiat job while Open); the agent record must be
     /// Active. On a policy job the institution's `PreflightProof` (verifier `set_preflight_proof`,
-    /// ADR 0028) must be bound to this job and its policy snapshot. `spec_hash` guards against a
-    /// swapped spec.
+    /// ADR 0028) must be bound to this job, its policy snapshot and its current agent wallet (bound
+    /// again after `sync_agent_wallet`). `spec_hash` guards against a swapped spec.
     pub fn accept_job(ctx: Context<AcceptJob>, spec_hash: [u8; 32]) -> Result<()> {
         instructions::accept_job::handler(ctx, spec_hash)
     }
