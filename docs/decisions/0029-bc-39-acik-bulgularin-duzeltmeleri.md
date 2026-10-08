@@ -1,11 +1,11 @@
 # ADR 0029: BC-39 iç incelemesinin açık bulgularının düzeltmeleri
 
-- **Durum:** Önerildi
+- **Durum:** Kabul edildi
 - **Issue:** P-02 (#237), P-03 (#238), P-04 (#239), P-05 (#240), P-06 (#241), P-08 (#243), P-09 (#244), P-10 (#245),
   P-11 (#246), P-12 (#247), P-13 (#248), P-14 (#249), P-15 (#250), P-16 (#251), P-17 (#252), P-18 (#253), P-19 (#254)
 - **Karar kaynağı:**
   - BC-39 iç incelemesinin bulguları ve önerileri ([review-bc-39.md](../security/review-bc-39.md) §3);
-  - bu taslak (2026-10-07). Seçenekleri ve öneriyi yazar; karar proje sahibinindir.
+  - proje sahibinin yönlendirmesi (2026-10-08): önerilen seçenekler kabul edildi.
 - **Kapsam dışı:**
   - P-01 (#236): [ADR 0028](0028-kabul-oncesi-on-ispat-ve-dispute-duzeltmeleri.md), #262;
   - P-07 (#242) ve P-20 (#255): tek ve net önerileri var, #265;
@@ -271,6 +271,12 @@ dayandığı olgular var.
       talimatı yazılır, yoksa gerekmez (ADR 0027: yalnızca devnet).
     - Sona alan ekleyen her değişiklikten önce gelir: madde 8, 11, 17 ve ADR 0028'in ret maskesi (#259). ADR
       0028'in "alan gelmeden açılmış işler dolgu baytlarını 0 okur" varsayımı bu maddeyle doğru olur.
+    - **#259, bu maddeden önce:** #259 ret maskesini `Job`'un sonuna bu madde uygulanmadan ekler.
+      - O PR'ın devnet adımında, upgrade'den önce devnet'teki bütün `Job` hesaplarının `rail`'den sonraki baytları
+        salt okunur taranır; sıfır olmayan çıkarsa upgrade yapılmaz.
+      - Bu tarama yalnızca o alanı korur, bu maddenin göçünün yerine geçmez.
+      - #259'un ret sıfırlaması da `resolution`'ı `Split`'ten `Pending`'e küçültebildiği için bu maddenin kapsamına
+        girer.
 16. **Alacak fiyatı (P-18):** `list_claim` `0 < price < amount − keeper ücreti` ister (ücret madde 11'deki oran);
     değilse `InvalidClaimPrice`.
 17. **Agent sahipliğinin iki adımla devri (P-13):**
@@ -310,7 +316,8 @@ dayandığı olgular var.
 ## Gerekçe
 
 Kaynak ([review-bc-39.md](../security/review-bc-39.md)) bulguları ve seçenekleri verir, aralarında seçim yapmaz.
-Aşağıdaki gerekçe bu taslağı hazırlayanın değerlendirmesidir; kayıtlı olgulara dayanır.
+Seçimi proje sahibi önerilen seçenekleri kabul ederek yaptı (2026-10-08). Aşağıdaki gerekçe önerinin gerekçesidir;
+kayıtlı olgulara dayanır.
 
 - **Madde 1:**
   - Policy ve verifier kurumu zaten `Institution::authority()` ile tanır. Escrow'un aynı kaynağı okumasıyla
