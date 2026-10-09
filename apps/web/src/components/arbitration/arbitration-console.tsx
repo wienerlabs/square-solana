@@ -165,7 +165,7 @@ export function ArbitrationConsole({ escrowProgramId }: { escrowProgramId: strin
 
   return (
     <div className="grid gap-6">
-      <section aria-labelledby="panel-heading" className="rounded-card border border-border bg-surface p-6">
+      <section aria-labelledby="panel-heading" className="card p-6">
         <h2 id="panel-heading" className="text-sm font-medium uppercase tracking-wide text-muted">
           Panel
         </h2>
@@ -248,7 +248,7 @@ export function QueuePager({ page, pages, onPage }: { page: number; pages: numbe
 }
 
 function Notice({ children }: { children: ReactNode }) {
-  return <p className="rounded-card border border-border bg-surface p-6 text-sm text-muted">{children}</p>;
+  return <p className="card p-6 text-sm text-muted">{children}</p>;
 }
 
 export function QueueCard({
@@ -279,7 +279,7 @@ export function QueueCard({
   const headingId = `dispute-${address}`;
   if (!account) {
     return (
-      <article aria-labelledby={headingId} className="rounded-card border border-border bg-surface p-6 text-sm">
+      <article aria-labelledby={headingId} className="card p-6 text-sm">
         <h3 id={headingId} className="font-medium">
           <Address value={address} label="job" />
         </h3>
@@ -298,7 +298,7 @@ export function QueueCard({
     (item.hasVoted ? 'You have already voted on the pending proposal.' : null);
 
   return (
-    <article aria-labelledby={headingId} className="rounded-card border border-border bg-surface p-6">
+    <article aria-labelledby={headingId} className="card p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h3 id={headingId} className="flex flex-wrap items-center gap-2 text-sm font-medium">
           Job <Address value={address} label="job" />

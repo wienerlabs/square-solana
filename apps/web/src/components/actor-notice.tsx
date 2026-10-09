@@ -11,7 +11,7 @@ import type { Actor } from './actor';
 export function ActorNotice({ actor }: { actor: Actor }) {
   if (actor.mode === 'wallet') return null;
   return (
-    <p role="status" className="mb-6 rounded-card border border-border bg-surface p-4 text-sm text-muted">
+    <p role="status" className="mb-6 card p-4 text-sm text-muted">
       {actor.mode === 'smartAccount' && actor.address ? (
         <>
           Acting as the smart account vault <Address value={actor.address.toBase58()} label="vault" />. Each step is

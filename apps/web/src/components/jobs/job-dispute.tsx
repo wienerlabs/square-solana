@@ -222,7 +222,7 @@ export function JobDispute({
   const canAct = guard.canTransact && action.busy === null && !action.pending;
 
   return (
-    <section aria-labelledby="dispute-heading" className="rounded-card border border-border bg-surface p-6">
+    <section aria-labelledby="dispute-heading" className="card p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 id="dispute-heading" className="text-sm font-medium uppercase tracking-wide text-muted">
           Dispute

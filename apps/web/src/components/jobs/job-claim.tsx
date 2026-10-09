@@ -96,7 +96,7 @@ export function JobClaim({
   const isAgent = Boolean(agent?.equals(account.agentWallet));
 
   return (
-    <section aria-labelledby="claim-heading" className="rounded-card border border-border bg-surface p-6">
+    <section aria-labelledby="claim-heading" className="card p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 id="claim-heading" className="text-sm font-medium uppercase tracking-wide text-muted">
           Receivable

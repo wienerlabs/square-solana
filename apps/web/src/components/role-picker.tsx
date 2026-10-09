@@ -6,7 +6,7 @@ import { useRole } from './role-provider';
 export function RolePicker() {
   const { address, role, setRole } = useRole();
   return (
-    <section aria-labelledby="role-heading" className="rounded-card border border-border bg-surface p-6">
+    <section aria-labelledby="role-heading" className="card p-6">
       <h2 id="role-heading" className="text-sm font-medium uppercase tracking-wide text-muted">
         Role
       </h2>

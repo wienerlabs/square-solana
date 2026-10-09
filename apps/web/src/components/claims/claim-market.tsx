@@ -65,7 +65,7 @@ export function ClaimMarket({ escrowProgramId }: { escrowProgramId: string }) {
 
   if (!verified) {
     return (
-      <p className="rounded-card border border-border bg-surface p-6 text-sm text-muted">
+      <p className="card p-6 text-sm text-muted">
         {guard.rpc.state === 'checking'
           ? 'Verifying the network before reading the listings…'
           : 'The network is not verified, so the listings are not read.'}

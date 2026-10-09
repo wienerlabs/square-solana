@@ -26,9 +26,14 @@ export function CopyButton({ value, label }: { value: string; label: string }) {
         type="button"
         onClick={() => void copy()}
         aria-label={label}
-        className="rounded-md px-1.5 py-0.5 text-caption text-muted hover:bg-surface-muted hover:text-text"
+        className="rounded-md px-1.5 py-0.5 text-caption text-muted transition-colors hover:bg-surface-muted hover:text-text"
       >
-        {state === 'copied' ? 'Copied' : state === 'failed' ? 'Failed' : 'Copy'}
+        <span
+          key={state}
+          className={`inline-block ${state === 'copied' ? 'text-tone-fg motion-safe:animate-[sq-pop_0.35s_ease-out]' : ''}`}
+        >
+          {state === 'copied' ? 'Copied' : state === 'failed' ? 'Failed' : 'Copy'}
+        </span>
       </button>
       <span role="status" className="sr-only">
         {state === 'copied' ? 'Copied to clipboard' : state === 'failed' ? 'Could not copy' : ''}

@@ -9,7 +9,7 @@ export type Load<T> = { state: 'loading' } | { state: 'ready'; value: T } | { st
 export const iso = (unix: number) => new Date(unix * 1000).toISOString().replace(/\.\d{3}Z$/, 'Z');
 
 export function Notice({ children }: { children: ReactNode }) {
-  return <p className="rounded-card border border-border bg-surface p-6 text-sm text-muted">{children}</p>;
+  return <p className="card p-6 text-sm text-muted">{children}</p>;
 }
 
 export function Section({
@@ -24,7 +24,7 @@ export function Section({
   children: ReactNode;
 }) {
   return (
-    <section className="rounded-card border border-border bg-surface p-6">
+    <section className="card p-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <h2 className="text-sm font-medium uppercase tracking-wide text-muted">{title}</h2>
         {actions}

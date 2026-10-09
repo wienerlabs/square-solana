@@ -9,7 +9,7 @@ export function JobDetailPage({ jobAddress }: { jobAddress: string }) {
   const { programIds } = useWebConfig();
   if (!programIds.escrow) {
     return (
-      <p className="rounded-card border border-border bg-surface p-6 text-sm text-muted">
+      <p className="card p-6 text-sm text-muted">
         Unavailable: <span className="font-mono">{PROGRAM_ID_ENV.escrow}</span> is not set. Jobs live in the
         square_escrow program.
       </p>

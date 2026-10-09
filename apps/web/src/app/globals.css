@@ -47,13 +47,15 @@
   --text-heading--line-height: 1.22;
   --text-display: 60px;
   --text-display--line-height: 1.13;
-  --radius-card: 12px;
+  --radius-card: 16px;
 }
 
 @layer base {
   html {
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    scroll-behavior: smooth;
+    scroll-padding-top: 5rem;
   }
 
   body {
@@ -61,6 +63,9 @@
     color: var(--sq-text);
     font-family: var(--font-sans);
     letter-spacing: -0.01em;
+    transition:
+      background-color 0.4s ease,
+      color 0.4s ease;
   }
 
   :focus-visible {
@@ -78,22 +83,333 @@
   }
 }
 
-/* wallet-adapter-react-ui butonu token'lara uyar. */
+/* wallet-adapter-react-ui butonu: navbar'da sakin, ters renkli (metin rengi zemin) bir düğme. */
 .wallet-adapter-button.wallet-adapter-button-trigger {
-  background-color: var(--sq-accent);
-  color: var(--sq-on-accent);
-  border-radius: 9999px;
+  background-color: var(--sq-text);
+  color: var(--sq-bg);
+  border-radius: 10px;
   font-family: var(--font-sans);
+  font-size: 14px;
   font-weight: 500;
-  height: 40px;
-  padding: 0 18px;
+  height: 36px;
+  padding: 0 14px;
+  white-space: nowrap;
+  box-shadow:
+    0 1px 0 0 color-mix(in oklab, white 18%, transparent) inset,
+    0 6px 18px -10px color-mix(in oklab, var(--sq-text) 60%, transparent);
+  transition:
+    transform 0.15s ease,
+    opacity 0.15s ease;
 }
 
 .wallet-adapter-button.wallet-adapter-button-trigger:not([disabled]):hover {
-  background-color: var(--sq-accent-hover);
+  background-color: var(--sq-text);
+  opacity: 0.88;
+}
+
+.wallet-adapter-button.wallet-adapter-button-trigger:not([disabled]):active {
+  transform: scale(0.98);
+}
+
+.wallet-adapter-button-trigger .wallet-adapter-button-start-icon {
+  width: 18px;
+  height: 18px;
+  margin-right: 8px;
+}
+
+/* Dar ekranda logo, tema seçici ve cüzdan düğmesi tek satıra sığar. */
+@media (max-width: 480px) {
+  .wallet-adapter-button.wallet-adapter-button-trigger {
+    font-size: 13px;
+    height: 34px;
+    padding: 0 10px;
+  }
 }
 
 .wallet-adapter-button:focus-visible {
   outline: 2px solid var(--sq-focus);
   outline-offset: 2px;
+}
+
+/* ---------------------------------------------------------------- yüzeyler */
+
+/* Kart: hafif dikey geçişli yüzey, üst kenarda ince ışık, katmanlı gölge. Bileşenler `card` sınıfını kullanır. */
+@utility card {
+  position: relative;
+  border-radius: var(--radius-card);
+  border: 1px solid var(--sq-border);
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklab, var(--sq-surface) 100%, var(--sq-text) 2.5%) 0%,
+    var(--sq-surface) 55%
+  );
+  box-shadow:
+    0 1px 0 0 color-mix(in oklab, white 5%, transparent) inset,
+    0 1px 2px 0 rgb(0 0 0 / 0.04),
+    0 16px 40px -24px rgb(0 0 0 / 0.35);
+  transition:
+    border-color 0.25s ease,
+    box-shadow 0.25s ease,
+    transform 0.25s ease,
+    background-color 0.4s ease;
+
+  /* İmleci izleyen yumuşak ışık (`CardSpotlight` --mx / --my yazar); yalnızca fareli cihazlarda. */
+  &::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    opacity: 0;
+    background: radial-gradient(
+      420px circle at var(--mx, 50%) var(--my, 0%),
+      color-mix(in oklab, var(--sq-accent) 11%, transparent),
+      transparent 65%
+    );
+    transition: opacity 0.35s ease;
+  }
+
+  @media (hover: hover) {
+    &:hover::after {
+      opacity: 1;
+    }
+  }
+}
+
+/* Etkileşimli kart (bağlantı, seçilebilir öğe): üzerine gelince yükselir, kenarı vurgu rengine döner. */
+@utility card-interactive {
+  &:hover {
+    transform: translateY(-2px);
+    border-color: color-mix(in oklab, var(--sq-accent) 45%, var(--sq-border));
+    box-shadow:
+      0 1px 0 0 color-mix(in oklab, white 6%, transparent) inset,
+      0 20px 48px -24px color-mix(in oklab, var(--sq-accent) 35%, transparent);
+  }
+}
+
+/* Ana düğmede üzerine gelince geçen parıltı. */
+@utility shine {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background: linear-gradient(110deg, transparent 30%, rgb(255 255 255 / 0.45) 50%, transparent 70%);
+    transform: translateX(-120%);
+    transition: transform 0.7s cubic-bezier(0.2, 0.7, 0.2, 1);
+  }
+
+  &:hover::before {
+    transform: translateX(120%);
+  }
+}
+
+/* Hafif süzülme (hero görseli). */
+@utility hover-float {
+  animation: sq-float 7s ease-in-out infinite;
+}
+
+/* Metin üstünde vurgu geçişi (başlıklar). */
+@utility text-gradient {
+  background: linear-gradient(100deg, var(--sq-text) 0%, var(--sq-text) 35%, var(--sq-link) 70%, var(--sq-accent) 100%);
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: sq-sheen 9s ease-in-out infinite alternate;
+}
+
+/* ---------------------------------------------------------------- hareket */
+
+@keyframes sq-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes sq-sheen {
+  from {
+    background-position: 0% 50%;
+  }
+  to {
+    background-position: 100% 50%;
+  }
+}
+
+@keyframes sq-drift {
+  0% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(4%, 3%, 0) scale(1.08);
+  }
+  100% {
+    transform: translate3d(-3%, -2%, 0) scale(1);
+  }
+}
+
+@keyframes sq-ping {
+  0% {
+    transform: scale(1);
+    opacity: 0.6;
+  }
+  80%,
+  100% {
+    transform: scale(2.6);
+    opacity: 0;
+  }
+}
+
+@keyframes sq-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+@keyframes sq-pop {
+  0% {
+    transform: scale(0.85);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.06);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes sq-fill {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+@keyframes sq-dash {
+  to {
+    stroke-dashoffset: -24;
+  }
+}
+
+/* Sayfa açılışı: sayfanın bölümleri (kapsayıcının torunları) sırayla yükselir. */
+@utility rise-in {
+  & > * > * {
+    animation: sq-rise 0.55s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  }
+  & > * > *:nth-child(2) {
+    animation-delay: 70ms;
+  }
+  & > * > *:nth-child(3) {
+    animation-delay: 140ms;
+  }
+  & > * > *:nth-child(4) {
+    animation-delay: 210ms;
+  }
+  & > * > *:nth-child(5) {
+    animation-delay: 280ms;
+  }
+  & > * > *:nth-child(n + 6) {
+    animation-delay: 350ms;
+  }
+}
+
+/* Tek öğe açılışı (hero metni). */
+@utility rise-in-self {
+  animation: sq-rise 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+/* Kaydırınca belirme (`Reveal`): görünür olana kadar soluk ve aşağıda. */
+[data-reveal='pending'] {
+  opacity: 0;
+  transform: translateY(16px);
+}
+
+[data-reveal='shown'] {
+  opacity: 1;
+  transform: none;
+  transition:
+    opacity 0.7s cubic-bezier(0.2, 0.7, 0.2, 1),
+    transform 0.7s cubic-bezier(0.2, 0.7, 0.2, 1);
+  transition-delay: var(--reveal-delay, 0ms);
+}
+
+/* ---------------------------------------------------------------- arka plan */
+
+.sq-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+  background: var(--sq-bg);
+}
+
+/* İnce ızgara: üstte belirgin, aşağı doğru kaybolur. */
+.sq-backdrop::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(to right, color-mix(in oklab, var(--sq-text) 5%, transparent) 1px, transparent 1px),
+    linear-gradient(to bottom, color-mix(in oklab, var(--sq-text) 5%, transparent) 1px, transparent 1px);
+  background-size: 56px 56px;
+  mask-image: radial-gradient(ellipse 80% 55% at 50% 0%, black 30%, transparent 75%);
+}
+
+.sq-glow {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(90px);
+  opacity: 0.55;
+  animation: sq-drift 22s ease-in-out infinite alternate;
+}
+
+.sq-glow-a {
+  top: -18rem;
+  left: 50%;
+  width: 46rem;
+  height: 28rem;
+  margin-left: -23rem;
+  background: color-mix(in oklab, var(--sq-accent) 70%, transparent);
+}
+
+.sq-glow-b {
+  top: 6rem;
+  right: -12rem;
+  width: 30rem;
+  height: 22rem;
+  background: color-mix(in oklab, var(--sq-tone-info-dot) 45%, transparent);
+  animation-duration: 28s;
+  animation-delay: -6s;
+}
+
+.sq-glow-c {
+  top: 14rem;
+  left: -14rem;
+  width: 28rem;
+  height: 20rem;
+  background: color-mix(in oklab, var(--sq-tone-success-dot) 28%, transparent);
+  animation-duration: 32s;
+  animation-delay: -12s;
+}
+
+[data-theme='light'] .sq-glow {
+  opacity: 0.28;
 }

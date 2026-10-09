@@ -36,10 +36,19 @@ describe('landing', () => {
   it('shows all eight steps in order', () => {
     mount();
     const flow = screen.getByRole('region', { name: 'From mandate to payment' });
-    const steps = within(flow).getAllByRole('listitem');
+    // Adımlar sıralı listenin doğrudan öğeleri; her adımın talimatları kendi listesindedir.
+    const steps = [...within(flow).getAllByRole('list')[0]!.children] as HTMLElement[];
     expect(steps.map((s) => within(s).getByRole('heading').textContent)).toEqual(
       FLOW_STEPS.map((s) => `Step ${s.number}: ${s.title}`),
     );
+    for (const [index, step] of FLOW_STEPS.entries()) {
+      const chips = within(steps[index]!).getByRole('list', { name: `Step ${step.number} instructions` });
+      expect(
+        within(chips)
+          .getAllByRole('listitem')
+          .map((chip) => chip.textContent),
+      ).toEqual([...step.instructions]);
+    }
   });
 
   it('lists the four programs and says which are not configured', () => {

@@ -12,7 +12,7 @@ import { ROLE_INFO } from '@/lib/roles';
 import { AgentRegistration } from './agent-registration';
 
 function Notice({ children }: { children: ReactNode }) {
-  return <p className="rounded-card border border-border bg-surface p-6 text-sm text-muted">{children}</p>;
+  return <p className="card p-6 text-sm text-muted">{children}</p>;
 }
 
 // Kaydı agent'ın sahibi imzalar: cüzdan ya da agent'ın smart account vault'u (FE-21). AgentRecord PDA'sı

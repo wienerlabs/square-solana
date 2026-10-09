@@ -30,7 +30,7 @@ import { useSettlementToken } from '@/lib/use-settlement';
 type Load<T> = { state: 'loading' } | { state: 'ready'; value: T } | { state: 'error'; message: string };
 
 function Notice({ children }: { children: ReactNode }) {
-  return <p className="rounded-card border border-border bg-surface p-6 text-sm text-muted">{children}</p>;
+  return <p className="card p-6 text-sm text-muted">{children}</p>;
 }
 
 const inputClass = 'w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text';
@@ -107,7 +107,7 @@ export function AgentDirectory() {
   return (
     <div className="grid gap-6">
       <form
-        className="grid gap-4 rounded-card border border-border bg-surface p-6 md:grid-cols-2"
+        className="grid gap-4 card p-6 md:grid-cols-2"
         onSubmit={(event) => {
           event.preventDefault();
           setQuery((current) => ({ ...current, skill: skillText.trim() === '' ? null : skillText.trim() }));

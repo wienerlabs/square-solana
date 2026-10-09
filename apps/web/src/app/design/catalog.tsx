@@ -13,7 +13,7 @@ import { ConnectedIdentity, LatestTransaction, PerformanceTable, TokenSwatches }
 
 function Section({ id, title, note, children }: { id: string; title: string; note?: string; children: ReactNode }) {
   return (
-    <section aria-labelledby={id} className="rounded-card border border-border bg-surface p-6">
+    <section aria-labelledby={id} className="card p-6">
       <h2 id={id} className="text-subheading font-semibold">
         {title}
       </h2>
@@ -98,7 +98,7 @@ export function Catalog() {
             label="Mandate to payment"
             steps={FLOW_STEPS.map((step) => ({
               title: step.title,
-              description: `${step.actor} · ${step.instructions}`,
+              description: `${step.actor} · ${step.instructions.join(', ')}`,
               state: 'upcoming',
             }))}
           />
