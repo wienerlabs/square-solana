@@ -12,10 +12,10 @@ const WalletMultiButton = dynamic(async () => (await import('@solana/wallet-adap
   ssr: false,
 });
 
+// Bileşen kataloğu (`/design`, FE-02) ekip içindir; menüde yer almaz.
 const LINKS = [
   { href: '/', label: 'Protocol' },
   { href: '/app', label: 'App' },
-  { href: '/design', label: 'Design system' },
 ] as const;
 
 export function Header() {
