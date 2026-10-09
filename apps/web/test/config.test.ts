@@ -216,7 +216,14 @@ describe('fee payer', () => {
     });
     expect(parseWebConfig({ ...api, SQUARE_FEE_PAYER_URL: 'http://sponsor.example.org' })).toEqual({
       ok: false,
-      errors: ['SQUARE_FEE_PAYER_URL must use https unless SQUARE_SOLANA_CLUSTER is localnet'],
+      errors: [
+        'SQUARE_FEE_PAYER_URL must use https unless SQUARE_SOLANA_CLUSTER is localnet or the host is local (localhost, 127.0.0.1, [::1])',
+      ],
+    });
+    // Öteki uçlar gibi bu makinenin adresinde http kabul edilir (tarayıcı adrese doğrudan gider).
+    expect(parseWebConfig({ ...api, SQUARE_FEE_PAYER_URL: 'http://127.0.0.1:8790' })).toMatchObject({
+      ok: true,
+      config: { feePayerUrl: 'http://127.0.0.1:8790' },
     });
   });
 
