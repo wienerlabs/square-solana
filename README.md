@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="docs/assets/wiener-labs-mark.svg" alt="Wiener Labs" width="96">
+<img src="docs/assets/square-mark.svg" alt="Square" width="96">
 
 # Square on Solana
 
