@@ -173,6 +173,10 @@ describe('prover and verifier', () => {
     const failure = (code: number) => new Error(`Simulation failed: custom program error: 0x${code.toString(16)}`);
     expect(verifierErrorMessage(failure(6005))).toMatch(/StaleProof, 6005\)\. The proof is older than 10 minutes/);
     expect(verifierErrorMessage(failure(6000))).toMatch(/InvalidProof, 6000\)\. The proof does not match/);
+    // Kabul öncesi ön-ispat (ADR 0028): işin kendi koşulları politikayı çiğniyor.
+    expect(verifierErrorMessage(failure(6012))).toMatch(
+      /PreflightRefused, 6012\)\. The job's own terms break the policy/,
+    );
     expect(verifierErrorMessage(new Error('User rejected the request.'))).toBeNull();
   });
 });

@@ -35,11 +35,12 @@ solana-transaction-error = "3"
 spl-associated-token-account-interface = "2"
 spl-token-interface = "2"
 spl-token-2022-interface = "2"
+# Compute unit bütçeleri SDK'nın işlem profilinden (`cu::profile_budget`); verifier testlerinin release ispatı
+# fikstürü (tests/fixtures/release-proofs.json).
+serde_json = "1"
 square-common = { path = "../../crates/square-common" }
 
 [dev-dependencies]
-# Verifier testlerinin release ispatı fikstürü (tests/fixtures/release-proofs.json).
-serde_json = "1"
 solana-sha256-hasher = "3"
 square-registry = { path = "../../programs/square-registry", features = ["no-entrypoint"] }
 square-policy = { path = "../../programs/square-policy", features = ["no-entrypoint"] }

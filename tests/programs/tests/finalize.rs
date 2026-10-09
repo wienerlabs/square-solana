@@ -43,7 +43,11 @@ fn anyone_finalizes_after_the_window_and_the_keeper_is_paid() {
     let executed = w
         .finalize(&keeper, &job, settlement)
         .expect("finalize_payment");
-    cu::within("escrow.finalize_payment (gate yok)", &executed, 80_000);
+    cu::within_profile(
+        "escrow.finalize_payment (gate yok)",
+        &executed,
+        "finalizePayment",
+    );
 
     assert_eq!(w.balance(&settlement.keeper_token_account), Some(FEE));
     assert_eq!(w.balance(&settlement.payee_token_account), Some(NET));

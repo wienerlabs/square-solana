@@ -112,4 +112,9 @@ pub enum EscrowError {
     // ---- M6: Stripe MPP fiat rail ----
     #[msg("Instruction does not apply to the job's settlement rail")]
     RailMismatch,
+    // ---- ADR 0028: pre-acceptance preflight proof ----
+    #[msg("Policy job: the institution must bind a preflight proof before the agent accepts")]
+    PreflightRequired,
+    #[msg("Job amount is above the policy's public daily ceiling")]
+    AmountAboveDailyCeiling,
 }

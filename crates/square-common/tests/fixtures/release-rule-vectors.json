@@ -4,7 +4,8 @@
       "code": 0,
       "dailySpentBefore": "0",
       "rules": [],
-      "final": false
+      "final": false,
+      "preflight": true
     },
     {
       "code": 1,
@@ -12,7 +13,8 @@
       "rules": [
         "perTx"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 2,
@@ -20,7 +22,8 @@
       "rules": [
         "dailyPrivate"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 3,
@@ -29,7 +32,8 @@
         "perTx",
         "dailyPrivate"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 4,
@@ -37,7 +41,8 @@
       "rules": [
         "mintNotAllowed"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 5,
@@ -46,7 +51,8 @@
         "perTx",
         "mintNotAllowed"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 6,
@@ -55,7 +61,8 @@
         "dailyPrivate",
         "mintNotAllowed"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 7,
@@ -65,7 +72,8 @@
         "dailyPrivate",
         "mintNotAllowed"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 8,
@@ -73,7 +81,8 @@
       "rules": [
         "payeeBlocked"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 9,
@@ -82,7 +91,8 @@
         "perTx",
         "payeeBlocked"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 10,
@@ -91,7 +101,8 @@
         "dailyPrivate",
         "payeeBlocked"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 11,
@@ -101,7 +112,8 @@
         "dailyPrivate",
         "payeeBlocked"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 12,
@@ -110,7 +122,8 @@
         "mintNotAllowed",
         "payeeBlocked"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 13,
@@ -120,7 +133,8 @@
         "mintNotAllowed",
         "payeeBlocked"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 14,
@@ -130,7 +144,8 @@
         "mintNotAllowed",
         "payeeBlocked"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 15,
@@ -141,7 +156,8 @@
         "mintNotAllowed",
         "payeeBlocked"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 16,
@@ -149,7 +165,8 @@
       "rules": [
         "categoryNotAllowed"
       ],
-      "final": false
+      "final": false,
+      "preflight": true
     },
     {
       "code": 17,
@@ -158,7 +175,8 @@
         "perTx",
         "categoryNotAllowed"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 18,
@@ -167,7 +185,8 @@
         "dailyPrivate",
         "categoryNotAllowed"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 19,
@@ -177,7 +196,8 @@
         "dailyPrivate",
         "categoryNotAllowed"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 20,
@@ -186,7 +206,8 @@
         "mintNotAllowed",
         "categoryNotAllowed"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 21,
@@ -196,7 +217,8 @@
         "mintNotAllowed",
         "categoryNotAllowed"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 22,
@@ -206,7 +228,8 @@
         "mintNotAllowed",
         "categoryNotAllowed"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 23,
@@ -217,7 +240,8 @@
         "mintNotAllowed",
         "categoryNotAllowed"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 24,
@@ -226,7 +250,8 @@
         "payeeBlocked",
         "categoryNotAllowed"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 25,
@@ -236,7 +261,8 @@
         "payeeBlocked",
         "categoryNotAllowed"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 26,
@@ -246,7 +272,8 @@
         "payeeBlocked",
         "categoryNotAllowed"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 27,
@@ -257,7 +284,8 @@
         "payeeBlocked",
         "categoryNotAllowed"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 28,
@@ -267,7 +295,8 @@
         "payeeBlocked",
         "categoryNotAllowed"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 29,
@@ -278,7 +307,8 @@
         "payeeBlocked",
         "categoryNotAllowed"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 30,
@@ -289,7 +319,8 @@
         "payeeBlocked",
         "categoryNotAllowed"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 31,
@@ -301,7 +332,8 @@
         "payeeBlocked",
         "categoryNotAllowed"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 32,
@@ -309,7 +341,8 @@
       "rules": [
         "outsideTimeWindow"
       ],
-      "final": false
+      "final": false,
+      "preflight": true
     },
     {
       "code": 33,
@@ -318,7 +351,8 @@
         "perTx",
         "outsideTimeWindow"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 34,
@@ -327,7 +361,8 @@
         "dailyPrivate",
         "outsideTimeWindow"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 35,
@@ -337,7 +372,8 @@
         "dailyPrivate",
         "outsideTimeWindow"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 36,
@@ -346,7 +382,8 @@
         "mintNotAllowed",
         "outsideTimeWindow"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 37,
@@ -356,7 +393,8 @@
         "mintNotAllowed",
         "outsideTimeWindow"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 38,
@@ -366,7 +404,8 @@
         "mintNotAllowed",
         "outsideTimeWindow"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 39,
@@ -377,7 +416,8 @@
         "mintNotAllowed",
         "outsideTimeWindow"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 40,
@@ -386,7 +426,8 @@
         "payeeBlocked",
         "outsideTimeWindow"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 41,
@@ -396,7 +437,8 @@
         "payeeBlocked",
         "outsideTimeWindow"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 42,
@@ -406,7 +448,8 @@
         "payeeBlocked",
         "outsideTimeWindow"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 43,
@@ -417,7 +460,8 @@
         "payeeBlocked",
         "outsideTimeWindow"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 44,
@@ -427,7 +471,8 @@
         "payeeBlocked",
         "outsideTimeWindow"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 45,
@@ -438,7 +483,8 @@
         "payeeBlocked",
         "outsideTimeWindow"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 46,
@@ -449,7 +495,8 @@
         "payeeBlocked",
         "outsideTimeWindow"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 47,
@@ -461,7 +508,8 @@
         "payeeBlocked",
         "outsideTimeWindow"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 48,
@@ -470,7 +518,8 @@
         "categoryNotAllowed",
         "outsideTimeWindow"
       ],
-      "final": false
+      "final": false,
+      "preflight": true
     },
     {
       "code": 49,
@@ -480,7 +529,8 @@
         "categoryNotAllowed",
         "outsideTimeWindow"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 50,
@@ -490,7 +540,8 @@
         "categoryNotAllowed",
         "outsideTimeWindow"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 51,
@@ -501,7 +552,8 @@
         "categoryNotAllowed",
         "outsideTimeWindow"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 52,
@@ -511,7 +563,8 @@
         "categoryNotAllowed",
         "outsideTimeWindow"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 53,
@@ -522,7 +575,8 @@
         "categoryNotAllowed",
         "outsideTimeWindow"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 54,
@@ -533,7 +587,8 @@
         "categoryNotAllowed",
         "outsideTimeWindow"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 55,
@@ -545,7 +600,8 @@
         "categoryNotAllowed",
         "outsideTimeWindow"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 56,
@@ -555,7 +611,8 @@
         "categoryNotAllowed",
         "outsideTimeWindow"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 57,
@@ -566,7 +623,8 @@
         "categoryNotAllowed",
         "outsideTimeWindow"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 58,
@@ -577,7 +635,8 @@
         "categoryNotAllowed",
         "outsideTimeWindow"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 59,
@@ -589,7 +648,8 @@
         "categoryNotAllowed",
         "outsideTimeWindow"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 60,
@@ -600,7 +660,8 @@
         "categoryNotAllowed",
         "outsideTimeWindow"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 61,
@@ -612,7 +673,8 @@
         "categoryNotAllowed",
         "outsideTimeWindow"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 62,
@@ -624,7 +686,8 @@
         "categoryNotAllowed",
         "outsideTimeWindow"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 63,
@@ -637,7 +700,8 @@
         "categoryNotAllowed",
         "outsideTimeWindow"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 64,
@@ -645,7 +709,8 @@
       "rules": [
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 65,
@@ -654,7 +719,8 @@
         "perTx",
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 66,
@@ -663,7 +729,8 @@
         "dailyPrivate",
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 67,
@@ -673,7 +740,8 @@
         "dailyPrivate",
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 68,
@@ -682,7 +750,8 @@
         "mintNotAllowed",
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 69,
@@ -692,7 +761,8 @@
         "mintNotAllowed",
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 70,
@@ -702,7 +772,8 @@
         "mintNotAllowed",
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 71,
@@ -713,7 +784,8 @@
         "mintNotAllowed",
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 72,
@@ -722,7 +794,8 @@
         "payeeBlocked",
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 73,
@@ -732,7 +805,8 @@
         "payeeBlocked",
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 74,
@@ -742,7 +816,8 @@
         "payeeBlocked",
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 75,
@@ -753,7 +828,8 @@
         "payeeBlocked",
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 76,
@@ -763,7 +839,8 @@
         "payeeBlocked",
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 77,
@@ -774,7 +851,8 @@
         "payeeBlocked",
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 78,
@@ -785,7 +863,8 @@
         "payeeBlocked",
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 79,
@@ -797,7 +876,8 @@
         "payeeBlocked",
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 80,
@@ -806,7 +886,8 @@
         "categoryNotAllowed",
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 81,
@@ -816,7 +897,8 @@
         "categoryNotAllowed",
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 82,
@@ -826,7 +908,8 @@
         "categoryNotAllowed",
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 83,
@@ -837,7 +920,8 @@
         "categoryNotAllowed",
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 84,
@@ -847,7 +931,8 @@
         "categoryNotAllowed",
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 85,
@@ -858,7 +943,8 @@
         "categoryNotAllowed",
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 86,
@@ -869,7 +955,8 @@
         "categoryNotAllowed",
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 87,
@@ -881,7 +968,8 @@
         "categoryNotAllowed",
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 88,
@@ -891,7 +979,8 @@
         "categoryNotAllowed",
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 89,
@@ -902,7 +991,8 @@
         "categoryNotAllowed",
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 90,
@@ -913,7 +1003,8 @@
         "categoryNotAllowed",
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 91,
@@ -925,7 +1016,8 @@
         "categoryNotAllowed",
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 92,
@@ -936,7 +1028,8 @@
         "categoryNotAllowed",
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 93,
@@ -948,7 +1041,8 @@
         "categoryNotAllowed",
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 94,
@@ -960,7 +1054,8 @@
         "categoryNotAllowed",
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 95,
@@ -973,7 +1068,8 @@
         "categoryNotAllowed",
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 96,
@@ -982,7 +1078,8 @@
         "outsideTimeWindow",
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 97,
@@ -992,7 +1089,8 @@
         "outsideTimeWindow",
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 98,
@@ -1002,7 +1100,8 @@
         "outsideTimeWindow",
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 99,
@@ -1013,7 +1112,8 @@
         "outsideTimeWindow",
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 100,
@@ -1023,7 +1123,8 @@
         "outsideTimeWindow",
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 101,
@@ -1034,7 +1135,8 @@
         "outsideTimeWindow",
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 102,
@@ -1045,7 +1147,8 @@
         "outsideTimeWindow",
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 103,
@@ -1057,7 +1160,8 @@
         "outsideTimeWindow",
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 104,
@@ -1067,7 +1171,8 @@
         "outsideTimeWindow",
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 105,
@@ -1078,7 +1183,8 @@
         "outsideTimeWindow",
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 106,
@@ -1089,7 +1195,8 @@
         "outsideTimeWindow",
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 107,
@@ -1101,7 +1208,8 @@
         "outsideTimeWindow",
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 108,
@@ -1112,7 +1220,8 @@
         "outsideTimeWindow",
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 109,
@@ -1124,7 +1233,8 @@
         "outsideTimeWindow",
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 110,
@@ -1136,7 +1246,8 @@
         "outsideTimeWindow",
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 111,
@@ -1149,7 +1260,8 @@
         "outsideTimeWindow",
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 112,
@@ -1159,7 +1271,8 @@
         "outsideTimeWindow",
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 113,
@@ -1170,7 +1283,8 @@
         "outsideTimeWindow",
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 114,
@@ -1181,7 +1295,8 @@
         "outsideTimeWindow",
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 115,
@@ -1193,7 +1308,8 @@
         "outsideTimeWindow",
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 116,
@@ -1204,7 +1320,8 @@
         "outsideTimeWindow",
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 117,
@@ -1216,7 +1333,8 @@
         "outsideTimeWindow",
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 118,
@@ -1228,7 +1346,8 @@
         "outsideTimeWindow",
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 119,
@@ -1241,7 +1360,8 @@
         "outsideTimeWindow",
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 120,
@@ -1252,7 +1372,8 @@
         "outsideTimeWindow",
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 121,
@@ -1264,7 +1385,8 @@
         "outsideTimeWindow",
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 122,
@@ -1276,7 +1398,8 @@
         "outsideTimeWindow",
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 123,
@@ -1289,7 +1412,8 @@
         "outsideTimeWindow",
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 124,
@@ -1301,7 +1425,8 @@
         "outsideTimeWindow",
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 125,
@@ -1314,7 +1439,8 @@
         "outsideTimeWindow",
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 126,
@@ -1327,7 +1453,8 @@
         "outsideTimeWindow",
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 127,
@@ -1341,13 +1468,15 @@
         "outsideTimeWindow",
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 0,
       "dailySpentBefore": "40000000",
       "rules": [],
-      "final": false
+      "final": false,
+      "preflight": true
     },
     {
       "code": 1,
@@ -1355,7 +1484,8 @@
       "rules": [
         "perTx"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 2,
@@ -1363,7 +1493,8 @@
       "rules": [
         "dailyPrivate"
       ],
-      "final": false
+      "final": false,
+      "preflight": false
     },
     {
       "code": 3,
@@ -1372,7 +1503,8 @@
         "perTx",
         "dailyPrivate"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 4,
@@ -1380,7 +1512,8 @@
       "rules": [
         "mintNotAllowed"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 5,
@@ -1389,7 +1522,8 @@
         "perTx",
         "mintNotAllowed"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 6,
@@ -1398,7 +1532,8 @@
         "dailyPrivate",
         "mintNotAllowed"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 7,
@@ -1408,7 +1543,8 @@
         "dailyPrivate",
         "mintNotAllowed"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 8,
@@ -1416,7 +1552,8 @@
       "rules": [
         "payeeBlocked"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 9,
@@ -1425,7 +1562,8 @@
         "perTx",
         "payeeBlocked"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 10,
@@ -1434,7 +1572,8 @@
         "dailyPrivate",
         "payeeBlocked"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 11,
@@ -1444,7 +1583,8 @@
         "dailyPrivate",
         "payeeBlocked"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 12,
@@ -1453,7 +1593,8 @@
         "mintNotAllowed",
         "payeeBlocked"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 13,
@@ -1463,7 +1604,8 @@
         "mintNotAllowed",
         "payeeBlocked"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 14,
@@ -1473,7 +1615,8 @@
         "mintNotAllowed",
         "payeeBlocked"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 15,
@@ -1484,7 +1627,8 @@
         "mintNotAllowed",
         "payeeBlocked"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 16,
@@ -1492,7 +1636,8 @@
       "rules": [
         "categoryNotAllowed"
       ],
-      "final": false
+      "final": false,
+      "preflight": true
     },
     {
       "code": 17,
@@ -1501,7 +1646,8 @@
         "perTx",
         "categoryNotAllowed"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 18,
@@ -1510,7 +1656,8 @@
         "dailyPrivate",
         "categoryNotAllowed"
       ],
-      "final": false
+      "final": false,
+      "preflight": false
     },
     {
       "code": 19,
@@ -1520,7 +1667,8 @@
         "dailyPrivate",
         "categoryNotAllowed"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 20,
@@ -1529,7 +1677,8 @@
         "mintNotAllowed",
         "categoryNotAllowed"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 21,
@@ -1539,7 +1688,8 @@
         "mintNotAllowed",
         "categoryNotAllowed"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 22,
@@ -1549,7 +1699,8 @@
         "mintNotAllowed",
         "categoryNotAllowed"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 23,
@@ -1560,7 +1711,8 @@
         "mintNotAllowed",
         "categoryNotAllowed"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 24,
@@ -1569,7 +1721,8 @@
         "payeeBlocked",
         "categoryNotAllowed"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 25,
@@ -1579,7 +1732,8 @@
         "payeeBlocked",
         "categoryNotAllowed"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 26,
@@ -1589,7 +1743,8 @@
         "payeeBlocked",
         "categoryNotAllowed"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 27,
@@ -1600,7 +1755,8 @@
         "payeeBlocked",
         "categoryNotAllowed"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 28,
@@ -1610,7 +1766,8 @@
         "payeeBlocked",
         "categoryNotAllowed"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 29,
@@ -1621,7 +1778,8 @@
         "payeeBlocked",
         "categoryNotAllowed"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 30,
@@ -1632,7 +1790,8 @@
         "payeeBlocked",
         "categoryNotAllowed"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 31,
@@ -1644,7 +1803,8 @@
         "payeeBlocked",
         "categoryNotAllowed"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 32,
@@ -1652,7 +1812,8 @@
       "rules": [
         "outsideTimeWindow"
       ],
-      "final": false
+      "final": false,
+      "preflight": true
     },
     {
       "code": 33,
@@ -1661,7 +1822,8 @@
         "perTx",
         "outsideTimeWindow"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 34,
@@ -1670,7 +1832,8 @@
         "dailyPrivate",
         "outsideTimeWindow"
       ],
-      "final": false
+      "final": false,
+      "preflight": false
     },
     {
       "code": 35,
@@ -1680,7 +1843,8 @@
         "dailyPrivate",
         "outsideTimeWindow"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 36,
@@ -1689,7 +1853,8 @@
         "mintNotAllowed",
         "outsideTimeWindow"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 37,
@@ -1699,7 +1864,8 @@
         "mintNotAllowed",
         "outsideTimeWindow"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 38,
@@ -1709,7 +1875,8 @@
         "mintNotAllowed",
         "outsideTimeWindow"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 39,
@@ -1720,7 +1887,8 @@
         "mintNotAllowed",
         "outsideTimeWindow"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 40,
@@ -1729,7 +1897,8 @@
         "payeeBlocked",
         "outsideTimeWindow"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 41,
@@ -1739,7 +1908,8 @@
         "payeeBlocked",
         "outsideTimeWindow"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 42,
@@ -1749,7 +1919,8 @@
         "payeeBlocked",
         "outsideTimeWindow"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 43,
@@ -1760,7 +1931,8 @@
         "payeeBlocked",
         "outsideTimeWindow"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 44,
@@ -1770,7 +1942,8 @@
         "payeeBlocked",
         "outsideTimeWindow"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 45,
@@ -1781,7 +1954,8 @@
         "payeeBlocked",
         "outsideTimeWindow"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 46,
@@ -1792,7 +1966,8 @@
         "payeeBlocked",
         "outsideTimeWindow"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 47,
@@ -1804,7 +1979,8 @@
         "payeeBlocked",
         "outsideTimeWindow"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 48,
@@ -1813,7 +1989,8 @@
         "categoryNotAllowed",
         "outsideTimeWindow"
       ],
-      "final": false
+      "final": false,
+      "preflight": true
     },
     {
       "code": 49,
@@ -1823,7 +2000,8 @@
         "categoryNotAllowed",
         "outsideTimeWindow"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 50,
@@ -1833,7 +2011,8 @@
         "categoryNotAllowed",
         "outsideTimeWindow"
       ],
-      "final": false
+      "final": false,
+      "preflight": false
     },
     {
       "code": 51,
@@ -1844,7 +2023,8 @@
         "categoryNotAllowed",
         "outsideTimeWindow"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 52,
@@ -1854,7 +2034,8 @@
         "categoryNotAllowed",
         "outsideTimeWindow"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 53,
@@ -1865,7 +2046,8 @@
         "categoryNotAllowed",
         "outsideTimeWindow"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 54,
@@ -1876,7 +2058,8 @@
         "categoryNotAllowed",
         "outsideTimeWindow"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 55,
@@ -1888,7 +2071,8 @@
         "categoryNotAllowed",
         "outsideTimeWindow"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 56,
@@ -1898,7 +2082,8 @@
         "categoryNotAllowed",
         "outsideTimeWindow"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 57,
@@ -1909,7 +2094,8 @@
         "categoryNotAllowed",
         "outsideTimeWindow"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 58,
@@ -1920,7 +2106,8 @@
         "categoryNotAllowed",
         "outsideTimeWindow"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 59,
@@ -1932,7 +2119,8 @@
         "categoryNotAllowed",
         "outsideTimeWindow"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 60,
@@ -1943,7 +2131,8 @@
         "categoryNotAllowed",
         "outsideTimeWindow"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 61,
@@ -1955,7 +2144,8 @@
         "categoryNotAllowed",
         "outsideTimeWindow"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 62,
@@ -1967,7 +2157,8 @@
         "categoryNotAllowed",
         "outsideTimeWindow"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 63,
@@ -1980,7 +2171,8 @@
         "categoryNotAllowed",
         "outsideTimeWindow"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 64,
@@ -1988,7 +2180,8 @@
       "rules": [
         "dailyCeiling"
       ],
-      "final": false
+      "final": false,
+      "preflight": false
     },
     {
       "code": 65,
@@ -1997,7 +2190,8 @@
         "perTx",
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 66,
@@ -2006,7 +2200,8 @@
         "dailyPrivate",
         "dailyCeiling"
       ],
-      "final": false
+      "final": false,
+      "preflight": false
     },
     {
       "code": 67,
@@ -2016,7 +2211,8 @@
         "dailyPrivate",
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 68,
@@ -2025,7 +2221,8 @@
         "mintNotAllowed",
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 69,
@@ -2035,7 +2232,8 @@
         "mintNotAllowed",
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 70,
@@ -2045,7 +2243,8 @@
         "mintNotAllowed",
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 71,
@@ -2056,7 +2255,8 @@
         "mintNotAllowed",
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 72,
@@ -2065,7 +2265,8 @@
         "payeeBlocked",
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 73,
@@ -2075,7 +2276,8 @@
         "payeeBlocked",
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 74,
@@ -2085,7 +2287,8 @@
         "payeeBlocked",
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 75,
@@ -2096,7 +2299,8 @@
         "payeeBlocked",
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 76,
@@ -2106,7 +2310,8 @@
         "payeeBlocked",
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 77,
@@ -2117,7 +2322,8 @@
         "payeeBlocked",
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 78,
@@ -2128,7 +2334,8 @@
         "payeeBlocked",
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 79,
@@ -2140,7 +2347,8 @@
         "payeeBlocked",
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 80,
@@ -2149,7 +2357,8 @@
         "categoryNotAllowed",
         "dailyCeiling"
       ],
-      "final": false
+      "final": false,
+      "preflight": false
     },
     {
       "code": 81,
@@ -2159,7 +2368,8 @@
         "categoryNotAllowed",
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 82,
@@ -2169,7 +2379,8 @@
         "categoryNotAllowed",
         "dailyCeiling"
       ],
-      "final": false
+      "final": false,
+      "preflight": false
     },
     {
       "code": 83,
@@ -2180,7 +2391,8 @@
         "categoryNotAllowed",
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 84,
@@ -2190,7 +2402,8 @@
         "categoryNotAllowed",
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 85,
@@ -2201,7 +2414,8 @@
         "categoryNotAllowed",
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 86,
@@ -2212,7 +2426,8 @@
         "categoryNotAllowed",
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 87,
@@ -2224,7 +2439,8 @@
         "categoryNotAllowed",
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 88,
@@ -2234,7 +2450,8 @@
         "categoryNotAllowed",
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 89,
@@ -2245,7 +2462,8 @@
         "categoryNotAllowed",
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 90,
@@ -2256,7 +2474,8 @@
         "categoryNotAllowed",
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 91,
@@ -2268,7 +2487,8 @@
         "categoryNotAllowed",
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 92,
@@ -2279,7 +2499,8 @@
         "categoryNotAllowed",
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 93,
@@ -2291,7 +2512,8 @@
         "categoryNotAllowed",
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 94,
@@ -2303,7 +2525,8 @@
         "categoryNotAllowed",
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 95,
@@ -2316,7 +2539,8 @@
         "categoryNotAllowed",
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 96,
@@ -2325,7 +2549,8 @@
         "outsideTimeWindow",
         "dailyCeiling"
       ],
-      "final": false
+      "final": false,
+      "preflight": false
     },
     {
       "code": 97,
@@ -2335,7 +2560,8 @@
         "outsideTimeWindow",
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 98,
@@ -2345,7 +2571,8 @@
         "outsideTimeWindow",
         "dailyCeiling"
       ],
-      "final": false
+      "final": false,
+      "preflight": false
     },
     {
       "code": 99,
@@ -2356,7 +2583,8 @@
         "outsideTimeWindow",
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 100,
@@ -2366,7 +2594,8 @@
         "outsideTimeWindow",
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 101,
@@ -2377,7 +2606,8 @@
         "outsideTimeWindow",
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 102,
@@ -2388,7 +2618,8 @@
         "outsideTimeWindow",
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 103,
@@ -2400,7 +2631,8 @@
         "outsideTimeWindow",
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 104,
@@ -2410,7 +2642,8 @@
         "outsideTimeWindow",
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 105,
@@ -2421,7 +2654,8 @@
         "outsideTimeWindow",
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 106,
@@ -2432,7 +2666,8 @@
         "outsideTimeWindow",
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 107,
@@ -2444,7 +2679,8 @@
         "outsideTimeWindow",
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 108,
@@ -2455,7 +2691,8 @@
         "outsideTimeWindow",
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 109,
@@ -2467,7 +2704,8 @@
         "outsideTimeWindow",
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 110,
@@ -2479,7 +2717,8 @@
         "outsideTimeWindow",
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 111,
@@ -2492,7 +2731,8 @@
         "outsideTimeWindow",
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 112,
@@ -2502,7 +2742,8 @@
         "outsideTimeWindow",
         "dailyCeiling"
       ],
-      "final": false
+      "final": false,
+      "preflight": false
     },
     {
       "code": 113,
@@ -2513,7 +2754,8 @@
         "outsideTimeWindow",
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 114,
@@ -2524,7 +2766,8 @@
         "outsideTimeWindow",
         "dailyCeiling"
       ],
-      "final": false
+      "final": false,
+      "preflight": false
     },
     {
       "code": 115,
@@ -2536,7 +2779,8 @@
         "outsideTimeWindow",
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 116,
@@ -2547,7 +2791,8 @@
         "outsideTimeWindow",
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 117,
@@ -2559,7 +2804,8 @@
         "outsideTimeWindow",
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 118,
@@ -2571,7 +2817,8 @@
         "outsideTimeWindow",
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 119,
@@ -2584,7 +2831,8 @@
         "outsideTimeWindow",
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 120,
@@ -2595,7 +2843,8 @@
         "outsideTimeWindow",
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 121,
@@ -2607,7 +2856,8 @@
         "outsideTimeWindow",
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 122,
@@ -2619,7 +2869,8 @@
         "outsideTimeWindow",
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 123,
@@ -2632,7 +2883,8 @@
         "outsideTimeWindow",
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 124,
@@ -2644,7 +2896,8 @@
         "outsideTimeWindow",
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 125,
@@ -2657,7 +2910,8 @@
         "outsideTimeWindow",
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 126,
@@ -2670,7 +2924,8 @@
         "outsideTimeWindow",
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     },
     {
       "code": 127,
@@ -2684,7 +2939,8 @@
         "outsideTimeWindow",
         "dailyCeiling"
       ],
-      "final": true
+      "final": true,
+      "preflight": false
     }
   ],
   "dailySpentAt": [

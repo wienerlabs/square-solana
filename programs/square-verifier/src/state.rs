@@ -55,6 +55,25 @@ pub struct ReleaseProof {
     pub bump: u8,
 }
 
+/// seeds = ["preflight_proof", job] (ADR 0028)
+#[account]
+#[derive(InitSpace)]
+pub struct PreflightProof {
+    pub job: Pubkey,
+    pub policy: Pubkey,
+    /// `job.agent_wallet` when the proof was bound: the payee the proof was checked against. Escrow
+    /// `accept_job` requires it to still be the job's agent wallet.
+    pub payee: Pubkey,
+    /// The job's policy commitment snapshot the proof was checked against; escrow compares it at
+    /// `accept_job`.
+    pub policy_commitment: [u8; 32],
+    /// Bits left by the proof: only the time window and the payment category (temporary). 0 when the
+    /// job fully satisfies the policy at `proof_timestamp`.
+    pub refusal_code: u16,
+    pub proof_timestamp: i64,
+    pub bump: u8,
+}
+
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq, Debug, InitSpace)]
 pub enum ReleaseVerdict {
     Compliant,

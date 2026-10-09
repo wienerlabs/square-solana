@@ -5,10 +5,10 @@ import { mppAttestationMessage, TX_COMPUTE_UNIT_LIMITS, type BuiltTx } from '@sq
 import type { ProveResponse } from '@squaresdk/solana-types';
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { createRemoteProver, type Prover } from '../src/prover.js';
-import { buildSetComplianceProofTx, buildVerifyMppPaymentProofTx } from '../src/tx.js';
+import { buildSetComplianceProofTx, buildSetPreflightProofTx, buildVerifyMppPaymentProofTx } from '../src/tx.js';
 import { watchJobProof, type MppAttestation } from '../src/watch.js';
 import { dayStart } from '../src/release.js';
-import { buildReleaseWitness, type ReleaseWitness } from '../src/witness.js';
+import { buildPreflightWitness, buildReleaseWitness, type ReleaseWitness } from '../src/witness.js';
 import { localProver, verify } from './helpers/artifacts.js';
 import { readCircuitJson, TIMESTAMP, USDC_DEVNET, world } from './helpers/circuit-world.js';
 import { JOB_AMOUNT, okPolicy, policyAccount, salts, State } from './helpers/state.js';
@@ -148,6 +148,77 @@ describe('buildSetComplianceProofTx', () => {
         { feePayer },
       ),
     ).rejects.toThrow(/u16/);
+  });
+});
+
+describe('kabul öncesi ön-ispat (ADR 0028)', () => {
+  const preflight = () =>
+    buildPreflightWitness({
+      client: state.client,
+      job: world.job,
+      policy: okPolicy,
+      salts,
+      paymentCategory: 'research',
+      now: TIMESTAMP,
+    });
+  const refusal = (code: number) => code.toString(16).padStart(64, '0');
+
+  it('işin kendi koşulları: net tutarın tamamı, payee agent (alacak satılmış görünse de), sayaç 0, makbuz 0', async () => {
+    await state.job({ status: { funded: {} } });
+    await state.claim('bought', Keypair.generate().publicKey);
+    await state.operator(900_000_000n, dayStart(TIMESTAMP));
+    const w = await preflight();
+    expect(w.netAmount).toBe(JOB_AMOUNT);
+    expect(w.payee.equals(world.agentWallet)).toBe(true);
+    expect(w.dailySpentBefore).toBe(0n);
+    expect(w.stripeReceiptHash).toBe(0n);
+    expect(w.timestamp).toBe(TIMESTAMP);
+    const proof = await localProver.prove(w);
+    expect(await verify(proof)).toBe(true);
+    expect(proof.publicInputs[0]).toBe(refusal(0));
+  });
+
+  it('set_preflight_proof: ispat, ret kodu ve an; hesaplar PDA; kalıcı ya da günlük tavan bitli ispat kurulmaz', async () => {
+    await state.job({ status: { funded: {} } });
+    const proof = await localProver.prove(await preflight());
+    const params = { authority, institution: world.institution, policy: policyAccount, job: world.job, proof };
+    const { name, args, accounts, computeUnitLimit } = decodeComplianceTx(
+      await buildSetPreflightProofTx(state.client, params, { feePayer }),
+    );
+    expect(name).toBe('setPreflightProof');
+    expect(computeUnitLimit).toBe(TX_COMPUTE_UNIT_LIMITS.setPreflightProof);
+    expect(args.refusalCode).toBe(0);
+    expect((args.proofTimestamp as BN).toNumber()).toBe(TIMESTAMP);
+    expect(Buffer.from(args.proofA as number[]).toString('hex')).toBe(proof.proofA);
+    const pda = state.client.pda;
+    expect(accounts).toMatchObject({
+      payer: feePayer.toBase58(),
+      authority: authority.toBase58(),
+      config: pda.verifierConfig()[0].toBase58(),
+      institution: world.institution.toBase58(),
+      policy: policyAccount.toBase58(),
+      job: world.job.toBase58(),
+      preflightProof: pda.preflightProof(world.job)[0].toBase58(),
+    });
+    // Zaman penceresi (32) ve kategori (16) geçicidir; işlem başı tavan (1) ve günlük tavan (64) değil.
+    const withCode = (code: number) => ({ ...proof, publicInputs: [refusal(code), ...proof.publicInputs.slice(1)] });
+    for (const code of [16, 32, 48]) {
+      await expect(
+        buildSetPreflightProofTx(state.client, { ...params, proof: withCode(code) }, { feePayer }),
+      ).resolves.toBeDefined();
+    }
+    for (const code of [1, 2, 4, 8, 64]) {
+      await expect(
+        buildSetPreflightProofTx(state.client, { ...params, proof: withCode(code) }, { feePayer }),
+      ).rejects.toThrow(/kalıcı ya da günlük tavan/);
+    }
+  });
+
+  it('politikasız job ve yerel politikanın snapshot uyuşmazlığı hata verir', async () => {
+    await state.job({ policy: null });
+    await expect(preflight()).rejects.toThrow(/politikaya bağlı değil/);
+    await state.job({ policyCommitment: Array.from(new Uint8Array(32)) });
+    await expect(preflight()).rejects.toThrow(/commitment snapshot/);
   });
 });
 

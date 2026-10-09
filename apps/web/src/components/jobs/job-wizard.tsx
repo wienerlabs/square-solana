@@ -300,6 +300,8 @@ export function JobWizard({ owner, escrowProgramId }: { owner: string; escrowPro
     challenge?.ok === true &&
     spec.ok &&
     (policyChoice === '' || policy !== null) &&
+    // Public tavanı aşan iş açılmaz (ADR 0028): escrow `AmountAboveDailyCeiling` döner.
+    !(policy && amountValue !== null && amountValue > policy.dailyCeiling) &&
     guard.canTransact &&
     !pending;
   const canFund =
@@ -509,7 +511,8 @@ export function JobWizard({ owner, escrowProgramId }: { owner: string; escrowPro
         </Field>
         {policy && amountValue !== null && amountValue > policy.dailyCeiling && (
           <p className="text-sm text-danger-text">
-            The amount is above this policy&apos;s public daily ceiling; its release proof would be refused.
+            The amount is above this policy&apos;s public daily ceiling: the escrow does not open such a job, since no
+            release could be paid under it.
           </p>
         )}
       </Section>
@@ -649,7 +652,8 @@ export function JobWizard({ owner, escrowProgramId }: { owner: string; escrowPro
         <p className="text-caption text-muted">
           Transactions signed by this wallet: create_job opens the job and its vault; above the Travel Rule threshold
           commit_travel_rule binds the record&apos;s commitment; fund_job moves the amount into the vault once both
-          wallets are screened clear.
+          wallets are screened clear. With a policy, you then bind the pre-acceptance proof on the job page: the agent
+          can accept only after it.
         </p>
         {error && <p className="text-sm text-danger-text">{error}</p>}
         {status && <TxConfirmation stage={status.stage} signature={signature ?? undefined} error={status.error} />}

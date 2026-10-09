@@ -159,6 +159,12 @@ describe('sanctions screening', () => {
       `${entry(6005).msg} (${entry(6005).name}, 6005)`,
     );
     expect(escrowErrorMessage(new Error('Blockhash not found'))).toBeNull();
+    // ADR 0028: kabul öncesi ön-ispat ve açılışta public tavan.
+    const named = (name: string) =>
+      (SQUARE_IDLS.escrow.errors as readonly { code: number; name: string }[]).find((e) => e.name === name)!.code;
+    const text = (name: string) => escrowErrorMessage(new Error(`custom program error: 0x${named(name).toString(16)}`));
+    expect(text('PreflightRequired')).toMatch(/The institution binds its pre-acceptance proof on the job page/);
+    expect(text('AmountAboveDailyCeiling')).toMatch(/lower the amount or choose another policy/);
   });
 });
 

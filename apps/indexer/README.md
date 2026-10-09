@@ -110,7 +110,7 @@ kendisi bekleyerek yeniden dener (bu bekleme web3.js'in kendi `console` satırı
 
 `pnpm --filter @squaresdk/solana-indexer test`. Veritabanı testleri Postgres konteyneri açar (Docker
 gerekir). Zincir, yerel bir JSON-RPC sunucusudur. Indexer bu sunucuyla gerçek web3.js istemcisiyle
-konuşur; hesaplar ve event logları IDL coder'ıyla kodlanmıştır. Sözleşmedeki 40 event tipi fixture
+konuşur; hesaplar ve event logları IDL coder'ıyla kodlanmıştır. Sözleşmedeki 43 event tipi fixture
 log'larla çözülüp yazılır.
 
 Gerçek programlarla uçtan uca deneme [`tests/services`](../../tests/services/)'tedir (BE-36, localnet):

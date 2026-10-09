@@ -142,6 +142,13 @@ pub fn new_job(new: NewJob, now: i64) -> Result<Job> {
         })
         .transpose()?;
     let snapshot = snapshot.as_ref();
+    // Public tavanı aşan iş hiçbir gün ödenemez; ön-ispat da reddederdi (ADR 0028 madde 2).
+    if let Some(snapshot) = snapshot {
+        require!(
+            new.amount <= snapshot.daily_ceiling,
+            EscrowError::AmountAboveDailyCeiling
+        );
+    }
     Ok(Job {
         institution: new.institution,
         agent_record: new.agent_record.key(),

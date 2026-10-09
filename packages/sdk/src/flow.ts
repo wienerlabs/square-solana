@@ -316,7 +316,14 @@ export function createFlow(deps: FlowDeps): SquareFlow {
       const account = await job(params.job);
       const ix = await deps.escrow.methods
         .acceptJob(account.specHash)
-        .accountsStrict({ agent: params.agent, job: params.job, agentRecord: account.agentRecord })
+        .accountsStrict({
+          agent: params.agent,
+          job: params.job,
+          agentRecord: account.agentRecord,
+          config: pda.escrowConfig()[0],
+          // Policy'li işte escrow kurumun ön-ispatını okur (ADR 0028); policy'siz işte hesap okunmaz.
+          preflightProof: pda.preflightProof(params.job)[0],
+        })
         .instruction();
       return deps.buildTx([ix], withComputeProfile(options, 'acceptJob'));
     },

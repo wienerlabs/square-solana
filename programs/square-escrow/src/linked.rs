@@ -7,6 +7,7 @@ use square_common::account_read::{self, AccountReadError};
 use square_common::contract::square_policy_contract::accounts::{Institution, Policy};
 use square_common::contract::square_registry_contract::accounts::AgentRecord;
 use square_common::contract::square_registry_contract::types::AgentStatus;
+use square_common::contract::square_verifier_contract::accounts::PreflightProof;
 use square_common::merkle::UNRESTRICTED_ROOT;
 use square_common::screening::{self, ScreeningRejection};
 use square_common::seeds::{AGENT_SEED, INSTITUTION_SEED, POLICY_SEED};
@@ -34,6 +35,38 @@ pub fn registered_agent(info: &AccountInfo, registry_program: &Pubkey) -> Result
 /// Adresi `create_job`'da doğrulanıp job'a bağlanmış (`has_one = agent_record`) kayıt.
 pub fn bound_agent(info: &AccountInfo) -> Result<AgentRecord> {
     account_read::read_bound(info).map_err(|_| error!(EscrowError::AgentNotRegistered))
+}
+
+/// Policy'li işin kabul öncesi ön-ispatı (ADR 0028): verifier'ın `["preflight_proof", job]` hesabı (adres
+/// talimatın kısıtıyla bağlı), bu işin, job'un policy anlık görüntüsünün ve güncel agent cüzdanının. Hesap yoksa ya
+/// da başka bir işe, commitment'a veya cüzdana aitse `PreflightRequired`; owner verifier değilse
+/// `LinkedProgramMismatch`.
+pub fn require_preflight(
+    info: &AccountInfo,
+    job: &Pubkey,
+    policy: &Pubkey,
+    policy_commitment: &[u8; 32],
+    agent_wallet: &Pubkey,
+    verifier_program: &Pubkey,
+) -> Result<()> {
+    if info.data_is_empty() {
+        return err!(EscrowError::PreflightRequired);
+    }
+    let proof: PreflightProof =
+        account_read::read_owned(info, verifier_program).map_err(|error| match error {
+            AccountReadError::WrongOwner => error!(EscrowError::LinkedProgramMismatch),
+            _ => error!(EscrowError::PreflightRequired),
+        })?;
+    // Ön-ispat bağlandığı andaki agent cüzdanı için kanıtlar; cüzdan sonra değiştiyse (`sync_agent_wallet`) kurum
+    // yeniden bağlar.
+    require!(
+        proof.job == *job
+            && proof.policy == *policy
+            && proof.policy_commitment == *policy_commitment
+            && proof.payee == *agent_wallet,
+        EscrowError::PreflightRequired
+    );
+    Ok(())
 }
 
 /// Yeni iş ve kabul için kayıt `Active` olmalı.

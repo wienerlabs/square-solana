@@ -315,6 +315,21 @@ impl Harness {
             .expect("hesap yazılamadı");
     }
 
+    /// `owner` programına ait, verisi `data` olan rent'ten muaf hesap (başka bir programın yazdığı durumun yerine).
+    pub fn set_program_account(&mut self, address: Pubkey, owner: Pubkey, data: Vec<u8>) {
+        let lamports = self.svm.minimum_balance_for_rent_exemption(data.len());
+        self.set_account(
+            address,
+            Account {
+                lamports,
+                data,
+                owner,
+                executable: false,
+                rent_epoch: 0,
+            },
+        );
+    }
+
     pub fn lamports(&self, address: &Pubkey) -> u64 {
         self.svm.get_balance(address).unwrap_or(0)
     }
@@ -445,6 +460,28 @@ where
 /// Compute unit bütçeleri ve rapor.
 pub mod cu {
     use super::Executed;
+
+    const PROFILE: &str = include_str!("../../../packages/sdk/src/tx-profile.json");
+
+    /// SDK işlem profilinde `kind`'ın compute unit sınırının `1 − headroom` katı
+    /// (`packages/sdk/src/tx-profile.json`). `tx_budget.rs` her tx'in ölçümünü bu değere karşı denetler.
+    /// Programlar PDA bump'ını zincirde arar ve test dünyalarının anahtarları rastgeledir: ölçüm koşudan koşuya
+    /// ~1 500 CU'luk adımlarla dağılır. Profilin sınırı 60 ölçümün en yükseğinin en az iki katı olduğu için talimat
+    /// testleri de bu bütçeyi kullanır; daha dar bir bütçe dağılımın kuyruğunda düşer.
+    pub fn profile_budget(kind: &str) -> u64 {
+        let profile: serde_json::Value = serde_json::from_str(PROFILE).expect("tx-profile.json");
+        let headroom = profile["headroom"].as_f64().expect("headroom");
+        let limit = profile["computeUnitLimits"][kind]
+            .as_u64()
+            .unwrap_or_else(|| panic!("işlem profilinde {kind} yok"));
+        (limit as f64 * (1.0 - headroom)) as u64
+    }
+
+    /// [`within`], bütçe işlem profilinden ([`profile_budget`]).
+    #[track_caller]
+    pub fn within_profile(label: &str, executed: &Executed, kind: &str) -> u64 {
+        within(label, executed, profile_budget(kind))
+    }
 
     /// Ölçülen compute unit'i `[cu] <etiket>: <değer> / <bütçe>` biçiminde yazar (`cargo test -- --nocapture`)
     /// ve bütçeyi aşarsa testi düşürür.

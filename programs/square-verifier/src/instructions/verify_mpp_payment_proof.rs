@@ -75,6 +75,12 @@ fn require_attestation(
     stripe_receipt_hash: &[u8; 32],
     amount: u64,
 ) -> Result<()> {
+    // Sıfır anahtar fiat rayını kapatır (`update_mpp_authority`); ret precompile'ın sıkı doğrulamasına
+    // bırakılmaz (BC-39 P-20).
+    require!(
+        *mpp_authority != Pubkey::default(),
+        VerifierError::InvalidMppAttestation
+    );
     let previous = get_instruction_relative(-1, instructions)
         .map_err(|_| error!(VerifierError::InvalidMppAttestation))?;
     require_keys_eq!(

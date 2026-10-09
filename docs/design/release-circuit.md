@@ -63,6 +63,15 @@ Bit 4 ile birlikte gelen kalıcı bir bit (0, 2, 3) yine kalıcı sayılabilir. 
 
 **Karar ([ADR 0013](../decisions/0013-release-keeper-ucreti-iade-ve-itibar.md)):** Escrow ancak kalıcı bir sebep varsa neti iade eder: bit 0, 2, 3; ispattaki sayaç 0 iken bit 1 ya da 6. Bit 4 ve 5 ile sayaç 0 değilken bit 1 ve 6 beklemeye döner (`ProofRequired`); kurum uyumlu ispat bağlayınca ödenir. Kural `square_common::release::is_final_refusal`'dadır.
 
+**Kabul öncesi ön-ispat ([ADR 0028](../decisions/0028-kabul-oncesi-on-ispat-ve-dispute-duzeltmeleri.md)):** Kalıcı bitlerin parametrelerini kurum iş açılmadan önce, agent'tan gizli seçer (BC-39 P-01). Bu yüzden policy'li işte kurum, agent kabul etmeden önce aynı devreyle bir ispat daha bağlar (`set_preflight_proof`). Verifier sinyalleri işin kendi koşullarından kurar: net `job.amount`, payee `job.agent_wallet`, sayaç 0, makbuz 0; politika commitment'ı ve public tavan job'un anlık görüntüsüdür. Ret kodunda bit 0, 1, 2, 3 ya da 6 varsa ispat bağlanmaz (`square_common::release::preflight_accepts`); bit 4 ve 5 geçicidir.
+
+Bu ispat geçince teslimden sonra kesin ret yalnızca payee değişirse çıkabilir:
+- release'in neti en çok `job.amount`'tur ve mint aynıdır, bu yüzden bit 0 ve 2 yeniden çıkamaz;
+- sayaç 0 iken bit 1 ve 6 tutarın tamamıyla geçtiği için, sayaç 0 iken daha küçük netle de geçer; sayaç 0 değilse ret geçicidir;
+- bit 3 yalnızca alacak, politikanın engelli listesindeki bir alıcıya satılırsa çıkar. Alıcı listesi kurumundur, engelli listesi gizlidir; bu alıcının kendi riskidir.
+
+Ön-ispat bağlamadaki agent cüzdanını (`PreflightProof.payee`) saklar ve `accept_job` onun işin güncel cüzdanı olmasını ister. Cüzdan kabulden önce `sync_agent_wallet` ile taşınırsa kurum ön-ispatı yeniden bağlar. Kabulden sonraki taşıma agent'ın kendi eylemidir; ön-ispatın güvencesi yeni cüzdanı kapsamaz, yeni cüzdan engelli listedeyse bit 3 kesin ret verir.
+
 ## 4. Kurallar
 
 | # | Kural | Private girdiler | Public sinyaller |

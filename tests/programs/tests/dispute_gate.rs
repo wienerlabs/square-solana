@@ -7,6 +7,8 @@
 mod escrow_world;
 mod release_world;
 
+use anchor_lang::prelude::Pubkey;
+use anchor_lang::AccountSerialize;
 use escrow_world::*;
 use release_world::*;
 use solana_signer::Signer;
@@ -19,6 +21,7 @@ use square_escrow::{
 };
 use square_program_tests::{anchor_error, compute_unit_limit, cu, event, Outcome};
 use square_registry::ScreeningStatus;
+use square_verifier::state::ReleaseProof;
 
 const LAMPORTS: u64 = 1_000_000_000;
 
@@ -81,10 +84,11 @@ fn favor_agent_on_a_policy_job_pays_the_full_amount_against_a_fresh_proof() {
     r.bind(&job, &r.proof("dispute_favor_agent"))
         .expect("Resolved işe ispat");
     let executed = execute(&mut r, &caller, &job, settlement).expect("execute_resolution");
+    // Profilde yok: 200 ölçümün en yükseğinin (95 989) iki katı, 10 bine yukarı yuvarlanmış (profilin kuralı).
     cu::within(
         "escrow.execute_resolution (ispat kapısı)",
         &executed,
-        140_000,
+        200_000,
     );
 
     let bond = min_bond(amount);
@@ -142,29 +146,44 @@ fn a_split_needs_a_proof_of_the_agent_share() {
 #[test]
 fn a_final_refusal_refunds_the_award_but_the_bond_stays_a_penalty() {
     let mut r = ReleaseWorld::new(false);
-    let job = resolved(&mut r, "c", DisputeResolution::FavorAgent);
-    let amount = r.amount("c");
+    // ADR 0028'den sonra kalıcı ret yalnızca alacak satılınca çıkabilir: alacak kurumun politikasında engelli
+    // alıcıya satıldı, karar agent tarafının (alıcının) lehine.
+    let job = r.delivered_job("a");
+    let buyer = r.sell_claim_to_blocked_buyer(&job);
+    let amount = r.amount("a");
     let bond = min_bond(amount);
+    let institution = Institution {
+        key: r.institution.key.insecure_clone(),
+        token_account: r.institution.token_account,
+    };
+    r.w.raise_dispute(&institution, &job, bond)
+        .expect("raise_dispute");
+    r.w.decide(&job, DisputeResolution::FavorAgent);
+    r.w.h.set_time(r.proof_time());
     let caller = r.w.h.funded(LAMPORTS);
-    let settlement = r.settlement(&caller, r.agent.wallet.pubkey());
+    let settlement = r.settlement(&caller, buyer);
+    let buyer_before = r.w.balance(&settlement.payee_token_account).unwrap();
     let institution_before = r.w.balance(&r.institution.token_account).unwrap();
 
-    r.bind(&job, &r.proof("dispute_refused_per_tx"))
+    r.bind(&job, &r.proof("dispute_refused_blocked_buyer"))
         .expect("kalıcı ret");
     let executed = execute(&mut r, &caller, &job, settlement).expect("execute_resolution");
-    // Escrow kapıdan geçmez ve kuruma döner; bond cezadır, kapıdan geçmeden agent tarafına kesilir.
-    assert_eq!(r.w.balance(&settlement.payee_token_account), Some(bond));
+    // Escrow kapıdan geçmez ve kuruma döner; bond cezadır, kapıdan geçmeden agent tarafına (alıcıya) kesilir.
+    assert_eq!(
+        r.w.balance(&settlement.payee_token_account),
+        Some(buyer_before + bond)
+    );
     assert_eq!(
         r.w.balance(&r.institution.token_account),
         Some(institution_before + amount)
     );
     assert_eq!(r.w.job(&job).status, JobStatus::Refunded);
     let refused: ReleaseRefused = event(&executed);
-    assert_eq!((refused.refusal_code, refused.refunded_amount), (1, amount));
+    assert_eq!((refused.refusal_code, refused.refunded_amount), (8, amount));
     let validation: ValidationRecord = r.w.h.account(&validation_address(&job)).unwrap();
     assert_eq!(
         (validation.outcome, validation.refusal_code),
-        (ValidationOutcome::Refused, 1)
+        (ValidationOutcome::Refused, 8)
     );
     let reputation: AgentReputation = r.w.h.account(&reputation_address(&r.agent.record)).unwrap();
     assert_eq!(
@@ -176,31 +195,44 @@ fn a_final_refusal_refunds_the_award_but_the_bond_stays_a_penalty() {
 #[test]
 fn a_flagged_payee_without_an_award_does_not_lock_the_refund_or_the_bond() {
     let mut r = ReleaseWorld::new(false);
-    let job = resolved(&mut r, "c", DisputeResolution::FavorAgent);
-    let amount = r.amount("c");
+    // Kesin ret yalnızca alacak engelli alıcıya satılınca çıkar (ADR 0028 madde 1); karar agent tarafının (alıcının)
+    // lehine, ispat kesin ret: agent payı 0, payee'ye gidecek tek şey bond'dur.
+    let job = r.delivered_job("a");
+    let buyer = r.sell_claim_to_blocked_buyer(&job);
+    let amount = r.amount("a");
     let bond = min_bond(amount);
+    let institution = Institution {
+        key: r.institution.key.insecure_clone(),
+        token_account: r.institution.token_account,
+    };
+    r.w.raise_dispute(&institution, &job, bond)
+        .expect("raise_dispute");
+    r.w.decide(&job, DisputeResolution::FavorAgent);
+    let now = r.proof_time();
+    r.w.h.set_time(now);
     let caller = r.w.h.funded(LAMPORTS);
-    let settlement = r.settlement(&caller, r.agent.wallet.pubkey());
+    let settlement = r.settlement(&caller, buyer);
+    let buyer_before = r.w.balance(&settlement.payee_token_account).unwrap();
     let institution_before = r.w.balance(&r.institution.token_account).unwrap();
-    r.bind(&job, &r.proof("dispute_refused_per_tx"))
+    r.bind(&job, &r.proof("dispute_refused_blocked_buyer"))
         .expect("kalıcı ret");
 
     // Süresi dolmuş kayıt yenilenebilir: ödeme bekler, bond'un yolu kayda göre belirlenir.
-    let wallet = r.agent.wallet.pubkey();
-    let now = r.proof_time();
     r.w.h.set_time(now - SCREENING_TTL - 1);
-    r.w.screen(&wallet, ScreeningStatus::Clear);
+    r.w.screen(&buyer, ScreeningStatus::Clear);
     r.w.h.set_time(now);
     execute(&mut r, &caller, &job, settlement)
         .expect_err("kayıt eskidi")
         .assert_error(anchor_error(EscrowError::ScreeningExpired));
     assert_eq!(r.w.job(&job).status, JobStatus::Resolved);
 
-    // Agent payı 0: payee'ye gidecek tek şey bond'dur. Yaptırımlı adrese ödeme yapılmaz; bond kuruma döner,
-    // iade beklemez (ADR 0028 madde 3).
-    r.w.screen(&wallet, ScreeningStatus::Flagged);
+    // Yaptırımlı adrese ödeme yapılmaz; bond kuruma döner, iade beklemez (ADR 0028 madde 3).
+    r.w.screen(&buyer, ScreeningStatus::Flagged);
     let executed = execute(&mut r, &caller, &job, settlement).expect("execute_resolution");
-    assert_eq!(r.w.balance(&settlement.payee_token_account), Some(0));
+    assert_eq!(
+        r.w.balance(&settlement.payee_token_account),
+        Some(buyer_before)
+    );
     assert_eq!(
         r.w.balance(&r.institution.token_account),
         Some(institution_before + amount + bond)
@@ -262,7 +294,8 @@ fn the_agent_escalates_a_missing_proof_after_the_timeout() {
     let executed = w
         .escalate(&agent.wallet, &job)
         .expect("escalate_missing_proof");
-    cu::within("escrow.escalate_missing_proof", &executed, 30_000);
+    // Profilde yok: 200 ölçümün en yükseğinin (23 540) iki katı, 10 bine yukarı yuvarlanmış (profilin kuralı).
+    cu::within("escrow.escalate_missing_proof", &executed, 50_000);
     let escalated: MissingProofEscalated = event(&executed);
     assert_eq!(
         (escalated.job, escalated.agent_wallet),
@@ -345,6 +378,42 @@ fn escalation_waits_while_a_bound_proof_can_settle_the_job_today() {
     r.bind(&job, &r.proof("refused_time_window"))
         .expect("geçici ret");
     r.w.escalate(&wallet, &job).expect("geçici retle başvuru");
+}
+
+#[test]
+fn a_proof_for_another_net_or_mint_does_not_block_the_escalation() {
+    // Verifier neti doğrulamaz (kurumun beyanı); finalize başka bir net ya da mint için yapılmış ispatı bayat
+    // sayar (`StaleReleaseProof`). Böyle bir ispat işi kapatamaz, başvuruyu da engellemez (BC-39 P-07).
+    for change in ["net", "mint"] {
+        let mut r = ReleaseWorld::new(false);
+        let mut p = params();
+        p.proof_timeout_secs = 0;
+        let admin = r.w.admin.insecure_clone();
+        let ix = r.w.update_params_ix(&admin.pubkey(), p);
+        r.w.h.send(&[ix], &[&admin]).expect("update_params");
+        let job = r.delivered_job("a");
+        let wallet = r.agent.wallet.insecure_clone();
+        r.w.h.set_time(r.proof_time());
+        r.bind(&job, &r.proof("compliant")).expect("uyumlu ispat");
+        r.w.escalate(&wallet, &job)
+            .expect_err("ispat işi kapatabilir")
+            .assert_error(anchor_error(EscrowError::InvalidStatus));
+
+        let address = release_proof_address(&job);
+        let mut proof: ReleaseProof = r.w.h.account(&address).expect("ReleaseProof");
+        match change {
+            "net" => proof.net_amount -= 1,
+            _ => proof.mint = Pubkey::new_unique(),
+        }
+        let mut account = r.w.h.raw_account(&address).expect("ReleaseProof hesabı");
+        account.data.clear();
+        proof
+            .try_serialize(&mut account.data)
+            .expect("ReleaseProof");
+        r.w.h.set_account(address, account);
+        r.w.escalate(&wallet, &job).expect(change);
+        assert_eq!(r.w.job(&job).status, JobStatus::Disputed);
+    }
 }
 
 #[test]

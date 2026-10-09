@@ -56,7 +56,8 @@ fn the_institution_disputes_inside_the_window_with_enough_bond() {
     let executed = w
         .raise_dispute(&institution, &job, MIN_BOND)
         .expect("raise_dispute");
-    cu::within("escrow.raise_dispute", &executed, 60_000);
+    // Profilde yok: 200 ölçümün en yükseğinin (36 745) iki katı, 10 bine yukarı yuvarlanmış (profilin kuralı).
+    cu::within("escrow.raise_dispute", &executed, 80_000);
 
     let state = w.job(&job);
     assert_eq!(state.status, JobStatus::Disputed);
@@ -243,7 +244,8 @@ fn m_of_n_arbitrators_decide_in_favor_of_the_agent() {
     let executed = w
         .execute(&caller, &job, settlement)
         .expect("execute_resolution");
-    cu::within("escrow.execute_resolution (gate yok)", &executed, 90_000);
+    // Profilde yok: 200 ölçümün en yükseğinin (66 714) iki katı, 10 bine yukarı yuvarlanmış (profilin kuralı).
+    cu::within("escrow.execute_resolution (gate yok)", &executed, 140_000);
 
     // Agent tarafı escrow'un tamamını (keeper ücreti yok) ve kurumun bond'unu alır.
     assert_eq!(

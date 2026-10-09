@@ -41,8 +41,10 @@ sequenceDiagram
 - **Job kabulü:** Agent ayrıca kendi koşullarını denetler; uymayan görev `REJECTED` olur ve tx gönderilmez:
   spec parçası var; spec'in `capability` alanı bilinen bir beceri (tek beceride isteğe bağlı); job fonlanmış;
   job'un agent cüzdanı `signer`; tutar becerinin fiyatından az değil; deadline'a teslim payından
-  (`retry.submitMarginSeconds`) fazla var; `admit` (verilirse, ör. kapasite) metin dönmüyor. Karar görev başına
-  bir kez verilir. Sonra `accept_job`.
+  (`retry.submitMarginSeconds`) fazla var; `admit` (verilirse, ör. kapasite) metin dönmüyor; policy'li işte kurumun
+  kabul öncesi ön-ispatı (`PreflightProof`, [ADR 0028](../../docs/decisions/0028-kabul-oncesi-on-ispat-ve-dispute-duzeltmeleri.md))
+  işin güncel agent cüzdanı için bağlı, değilse escrow kabulü `PreflightRequired` ile reddederdi. Karar görev başına bir kez verilir. Sonra
+  `accept_job`.
 - **Teslim:** İşleyicinin çıktısı yüklenir, makbuz yerelde doğrulanır (`workHash` içeriğin SHA-256'sı,
   `deliveryUri` en fazla 128 bayt), `submit_work` gönderilir; zincirdeki taahhütten sonra makbuz görevin
   `delivery` artefaktına yazılır ve görev `COMPLETED` olur. İçerik `submit_work`'ten önce çağırana gösterilmez.
@@ -139,6 +141,11 @@ Dönen `Agent`: `card`, `cardBytes`, `cardHash`, `cardUrl`, `a2aUrl`, `did`, `ag
   döndürdüğü hash agent'ınkiyle aynı olmalıdır (iki taraf da RFC 8785 kanonikleştirir).
 - Kayıt yoksa `register_agent`; varsa ve kart adresi, hash ya da cüzdan değiştiyse `update_agent`; aynıysa tx
   gönderilmez (`unchanged`). Kart adresi en fazla 200 bayt.
+- **Cüzdan değişince:** Kaydın kapanmamış policy'li işleri `openPolicyJobs`'ta döner ve `logger`'a yazılır. Bu işler
+  eski cüzdanda kalır.
+  - Bir iş `sync_agent_wallet` ile taşınırsa kabulden önce kurum ön-ispatı yeni cüzdan için yeniden bağlamalıdır.
+  - Kabulden sonra ön-ispatın güvencesi yeni cüzdanı kapsamaz: yeni cüzdan politikanın engelli listesindeyse release
+    kesin ret alır (ADR 0028).
 
 ### LLM işleyicisi: `@squaresdk/solana-agent-sdk/anthropic`
 

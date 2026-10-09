@@ -479,6 +479,27 @@ export const PolicyUpdatedSchema = z.object({
 });
 export type PolicyUpdated = z.infer<typeof PolicyUpdatedSchema>;
 
+/** verifier: seeds = ["preflight_proof", job] (ADR 0028) */
+export const PreflightProofSchema = z.object({
+  job: Address,
+  policy: Address,
+  payee: Address,
+  policyCommitment: Hex32,
+  refusalCode: z.number().int().min(0).max(65535),
+  proofTimestamp: I64,
+  bump: z.number().int().min(0).max(255),
+});
+export type PreflightProof = z.infer<typeof PreflightProofSchema>;
+
+/** verifier: A pre-acceptance compliance proof bound to a policy job by `set_preflight_proof` (ADR 0028). */
+export const PreflightProofSetSchema = z.object({
+  job: Address,
+  policy: Address,
+  refusalCode: z.number().int().min(0).max(65535),
+  proofTimestamp: I64,
+});
+export type PreflightProofSet = z.infer<typeof PreflightProofSetSchema>;
+
 /** registry: Singleton. seeds = ["registry_config"] */
 export const RegistryConfigSchema = z.object({
   admin: Address,
@@ -770,12 +791,14 @@ export const IDL_PROGRAMS = {
     "version": "0.1.0",
     "accounts": [
       "OperatorState",
+      "PreflightProof",
       "ReleaseProof",
       "VerifierConfig"
     ],
     "events": [
       "ComplianceProofSet",
       "MppPaymentVerified",
+      "PreflightProofSet",
       "ReleaseRecorded",
       "VerifierConfigUpdated"
     ],
@@ -783,6 +806,7 @@ export const IDL_PROGRAMS = {
       "init_verifier_config",
       "record_release",
       "set_compliance_proof",
+      "set_preflight_proof",
       "update_mpp_authority",
       "verify_mpp_payment_proof"
     ],
@@ -846,6 +870,11 @@ export const IDL_PROGRAMS = {
         "code": 6011,
         "name": "RailMismatch",
         "msg": "Instruction does not apply to the job's settlement rail"
+      },
+      {
+        "code": 6012,
+        "name": "PreflightRefused",
+        "msg": "Preflight proof breaks a permanent or daily-ceiling rule of the policy"
       }
     ]
   },
@@ -1161,6 +1190,16 @@ export const IDL_PROGRAMS = {
         "code": 6049,
         "name": "RailMismatch",
         "msg": "Instruction does not apply to the job's settlement rail"
+      },
+      {
+        "code": 6050,
+        "name": "PreflightRequired",
+        "msg": "Policy job: the institution must bind a preflight proof before the agent accepts"
+      },
+      {
+        "code": 6051,
+        "name": "AmountAboveDailyCeiling",
+        "msg": "Job amount is above the policy's public daily ceiling"
       }
     ]
   }
@@ -1184,6 +1223,7 @@ export const ProgramEventPayloadSchema = z.discriminatedUnion('name', [
   z.object({ program: z.literal('policy'), name: z.literal('PolicyUpdated'), data: PolicyUpdatedSchema }),
   z.object({ program: z.literal('verifier'), name: z.literal('ComplianceProofSet'), data: ComplianceProofSetSchema }),
   z.object({ program: z.literal('verifier'), name: z.literal('MppPaymentVerified'), data: MppPaymentVerifiedSchema }),
+  z.object({ program: z.literal('verifier'), name: z.literal('PreflightProofSet'), data: PreflightProofSetSchema }),
   z.object({ program: z.literal('verifier'), name: z.literal('ReleaseRecorded'), data: ReleaseRecordedSchema }),
   z.object({ program: z.literal('verifier'), name: z.literal('VerifierConfigUpdated'), data: VerifierConfigUpdatedSchema }),
   z.object({ program: z.literal('escrow'), name: z.literal('ArbitratorsUpdated'), data: ArbitratorsUpdatedSchema }),
@@ -1329,6 +1369,16 @@ export const SetComplianceProofArgsSchema = z.object({
   proofTimestamp: I64,
 });
 export type SetComplianceProofArgs = z.infer<typeof SetComplianceProofArgsSchema>;
+
+/** verifier.set_preflight_proof argümanları. */
+export const SetPreflightProofArgsSchema = z.object({
+  proofA: hexBytes(64),
+  proofB: hexBytes(128),
+  proofC: hexBytes(64),
+  refusalCode: z.number().int().min(0).max(65535),
+  proofTimestamp: I64,
+});
+export type SetPreflightProofArgs = z.infer<typeof SetPreflightProofArgsSchema>;
 
 /** verifier.update_mpp_authority argümanları. */
 export const UpdateMppAuthorityArgsSchema = z.object({
@@ -1491,6 +1541,7 @@ export const InstructionCallSchema = z.discriminatedUnion('instruction', [
   z.object({ program: z.literal('verifier'), instruction: z.literal('initVerifierConfig'), args: InitVerifierConfigArgsSchema }),
   z.object({ program: z.literal('verifier'), instruction: z.literal('recordRelease'), args: RecordReleaseArgsSchema }),
   z.object({ program: z.literal('verifier'), instruction: z.literal('setComplianceProof'), args: SetComplianceProofArgsSchema }),
+  z.object({ program: z.literal('verifier'), instruction: z.literal('setPreflightProof'), args: SetPreflightProofArgsSchema }),
   z.object({ program: z.literal('verifier'), instruction: z.literal('updateMppAuthority'), args: UpdateMppAuthorityArgsSchema }),
   z.object({ program: z.literal('verifier'), instruction: z.literal('verifyMppPaymentProof'), args: VerifyMppPaymentProofArgsSchema }),
   z.object({ program: z.literal('escrow'), instruction: z.literal('acceptJob'), args: AcceptJobArgsSchema }),
