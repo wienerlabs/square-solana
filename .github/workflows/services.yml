@@ -32,7 +32,7 @@ jobs:
   localnet:
     name: Servisler localnet'te (8 adım, gerçek programlar)
     runs-on: ubuntu-24.04
-    timeout-minutes: 60
+    timeout-minutes: 75
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -84,7 +84,7 @@ jobs:
         run: circuits/payment-compliance/scripts/ci-build.sh
 
       - name: Derleme
-        run: pnpm turbo run build --filter @squaresdk/solana-services-e2e...
+        run: pnpm turbo run build --filter @squaresdk/solana-services-e2e... --filter @squaresdk/solana-demo...
 
       - name: Servisler localnet'te
         timeout-minutes: 30
@@ -97,4 +97,22 @@ jobs:
         with:
           name: services-logs
           path: ${{ runner.temp }}/services-logs
+          if-no-files-found: ignore
+
+      - name: Demo senaryosu localnet'te
+        timeout-minutes: 15
+        run: |
+          set -o pipefail
+          mkdir -p "$RUNNER_TEMP/demo-logs"
+          pnpm --filter @squaresdk/solana-demo demo:localnet --ledger "$RUNNER_TEMP/demo-ledger" \
+            --rpc-port 38899 --faucet-port 39900 --gossip-port 38001 --dynamic-port-range 38100-38200 \
+            --out "$RUNNER_TEMP/demo-logs/demo-localnet.json" 2>&1 | tee "$RUNNER_TEMP/demo-logs/demo-localnet.log"
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: failure() || cancelled()
+        with:
+          name: demo-logs
+          path: |
+            ${{ runner.temp }}/demo-logs
+            ${{ runner.temp }}/demo-ledger/validator.log
           if-no-files-found: ignore

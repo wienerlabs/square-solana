@@ -101,10 +101,11 @@ impl FiatWorld {
         self.r.w.h.send(&[ix], &[&institution])
     }
 
-    /// Fiat iş açılır, agent kabul eder ve teslim eder.
+    /// Fiat iş açılır, kurum kabul öncesi ön-ispatı bağlar (ADR 0028), agent kabul eder ve teslim eder.
     pub fn delivered(&mut self) -> Pubkey {
         self.create().expect("create_fiat_job");
         let job = self.r.job_address(FIAT);
+        self.r.preflight(&job, FIAT);
         let wallet = self.r.agent.wallet.insecure_clone();
         let (record, spec) = (self.r.agent.record, self.r.spec(FIAT));
         let w = &mut self.r.w;

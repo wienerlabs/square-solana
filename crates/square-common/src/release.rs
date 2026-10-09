@@ -40,6 +40,16 @@ pub mod refusal {
     /// Günlük tavanlar: sayaç 0 iken çiğneniyorsa net tutar tek başına tavanı aşar, kalıcıdır; değilse
     /// sayaç gece yarısı sıfırlanınca geçebilir.
     pub const DAILY: u16 = DAILY_PRIVATE | DAILY_CEILING;
+    /// Kabul öncesi ön-ispatı reddeden bitler (ADR 0028): ön-ispat sayaç 0 ile kurulur, bu yüzden günlük
+    /// tavan bitleri de kesindir. Zaman penceresi ve kategori geçicidir, ön-ispatı engellemez.
+    pub const PREFLIGHT_BLOCKING: u16 = PERMANENT | DAILY;
+}
+
+/// Kabul öncesi ön-ispat kabul edilir mi (ADR 0028): ret kodunda kalıcı bit ve günlük tavan biti yok. Ön-ispatı
+/// geçen işte agent'a ödenecek her release'te net `≤ job.amount`, payee aynı agent cüzdanı ve sayaç `≥ 0`'dır;
+/// kalıcı bitler (ve sayaç 0 iken günlük bitler) bu yüzden sonradan çıkamaz.
+pub const fn preflight_accepts(refusal_code: u16) -> bool {
+    refusal_code & refusal::PREFLIGHT_BLOCKING == 0
 }
 
 /// Ret, escrow'u kuruma iade edecek kesin bir karar mı (ADR 0013). Kalıcı bir sebep yoksa ret

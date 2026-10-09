@@ -48,6 +48,10 @@ const LABELS = Object.freeze({
   claimBuyer: 'claim buyer',
   settlementMint: 'settlement mint',
   otherMint: 'other mint',
+  // Politikanın engelli adresi (release-input.mjs `blockedWallet`): alacağı alırsa release kesin ret olur.
+  blockedWallet: 'sanctioned wallet',
+  // Kayıt sahibinin ön-ispattan sonra taşıdığı agent cüzdanı (`sync_agent_wallet`): kurum yeniden bağlar.
+  rotatedWallet: 'rotated agent wallet',
 });
 const SPECS = Object.freeze({
   a: 'job spec: market research report',
@@ -64,6 +68,10 @@ const KEEPER_FEE_BPS = 50n;
 const AMOUNTS = Object.freeze({ a: 25n * USDC, b: 40n * USDC, c: 150n * USDC, d: 30n * USDC });
 const net = (spec) => AMOUNTS[spec] - (AMOUNTS[spec] * KEEPER_FEE_BPS) / 10_000n;
 const HOUR = 3600;
+// Kabul öncesi ön-ispat (ADR 0028): test dünyalarında iş, ispatların anından iki saat önce kabul edilir.
+const PREFLIGHT_TIMESTAMP = TIMESTAMP - 2 * HOUR;
+/** İşin kendi koşulları: net tutarın tamamı, payee agent cüzdanı, sayaç 0 (verifier `set_preflight_proof`). */
+const preflight = (spec) => ({ netAmount: AMOUNTS[spec], dailySpentBefore: 0n, timestamp: PREFLIGHT_TIMESTAMP });
 
 // MPP yolu (BC-37): makbuz commitment'ı bir BN254 alan elemanıdır. Fikstürünki etiketten türetilir
 // (`Poseidon(sha256(etiket)'in iki 128 bitlik yarısı)`); program yalnızca ispattaki ve attestation'daki
@@ -87,8 +95,8 @@ function scenarios() {
     keys,
     list: [
       ['compliant', 'a', {}],
-      // Kalıcı ret: işlem başı tavan (100 USDC) aşılıyor.
-      ['refused_per_tx', 'c', {}],
+      // Kalıcı ret (ADR 0028'den sonra tek yolu): alacak politikanın engelli adresine satıldı, payee o.
+      ['refused_blocked_buyer', 'a', { payee: keys.blockedWallet }],
       // Geçici ya da kurumun beyanına bağlı retler: zaman penceresi (9–17 UTC) dışı, izinsiz kategori.
       ['refused_time_window', 'a', { timestamp: TIMESTAMP + 4 * HOUR }],
       ['refused_category', 'a', { paymentCategory: 'travel' }],
@@ -102,10 +110,17 @@ function scenarios() {
       // kısmi tutar (Split, 10 USDC); escrow `execute_resolution`'da bu netleri bekler.
       ['dispute_favor_agent', 'a', { netAmount: AMOUNTS.a }],
       ['dispute_split', 'a', { netAmount: 10n * USDC }],
-      // FavorAgent'ın tam tutarı işlem başı tavanı (100 USDC) aşar: kalıcı ret, iade.
-      ['dispute_refused_per_tx', 'c', { netAmount: AMOUNTS.c }],
+      // FavorAgent kararında payee engelli alıcı: kalıcı ret, iade.
+      ['dispute_refused_blocked_buyer', 'a', { netAmount: AMOUNTS.a, payee: keys.blockedWallet }],
       // Fiat rayı (BC-37): Stripe ödemesi işin tamamıdır (keeper ücreti yok), makbuz commitment'ı sinyal 12.
       ['mpp_fiat', 'd', { netAmount: AMOUNTS.d, stripeReceiptHash: STRIPE_RECEIPT_HASH }],
+      // Kabul öncesi ön-ispatlar (ADR 0028). c işi işlem başı tavanı (100 USDC) aşar: kalıcı ret, kabul edilemez.
+      ['preflight_a', 'a', preflight('a')],
+      ['preflight_b', 'b', preflight('b')],
+      ['preflight_c', 'c', preflight('c')],
+      ['preflight_d', 'd', preflight('d')],
+      // Cüzdan ön-ispattan sonra değişti: yeni cüzdan için yeniden bağlanan ön-ispat.
+      ['preflight_a_rotated', 'a', { ...preflight('a'), payee: keys.rotatedWallet }],
     ].map(([name, spec, overrides]) => ({
       name,
       spec,
@@ -147,13 +162,25 @@ function squadsWorld() {
   const job = findPda(w.escrow, ['job', bs58.decode(vaults.institution), sha256(SQUADS_SPEC)]).address;
   const mint = keyFromLabel(SQUADS_LABELS.settlementMint);
   const netAmount = SQUADS_AMOUNT - (SQUADS_AMOUNT * KEEPER_FEE_BPS) / 10_000n;
+  const base = { institution, job, mint, tokenWhitelist: [mint], dailySpentBefore: 0n };
   return {
     vaults,
-    overrides: { institution, job, payee: vaults.buyer, mint, tokenWhitelist: [mint], dailySpentBefore: 0n, netAmount },
+    overrides: { ...base, payee: vaults.buyer, netAmount },
+    // Kabul öncesi ön-ispat (ADR 0028): payee agent vault'u, net tutarın tamamı, sayaç 0.
+    preflight: { ...base, payee: vaults.agent, netAmount: SQUADS_AMOUNT, timestamp: PREFLIGHT_TIMESTAMP },
   };
 }
 
-async function squadsFixture(record) {
+/** Squads fikstürünün senaryoları: adı, ispat girdisi ve payee'nin etiketi. */
+const squadsScenarios = () => {
+  const w = squadsWorld();
+  return [
+    { name: 'buyer_vault_payee', overrides: w.overrides, payee: 'buyerVault' },
+    { name: 'preflight', overrides: w.preflight, payee: 'agentVault' },
+  ];
+};
+
+async function squadsFixture(records) {
   const { overrides } = squadsWorld();
   const defaults = await input(overrides);
   return {
@@ -172,18 +199,17 @@ async function squadsFixture(record) {
       commitment: hex(fieldBytes(String(await policyCommitment(defaults)))),
       daily_ceiling: defaults.daily_ceiling_in,
     },
-    scenarios: record ? [record] : [],
+    scenarios: records,
   };
 }
 
-async function squadsRecord(proof, publicSignals) {
-  const { overrides } = squadsWorld();
+async function squadsRecord({ name, overrides, payee }, proof, publicSignals) {
   const signals = await evaluate(await input(overrides));
   const encoded = encodeProof(proof, publicSignals);
   return {
-    name: 'buyer_vault_payee',
+    name,
     job: 'squads',
-    payee: 'buyerVault',
+    payee,
     mint: 'settlementMint',
     net_amount: signals.net_amount,
     refusal_code: Number(signals.refusal_code),
@@ -196,13 +222,21 @@ async function squadsRecord(proof, publicSignals) {
   };
 }
 
-async function writeSquads(vk) {
-  const { overrides } = squadsWorld();
-  const { proof, publicSignals } = await snarkjs.groth16.fullProve(await input(overrides), WASM, ZKEY);
-  if (!(await snarkjs.groth16.verify(vk, publicSignals, proof))) throw new Error('squads: ispat doğrulanmadı');
-  const record = await squadsRecord(proof, publicSignals);
-  process.stdout.write(`squads ${record.name}: refusal_code ${record.refusal_code}\n`);
-  fs.writeFileSync(SQUADS_OUT, `${JSON.stringify(await squadsFixture(record), null, 2)}\n`);
+async function writeSquads(vk, { missingOnly = false } = {}) {
+  const existing = missingOnly && fs.existsSync(SQUADS_OUT) ? JSON.parse(fs.readFileSync(SQUADS_OUT, 'utf8')).scenarios : [];
+  const records = [];
+  for (const scenario of squadsScenarios()) {
+    const kept = existing.find((s) => s.name === scenario.name);
+    if (kept) {
+      records.push(kept);
+      continue;
+    }
+    const { proof, publicSignals } = await snarkjs.groth16.fullProve(await input(scenario.overrides), WASM, ZKEY);
+    if (!(await snarkjs.groth16.verify(vk, publicSignals, proof))) throw new Error(`squads ${scenario.name}: ispat doğrulanmadı`);
+    records.push(await squadsRecord(scenario, proof, publicSignals));
+    process.stdout.write(`squads ${scenario.name}: refusal_code ${records.at(-1).refusal_code}\n`);
+  }
+  fs.writeFileSync(SQUADS_OUT, `${JSON.stringify(await squadsFixture(records), null, 2)}\n`);
   process.stdout.write(`wrote ${path.relative(REPO, SQUADS_OUT)}\n`);
 }
 
@@ -213,14 +247,22 @@ async function checkSquads(vk, problems) {
   }
   const fixture = JSON.parse(fs.readFileSync(SQUADS_OUT, 'utf8'));
   // Senaryo dışındaki her alan (etiketler, iş, tutar, politika) betiğin bugünkü dünyasıyla aynı olmalı.
-  const expected = await squadsFixture(null);
+  const expected = await squadsFixture([]);
   const { scenarios, ...actual } = fixture;
   delete expected.scenarios;
   if (JSON.stringify(actual) !== JSON.stringify(expected)) problems.push('squads: fikstürün dünyası değişmiş');
-  if (scenarios.length !== 1) problems.push('squads: senaryo sayısı farklı');
-  const signals = toArray(await evaluate(await input(squadsWorld().overrides)));
-  if (!(await snarkjs.groth16.verify(vk, signals, decodeProof(scenarios[0])))) {
-    problems.push('squads: ispat bu sinyaller ve doğrulama anahtarıyla doğrulanmıyor');
+  const list = squadsScenarios();
+  if (scenarios.length !== list.length) problems.push('squads: senaryo sayısı farklı');
+  for (const scenario of list) {
+    const record = scenarios.find((s) => s.name === scenario.name);
+    if (!record) {
+      problems.push(`squads ${scenario.name}: fikstürde yok`);
+      continue;
+    }
+    const signals = toArray(await evaluate(await input(scenario.overrides)));
+    if (!(await snarkjs.groth16.verify(vk, signals, decodeProof(record)))) {
+      problems.push(`squads ${scenario.name}: ispat bu sinyaller ve doğrulama anahtarıyla doğrulanmıyor`);
+    }
   }
 }
 
@@ -237,7 +279,14 @@ async function scenarioRecord({ name, spec, overrides }, proof, publicSignals) {
   return {
     name,
     job: spec,
-    payee: overrides.payee === keyFromLabel(LABELS.claimBuyer) ? 'claimBuyer' : 'agentWallet',
+    payee:
+      overrides.payee === keyFromLabel(LABELS.claimBuyer)
+        ? 'claimBuyer'
+        : overrides.payee === keyFromLabel(LABELS.blockedWallet)
+          ? 'blockedWallet'
+          : overrides.payee === keyFromLabel(LABELS.rotatedWallet)
+            ? 'rotatedWallet'
+            : 'agentWallet',
     mint: overrides.mint === keyFromLabel(LABELS.otherMint) ? 'otherMint' : 'settlementMint',
     net_amount: signals.net_amount,
     refusal_code: Number(signals.refusal_code),
@@ -293,7 +342,7 @@ async function write({ missingOnly = false } = {}) {
   fs.mkdirSync(path.dirname(OUT), { recursive: true });
   fs.writeFileSync(OUT, `${JSON.stringify(fixture, null, 2)}\n`);
   process.stdout.write(`wrote ${path.relative(REPO, OUT)}\n`);
-  if (!missingOnly) await writeSquads(vk);
+  await writeSquads(vk, { missingOnly });
 }
 
 const fromHex = (text) => Array.from(Buffer.from(text, 'hex'));
@@ -348,7 +397,7 @@ async function check() {
     throw new Error(`fikstürler güncel değil (node scripts/program-proofs.mjs):\n  ${problems.join('\n  ')}`);
   }
   process.stdout.write(`${path.relative(REPO, OUT)}: ${list.length} ispat geçerli\n`);
-  process.stdout.write(`${path.relative(REPO, SQUADS_OUT)}: 1 ispat geçerli\n`);
+  process.stdout.write(`${path.relative(REPO, SQUADS_OUT)}: ${squadsScenarios().length} ispat geçerli\n`);
 }
 
 try {

@@ -18,6 +18,7 @@ import { StatusBadge } from '@/components/ui/status-badge';
 import { TxConfirmation } from '@/components/ui/tx-confirmation';
 import { JobClaim } from './job-claim';
 import { JobDispute } from './job-dispute';
+import { JobPreflight } from './job-preflight';
 import { JobRelease } from './job-release';
 import { JobSettlement } from './job-settlement';
 import { JobTravelRule } from './job-travel-rule';
@@ -39,7 +40,13 @@ import {
 } from '@/lib/job-detail';
 import { ENV_VARS } from '@/lib/config';
 import { escrowErrorMessage, formatDuration, readEscrowSetup, type EscrowSetupLookup } from '@/lib/job-wizard';
-import { readReleaseState, type ReleaseState } from '@/lib/release-proof';
+import {
+  preflightBoundFor,
+  readPreflight,
+  readReleaseState,
+  type PreflightView,
+  type ReleaseState,
+} from '@/lib/release-proof';
 import { sendErrorText } from '@/lib/sponsored-send';
 import { formatUnits } from '@/lib/settlement';
 import { JOB_STATUS_TONE, statusLabel } from '@/lib/status';
@@ -193,6 +200,20 @@ export function JobDetail({ jobAddress, escrowProgramId }: { jobAddress: string;
     };
   }, [escrow, jobKey, account, revision]);
 
+  // Kabul öncesi ön-ispat (ADR 0028): policy'li işi agent ancak kurum bağladıktan sonra kabul eder.
+  const [preflight, setPreflight] = useState<Load<PreflightView | null>>({ state: 'loading' });
+  useEffect(() => {
+    if (!escrow || !account?.policy) return;
+    let active = true;
+    readPreflight(escrow, jobKey).then(
+      (value) => active && setPreflight({ state: 'ready', value }),
+      (error: Error) => active && setPreflight({ state: 'error', message: error.message }),
+    );
+    return () => {
+      active = false;
+    };
+  }, [escrow, jobKey, account, revision]);
+
   // Agent eylemleri: yalnızca job'un agent cüzdanı (rolün adresi).
   const agentKey = agentActor.address;
   const isAgent = Boolean(account && agentKey?.equals(account.agentWallet));
@@ -297,6 +318,11 @@ export function JobDetail({ jobAddress, escrowProgramId }: { jobAddress: string;
     : null;
   const uriProblem = deliveryUri === '' ? null : deliveryUriProblem(deliveryUri);
   const beforeDeadline = chainNow !== null && chainNow < deadline;
+  // Policy'li işte escrow kurumun ön-ispatını ister (ADR 0028); o bağlanmadan kabul gönderilmez.
+  const awaitingPreflight =
+    account.policy !== null &&
+    !(preflight.state === 'ready' && preflightBoundFor(preflight.value, account.agentWallet));
+  const preflightForOtherWallet = preflight.state === 'ready' && preflight.value !== null && awaitingPreflight;
   const pending =
     signature !== null && status?.stage !== 'confirmed' && status?.stage !== 'finalized' && status?.stage !== 'failed';
 
@@ -415,6 +441,15 @@ export function JobDetail({ jobAddress, escrowProgramId }: { jobAddress: string;
         onConfirmed={refresh}
       />
 
+      <JobPreflight
+        escrow={escrow}
+        jobKey={jobKey}
+        account={account}
+        preflight={preflight}
+        release={release}
+        chainNow={chainNow}
+      />
+
       <JobRelease
         escrow={escrow}
         jobKey={jobKey}
@@ -460,11 +495,17 @@ export function JobDetail({ jobAddress, escrowProgramId }: { jobAddress: string;
                 <Button
                   onClick={() => void act('accept')}
                   loading={busy === 'accept'}
-                  disabled={!guard.canTransact || busy !== null || pending}
+                  disabled={!guard.canTransact || busy !== null || pending || awaitingPreflight}
                 >
                   Accept the job
                 </Button>
-                <p className="text-caption text-muted">Accepting commits you to deliver before the deadline.</p>
+                <p className="text-caption text-muted">
+                  {preflightForOtherWallet
+                    ? "The pre-acceptance proof was bound for another agent wallet; the institution binds it again for this job's wallet before it can be accepted."
+                    : awaitingPreflight
+                      ? 'The institution has not bound its pre-acceptance proof yet; the job can be accepted after it.'
+                      : 'Accepting commits you to deliver before the deadline.'}
+                </p>
               </div>
             )}
             {jobStatus === 'accepted' && (

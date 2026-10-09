@@ -35,31 +35,32 @@ cargo test --manifest-path tests/programs/Cargo.toml --test tx_budget -- --nocap
 
 | Tx | Durum | İmza | Hesap | Boyut, ALT'sız | Boyut, Square ALT | CU | Sınır |
 |---|---|---|---|---|---|---|---|
-| `initInstitution` | 64 baytlık ad | 2 | 6 | 463 | 466 | 14 033 | 50 000 |
-| `setPolicy` |  | 2 | 7 | 500 | 503 | 29 278 | 60 000 |
+| `initInstitution` | 64 baytlık ad | 2 | 6 | 463 | 466 | 15 533 | 50 000 |
+| `setPolicy` |  | 2 | 7 | 500 | 503 | 18 778 | 60 000 |
 | `updatePolicy` |  | 2 | 6 | 434 | 434 | 7 160 | 20 000 |
-| `initInstitution + setPolicy + setBuyerRoot` | web: tek tx | 2 | 7 | 629 | 632 | 37 846 | 130 000 |
-| `registerAgent` | 32 baytlık kimlik, 200 baytlık kart URI'si | 2 | 6 | 700 | 703 | 17 160 | 40 000 |
-| `recordScreening` |  | 2 | 7 | 493 | 465 | 25 554 | 60 000 |
-| `createJob` | policy'li | 2 | 13 | 682 | 592 | 36 627 | 100 000 |
+| `initInstitution + setPolicy + setBuyerRoot` | web: tek tx | 2 | 7 | 629 | 632 | 42 346 | 130 000 |
+| `registerAgent` | 32 baytlık kimlik, 200 baytlık kart URI'si | 2 | 6 | 700 | 703 | 20 160 | 50 000 |
+| `recordScreening` |  | 2 | 7 | 493 | 465 | 16 554 | 60 000 |
+| `createJob` | policy'li | 2 | 13 | 682 | 592 | 51 632 | 110 000 |
 | `commitTravelRule` |  | 2 | 5 | 393 | 393 | 6 450 | 20 000 |
-| `fundJob` |  | 2 | 12 | 592 | 533 | 59 149 | 120 000 |
-| `acceptJob` |  | 2 | 6 | 426 | 426 | 7 885 | 20 000 |
+| `fundJob` |  | 2 | 12 | 592 | 533 | 41 149 | 120 000 |
+| `acceptJob` | policy'li, ön-ispat okunur | 2 | 8 | 492 | 495 | 21 643 | 50 000 |
 | `submitWork` | 128 baytlık URI | 2 | 6 | 559 | 559 | 8 383 | 20 000 |
 | `setBuyerRoot` |  | 2 | 6 | 426 | 426 | 7 135 | 20 000 |
-| `listClaim` |  | 2 | 7 | 436 | 439 | 18 259 | 50 000 |
+| `listClaim` |  | 2 | 7 | 436 | 439 | 19 759 | 50 000 |
 | `cancelClaim` |  | 2 | 5 | 362 | 362 | 4 405 | 10 000 |
-| `buyClaim` | 16 kardeşli kanıt, satıcının ATA'sı açılır | 2 | 16 | **1288** (sığmaz) | 1198 | 56 297 | 120 000 |
+| `buyClaim` | 16 kardeşli kanıt, satıcının ATA'sı açılır | 2 | 16 | **1288** (sığmaz) | 1198 | 53 305 | 120 000 |
 | `syncAgentWallet` |  | 2 | 6 | 394 | 394 | 7 493 | 20 000 |
-| `createJob` | policy'siz | 2 | 11 | 618 | 528 | 40 469 | 100 000 |
+| `createJob` | policy'siz | 2 | 11 | 618 | 528 | 37 469 | 110 000 |
 | `cancelJob` | fonlanmış iş | 2 | 9 | 494 | 466 | 15 415 | 40 000 |
-| `finalizePayment` | policy'siz, payee'nin ATA'sı açılır | 2 | 21 | 911 | 790 | 81 039 | 220 000 |
+| `finalizePayment` | policy'siz, payee'nin ATA'sı açılır | 2 | 21 | 911 | 790 | 79 539 | 220 000 |
+| `setPreflightProof` | Groth16, 13 sinyal | 2 | 10 | 794 | 766 | 168 024 | 340 000 |
 | `setComplianceProof` | Groth16, 13 sinyal | 2 | 12 | 868 | 840 | 194 843 | 390 000 |
-| `finalizePayment` | policy'li, `record_release` CPI, payee'nin ATA'sı açılır | 2 | 25 | 1039 | 856 | 108 751 | 220 000 |
-| `createFiatJob` | iki screening, policy snapshot'ı | 2 | 12 | 641 | 613 | 32 392 | 70 000 |
-| `acceptJob` | fiat iş, açıkken | 2 | 6 | 426 | 426 | 7 699 | 20 000 |
-| `verifyMppPaymentProof` | Ed25519 precompile + Groth16, 13 sinyal | 2 | 13 | 1135 | 1076 | 179 186 | 360 000 |
-| `finalizeFiatPayment` | `record_release` CPI, itibar ve validation kaydı açılır | 2 | 14 | 658 | 537 | 57 391 | 120 000 |
+| `finalizePayment` | policy'li, `record_release` CPI, payee'nin ATA'sı açılır | 2 | 25 | 1039 | 856 | 107 251 | 220 000 |
+| `createFiatJob` | iki screening, policy snapshot'ı | 2 | 12 | 641 | 613 | 32 397 | 70 000 |
+| `acceptJob` | fiat iş, açıkken | 2 | 8 | 492 | 495 | 15 457 | 50 000 |
+| `verifyMppPaymentProof` | Ed25519 precompile + Groth16, 13 sinyal | 2 | 13 | 1135 | 1076 | 179 190 | 360 000 |
+| `finalizeFiatPayment` | `record_release` CPI, itibar ve validation kaydı açılır | 2 | 14 | 658 | 537 | 54 391 | 120 000 |
 | `cancelFiatJob` | açık iş | 2 | 5 | 361 | 361 | 6 549 | 20 000 |
 
 "Hesap" ALT'sız tx'in statik anahtar sayısıdır; çağrılan programlar dahil.
@@ -73,6 +74,9 @@ cargo test --manifest-path tests/programs/Cargo.toml --test tx_budget -- --nocap
 - **Compute unit:**
   - En pahalı tx `setComplianceProof`'tur: Groth16 doğrulaması ~178 bin CU harcar. Bu, talimat başına
     varsayılan 200 bin sınıra yakındır, bu yüzden sınır profilden açıkça verilir.
+  - Kabul öncesi ön-ispat (`setPreflightProof`, ADR 0028) aynı doğrulamayı yapar; `ClaimListing` ve
+    `OperatorState` okumadığı için ~27 bin CU daha ucuzdur. `acceptJob` policy'li işte `EscrowConfig` ve
+    `PreflightProof`'u okur (iki hesap, 66 bayt).
   - Hiçbir tx 1,4 milyonluk üst sınıra yaklaşmaz.
 - **ALT'ın kazancı:**
   - En büyük kazanç `finalizePayment` (183 bayt) ve `buyClaim`'dedir (90 bayt).
@@ -98,7 +102,12 @@ değildir.
 - **Sınır:** Her tx türünün sınırı, 60 ölçümün en yükseğinin en az iki katıdır ve 10 bine yukarı yuvarlanır.
   BC-37'nin ölçümünde (2026-10-07) iki katını karşılamayan sınırlar yükseltildi: `setPolicy`, `recordScreening`,
   `fundJob`, `buyClaim`, `finalizePayment`, `setComplianceProof`. `setComplianceProof`'un CU'su main'in
-  verifier'ıyla da aynıdır (194 626); önceki tablodaki 178 276 BC-21'in ölçümüydü.
+  verifier'ıyla da aynıdır (194 626); önceki tablodaki 178 276 BC-21'in ölçümüydü. P-01'in ölçümünde
+  (2026-10-07, tablo bu ölçümdür) yeni `setPreflightProof` 340 000 aldı; `acceptJob` ön-ispatı okuduğu için
+  20 000'den 50 000'e çıktı. İki katını karşılamayan `registerAgent` (40 000 → 50 000) ve `createJob`
+  (100 000 → 110 000) yükseltildi; ikisinin de talimatı değişmedi, fark bump aramasının dağılımıdır.
+  `PreflightProof` bağlamadaki agent cüzdanını saklayınca (P-01'in incelemesi, 2026-10-08) iki `acceptJob` satırı ve
+  `setPreflightProof` 60 ölçümle yeniden ölçüldü.
   - İki katlık pay bump araması içindir: en küçük talimatta da (ör. `initInstitution`, ~8 bin CU
     tabanı) 20'den fazla ek denemeyi karşılar.
   - Fazla istenen CU'nun maliyeti öncelik ücretinin çarpanıdır; 1 000 micro-lamport/CU'da 100 bin CU
@@ -108,7 +117,8 @@ değildir.
   güncellenir.
 - **Kapsam dışı:** Profili olmayan tx'ler kendi issue'larında eklenir: dispute talimatları (BC-32,
   BC-33). SDK'nın dispute akışları o zamana kadar sınır eklemez. `commit_travel_rule` BC-34'te, fiat rayı
-  (`createFiatJob`, `verifyMppPaymentProof`, `finalizeFiatPayment`, `cancelFiatJob`) BC-37'de eklendi.
+  (`createFiatJob`, `verifyMppPaymentProof`, `finalizeFiatPayment`, `cancelFiatJob`) BC-37'de,
+  `setPreflightProof` P-01'de eklendi.
   `verifyMppPaymentProof`'un ölçümü Ed25519 precompile talimatını ve onun imza ücretini içerir.
 
 ## 6. SDK'da kullanım

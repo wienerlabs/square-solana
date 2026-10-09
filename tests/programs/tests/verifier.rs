@@ -159,7 +159,11 @@ fn a_valid_proof_writes_a_compliant_release_proof() {
     r.w.h.set_time(r.proof_time());
     let p = r.proof("compliant");
     let executed = r.bind(&job, &p).expect("set_compliance_proof");
-    cu::within("verifier.set_compliance_proof", &executed, 300_000);
+    cu::within_profile(
+        "verifier.set_compliance_proof",
+        &executed,
+        "setComplianceProof",
+    );
 
     let proof = r.release_proof(&job);
     assert_eq!(
@@ -332,7 +336,7 @@ fn a_proof_binds_only_to_a_delivered_job_within_the_clock_tolerance() {
         r.agent.record,
         Some(r.policy),
         spec_hash,
-        AMOUNT,
+        r.amount("a"),
         r.w.h.now() + 7 * DAY,
         CHALLENGE,
         r.w.usdc,
@@ -346,6 +350,7 @@ fn a_proof_binds_only_to_a_delivered_job_within_the_clock_tolerance() {
         .expect_err("fonlanmış iş")
         .assert_error(anchor_error(VerifierError::InvalidJobState));
 
+    r.preflight(&job, "a");
     let ix =
         r.w.accept_ix(&wallet.pubkey(), &job, r.agent.record, spec_hash);
     r.w.h.send(&[ix], &[&wallet]).expect("accept_job");
@@ -483,9 +488,11 @@ fn a_proof_of_yesterday_or_for_another_payee_or_amount_is_stale_at_release() {
 #[test]
 fn a_refused_release_consumes_the_proof_without_moving_the_counter() {
     let mut r = ReleaseWorld::new(false);
-    let job = r.delivered_job("c");
+    // Kalıcı ret (ADR 0028'den sonra): alacak kurumun politikasında engelli alıcıya satıldı.
+    let job = r.delivered_job("a");
+    r.sell_claim_to_blocked_buyer(&job);
     r.w.h.set_time(r.proof_time());
-    r.bind(&job, &r.proof("refused_per_tx"))
+    r.bind(&job, &r.proof("refused_blocked_buyer"))
         .expect("ret ispatı");
     let executed = r.record(&job).expect("record_release");
     assert!(r.release_proof(&job).consumed);

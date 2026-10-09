@@ -1,6 +1,7 @@
 // BE-27 kabulü gerçek zincirde: devnet'te üç Squads v4 smart account'u (kurum, agent, alıcı) 8 adımı yürütür, her
-// tx'in ücretini ve rent'ini fee payer servisi öder. Vault'lar hiç SOL tutmaz; üyeler yalnızca imzalar. Release ispatı
-// zincirden kurulan witness'la üretilen gerçek Groth16 ispatıdır (`@squaresdk/solana-policy`). Yalnızca
+// tx'in ücretini ve rent'ini fee payer servisi öder. Vault'lar hiç SOL tutmaz; üyeler yalnızca imzalar. Kabul öncesi
+// ön-ispat (ADR 0028) ve release ispatı zincirden kurulan witness'larla üretilen gerçek Groth16 ispatlarıdır
+// (`@squaresdk/solana-policy`). Yalnızca
 // `FEE_PAYER_E2E_*` ortamıyla çalışır (anahtarlar repoda tutulmaz):
 //   FEE_PAYER_E2E_SPONSOR   sponsorun keypair'i (SOL'ü var; hiçbir rolde değil)
 //   FEE_PAYER_E2E_FUNDER    devnet USDC'si olan cüzdan: vault'ların token hesaplarını açar ve doldurur (kurulum)
@@ -11,9 +12,12 @@ import { createHash } from 'node:crypto';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import {
+  SIGNAL,
   buildBuyerTree,
+  buildPreflightWitness,
   buildReleaseWitness,
   buildSetComplianceProofTx,
+  buildSetPreflightProofTx,
   computePolicyCommitment,
   createLocalProver,
   derivePolicySalts,
@@ -322,6 +326,27 @@ describe.skipIf(!ENABLED)('devnet: Squads smart account ile 8 adım sponsorlu', 
         ),
       ),
     );
+    // Kurum vault'u kabulden önce işin kendi koşullarıyla ön-ispatı bağlar (ADR 0028).
+    const prover = createLocalProver({
+      wasm: new Uint8Array(readFileSync(new URL('build/payment_js/payment.wasm', CIRCUIT))),
+      zkey: new Uint8Array(readFileSync(new URL('artifacts/payment.zkey', CIRCUIT))),
+      groth16,
+    });
+    const preflight = await prover.prove(
+      await buildPreflightWitness({ client, job, policy, salts, paymentCategory: CATEGORY }),
+    );
+    expect(BigInt(`0x${preflight.publicInputs[SIGNAL.refusalCode]}`)).toBe(0n);
+    await asVault(
+      '3. ön-ispat',
+      institution,
+      builtTxInstructions(
+        await buildSetPreflightProofTx(
+          client,
+          { authority: institution.vault, institution: institutionPda, policy: policyAddress, job, proof: preflight },
+          options(),
+        ),
+      ),
+    );
 
     // 4. Agent vault'u kabul eder ve teslim eder.
     await asVault(
@@ -371,11 +396,6 @@ describe.skipIf(!ENABLED)('devnet: Squads smart account ile 8 adım sponsorlu', 
     );
 
     // 6–7. İspat zincirden kurulan witness'la üretilir ve kurum vault'uyla bağlanır.
-    const prover = createLocalProver({
-      wasm: new Uint8Array(readFileSync(new URL('build/payment_js/payment.wasm', CIRCUIT))),
-      zkey: new Uint8Array(readFileSync(new URL('artifacts/payment.zkey', CIRCUIT))),
-      groth16,
-    });
     const witness = await buildReleaseWitness({ client, job, policy, salts, paymentCategory: CATEGORY });
     expect(witness.payee.equals(buyer.vault)).toBe(true);
     const proof = await prover.prove(witness);

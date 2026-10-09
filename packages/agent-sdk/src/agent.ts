@@ -215,6 +215,7 @@ export async function createAgent(options: AgentOptions): Promise<Agent> {
           cardUrl: urls.card,
           api,
           tx,
+          ...(options.logger ? { logger: options.logger } : {}),
         },
         registerOptions,
       ),

@@ -38,18 +38,18 @@ Her adımdan sonra sonuç zincirden okunup doğrulanır; tutmayan doğrulama ko�
 | hazırlık | 0 | keeper'ın ATA'sı | — |
 | 8 adım | 1 | `initInstitution` (yoksa) + `setPolicy` + `setBuyerRoot`, tek tx | commitment yerel politikayla aynı, tavan, alıcı kökü |
 | | 2 | `registerAgent` | `AgentRecord` cüzdanı ve durumu |
-| | 3 | `recordScreening` (kurum, agent, alıcı; screener authority), `createJob` (politikalı), eşikteyse `commitTravelRule`, `fundJob` | screening'ler temiz ve taze, vault tutarı |
+| | 3 | `recordScreening` (kurum, agent, alıcı; screener authority), `createJob` (politikalı), eşikteyse `commitTravelRule`, `fundJob`; in-process kabul öncesi ön-ispat, `setPreflightProof` ([ADR 0028](../../docs/decisions/0028-kabul-oncesi-on-ispat-ve-dispute-duzeltmeleri.md)) | screening'ler temiz ve taze, vault tutarı; `PreflightProof` bu işe ve politikaya ait, kalıcı ya da günlük tavan biti yok |
 | | 4 | `acceptJob`, `submitWork` | `Delivered`, iş hash'i |
 | | 5 | `listClaim`, `buyClaim` (Merkle kanıtı) | listeleme `Bought`, agent fiyatı aldı |
 | | 7 | in-process Groth16 ispatı, `setComplianceProof` | `ReleaseProof` uyumlu, payee alıcı, net tutar |
 | | 6 + 8 | `finalizePayment` (keeper) | `Released`, alıcıya net, keeper'a ücret, `AgentReputation`, `ValidationRecord` `Verified`, listeleme `Settled`, ispat tüketildi |
-| ispat-ret | 1–8 | işlem başı tavanı 1 olan ikinci politika; aynı akış, alacak satışı yok | ret kodu `PER_TX`, kesin ret; `Refunded`, net kuruma, keeper ücreti yine ödenir, `ValidationRecord` `Refused`, itibar değişmez |
+| ispat-ret | 1–8 | onaylı alıcıyı gizli engelli listesine de koyan ikinci politika (`setPolicy` + `setBuyerRoot`); ön-ispat geçer (payee agent), alacak o alıcıya satılır | ret kodu `PAYEE_BLOCKED`, payee alıcı, kesin ret; `Refunded`, net kuruma, alıcıya ödeme yok, listeleme `Defaulted`, keeper ücreti yine ödenir, `ValidationRecord` `Refused`, itibar değişmez |
 | ispat-yok | 3–8 | ispatsız finalize (ön simülasyonsuz gönderilir) → `ProofRequired`; sonra ispat ve finalize | ret anında iş `Delivered`, vault dolu, `ReleaseProof` yok; ispat bağlanınca agent'a ödenir |
-| fiat | 3–8 | Yalnızca `keys.mppAuthority` verilmişse ([`src/fiat.ts`](src/fiat.ts), ADR 0024): `createFiatJob`, `acceptJob` (açıkken), `submitWork`; `admin` yerel anahtarsa `updateMppAuthority` (yeni anahtar); Ed25519 attestation + `verifyMppPaymentProof`; `finalizeFiatPayment`; rotasyon yapıldıysa eski anahtara geri | ray `Fiat`, vault yok; `ReleaseProof` uyumlu, net işin tamamı, payee agent; `Released`, `ValidationRecord` `Verified`, itibar +1, günlük sayaç tutar kadar ilerledi, token hareketi yok; config'in MPP anahtarı upgrade'siz değişti |
+| fiat | 3–8 | Yalnızca `keys.mppAuthority` verilmişse ([`src/fiat.ts`](src/fiat.ts), ADR 0024): `createFiatJob`, `setPreflightProof`, `acceptJob` (açıkken), `submitWork`; `admin` yerel anahtarsa `updateMppAuthority` (yeni anahtar); Ed25519 attestation + `verifyMppPaymentProof`; `finalizeFiatPayment`; rotasyon yapıldıysa eski anahtara geri | ray `Fiat`, vault yok; `ReleaseProof` uyumlu, net işin tamamı, payee agent; `Released`, `ValidationRecord` `Verified`, itibar +1, günlük sayaç tutar kadar ilerledi, token hareketi yok; config'in MPP anahtarı upgrade'siz değişti |
 
 - **Yeniden koşu:** Koşu kimliği agent kimliğine, spec'lere ve politika kimliklerine girer. Aynı anahtarlarla
   tekrar koşmak çakışmaz. Kurum hesabı varsa yeniden açılmaz. Üç iş fonlanır: kurumun token bakiyesi en az
-  `3 × jobAmount`, alıcınınki en az `claimPrice` olmalıdır.
+  `3 × jobAmount`, alıcınınki en az `2 × claimPrice` olmalıdır (ana akışın ve ispat-ret'in alacağı).
 - **Saat** ([ADR 0012](../../docs/decisions/0012-ispat-tazeligi-ve-gunluk-sayac.md)):
   - İspatın anı zincirin saatidir (Clock sysvar'ı; verifier ±600 s tolerans ister).
   - Finalize ispatla aynı UTC gününde olmalıdır: gün dönümüne challenge süresi + 180 s'den az kalmışsa ispat
@@ -173,8 +173,10 @@ Validator'ın port ön denetimi ise birim testindedir: port doluysa `child_proce
 
 Modüller `@squaresdk/solana-smoke/<modül>` olarak dışa açıktır. Servis entegrasyon testi
 ([`tests/services`](../services/), BE-36) localnet koşucusunun parçalarını (`startValidator`, `fundLocalnet`,
-`assertDeployedPrograms`), `runInit`'i ve `runSmoke`'u kullanır. `runSmoke`'un isteğe bağlı üç kancası vardır;
-verilmezse smoke tx'leri kendisi gönderir:
+`assertDeployedPrograms`), `runInit`'i ve `runSmoke`'u kullanır. Demo paketi ([`apps/demo`](../../apps/demo/), BE-21)
+`startValidator`, `writeRoleKeys`, `airdrop` ve `assertDeployedPrograms`'ı, `runInit`'i, yapılandırma şemalarını
+(`Address`, `U64`, `PositiveSecs`, `KeyPath`), anahtar, gönderici ve prover modüllerini kullanır. `runSmoke`'un isteğe
+bağlı üç kancası vardır; verilmezse smoke tx'leri kendisi gönderir:
 - `screen(wallet)`: adım 3'ün screening kaydını yazar (servis testinde screener servisi).
 - `finalize(job, expectError)`: challenge bittikten sonra finalize'ı yapar ya da beklenen bekletmeyi bekler (servis
   testinde keeper servisi).

@@ -31,6 +31,7 @@ export {
   type BuyerTree,
 } from './buyers.js';
 export {
+  buildPreflightWitness,
   buildReleaseWitness,
   releaseInputs,
   type CircuitInputs,
@@ -50,12 +51,14 @@ export {
   CLOCK_TOLERANCE_SECS,
   DAILY_REFUSALS,
   PERMANENT_REFUSALS,
+  PREFLIGHT_BLOCKING,
   REFUSAL,
   SECONDS_PER_DAY,
   checkFresh,
   dailySpentAt,
   dayStart,
   isFinalRefusal,
+  preflightAccepts,
   refusalRules,
   releaseNetAmount,
   type BoundProof,
@@ -64,5 +67,5 @@ export {
   type ReleaseTarget,
   type Staleness,
 } from './release.js';
-export { SIGNAL, buildSetComplianceProofTx, buildVerifyMppPaymentProofTx } from './tx.js';
+export { SIGNAL, buildSetComplianceProofTx, buildSetPreflightProofTx, buildVerifyMppPaymentProofTx } from './tx.js';
 export { watchJobProof, type MppAttestation, type WatchJobProofParams } from './watch.js';

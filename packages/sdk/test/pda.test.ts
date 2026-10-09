@@ -39,6 +39,7 @@ describe('createPda', () => {
         derive(PROGRAM_IDS.verifier, [seed('operator_state'), institution.toBytes()]),
       ],
       [pda.releaseProof(job)[0], derive(PROGRAM_IDS.verifier, [seed('release_proof'), job.toBytes()])],
+      [pda.preflightProof(job)[0], derive(PROGRAM_IDS.verifier, [seed('preflight_proof'), job.toBytes()])],
       [pda.escrowConfig()[0], derive(PROGRAM_IDS.escrow, [seed('config')])],
       [pda.job(institution, specHash)[0], derive(PROGRAM_IDS.escrow, [seed('job'), institution.toBytes(), specHash])],
       [pda.vault(job)[0], derive(PROGRAM_IDS.escrow, [seed('escrow_token'), job.toBytes()])],

@@ -425,6 +425,159 @@ export type SquareVerifierContract = {
       ]
     },
     {
+      "name": "setPreflightProof",
+      "docs": [
+        "Pre-acceptance compliance proof (ADR 0028): before the agent accepts a policy job (Open or",
+        "Funded), the institution's authority proves the job against its own terms. The program builds",
+        "the signals from the job: net = `job.amount` (the upper bound of every release to the agent",
+        "side), payee = `Job.agent_wallet`, mint, daily counter 0, the job address and a zero",
+        "`stripe_receipt_hash`; the policy snapshot is the job's. `refusal_code` must have no permanent",
+        "bit and no daily-ceiling bit (time window and category are temporary); otherwise",
+        "`PreflightRefused`. Writes `PreflightProof` with the payee, which escrow `accept_job` requires while",
+        "the job's agent wallet is unchanged; can be re-bound until acceptance. Arguments: `refusal_code` is public signal 0; `proof_timestamp` is public",
+        "signal 9 (Unix seconds), within the clock tolerance."
+      ],
+      "discriminator": [
+        103,
+        154,
+        253,
+        129,
+        33,
+        77,
+        36,
+        195
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "docs": [
+            "Pays rent and fees; separate from the role signer (fee payer / sponsored transactions)."
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "authority",
+          "docs": [
+            "The institution's current authority (key, or its Squads vault once bound)."
+          ],
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  101,
+                  114,
+                  105,
+                  102,
+                  105,
+                  101,
+                  114,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "institution"
+        },
+        {
+          "name": "policy"
+        },
+        {
+          "name": "job",
+          "docs": [
+            "`job.policy == policy`; supplies the policy snapshot, amount, mint and agent wallet."
+          ]
+        },
+        {
+          "name": "preflightProof",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  101,
+                  102,
+                  108,
+                  105,
+                  103,
+                  104,
+                  116,
+                  95,
+                  112,
+                  114,
+                  111,
+                  111,
+                  102
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "job"
+              }
+            ]
+          }
+        },
+        {
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "proofA",
+          "type": {
+            "array": [
+              "u8",
+              64
+            ]
+          }
+        },
+        {
+          "name": "proofB",
+          "type": {
+            "array": [
+              "u8",
+              128
+            ]
+          }
+        },
+        {
+          "name": "proofC",
+          "type": {
+            "array": [
+              "u8",
+              64
+            ]
+          }
+        },
+        {
+          "name": "refusalCode",
+          "type": "u16"
+        },
+        {
+          "name": "proofTimestamp",
+          "type": "i64"
+        }
+      ]
+    },
+    {
       "name": "syncVkVersion",
       "docs": [
         "After an upgrade that embeds a new verifying key (phase-2 ceremony, BC-38), records the program's",
@@ -752,6 +905,19 @@ export type SquareVerifierContract = {
       ]
     },
     {
+      "name": "preflightProof",
+      "discriminator": [
+        41,
+        81,
+        56,
+        115,
+        134,
+        41,
+        47,
+        110
+      ]
+    },
+    {
       "name": "releaseProof",
       "discriminator": [
         50,
@@ -803,6 +969,19 @@ export type SquareVerifierContract = {
         217,
         49,
         129
+      ]
+    },
+    {
+      "name": "preflightProofSet",
+      "discriminator": [
+        82,
+        178,
+        16,
+        60,
+        118,
+        87,
+        139,
+        52
       ]
     },
     {
@@ -895,6 +1074,11 @@ export type SquareVerifierContract = {
     },
     {
       "code": 6012,
+      "name": "preflightRefused",
+      "msg": "Preflight proof breaks a permanent or daily-ceiling rule of the policy"
+    },
+    {
+      "code": 6013,
       "name": "vkVersionAlreadySynced",
       "msg": "Config already records the embedded verifying key version"
     }
@@ -1013,6 +1197,89 @@ export type SquareVerifierContract = {
           {
             "name": "bump",
             "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "preflightProof",
+      "docs": [
+        "seeds = [\"preflight_proof\", job] (ADR 0028)"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "job",
+            "type": "pubkey"
+          },
+          {
+            "name": "policy",
+            "type": "pubkey"
+          },
+          {
+            "name": "payee",
+            "docs": [
+              "`job.agent_wallet` when the proof was bound: the payee the proof was checked against. Escrow",
+              "`accept_job` requires it to still be the job's agent wallet."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "policyCommitment",
+            "docs": [
+              "The job's policy commitment snapshot the proof was checked against; escrow compares it at",
+              "`accept_job`."
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "refusalCode",
+            "docs": [
+              "Bits left by the proof: only the time window and the payment category (temporary). 0 when the",
+              "job fully satisfies the policy at `proof_timestamp`."
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "proofTimestamp",
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "preflightProofSet",
+      "docs": [
+        "A pre-acceptance compliance proof bound to a policy job by `set_preflight_proof` (ADR 0028)."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "job",
+            "type": "pubkey"
+          },
+          {
+            "name": "policy",
+            "type": "pubkey"
+          },
+          {
+            "name": "refusalCode",
+            "type": "u16"
+          },
+          {
+            "name": "proofTimestamp",
+            "type": "i64"
           }
         ]
       }
@@ -1219,6 +1486,11 @@ export type SquareVerifierContract = {
       "name": "operatorStateSeed",
       "type": "bytes",
       "value": "[111, 112, 101, 114, 97, 116, 111, 114, 95, 115, 116, 97, 116, 101]"
+    },
+    {
+      "name": "preflightProofSeed",
+      "type": "bytes",
+      "value": "[112, 114, 101, 102, 108, 105, 103, 104, 116, 95, 112, 114, 111, 111, 102]"
     },
     {
       "name": "releaseProofSeed",

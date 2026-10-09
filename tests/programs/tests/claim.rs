@@ -85,7 +85,7 @@ fn an_agent_lists_and_an_approved_buyer_buys() {
     let executed = w
         .list_claim(&agent.wallet, &job, CLAIM_PRICE)
         .expect("list_claim");
-    cu::within("escrow.list_claim", &executed, 25_000);
+    cu::within_profile("escrow.list_claim", &executed, "listClaim");
     let listed: ClaimListed = event(&executed);
     assert_eq!(
         (listed.job, listed.seller, listed.price, listed.face_value),
@@ -105,7 +105,7 @@ fn an_agent_lists_and_an_approved_buyer_buys() {
     let executed = w
         .buy_claim(buyer, &job, CLAIM_PRICE, &list.eligibility(2))
         .expect("buy_claim");
-    cu::within("escrow.buy_claim (3 alıcılı liste)", &executed, 40_000);
+    cu::within_profile("escrow.buy_claim (3 alıcılı liste)", &executed, "buyClaim");
     let bought: ClaimBought = event(&executed);
     assert_eq!(
         (bought.job, bought.buyer, bought.price),
@@ -388,7 +388,7 @@ fn the_seller_withdraws_an_unsold_listing_and_the_sponsor_gets_the_rent() {
 
     let ix = w.cancel_claim_ix(&agent.wallet.pubkey(), &job, sponsor.pubkey());
     let executed = w.h.send(&[ix], &[&agent.wallet]).expect("cancel_claim");
-    cu::within("escrow.cancel_claim", &executed, 10_000);
+    cu::within_profile("escrow.cancel_claim", &executed, "cancelClaim");
     assert_eq!(event::<ClaimCancelled>(&executed).job, job);
     assert_eq!(w.h.lamports(&claim_address(&job)), 0);
     assert_eq!(w.h.lamports(&sponsor.pubkey()), LAMPORTS);
@@ -443,5 +443,9 @@ fn the_deepest_buyer_list_fits_one_transaction() {
     let executed = w
         .buy_claim(&buyer, &job, CLAIM_PRICE, &eligibility)
         .expect("buy_claim");
-    cu::within("escrow.buy_claim (16 seviyeli liste)", &executed, 40_000);
+    cu::within_profile(
+        "escrow.buy_claim (16 seviyeli liste)",
+        &executed,
+        "buyClaim",
+    );
 }

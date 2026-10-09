@@ -4,7 +4,8 @@ use square_common::seeds::JOB_SEED;
 use crate::errors::EscrowError;
 use crate::state::Job;
 
-/// `accept_job` ve `submit_work`'ün hesapları: imzacı job'un agent cüzdanı, kayıt job'a bağlı olanı.
+/// `submit_work`'ün hesapları: imzacı job'un agent cüzdanı, kayıt job'a bağlı olanı. `accept_job` ayrıca
+/// config'i ve ön-ispatı okur (`AcceptJob`).
 #[derive(Accounts)]
 pub struct AgentJob<'info> {
     /// Must equal `job.agent_wallet`.

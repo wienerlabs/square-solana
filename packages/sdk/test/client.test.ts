@@ -305,7 +305,14 @@ describe('flow', () => {
     });
     const agent = key();
     const accept = decoded(await client.flow.acceptJob({ agent, job: address }, options()), escrow());
-    expect(accept.accounts).toMatchObject({ agent: b58(agent), job: b58(address), agentRecord: b58(agentRecord) });
+    // Policy'li işte escrow kurumun kabul öncesi ön-ispatını okur (ADR 0028); hesap her işte geçirilir.
+    expect(accept.accounts).toMatchObject({
+      agent: b58(agent),
+      job: b58(address),
+      agentRecord: b58(agentRecord),
+      config: b58(client.pda.escrowConfig()[0]),
+      preflightProof: b58(client.pda.preflightProof(address)[0]),
+    });
     expect(accept.data.specHash).toEqual(plain(account.specHash));
     const workHash = randomBytes(32);
     const submit = decoded(

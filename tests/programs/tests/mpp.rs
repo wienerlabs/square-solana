@@ -55,6 +55,7 @@ fn a_stripe_payment_settles_a_fiat_job() {
     let job = {
         let wallet = f.r.agent.wallet.insecure_clone();
         let (record, spec) = (f.r.agent.record, f.r.spec(FIAT));
+        f.r.preflight(&job, FIAT);
         let ix = f.r.w.accept_ix(&wallet.pubkey(), &job, record, spec);
         f.r.w.h.send(&[ix], &[&wallet]).expect("accept_job");
         let ix =
@@ -65,7 +66,11 @@ fn a_stripe_payment_settles_a_fiat_job() {
     };
     f.r.w.h.set_time(f.r.proof_time());
     let executed = f.verify(&job).expect("verify_mpp_payment_proof");
-    cu::within("verifier.verify_mpp_payment_proof", &executed, 300_000);
+    cu::within_profile(
+        "verifier.verify_mpp_payment_proof",
+        &executed,
+        "verifyMppPaymentProof",
+    );
     let amount = f.r.amount(FIAT);
     let proof = f.r.release_proof(&job);
     assert_eq!(
@@ -90,7 +95,11 @@ fn a_stripe_payment_settles_a_fiat_job() {
 
     // Challenge penceresi yok: kurumun ödemesi teslimin kabulüdür.
     let executed = f.finalize(&job).expect("finalize_fiat_payment");
-    cu::within("escrow.finalize_fiat_payment", &executed, 120_000);
+    cu::within_profile(
+        "escrow.finalize_fiat_payment",
+        &executed,
+        "finalizeFiatPayment",
+    );
     let state = f.r.w.job(&job);
     assert_eq!(state.status, JobStatus::Released);
     assert!(f.r.release_proof(&job).consumed);
@@ -233,6 +242,30 @@ fn the_admin_rotates_the_authority_without_an_upgrade() {
 }
 
 #[test]
+fn a_zero_authority_closes_the_fiat_rail() {
+    // Sıfır anahtar fiat rayını kapatır; program bunu precompile'ın sıkı doğrulamasına bırakmaz (BC-39 P-20).
+    // Sıfır anahtarlı bir precompile talimatı tx'i programdan önce düşürdüğü için burada geçerli bir
+    // attestation'la denenir.
+    let mut f = FiatWorld::new();
+    let job = f.delivered();
+    f.r.w.h.set_time(f.r.proof_time());
+    let admin = f.r.w.admin.insecure_clone();
+    let ix = f.update_authority_ix(&admin.pubkey(), anchor_lang::prelude::Pubkey::default());
+    f.r.w
+        .h
+        .send(&[ix], &[&admin])
+        .expect("update_mpp_authority");
+    let config: VerifierConfig = f.r.w.h.account(&verifier_config_address()).unwrap();
+    assert_eq!(
+        config.mpp_authority,
+        anchor_lang::prelude::Pubkey::default()
+    );
+    f.verify(&job)
+        .expect_err("sıfır anahtar")
+        .assert_error(anchor_error(VerifierError::InvalidMppAttestation));
+}
+
+#[test]
 fn escrow_paths_do_not_apply_to_fiat_jobs_and_fiat_paths_not_to_escrow_jobs() {
     let mut f = FiatWorld::new();
     let job = f.delivered();
@@ -316,6 +349,7 @@ fn an_accepted_fiat_job_is_cancelled_only_after_the_deadline() {
     let mut f = FiatWorld::new();
     f.create().expect("create_fiat_job");
     let job = f.r.job_address(FIAT);
+    f.r.preflight(&job, FIAT);
     let wallet = f.r.agent.wallet.insecure_clone();
     let ix =
         f.r.w
