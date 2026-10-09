@@ -18,7 +18,7 @@ Square'in web uygulaması: Next.js 16 (App Router), React 19, Tailwind CSS 4 ve 
 | `/app/claims` | Alacak piyasası: satıştaki alacaklar, fiyat, iskonto, kimin alabileceği (FE-08) |
 | `/audit/[job]` | Denetim görünümü: job'un herkese açık uyum geçmişi; event'ler ve işlemleri, ispatın kararı ve geçmişi, validation kaydı. Politikanın içeriği yok (FE-12) |
 | `/app/developers` | Geliştirici portalı: API oturumu, API anahtarları, x402 ücretli uç noktalar ve kullanımı, SDK örnekleri (FE-22) |
-| `/design` | Bileşen kataloğu |
+| `/design` | Bileşen kataloğu; ekip içindir, menüde bağlantısı yok |
 | `/healthz` | Sağlık kontrolü (Railway) |
 
 ## Yapılandırma
