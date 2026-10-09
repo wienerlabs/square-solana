@@ -358,6 +358,26 @@ SQUARE_LOCALNET=1 SQUARE_WEB_E2E=1 SQUARE_WEB_E2E_CHANNEL=chrome SQUARE_LOCALNET
   pnpm --filter @squaresdk/solana-api exec vitest run test/web-dispute.e2e.test.ts
 ```
 
+**Arayüzden 8 adım ve ret (FE-13):** `test/web-flow.e2e.test.ts`, `SQUARE_LOCALNET=1` ve `SQUARE_WEB_E2E=1` ile çalışır.
+- **Kurulum:** FE-17'nin testiyle aynı; prover (BE-11) de gerçek süreçtir. Dört rol (kurum, agent, alıcı, keeper) kendi
+  cüzdanlarıyla ücretlerini öder.
+- **Senaryo:**
+  - Kurum politika sayfasında iki politika yazar. İkisinin de onaylı alıcısı alıcıdır; ikincisinin engelli listesinde
+    de alıcı vardır. Alıcının kanıt dosyaları politika sayfasından indirilir.
+  - **Ödeme:** İş açılır, fonlanır ve kabul öncesi ön-ispat bağlanır. Agent kabul eder, teslimatı API'ye yükler,
+    teslim eder ve alacağı listeler. Alıcı kanıt dosyasıyla alır. Kurum ispatı bağlar, keeper cüzdanı finalize eder;
+    net alıcıya gider.
+  - **Ret:** Aynı adımlar ikinci politikayla. Release ispatı kesin ret verir (engelli payee). Finalize neti kuruma
+    iade eder, listeleme `Defaulted` olur. Sayfa ret sebebini ve zaman çizelgesinde reddi gösterir.
+- **CI:** `Web E2E` iş akışı bu üç testi her PR'da koşar ([docs/ci.md](../../docs/ci.md)). Testler aynı vitest sürecinde
+  arka arkaya koşturulmaz: localnet fixture'ı validator'ı sabit portta açar.
+
+```bash
+pnpm turbo build --filter @squaresdk/solana-api... --filter @squaresdk/solana-web --filter @squaresdk/solana-prover
+SQUARE_LOCALNET=1 SQUARE_WEB_E2E=1 SQUARE_WEB_E2E_CHANNEL=chrome \
+  pnpm --filter @squaresdk/solana-api exec vitest run test/web-flow.e2e.test.ts
+```
+
 **Devnet uçtan uca (BE-22):** `test/devnet.e2e.test.ts` yalnızca ortamla çalışır; anahtarlar repoda tutulmaz.
 - **Ne kullanır:** Devnet'teki programlar ve escrow config'i. Indexer gerçek süreç olarak devnet'i indexler.
 - **Senaryo:** kanıt → `raise_dispute` → kuyruk → iki arbitrator'ın API'den aldığı oy tx'leri → üçüncü oyun reddi →

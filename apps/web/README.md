@@ -333,6 +333,14 @@ pnpm --filter @squaresdk/solana-web test       # vitest
 
 `dev` ve `start` için iki değişkeni ortamda verin ya da `apps/web/.env.local`'a yazın (`.env*` git'e girmez). `start`, PORT'u (varsayılan 3000) ve HOSTNAME'i ortamdan okur.
 
+**Arayüzden uçtan uca testler** `apps/api/test/` altındadır ve derlenmiş web'i gerçek bir tarayıcıda, localnet'teki
+gerçek programlara karşı koşar ([apps/api](../api/README.md#testler)):
+- `web-flow`: kendi cüzdanlarıyla 8 adım ve ret senaryosu (FE-13);
+- `web-dispute`: uyuşmazlık (FE-17);
+- `web-smart-account`: smart account'la sponsorlu 8 adım (FE-21).
+
+CI'da `Web E2E` iş akışı üçünü her PR'da koşar ([docs/ci.md](../../docs/ci.md)).
+
 ## Dağıtım: Railway
 
 Web, API ve worker'larla aynı Railway projesinde bir servis olarak çalışır ([ADR 0002](../../docs/decisions/0002-web-hosting-railway.md)).
