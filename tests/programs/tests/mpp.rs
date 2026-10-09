@@ -66,7 +66,11 @@ fn a_stripe_payment_settles_a_fiat_job() {
     };
     f.r.w.h.set_time(f.r.proof_time());
     let executed = f.verify(&job).expect("verify_mpp_payment_proof");
-    cu::within("verifier.verify_mpp_payment_proof", &executed, 300_000);
+    cu::within_profile(
+        "verifier.verify_mpp_payment_proof",
+        &executed,
+        "verifyMppPaymentProof",
+    );
     let amount = f.r.amount(FIAT);
     let proof = f.r.release_proof(&job);
     assert_eq!(
@@ -91,7 +95,11 @@ fn a_stripe_payment_settles_a_fiat_job() {
 
     // Challenge penceresi yok: kurumun ödemesi teslimin kabulüdür.
     let executed = f.finalize(&job).expect("finalize_fiat_payment");
-    cu::within("escrow.finalize_fiat_payment", &executed, 120_000);
+    cu::within_profile(
+        "escrow.finalize_fiat_payment",
+        &executed,
+        "finalizeFiatPayment",
+    );
     let state = f.r.w.job(&job);
     assert_eq!(state.status, JobStatus::Released);
     assert!(f.r.release_proof(&job).consumed);

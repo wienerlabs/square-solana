@@ -207,7 +207,7 @@ fn set_policy_stores_only_commitment_and_public_ceiling() {
     // Talimat verisi: discriminator + policy_id + commitment + tavan. Politikanın kendisi taşınmaz.
     assert_eq!(ix.data.len(), 8 + 32 + 32 + 8);
     let executed = w.send_owner(ix).unwrap();
-    cu::within("policy.set_policy", &executed, 40_000);
+    cu::within_profile("policy.set_policy", &executed, "setPolicy");
 
     let policy = w.policy_account(&POLICY_ID);
     assert_eq!(policy.institution, w.institution());
@@ -249,7 +249,7 @@ fn update_increments_version_each_time() {
         let executed = w
             .send_owner(w.update_policy_ix(owner, POLICY_ID, commitment, ceiling))
             .unwrap();
-        cu::within("policy.update_policy", &executed, 20_000);
+        cu::within_profile("policy.update_policy", &executed, "updatePolicy");
         let policy = w.policy_account(&POLICY_ID);
         assert_eq!(policy.version, version);
         assert_eq!(policy.commitment, commitment);
@@ -413,7 +413,7 @@ fn owner_publishes_buyer_root_and_proofs_verify_against_it() {
     let executed = w
         .send_owner(w.set_buyer_root_ix(owner, POLICY_ID, root))
         .unwrap();
-    cu::within("policy.set_buyer_root", &executed, 20_000);
+    cu::within_profile("policy.set_buyer_root", &executed, "setBuyerRoot");
     let policy = w.policy_account(&POLICY_ID);
     assert_eq!(policy.buyer_root, root);
     // Kök job snapshot'ına girmez; politika sürümü değişmez.

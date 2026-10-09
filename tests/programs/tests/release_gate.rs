@@ -64,10 +64,10 @@ fn a_compliant_fresh_proof_pays_the_agent_and_advances_the_counter() {
     let executed = r
         .finalize(&keeper, &job, settlement)
         .expect("finalize_payment");
-    cu::within(
+    cu::within_profile(
         "escrow.finalize_payment (uyumlu ispat, record_release CPI)",
         &executed,
-        150_000,
+        "finalizePayment",
     );
     let amount = r.amount("a");
     assert_eq!(p.net_amount, amount - fee(amount));

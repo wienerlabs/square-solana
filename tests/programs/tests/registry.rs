@@ -160,7 +160,7 @@ fn registered(h: &mut Harness, agent_id: &str) -> (Agent, Executed) {
 fn registers_an_agent_card_without_a_did_string() {
     let mut h = harness();
     let (agent, executed) = registered(&mut h, "alpha-1");
-    cu::within("registry.register_agent", &executed, 40_000);
+    cu::within_profile("registry.register_agent", &executed, "registerAgent");
 
     let record: AgentRecord = h.account(&agent.record).expect("AgentRecord");
     assert_eq!(record.creator, agent.owner.pubkey());

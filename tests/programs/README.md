@@ -37,6 +37,7 @@ LiteSVM testleri validator'ı kullanmaz. `.so` başka bir dizindeyse `SBF_OUT_DI
 | `token::create_usdc_mint`, `create_ata`, `create_token_account`, `mint_to`, `balance` | Settlement mint'i ve hesapları (ATA ve ATA olmayan token hesabı), SPL Token programının kendi instruction'larıyla |
 | `squads::SquadsMultisig` | Squads v4'e ait, `Multisig` discriminator'ıyla başlatılmış hesap ve vault PDA'sı (`square_common::squads`). `Harness::without_sigverify()` + `send_as(ixs, keypairs, pdas)` ile vault imzacı olur |
 | `cu::within(label, executed, budget)` | Compute unit'i `[cu] label: N / bütçe` olarak yazar, bütçe aşılırsa testi düşürür |
+| `cu::within_profile(label, executed, kind)` | Bütçe SDK işlem profilinden: `kind`'ın sınırının `1 − headroom` katı (`tx_budget.rs`'in kuralı). Test dünyalarının anahtarları rastgele olduğu için PDA bump araması ölçümü koşudan koşuya ~1 500 CU'luk adımlarla dağıtır; profili olan talimatların testleri bu bütçeyi kullanır. Profili olmayan talimatlarda bütçe aynı kuralla seçilir: 200 ölçümün en yükseğinin iki katı, 10 bine yukarı yuvarlanmış |
 | `v0_transaction(ixs, signers, tables)`, `send_transaction(tx)`, `create_lookup_table(addresses)`, `wire_size(tx)` | v0 işlemi (ALT'lı ya da ALT'sız), address lookup table'ı ALT programının talimatlarıyla kurmak, işlemin tel boyutu (`PACKET_DATA_SIZE` = 1232) (BC-28) |
 
 Squads programının kendisi ortamda yoktur. Square programları Squads'tan yalnızca multisig hesabının
