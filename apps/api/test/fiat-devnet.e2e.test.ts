@@ -29,7 +29,9 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Connection, Keypair, PublicKey } from '@solana/web3.js';
 import {
+  buildPreflightWitness,
   buildReleaseWitness,
+  buildSetPreflightProofTx,
   buildVerifyMppPaymentProofTx,
   createRemoteProver,
   derivePolicySalts,
@@ -181,7 +183,20 @@ describe.skipIf(!ENABLED)('devnet + Stripe test modu: fiat ödeme → MPP ispat�
     await stack?.close();
   });
 
-  /** Fiat iş: açılır, agent kabul eder ve teslim eder. */
+  /** Kurumun politikası (belge ve sır dosyalarından) ve uzak prover. */
+  function institutionPolicy() {
+    const document = PolicyDocumentSchema.parse(JSON.parse(readFileSync(env('POLICY_DOCUMENT')!, 'utf8')));
+    const secret = Uint8Array.from(Buffer.from(readFileSync(env('POLICY_SECRET')!, 'utf8').trim(), 'hex'));
+    const salts = derivePolicySalts(secret, Uint8Array.from(Buffer.from(document.policyId, 'hex')));
+    const prover = createRemoteProver({
+      baseUrl: env('PROVER_URL')!,
+      apiKey: env('PROVER_API_KEY')!,
+      artifactVersion: env('ARTIFACT_VERSION')!,
+    });
+    return { document, salts, prover, policy: new PublicKey(env('POLICY')!) };
+  }
+
+  /** Fiat iş: açılır, kurum kabul öncesi ön-ispatı bağlar (ADR 0028), agent kabul eder ve teslim eder. */
   async function deliveredFiatJob(label: string): Promise<PublicKey> {
     const { client } = stack;
     const created = await client.flow.createFiatJob(
@@ -197,6 +212,26 @@ describe.skipIf(!ENABLED)('devnet + Stripe test modu: fiat ödeme → MPP ispat�
     );
     const steps: Record<string, string> = {};
     steps['create_fiat_job'] = await send('create_fiat_job', created, [institution]);
+    const { document, salts, prover, policy } = institutionPolicy();
+    const preflight = await prover.prove(
+      await buildPreflightWitness({ client, job: created.job, policy: document, salts, paymentCategory: CATEGORY }),
+    );
+    const onChainPolicy = (await client.policy.fetch('policy', policy))!;
+    steps['set_preflight_proof'] = await send(
+      'set_preflight_proof',
+      await buildSetPreflightProofTx(
+        client,
+        {
+          authority: institution.keypair.publicKey,
+          institution: onChainPolicy.institution,
+          policy,
+          job: created.job,
+          proof: preflight,
+        },
+        { feePayer: feePayer.keypair.publicKey },
+      ),
+      [institution],
+    );
     steps['accept_job'] = await send(
       'accept_job',
       await client.flow.acceptJob(
@@ -225,9 +260,7 @@ describe.skipIf(!ENABLED)('devnet + Stripe test modu: fiat ödeme → MPP ispat�
   /** Attestation'la ispat → `verify_mpp_payment_proof` → `finalize_fiat_payment`; job `Released`. */
   async function bindAndFinalize(job: PublicKey, attestation: FiatAttestation) {
     const { client } = stack;
-    const document = PolicyDocumentSchema.parse(JSON.parse(readFileSync(env('POLICY_DOCUMENT')!, 'utf8')));
-    const secret = Uint8Array.from(Buffer.from(readFileSync(env('POLICY_SECRET')!, 'utf8').trim(), 'hex'));
-    const salts = derivePolicySalts(secret, Uint8Array.from(Buffer.from(document.policyId, 'hex')));
+    const { document, salts, prover, policy } = institutionPolicy();
     const witness = await buildReleaseWitness({
       client,
       job,
@@ -236,13 +269,7 @@ describe.skipIf(!ENABLED)('devnet + Stripe test modu: fiat ödeme → MPP ispat�
       paymentCategory: CATEGORY,
       stripeReceiptHash: BigInt(`0x${attestation.receiptHash}`),
     });
-    const prover = createRemoteProver({
-      baseUrl: env('PROVER_URL')!,
-      apiKey: env('PROVER_API_KEY')!,
-      artifactVersion: env('ARTIFACT_VERSION')!,
-    });
     const proof = await prover.prove(witness);
-    const policy = new PublicKey(env('POLICY')!);
     const onChainPolicy = (await client.policy.fetch('policy', policy))!;
     const steps = (record[job.toBase58()] as { steps: Record<string, string> }).steps;
     steps['verify_mpp_payment_proof'] = await send(

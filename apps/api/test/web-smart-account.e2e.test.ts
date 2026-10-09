@@ -345,6 +345,15 @@ describe.skipIf(!ENABLED)('localnet: smart account ile 8 adım arayüzden sponso
     const jobKey = (await jobs())[0]!.publicKey;
     await institution.getByRole('button', { name: 'Fund the job' }).click();
     await until('fonlama', UI_TIMEOUT_MS, async () => (await jobStatus(jobKey)) === 'funded');
+    // Kabul öncesi ön-ispat (ADR 0028): kurum iş sayfasında prover'la üretir ve vault'uyla bağlar; agent ancak
+    // sonra kabul eder.
+    await open(institution, `/app/jobs/${jobKey.toBase58()}`);
+    await institution.getByLabel('Payment category').selectOption(CATEGORY);
+    await institution.getByLabel('Prover API key').fill(PROVER_KEY);
+    await institution.getByRole('button', { name: 'Make the pre-acceptance proof' }).click();
+    await institution.getByRole('button', { name: 'Bind before acceptance' }).click();
+    const preflightProof = stack.client.pda.preflightProof(jobKey)[0];
+    await until('ön-ispat', UI_TIMEOUT_MS, () => stack.client.verifier.fetch('preflightProof', preflightProof));
 
     // 4–5. Agent kabul eder, teslimatı API'ye (vault adına) yükler ve teslim eder.
     await until('iş aynası', UI_TIMEOUT_MS, () => stack.db.job.findUnique({ where: { address: jobKey.toBase58() } }));
@@ -426,6 +435,7 @@ describe.skipIf(!ENABLED)('localnet: smart account ile 8 adım arayüzden sponso
       'vault>registry:register_agent',
       'vault>escrow:create_job',
       'vault>escrow:fund_job',
+      'vault>verifier:set_preflight_proof',
       'vault>escrow:accept_job',
       'vault>escrow:submit_work',
       'vault>escrow:list_claim',

@@ -53,7 +53,7 @@ P-02'nin belgeyle çelişen satırı program arayüzünde koda göre düzeltildi
 
 | ID | Önem | Program | Bulgu | Durum |
 |---|---|---|---|---|
-| [P-01](https://github.com/wienerlabs/square-solana/issues/236) | yüksek | escrow, verifier | Kalıcı ret sebeplerinin parametrelerini (tx tavanı, mint listesi, engelli adresler) kurum iş açılmadan önce, agent'tan gizli seçer. Teslimden sonra geçerli bir kesin ret bağlayıp neti geri alabilir; agent'ın zincirde başvurusu yok | Açık (tasarım; ADR gerekir) |
+| [P-01](https://github.com/wienerlabs/square-solana/issues/236) | yüksek | escrow, verifier | Kalıcı ret sebeplerinin parametrelerini (tx tavanı, mint listesi, engelli adresler) kurum iş açılmadan önce, agent'tan gizli seçer. Teslimden sonra geçerli bir kesin ret bağlayıp neti geri alabilir; agent'ın zincirde başvurusu yok | Düzeltildi: kabul öncesi ön-ispat ve public tavan ([ADR 0028](../decisions/0028-kabul-oncesi-on-ispat-ve-dispute-duzeltmeleri.md), program sözleşmesi v0.8.0); devnet'te Squads upgrade'iyle yürürlüğe girer |
 | [P-02](https://github.com/wienerlabs/square-solana/issues/237) | orta | policy, escrow | Multisig bağlandıktan sonra, bağlamadan önce açılmış işlerin kurum yetkisi açan anahtarda kalır: sızmış anahtar fonlanmış işi iptal edip iadeyi kendine alır | Açık; program arayüzü belgesi koda göre düzeltildi |
 | [P-03](https://github.com/wienerlabs/square-solana/issues/238) | orta | escrow | Alacak satışında satıcı, finalize'da keeper taranmaz: işaretli agent cüzdanı alacağını satıp fiyatı alır | Açık |
 | [P-04](https://github.com/wienerlabs/square-solana/issues/239) | orta | registry | Screening kaydında yazım sırası yok: eski bir `Clear` kararı yeni `Flagged` kaydının üstüne yazılıp ömrü yeniler | Açık |
@@ -155,6 +155,18 @@ kodunun beklenen hata olarak denetlenmesini sayar. Bu yüzden kritik bir kısıt
   - kesin retteki iadeyi agent'ın dispute açabileceği bir pencereye bağlamak.
 
   Karar bir ADR'dir. En azından agent'ın ve alıcının güven varsayımı belgelenmelidir.
+- **Durum: düzeltildi** ([ADR 0028](../decisions/0028-kabul-oncesi-on-ispat-ve-dispute-duzeltmeleri.md) madde 1
+  ve 2, program sözleşmesi v0.8.0):
+  - Verifier `set_preflight_proof`: kurum, agent kabul etmeden önce işin kendi koşullarıyla (net `job.amount`,
+    payee agent cüzdanı, sayaç 0) bir ispat bağlar. Ret kodunda kalıcı bit ya da günlük tavan biti varsa bağlanmaz.
+    Escrow `accept_job` policy'li işte (fiat dahil) bu `PreflightProof`'u ister. Ön-ispat bağlamadaki agent
+    cüzdanını saklar; cüzdan kabulden önce `sync_agent_wallet` ile taşınırsa kurum yeniden bağlar
+    (`preflight.rs::a_wallet_moved_after_the_preflight_needs_a_new_preflight`).
+  - `create_job` / `create_fiat_job` public günlük tavanı aşan tutarı reddeder.
+  - Commitment iş açılışında sabit olduğu için aynı iş, net ve payee için kalıcı bitler değişmez. Kesin ret yalnızca
+    alacak, politikanın gizli engelli listesindeki bir alıcıya satılınca çıkabilir; bu alıcının kendi riskidir
+    (alıcı listesi kurumun, engelli listesi gizli). `release_gate.rs::a_final_refusal_refunds_the_net_to_the_institution`
+    artık bu yolu çalıştırır; iş "c"nin senaryosu `preflight.rs`'te kabulden önce durur.
 
 ### P-02: Multisig'e geçişte açık işlerin yetkisi açan anahtarda kalır (orta)
 
@@ -428,5 +440,5 @@ Sonuç devnet kaydına yazılır.
 
 - Açık bulguların düzeltmeleri. Her biri program kodunu ve çoğu sözleşmeyi değiştirir, devnet'te Squads upgrade'i
   ister.
-- P-01 ve P-04 önce karar ister (ADR).
+- P-04 önce karar ister (ADR). P-01'in kararı ADR 0028'dir ve düzeltildi.
 - Dış audit: firma ve kapsam BC-40 (#96), yürütme BC-41 (#97). Paket: [audit-package.md](audit-package.md).

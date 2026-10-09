@@ -1,5 +1,5 @@
-// Smoke varyantı: fiat rayı (BC-37, ADR 0024). Kurum vault'suz bir iş açar, agent açıkken kabul eder ve teslim
-// eder; ödeme zincir dışındadır. MPP authority'nin attestation'ı (Ed25519 precompile) ve release devresinin
+// Smoke varyantı: fiat rayı (BC-37, ADR 0024). Kurum vault'suz bir iş açar ve kabul öncesi ön-ispatı bağlar
+// (ADR 0028); agent açıkken kabul eder ve teslim eder; ödeme zincir dışındadır. MPP authority'nin attestation'ı (Ed25519 precompile) ve release devresinin
 // ispatı (`stripe_receipt_hash` ≠ 0) `verify_mpp_payment_proof` ile işe bağlanır; `finalize_fiat_payment` işi
 // `Released` yapar, günlük sayaç, itibar ve validation kaydı USDC yolundaki gibi yazılır, token hareket etmez.
 //
@@ -49,6 +49,8 @@ export interface FiatDeps {
     expectError?: string,
   ): Promise<{ record: TxRecord; built: T }>;
   check(ok: boolean, text: string): void;
+  /** Kurumun kabul öncesi ön-ispatı (`setPreflightProof`, ADR 0028): üretir, bağlar ve doğrular. */
+  preflight(job: PublicKey): Promise<void>;
   recordProof(job: PublicKey, verdict: string, refusalCode: number, provingMs: number): void;
   units(value: bigint): string;
   /** Sahibinin settlement mint bakiyesi (ATA'sı yoksa 0). */
@@ -113,6 +115,7 @@ export async function runFiatVariant(d: FiatDeps): Promise<void> {
       (await connection.getAccountInfo(pda.vault(job)[0])) === null,
     `fiat iş ${job.toBase58()} açıldı: ray \`Fiat\`, \`Open\`, vault yok`,
   );
+  await d.preflight(job);
 
   // Adım 4: agent açık işi kabul eder ve teslim eder.
   const delivery = `square-smoke ${d.runId} fiat: teslim`;

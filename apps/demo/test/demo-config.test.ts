@@ -13,7 +13,17 @@ import {
   requireSeed,
   selectScenarios,
 } from '../src/demo-config.js';
-import { address, rawAgentConfig, rawDemoConfig, scenario, tempDir, TIMING, USDC_DEVNET } from './helpers.js';
+import {
+  address,
+  policy,
+  rawAgentConfig,
+  rawDemoConfig,
+  refusedScenario,
+  scenario,
+  tempDir,
+  TIMING,
+  USDC_DEVNET,
+} from './helpers.js';
 
 const parse = (raw: unknown) => parseDemoConfig(raw, '/srv/demo', {});
 
@@ -35,7 +45,8 @@ describe('parseDemoConfig', () => {
     const seed = requireSeed(config);
     expect(seed.policySecret).toBe('/srv/demo/state/policy-secret');
     expect(seed.output).toBe('/srv/demo/state/seed-devnet.json');
-    expect(seed.policies.strict!.maxPerTx).toBe(1_000_000n);
+    expect(seed.policies['blocked-buyer']!.blockedPayees).toEqual(['buyer']);
+    expect(seed.policies.standard!.blockedPayees).toEqual([]);
     expect(seed.funding.agentLamports).toBe(100_000_000n);
     expect(seed.extraBuyers).toEqual([]);
     const demo = requireDemo(config);
@@ -50,7 +61,7 @@ describe('parseDemoConfig', () => {
     expect(seed.policies.standard!.timeWindow).toMatchObject({ startHourUtc: 0, endHourUtc: 23 });
     expect(demo.scenarios.approved).toMatchObject({ claimSale: false, amount: 5_000_000n });
     expect(demo.scenarios.approved!.report.signatures).toBe(5);
-    expect(demo.scenarios.refused!.refusalRules).toEqual(['perTx']);
+    expect(demo.scenarios.refused).toMatchObject({ claimSale: true, refusalRules: ['payeeBlocked'] });
     expect(demo.agent.institutions).toEqual([]);
     expect(demo.agent.wallet).toBeUndefined();
   });
@@ -94,7 +105,7 @@ describe('parseDemoConfig', () => {
 
   it('seed olmadan senaryonun politikası denetlenmez', () => {
     const { seed: _seed, ...withoutSeed } = rawDemoConfig();
-    expect(requireDemo(parse(withoutSeed)).scenarios.refused!.policy).toBe('strict');
+    expect(requireDemo(parse(withoutSeed)).scenarios.refused!.policy).toBe('blocked-buyer');
   });
 
   it.each([
@@ -108,10 +119,26 @@ describe('parseDemoConfig', () => {
       }),
       /autoListClaimBps/,
     ],
+    ['satışsız ret senaryosu', withScenarios({ a: refusedScenario({ claimSale: false }) }), /alacak satılır/],
     [
-      'ret senaryosunda satış',
-      withScenarios({ a: scenario({ expect: 'refused', claimSale: true }) }),
-      /ret senaryosunda/,
+      'alıcıyı engellemeyen politikada ret',
+      withScenarios({ a: refusedScenario({ policy: 'standard' }) }),
+      /standard alıcıyı engellemiyor/,
+    ],
+    [
+      'alıcıyı engelleyen politikada satışlı onay',
+      withScenarios({ a: scenario({ policy: 'blocked-buyer', claimSale: true }) }),
+      /blocked-buyer alıcıyı engelliyor/,
+    ],
+    [
+      'payeeBlocked içermeyen ret',
+      withScenarios({ a: refusedScenario({ refusalRules: ['dailyPrivate'] }) }),
+      /payeeBlocked içerir/,
+    ],
+    [
+      'ön-ispattan geçmiş işte çıkamayan ret kuralı',
+      withScenarios({ a: refusedScenario({ refusalRules: ['payeeBlocked', 'perTx'] }) }),
+      /perTx ve mintNotAllowed/,
     ],
     ['deadline challenge süresinden kısa', withScenarios({ a: scenario({ deadlineSecs: 60 }) }), /deadline/],
     ['bilinmeyen hedef', withScenarios({ a: scenario({ report: { targets: ['treasury'] } }) }), /rol/],
@@ -141,21 +168,27 @@ describe('parseDemoConfig', () => {
     ['RPC sınırını aşan imza sayısı', rawDemoConfig({ agent: { maxReportSignatures: 1_001 } }), /maxReportSignatures/],
     ['sıfır yoklama aralığı', rawDemoConfig({ demo: { timing: { ...TIMING, pollIntervalMs: 0 } } }), /pollIntervalMs/],
     ['senaryosuz demo', withScenarios({}), /en az bir senaryo/],
-    [
-      'ret kuralsız ret senaryosu',
-      withScenarios({ a: scenario({ policy: 'strict', expect: 'refused' }) }),
-      /refusalRules/,
-    ],
+    ['ret kuralsız ret senaryosu', withScenarios({ a: refusedScenario({ refusalRules: undefined }) }), /refusalRules/],
     ['ret kurallı onay senaryosu', withScenarios({ a: scenario({ refusalRules: ['perTx'] }) }), /refusalRules/],
-    [
-      'bilinmeyen ret kuralı',
-      withScenarios({ a: scenario({ policy: 'strict', expect: 'refused', refusalRules: ['tooBig'] }) }),
-      /refusalRules/,
-    ],
+    ['bilinmeyen ret kuralı', withScenarios({ a: refusedScenario({ refusalRules: ['tooBig'] }) }), /refusalRules/],
     [
       'tekrar eden ret kuralı',
-      withScenarios({ a: scenario({ policy: 'strict', expect: 'refused', refusalRules: ['perTx', 'perTx'] }) }),
+      withScenarios({ a: refusedScenario({ refusalRules: ['payeeBlocked', 'payeeBlocked'] }) }),
       /ret kuralı tekrar/,
+    ],
+    [
+      'tekrar eden engelli payee',
+      rawDemoConfig({
+        seed: { policies: { standard: policy(), 'blocked-buyer': policy({ blockedPayees: ['buyer', 'buyer'] }) } },
+      }),
+      /engelli payee tekrar/,
+    ],
+    [
+      'rol ya da adres olmayan engelli payee',
+      rawDemoConfig({
+        seed: { policies: { standard: policy(), 'blocked-buyer': policy({ blockedPayees: ['agent'] }) } },
+      }),
+      /blockedPayees/,
     ],
     [
       'tekrar eden kurum',

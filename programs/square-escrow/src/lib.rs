@@ -3,6 +3,7 @@
 //! BC-26: permissionless finalize, keeper ücreti, ispat kapısı, itibar ve validation kaydı. BC-25: alacak
 //! piyasası ve alıcı uygunluğu. BC-34: Travel Rule commitment'ı. BC-32: M-of-N arbitration. BC-33:
 //! dispute zaman aşımı ve ispatsız bekleme başvurusu (ADR 0016). BC-37: Stripe MPP fiat rayı (ADR 0024).
+//! P-01: kabul öncesi uyum ön-ispatı ve açılışta public tavan (ADR 0028).
 //!
 //!   Open (-(commit_travel_rule)) -(fund_job)-> Funded -(accept_job)-> Accepted -(submit_work)-> Delivered
 //!   Delivered -(finalize_payment)-> Released | Refunded
@@ -14,6 +15,9 @@
 //!   Fiat rayı (BC-37, ADR 0024): Open -(accept_job)-> Accepted -(submit_work)-> Delivered
 //!   Delivered -(verifier verify_mpp_payment_proof, finalize_fiat_payment)-> Released
 //!   Open | Accepted (deadline sonrası) -(cancel_fiat_job)-> Cancelled
+//!
+//!   Policy'li işte `accept_job` verifier'ın `PreflightProof`'unu ister (`set_preflight_proof`, ADR 0028); iş
+//!   açılırken tutar policy'nin public tavanını aşamaz.
 //!
 //!   Alacak (Delivered iş): -(list_claim)-> Listed -(buy_claim)-> Bought
 //!   Listed -(cancel_claim)-> kapanır; finalize: Listed | Bought -> Settled (ödeme) | Defaulted (iade)
@@ -63,9 +67,10 @@ pub mod square_escrow {
     use super::*;
 
     /// The job's agent wallet accepts a funded job (a fiat job while Open); the agent record must be
-    /// Active. `spec_hash`
-    /// guards against a swapped spec.
-    pub fn accept_job(ctx: Context<AgentJob>, spec_hash: [u8; 32]) -> Result<()> {
+    /// Active. On a policy job the institution's `PreflightProof` (verifier `set_preflight_proof`,
+    /// ADR 0028) must be bound to this job, its policy snapshot and its current agent wallet (bound
+    /// again after `sync_agent_wallet`). `spec_hash` guards against a swapped spec.
+    pub fn accept_job(ctx: Context<AcceptJob>, spec_hash: [u8; 32]) -> Result<()> {
         instructions::accept_job::handler(ctx, spec_hash)
     }
 

@@ -33,12 +33,17 @@ const WINDOW = {
   startHourUtc: 9,
   endHourUtc: 17,
 };
-const values = (maxPerTx: bigint, timeWindow: typeof WINDOW | null = WINDOW) => ({
+const values = (
+  maxPerTx: bigint,
+  timeWindow: typeof WINDOW | null = WINDOW,
+  blockedPayees: ('buyer' | PublicKey)[] = [],
+) => ({
   maxPerTx,
   maxDaily: 100_000_000n,
   dailyCeiling: 200_000_000n,
   categories: ['research'],
   timeWindow,
+  blockedPayees,
 });
 
 describe('politika sırrı', () => {
@@ -90,20 +95,21 @@ describe('politikalar ve alıcı listesi', () => {
   const secret = new Uint8Array(32).fill(7);
   const institutionPda = key();
   const mint = key();
+  const buyer = key();
 
   it("politika kimliği adından türer, salt'lar ve commitment sırdan; aynı girdi aynı sonucu verir", () => {
     expect(demoPolicyId('standard')).toEqual(demoPolicyId('standard'));
     expect(demoPolicyId('standard')).not.toEqual(demoPolicyId('strict'));
     const policies = { standard: values(10_000_000n), strict: values(1n) };
-    const first = demoPolicies({ secret, institutionPda, mint, pda, policies });
-    const second = demoPolicies({ secret, institutionPda, mint, pda, policies });
+    const first = demoPolicies({ secret, institutionPda, mint, buyer, pda, policies });
+    const second = demoPolicies({ secret, institutionPda, mint, buyer, pda, policies });
     expect(first.map((p) => p.name)).toEqual(['standard', 'strict']);
     expect(first.map((p) => Buffer.from(p.commitment).toString('hex'))).toEqual(
       second.map((p) => Buffer.from(p.commitment).toString('hex')),
     );
     expect(first[0]!.commitment).not.toEqual(first[1]!.commitment);
     expect(first[0]!.address.equals(pda.policy(institutionPda, demoPolicyId('standard'))[0])).toBe(true);
-    const other = demoPolicies({ secret: new Uint8Array(32).fill(8), institutionPda, mint, pda, policies });
+    const other = demoPolicies({ secret: new Uint8Array(32).fill(8), institutionPda, mint, buyer, pda, policies });
     expect(other[0]!.commitment).not.toEqual(first[0]!.commitment);
   });
 
@@ -112,6 +118,7 @@ describe('politikalar ve alıcı listesi', () => {
       institutionPda,
       policyId: demoPolicyId('standard'),
       mint,
+      buyer,
       values: values(5n),
       version: 3,
     });
@@ -128,10 +135,43 @@ describe('politikalar ve alıcı listesi', () => {
       institutionPda,
       policyId: demoPolicyId('standard'),
       mint,
+      buyer,
       values: values(5n, null),
       version: 1,
     });
     expect(always.timeWindow).toBeNull();
+  });
+
+  it("engelli payee listesinde `buyer` seed'in alıcısına çözülür, adres olduğu gibi kalır; commitment'a girer", () => {
+    const other = key();
+    const document = demoPolicyDocument({
+      institutionPda,
+      policyId: demoPolicyId('blocked-buyer'),
+      mint,
+      buyer,
+      values: values(5n, WINDOW, ['buyer', other]),
+      version: 1,
+    });
+    expect(document.blockedPayees).toEqual([buyer.toBase58(), other.toBase58()]);
+    const [open, blocking] = demoPolicies({
+      secret,
+      institutionPda,
+      mint,
+      buyer,
+      pda,
+      policies: { open: values(5n), blocking: values(5n, WINDOW, ['buyer']) },
+    });
+    const [blockingOtherBuyer] = demoPolicies({
+      secret,
+      institutionPda,
+      mint,
+      buyer: key(),
+      pda,
+      policies: { blocking: values(5n, WINDOW, ['buyer']) },
+    });
+    expect(blocking!.document.blockedPayees).toEqual([buyer.toBase58()]);
+    expect(open!.document.blockedPayees).toEqual([]);
+    expect(blockingOtherBuyer!.commitment).not.toEqual(blocking!.commitment);
   });
 
   it("alıcı yaprak salt'ı sırdan türer: kök tekrar kurulumda aynı, kanıt kökle doğrulanır", () => {

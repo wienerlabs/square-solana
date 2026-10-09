@@ -253,6 +253,17 @@ Adım 7: ispatı üretir (uzak prover) ve job'a bağlar (imzacı kurumun yetkili
 | `--secret <yol>` | politika sırrı |
 | `--category <ad>` | ödeme kategorisi (politikanın izin verdiği) |
 
+#### `squaresdk-solana proof preflight`
+
+Kabul öncesi ön-ispatı üretir (uzak prover) ve job'a bağlar; policy'li işte agent bundan sonra kabul eder (ADR 0028).
+
+| Seçenek | Açıklama |
+|---|---|
+| `--job <adres>` | politikaya bağlı, açık ya da fonlanmış job |
+| `--policy <yol>` | politika belgesi |
+| `--secret <yol>` | politika sırrı |
+| `--category <ad>` | ödeme kategorisi (politikanın izin verdiği) |
+
 ### dispute
 
 #### `squaresdk-solana dispute raise`

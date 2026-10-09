@@ -64,8 +64,8 @@ Eight steps take a job from mandate to payout ([protocol](docs/protocol.md),
 |---|---|---|---|
 | 1 | Institution | Opens its account and commits a spending policy and a public daily ceiling. | `init_institution`, `set_policy` |
 | 2 | Agent | Registers; the record resolves as a `did:aip` identifier with the hash of its agent card. | `register_agent` |
-| 3 | Screener, institution | Wallets are screened. The institution creates the job for the agent and funds it, committing Travel Rule data first when the amount requires it. | `record_screening`, `create_job`, `commit_travel_rule`, `fund_job` |
-| 4 | Agent | Accepts, delivers (SHA-256 and URI of the work) and opens the challenge window. | `accept_job`, `submit_work` |
+| 3 | Screener, institution | Wallets are screened. The institution creates the job for the agent and funds it, committing Travel Rule data first when the amount requires it. On a policy job its software then binds a pre-acceptance proof that the job itself (the full amount, paid to the agent's wallet) breaks none of the mandate's standing rules ([ADR 0028](docs/decisions/0028-kabul-oncesi-on-ispat-ve-dispute-duzeltmeleri.md)). | `record_screening`, `create_job`, `commit_travel_rule`, `fund_job`, `set_preflight_proof` |
+| 4 | Agent | Accepts, delivers (SHA-256 and URI of the work) and opens the challenge window. On a policy job acceptance fails with `PreflightRequired` until the pre-acceptance proof for the agent's current wallet is bound. | `accept_job`, `submit_work` |
 | 5 | Agent, buyer | The agent may sell the receivable; the buyer must be on the institution's allow list and screened clear. | `list_claim`, `buy_claim` |
 | 6 | Keeper | After the challenge window anyone can finalize and earn the keeper fee. On a policy job without a proof the release fails with `ProofRequired` and escrow waits; a final refusal refunds the institution. | `finalize_payment` |
 | 7 | Institution's software | On a policy job, binds a Groth16 proof that the payment complies with the mandate, before finalize. | `set_compliance_proof` |
@@ -113,7 +113,7 @@ flowchart TB
   I -- create + fund job --> ESC
   A -- accept + submit --> ESC
   B[Buyer] -- buy claim + Merkle proof --> ESC
-  I -- compliance proof --> VER
+  I -- pre-acceptance + compliance proofs --> VER
   KEEP -- finalize --> ESC
   ESC -. reads .-> REG & POL & VER
   VER -. reads .-> POL
@@ -181,7 +181,8 @@ Square runs on **Solana devnet** ([deploy record](docs/deploy/devnet.md)).
 - The eight-step smoke test has run on devnet with real transactions ([report](docs/deploy/smoke-devnet.md)).
 - There is no mainnet environment ([ADR 0027](docs/decisions/0027-yalnizca-devnet.md)); network-independent code
   (CAIP-2, `did:aip`, cluster options) is kept.
-- Contracts: program interface v0.7.1, HTTP API v0.26.1 ([API and SDK contract](docs/design/api-sdk-contract.md)).
+- Contracts: [program interface](docs/design/program-interface.md) and [API and SDK contract](docs/design/api-sdk-contract.md);
+  the current version is in each document's header.
 
 ## Quick start
 

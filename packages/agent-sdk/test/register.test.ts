@@ -64,8 +64,63 @@ describe('register', () => {
     expect(agent.cardHash).not.toBe(first.agent.cardHash);
     const result = await agent.register();
     expect(result.status).toBe('updated');
+    // Cüzdan değişmedi: açık işler listelenmez.
+    expect(result.openPolicyJobs).toEqual([]);
     expect(first.sim.sent.map((ix) => ix.name)).toEqual(['registerAgent', 'updateAgent']);
     expect(hex(first.sim.agentRecord(agent.agentRecord)!.agentCardHash)).toBe(agent.cardHash);
+  });
+
+  it('cüzdan değişince update_agent; kapanmamış policy’li işler bildirilir (ADR 0028)', async () => {
+    const owner = Keypair.generate();
+    const first = await setup({ owner: owner.publicKey });
+    await first.agent.register({ owner });
+    const { agentRecord } = first.agent;
+    const open = Keypair.generate().publicKey;
+    const settled = Keypair.generate().publicKey;
+    const policyless = Keypair.generate().publicKey;
+    for (const [address, status, policy] of [
+      [open, 'funded', Keypair.generate().publicKey],
+      [settled, 'released', Keypair.generate().publicKey],
+      [policyless, 'funded', null],
+    ] as const) {
+      await first.sim.setJob(address, {
+        ...(policy ? { policy } : {}),
+        institution: Keypair.generate().publicKey,
+        agentRecord,
+        agentWallet: first.signer.publicKey,
+        amount: 4_000_000n,
+        specHash: '00'.repeat(32),
+        status,
+        deadline: Math.floor(Date.now() / 1000) + 600,
+      });
+    }
+    // Başka bir kaydın işi listeye girmez.
+    await first.sim.setJob(Keypair.generate().publicKey, {
+      policy: Keypair.generate().publicKey,
+      institution: Keypair.generate().publicKey,
+      agentRecord: Keypair.generate().publicKey,
+      agentWallet: first.signer.publicKey,
+      amount: 4_000_000n,
+      specHash: '00'.repeat(32),
+      status: 'funded',
+      deadline: Math.floor(Date.now() / 1000) + 600,
+    });
+
+    const logs: string[] = [];
+    const { agent } = await setup(
+      { owner: owner.publicKey, logger: { info: (line) => logs.push(line), error: () => {} } },
+      first.sim,
+      first.api,
+    );
+    const result = await agent.register({ owner });
+    expect(result.status).toBe('updated');
+    expect(result.openPolicyJobs.map((job) => job.toBase58())).toEqual([open.toBase58()]);
+    expect(logs.join('\n')).toContain(open.toBase58());
+    expect(logs.join('\n')).toContain('ADR 0028');
+
+    // Değişiklik yoksa tx de liste de yok.
+    const again = await agent.register({ owner });
+    expect(again).toMatchObject({ status: 'unchanged', signature: null, openPolicyJobs: [] });
   });
 
   it('API barındırması: putAgentCard agentId ile çağrılır, zincire API adresi yazılır', async () => {

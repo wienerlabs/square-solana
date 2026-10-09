@@ -17,8 +17,9 @@ export type SquareEscrowContract = {
       "name": "acceptJob",
       "docs": [
         "The job's agent wallet accepts a funded job (a fiat job while Open); the agent record must be",
-        "Active. `spec_hash`",
-        "guards against a swapped spec."
+        "Active. On a policy job the institution's `PreflightProof` (verifier `set_preflight_proof`,",
+        "ADR 0028) must be bound to this job, its policy snapshot and its current agent wallet (bound",
+        "again after `sync_agent_wallet`). `spec_hash` guards against a swapped spec."
       ],
       "discriminator": [
         43,
@@ -67,11 +68,69 @@ export type SquareEscrowContract = {
         {
           "name": "agentRecord",
           "docs": [
-            "`accept_job` requires status Active."
+            "must be Active."
           ],
           "relations": [
             "job"
           ]
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "preflightProof",
+          "docs": [
+            "job (ADR 0028): bound to this job, its policy snapshot and its current agent wallet. Not read on a",
+            "job without a policy."
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  101,
+                  102,
+                  108,
+                  105,
+                  103,
+                  104,
+                  116,
+                  95,
+                  112,
+                  114,
+                  111,
+                  111,
+                  102
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "job"
+              }
+            ],
+            "program": {
+              "kind": "account",
+              "path": "config.verifierProgram",
+              "account": "escrowConfig"
+            }
+          }
         }
       ],
       "args": [
@@ -3413,6 +3472,16 @@ export type SquareEscrowContract = {
       "code": 6049,
       "name": "railMismatch",
       "msg": "Instruction does not apply to the job's settlement rail"
+    },
+    {
+      "code": 6050,
+      "name": "preflightRequired",
+      "msg": "Policy job: the institution must bind a preflight proof before the agent accepts"
+    },
+    {
+      "code": 6051,
+      "name": "amountAboveDailyCeiling",
+      "msg": "Job amount is above the policy's public daily ceiling"
     }
   ],
   "types": [

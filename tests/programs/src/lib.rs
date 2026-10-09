@@ -315,6 +315,21 @@ impl Harness {
             .expect("hesap yazılamadı");
     }
 
+    /// `owner` programına ait, verisi `data` olan rent'ten muaf hesap (başka bir programın yazdığı durumun yerine).
+    pub fn set_program_account(&mut self, address: Pubkey, owner: Pubkey, data: Vec<u8>) {
+        let lamports = self.svm.minimum_balance_for_rent_exemption(data.len());
+        self.set_account(
+            address,
+            Account {
+                lamports,
+                data,
+                owner,
+                executable: false,
+                rent_epoch: 0,
+            },
+        );
+    }
+
     pub fn lamports(&self, address: &Pubkey) -> u64 {
         self.svm.get_balance(address).unwrap_or(0)
     }

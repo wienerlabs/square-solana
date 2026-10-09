@@ -26,6 +26,7 @@ pub mod sync_agent_wallet;
 pub mod update_arbitrators;
 pub mod update_params;
 
+pub use accept_job::*;
 pub use agent_job::*;
 pub use buy_claim::*;
 pub use cancel_claim::*;

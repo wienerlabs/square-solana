@@ -23,6 +23,15 @@ export const PERMANENT_REFUSALS = REFUSAL.perTx | REFUSAL.mintNotAllowed | REFUS
 /** Günlük tavanlar: sayaç 0 iken kesin, değilse gece yarısı sayaç sıfırlanınca geçebilir. */
 export const DAILY_REFUSALS = REFUSAL.dailyPrivate | REFUSAL.dailyCeiling;
 
+/**
+ * Kabul öncesi ön-ispatı reddeden bitler (ADR 0028): ön-ispat sayaç 0 ile kurulur, bu yüzden günlük tavan bitleri de
+ * kesindir. Zaman penceresi ve kategori geçicidir, ön-ispatı engellemez.
+ */
+export const PREFLIGHT_BLOCKING = PERMANENT_REFUSALS | DAILY_REFUSALS;
+
+/** Kabul öncesi ön-ispat kabul edilir mi (`preflight_accepts`): ret kodunda kalıcı bit ve günlük tavan biti yok. */
+export const preflightAccepts = (refusalCode: number): boolean => (refusalCode & PREFLIGHT_BLOCKING) === 0;
+
 /** Ret kodunun çiğnenen kuralları, bit sırasıyla. */
 export function refusalRules(refusalCode: number): RefusalRule[] {
   return (Object.keys(REFUSAL) as RefusalRule[]).filter((rule) => (refusalCode & REFUSAL[rule]) !== 0);

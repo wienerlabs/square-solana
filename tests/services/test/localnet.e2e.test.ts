@@ -40,6 +40,7 @@ const RUN_EVENTS = [
   'jobfunded',
   'mpppaymentverified',
   'policycommitted',
+  'preflightproofset',
   'releaserecorded',
   'releaserefused',
   'releaseverified',
@@ -104,17 +105,23 @@ describe.skipIf(!ENABLED)('localnet: 8 adım servisler üzerinden (BE-36)', () =
       },
     });
     for (const proof of report.proofs) jobs.set(proof.section, new PublicKey(proof.job));
-    expect(Object.fromEntries(report.proofs.map((proof) => [proof.section, proof.verdict]))).toEqual({
-      akış: 'compliant',
-      'ispat-ret': 'refused',
-      'ispat-yok': 'compliant',
-      fiat: 'compliant',
+    // Her bölümde önce kabul öncesi ön-ispat (ADR 0028), sonra release ispatı.
+    const verdicts = (section: Section) =>
+      report.proofs.filter((proof) => proof.section === section).map((proof) => proof.verdict);
+    expect(
+      Object.fromEntries((['akış', 'ispat-ret', 'ispat-yok', 'fiat'] as const).map((s) => [s, verdicts(s)])),
+    ).toEqual({
+      akış: ['ön-ispat', 'compliant'],
+      'ispat-ret': ['ön-ispat', 'refused'],
+      'ispat-yok': ['ön-ispat', 'compliant'],
+      fiat: ['ön-ispat', 'compliant'],
     });
     expect(new Set(report.checks.map((check) => check.section))).toEqual(
       new Set(['akış', 'ispat-ret', 'ispat-yok', 'fiat']),
     );
     const prover = await metrics(world.service('prover').metricsUrl);
-    expect(metricSum(prover, 'prover_proofs_total', { result: 'ok' })).toBe(1);
+    // ispat-yok bölümünün iki ispatı (ön-ispat ve release) API ve prover servisinden.
+    expect(metricSum(prover, 'prover_proofs_total', { result: 'ok' })).toBe(2);
   }, 1_200_000);
 
   it('screener işaretli tarafı zincire yazar; o tarafın işi fonlanamaz (ScreeningFlagged)', async () => {
@@ -228,6 +235,7 @@ describe.skipIf(!ENABLED)('localnet: 8 adım servisler üzerinden (BE-36)', () =
     expect(main.releaseProof?.consumed).toBe(true);
     const refused = await view('ispat-ret');
     expect(refused.account.status).toBe('refunded');
+    expect(refused.claim?.status).toBe('defaulted');
     expect(refused.validation?.outcome).toBe('refused');
     const waiting = await view('ispat-yok');
     expect(waiting.account.status).toBe('released');

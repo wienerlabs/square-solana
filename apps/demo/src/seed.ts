@@ -188,7 +188,14 @@ export async function runSeed(context: Context, config: DemoConfig, options: See
     options.rotatePolicySecret === true || noDemoPolicyOnChain || policySecretExists(values.policySecret);
   const { secret, created: secretCreated } = loadOrCreatePolicySecret(values.policySecret, { allowCreate });
   if (secretCreated) context.log(`  politika sırrı üretildi: ${values.policySecret} (0600)`);
-  const policies = demoPolicies({ secret, institutionPda, mint, pda, policies: values.policies });
+  const policies = demoPolicies({
+    secret,
+    institutionPda,
+    mint,
+    buyer: key.buyer.publicKey,
+    pda,
+    policies: values.policies,
+  });
   const buyers = [key.buyer.publicKey, ...values.extraBuyers];
   const tree = demoBuyerTree(secret, buyers);
 
