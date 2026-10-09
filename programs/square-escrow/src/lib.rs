@@ -221,8 +221,10 @@ pub mod square_escrow {
         instructions::raise_dispute::handler(ctx, reason_hash, bond)
     }
 
-    /// One arbitrator vote. The first vote sets the pending resolution, later votes must match it;
-    /// reaching the threshold moves the job to `Resolved` (`DisputeDecided`). No funds move here.
+    /// One arbitrator vote. The first vote opens a proposal; the same resolution approves it, a
+    /// different one rejects it (`DisputeVoteRejected`). When rejections make the threshold
+    /// unreachable the proposal is reset and the next vote opens a new one (ADR 0028). Reaching the
+    /// threshold moves the job to `Resolved` (`DisputeDecided`). No funds move here.
     pub fn resolve_dispute(
         ctx: Context<ResolveDispute>,
         resolution: DisputeResolution,

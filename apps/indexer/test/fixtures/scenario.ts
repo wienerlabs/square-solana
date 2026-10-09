@@ -98,6 +98,7 @@ export async function buildScenario(world: World): Promise<Scenario> {
       ...jobBase,
       status: status('disputed'),
       dispute,
+      disputeRejectionMask: 0b010,
     }),
   );
   const noDispute = world.sample('escrow', 'disputeInfo', { raisedAt: new BN(0), resolution: status('pending') });

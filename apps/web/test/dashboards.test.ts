@@ -96,6 +96,7 @@ const job = (
       },
       deliveryUri: '',
       rail: 'escrow',
+      disputeRejectionMask: 0,
     },
     payee: wallet,
     claim: fields.claim ? claimListing(address, fields.claim.status, fields.claim.price, amount) : null,

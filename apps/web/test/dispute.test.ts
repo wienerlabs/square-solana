@@ -22,6 +22,7 @@ import {
   toAnchorResolution,
   voteBlock,
   voteChoices,
+  voteKind,
   voteTally,
   type DisputeParams,
 } from '@/lib/dispute';
@@ -43,12 +44,13 @@ const params = async (fields: { version?: number; threshold?: number } = {}): Pr
     }),
   );
 
-const disputed = (dispute: Parameters<typeof jobAccount>[0]['dispute'] = {}, status = 'disputed') =>
+const disputed = (dispute: Parameters<typeof jobAccount>[0]['dispute'] = {}, status = 'disputed', rejectionMask = 0) =>
   jobAccount({
     institution,
     agent_wallet: agent,
     mint,
     status,
+    dispute_rejection_mask: rejectionMask,
     dispute: { challenger: institution, bond: 12_500_000, raised_at: RAISED, deadline: DEADLINE, ...dispute },
   });
 
@@ -85,6 +87,10 @@ describe('resolution', () => {
     expect(resolutionOf({ FavorInstitution: {} })).toEqual({ kind: 'favorInstitution' });
     expect(resolutionOf({ split: { agentAmount: new BN(7) } })).toEqual({ kind: 'split', agentAmount: '7' });
     expect(resolutionOf({ Split: { agent_amount: new BN(9) } })).toEqual({ kind: 'split', agentAmount: '9' });
+    // Square API'nin event'leri (denetim sayfası) tip biçimiyle gelir.
+    expect(resolutionOf({ kind: 'favorAgent' })).toEqual({ kind: 'favorAgent' });
+    expect(resolutionOf({ kind: 'split', agentAmount: '11' })).toEqual({ kind: 'split', agentAmount: '11' });
+    expect(() => resolutionOf({ kind: 'unknown' })).toThrow();
     expect(() => resolutionOf({ Unknown: {} })).toThrow();
     const split = toAnchorResolution({ kind: 'split', agentAmount: '100' });
     expect(split.split?.agentAmount.toString()).toBe('100');
@@ -157,15 +163,38 @@ describe('dispute phase', () => {
 });
 
 describe('votes', () => {
-  it('counts the approvals towards M and fixes the decision after the first vote', async () => {
+  it('counts the approvals towards M; after the first vote a different decision rejects the proposal', async () => {
     const p = await params();
     const facts = disputeFacts(
       await disputed({ approval_mask: 0b001, approval_count: 1, resolution: { Split: { agent_amount: new BN(40) } } }),
     );
     const tally = voteTally(facts, p);
-    expect(tally).toMatchObject({ approvals: 1, threshold: 2, stale: false, voted: [true, false, false] });
-    expect(voteChoices(tally)).toEqual({ kind: 'fixed', resolution: { kind: 'split', agentAmount: '40' } });
-    expect(voteChoices(voteTally(disputeFacts(await disputed()), p))).toEqual({ kind: 'any' });
+    expect(tally).toMatchObject({
+      approvals: 1,
+      rejections: 0,
+      threshold: 2,
+      stale: false,
+      voted: [true, false, false],
+    });
+    const choices = voteChoices(tally);
+    expect(choices).toEqual({ kind: 'proposal', resolution: { kind: 'split', agentAmount: '40' } });
+    expect(voteKind(choices, { kind: 'split', agentAmount: '40' })).toBe('approve');
+    expect(voteKind(choices, { kind: 'split', agentAmount: '41' })).toBe('reject');
+    expect(voteKind(choices, { kind: 'favorInstitution' })).toBe('reject');
+    const open = voteChoices(voteTally(disputeFacts(await disputed()), p));
+    expect(open).toEqual({ kind: 'any' });
+    expect(voteKind(open, { kind: 'favorAgent' })).toBe('propose');
+  });
+
+  it('counts a rejection as a vote on the pending proposal (ADR 0028)', async () => {
+    const facts = disputeFacts(
+      await disputed({ approval_mask: 0b001, approval_count: 1, resolution: { FavorAgent: {} } }, 'disputed', 0b010),
+    );
+    expect(voteTally(facts, await params())).toMatchObject({
+      approvals: 1,
+      rejections: 1,
+      voted: [true, true, false],
+    });
   });
 
   it('drops the count of an older arbitrator set (ADR 0016 §2)', async () => {
@@ -308,6 +337,17 @@ describe('dispute events in the timeline', () => {
     expect(describe('DisputeVote', { arbitrator, resolution: { FavorAgent: {} }, approval_count: 1 })).toEqual({
       title: 'Arbitrator vote',
       detail: `${arbitrator.toBase58()}: In favor of the agent; 1 approval(s) in the count`,
+    });
+    expect(
+      describe('DisputeVoteRejected', {
+        arbitrator,
+        resolution: { FavorInstitution: {} },
+        rejection_count: 2,
+        proposal_reset: true,
+      }),
+    ).toEqual({
+      title: 'Arbitrator rejected the proposal',
+      detail: `${arbitrator.toBase58()}: In favor of the institution; 2 rejection(s), the proposal was dropped and the next vote opens a new one`,
     });
     expect(describe('DisputeDecided', { resolution: { Split: { agent_amount: new BN(5_000_000) } } })).toEqual({
       title: 'Dispute decided',

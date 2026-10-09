@@ -15,8 +15,8 @@ Event'lerin adları, alanları ve discriminator'ları sözleşme IDL'lerindedir 
 |---|---|---|
 | `square_registry` | 7 | [`square_registry_contract.json`](../../idl/square_registry_contract.json) |
 | `square_policy` | 6 | [`square_policy_contract.json`](../../idl/square_policy_contract.json) |
-| `square_verifier` | 4 | [`square_verifier_contract.json`](../../idl/square_verifier_contract.json) |
-| `square_escrow` | 23 | [`square_escrow_contract.json`](../../idl/square_escrow_contract.json) |
+| `square_verifier` | 5 | [`square_verifier_contract.json`](../../idl/square_verifier_contract.json) |
+| `square_escrow` | 25 | [`square_escrow_contract.json`](../../idl/square_escrow_contract.json) |
 
 Discriminator, Anchor'ın kuralıyla `sha256("event:<Ad>")`'ın ilk 8 baytıdır. Veri, discriminator'ın
 ardından alanların Borsh kodlamasıdır.

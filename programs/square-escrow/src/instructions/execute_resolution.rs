@@ -1,6 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token_interface::{Mint, TokenAccount, TokenInterface};
 use square_common::release::ReleaseFacts;
+use square_common::screening::ScreeningRejection;
 use square_common::seeds::{
     BOND_SEED, CLAIM_SEED, CONFIG_SEED, ESCROW_AUTHORITY_SEED, JOB_SEED, RELEASE_PROOF_SEED,
     REPUTATION_SEED, VALIDATION_SEED, VAULT_SEED, VERIFIER_CONFIG_SEED,
@@ -193,7 +194,7 @@ pub fn handler(ctx: Context<ExecuteResolution>) -> Result<()> {
     // Bond bir cezadır, kapıdan geçmez: FavorAgent'ta agent tarafına kesilir, diğer kararlarda kuruma
     // (bond'lu dispute'u yalnızca kurum açar) döner.
     let bond = job.dispute.bond;
-    let payout = Payout {
+    let mut payout = Payout {
         agent_side,
         refund: job.amount - agent_side,
         bond_to_agent_side: if slash_bond { bond } else { 0 },
@@ -208,13 +209,22 @@ pub fn handler(ctx: Context<ExecuteResolution>) -> Result<()> {
                 err!(EscrowError::AgentMismatch)
             };
         }
-        // Payee'nin kaydı temiz ve taze değilse ödeme bekler, iade yapılmaz (program arayüzü §8, 5).
-        linked::require_clear_screening(
+        // Payee'nin kaydı temiz ve taze değilse ödeme bekler (program arayüzü §8, 5). Agent tarafına escrow
+        // ödenmeyen kararda payee'ye giden tek şey bond'dur: payee `Flagged` ise ona ödeme yapılamaz, bond
+        // kuruma döner ve iade beklemez (ADR 0028 madde 3). Süresi dolmuş ya da hiç olmayan kayıt bekler.
+        match linked::payee_screening(
             &ctx.accounts.payee_screening,
             &ctx.accounts.config.registry_program,
             &payee,
             now,
-        )?;
+        ) {
+            None => {}
+            Some(ScreeningRejection::Flagged) if payout.agent_side == 0 => {
+                payout.bond_returned = bond;
+                payout.bond_to_agent_side = 0;
+            }
+            Some(rejection) => return Err(linked::screening_error(rejection)),
+        }
     }
 
     move_funds(ctx.accounts, &job, &payout)?;

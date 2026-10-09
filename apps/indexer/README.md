@@ -41,7 +41,7 @@ Square'in dört programının kesinleşmiş tx'lerinden event'leri ve ayna tablo
 |---|---|
 | Hesap zincirde var | Satır yazılır; `slot` durumun okunduğu slot'tur |
 | Hesap kapandı | `jobs` ve `claims`'te `closed_slot` yazılır, satır kalır. Aynı PDA yeniden açılırsa (yeni alacak listelemesi) satır yeniden açılır. Diğer tablolarda satır silinir |
-| Job'un dispute'u | `disputes`, `Job.dispute`'un izdüşümüdür; `raisedAt == 0` ise satır yoktur. Oy sayımı (`approvalMask`, `approvalCount`, `arbitratorSetVersion`), `decidedAt` ve `closedAt` da sütundur: arbitrator kuyruğu ve keeper'ın lapse crank'i bunlardan okur (BE-22); uzlaştırma hepsini karşılaştırır |
+| Job'un dispute'u | `disputes`, `Job.dispute`'un izdüşümüdür; `raisedAt == 0` ise satır yoktur. Oy sayımı (`approvalMask`, `rejectionMask` (`Job.dispute_rejection_mask`), `approvalCount`, `arbitratorSetVersion`), `decidedAt` ve `closedAt` da sütundur: arbitrator kuyruğu ve keeper'ın lapse crank'i bunlardan okur (BE-22); uzlaştırma hepsini karşılaştırır |
 | Sözleşme IDL'iyle çözülemeyen hesap | Ayna tabloya yazılmaz. `account_undecodable` uyarısı, `indexer_undecodable_accounts_total` metriği; uzlaştırmada sapmaya sayılmaz, `undecodable` olarak raporlanır. Örnek: devnet'te IDL'deki geçici adreslerde (BC-09) kaynak projelerin (Covenant, AIP, Aperture) dağıtımları duruyor; `Job` ve `AgentRecord` gibi aynı adlı hesapların discriminator'ı da aynı. |
 | Sözleşmede olmayan event | Hata. Tx yazılmaz, tarama o imzada durur, `indexer_errors` alarmı çalar. Yayımlanmış event değişmez (event şeması §4); bu durum indexer'ın IDL'inin programın gerisinde olduğunu gösterir. |
 
@@ -110,7 +110,7 @@ kendisi bekleyerek yeniden dener (bu bekleme web3.js'in kendi `console` satırı
 
 `pnpm --filter @squaresdk/solana-indexer test`. Veritabanı testleri Postgres konteyneri açar (Docker
 gerekir). Zincir, yerel bir JSON-RPC sunucusudur. Indexer bu sunucuyla gerçek web3.js istemcisiyle
-konuşur; hesaplar ve event logları IDL coder'ıyla kodlanmıştır. Sözleşmedeki 40 event tipi fixture
+konuşur; hesaplar ve event logları IDL coder'ıyla kodlanmıştır. Sözleşmedeki 43 event tipi fixture
 log'larla çözülüp yazılır.
 
 Gerçek programlarla uçtan uca deneme [`tests/services`](../../tests/services/)'tedir (BE-36, localnet):
