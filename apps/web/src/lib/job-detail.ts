@@ -180,6 +180,11 @@ export function describeJobEvent(
         title: 'Arbitrator vote',
         detail: `${str(d.arbitrator)}: ${describeResolution(resolutionOf(d.resolution), formatAmount)}; ${String(d.approval_count)} approval(s) in the count`,
       };
+    case 'DisputeVoteRejected':
+      return {
+        title: 'Arbitrator rejected the proposal',
+        detail: `${str(d.arbitrator)}: ${describeResolution(resolutionOf(d.resolution), formatAmount)}; ${String(d.rejection_count)} rejection(s)${d.proposal_reset ? ', the proposal was dropped and the next vote opens a new one' : ''}`,
+      };
     case 'DisputeDecided':
       return { title: 'Dispute decided', detail: describeResolution(resolutionOf(d.resolution), formatAmount) };
     case 'DisputeResolved':

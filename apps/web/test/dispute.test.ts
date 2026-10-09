@@ -87,6 +87,10 @@ describe('resolution', () => {
     expect(resolutionOf({ FavorInstitution: {} })).toEqual({ kind: 'favorInstitution' });
     expect(resolutionOf({ split: { agentAmount: new BN(7) } })).toEqual({ kind: 'split', agentAmount: '7' });
     expect(resolutionOf({ Split: { agent_amount: new BN(9) } })).toEqual({ kind: 'split', agentAmount: '9' });
+    // Square API'nin event'leri (denetim sayfası) tip biçimiyle gelir.
+    expect(resolutionOf({ kind: 'favorAgent' })).toEqual({ kind: 'favorAgent' });
+    expect(resolutionOf({ kind: 'split', agentAmount: '11' })).toEqual({ kind: 'split', agentAmount: '11' });
+    expect(() => resolutionOf({ kind: 'unknown' })).toThrow();
     expect(() => resolutionOf({ Unknown: {} })).toThrow();
     const split = toAnchorResolution({ kind: 'split', agentAmount: '100' });
     expect(split.split?.agentAmount.toString()).toBe('100');
@@ -333,6 +337,17 @@ describe('dispute events in the timeline', () => {
     expect(describe('DisputeVote', { arbitrator, resolution: { FavorAgent: {} }, approval_count: 1 })).toEqual({
       title: 'Arbitrator vote',
       detail: `${arbitrator.toBase58()}: In favor of the agent; 1 approval(s) in the count`,
+    });
+    expect(
+      describe('DisputeVoteRejected', {
+        arbitrator,
+        resolution: { FavorInstitution: {} },
+        rejection_count: 2,
+        proposal_reset: true,
+      }),
+    ).toEqual({
+      title: 'Arbitrator rejected the proposal',
+      detail: `${arbitrator.toBase58()}: In favor of the institution; 2 rejection(s), the proposal was dropped and the next vote opens a new one`,
     });
     expect(describe('DisputeDecided', { resolution: { Split: { agent_amount: new BN(5_000_000) } } })).toEqual({
       title: 'Dispute decided',
