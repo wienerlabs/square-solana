@@ -154,7 +154,7 @@ export function PolicyCommit(props: Props) {
   const pending = signature !== null && !confirmed && status?.stage !== 'failed';
 
   return (
-    <section aria-labelledby="commit-heading" className="rounded-card border border-border bg-surface p-6">
+    <section aria-labelledby="commit-heading" className="card p-6">
       <h2 id="commit-heading" className="text-sm font-medium uppercase tracking-wide text-muted">
         On chain
       </h2>

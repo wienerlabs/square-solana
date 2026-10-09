@@ -45,7 +45,7 @@ import { useSignatureStatus } from '@/lib/use-signature-status';
 
 type Load<T> = { state: 'loading' } | { state: 'ready'; value: T } | { state: 'error'; message: string };
 
-const panel = 'rounded-card border border-border bg-surface p-6';
+const panel = 'card p-6';
 const heading = 'text-sm font-medium uppercase tracking-wide text-muted';
 const formatSol = (lamports: bigint | number) =>
   (Number(lamports) / LAMPORTS_PER_SOL).toLocaleString('en-US', { maximumFractionDigits: 9 });

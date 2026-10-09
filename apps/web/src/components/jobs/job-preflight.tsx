@@ -82,7 +82,7 @@ export function JobPreflight({
   const isInstitution = Boolean(institution?.equals(account.institution));
 
   return (
-    <section aria-labelledby="preflight-heading" className="rounded-card border border-border bg-surface p-6">
+    <section aria-labelledby="preflight-heading" className="card p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 id="preflight-heading" className="text-sm font-medium uppercase tracking-wide text-muted">
           Pre-acceptance proof

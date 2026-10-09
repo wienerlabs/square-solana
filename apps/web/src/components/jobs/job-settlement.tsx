@@ -139,7 +139,7 @@ export function JobSettlement({
   const reputation = settlement.state === 'ready' ? settlement.value.reputation : null;
 
   return (
-    <section aria-labelledby="payment-heading" className="rounded-card border border-border bg-surface p-6">
+    <section aria-labelledby="payment-heading" className="card p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 id="payment-heading" className="text-sm font-medium uppercase tracking-wide text-muted">
           Payment

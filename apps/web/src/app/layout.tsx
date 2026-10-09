@@ -1,7 +1,10 @@
 import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
 import { connection } from 'next/server';
+import { Backdrop } from '@/components/backdrop';
+import { CardSpotlight } from '@/components/card-spotlight';
 import { ConfigError } from '@/components/config-error';
+import { Footer } from '@/components/footer';
 import { Header } from '@/components/header';
 import { NetworkBanner } from '@/components/network-banner';
 import { Providers } from '@/components/providers';
@@ -23,13 +26,16 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
   return (
     // suppressHydrationWarning: next-themes, temayı boyamadan önce <html data-theme>'e yazar.
     <html lang="en" className={openRunde.variable} suppressHydrationWarning>
-      <body className="min-h-screen">
+      <body className="flex min-h-screen flex-col">
         <ThemeProvider>
+          <Backdrop />
+          <CardSpotlight />
           {result.ok ? (
             <Providers config={result.config}>
               <Header />
               <NetworkBanner />
-              {children}
+              <div className="flex-1">{children}</div>
+              <Footer />
             </Providers>
           ) : (
             <ConfigError errors={result.errors} />

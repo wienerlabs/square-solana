@@ -288,7 +288,7 @@ export function JobDetail({ jobAddress, escrowProgramId }: { jobAddress: string;
 
   if (!verified) {
     return (
-      <p className="rounded-card border border-border bg-surface p-6 text-sm text-muted">
+      <p className="card p-6 text-sm text-muted">
         {guard.rpc.state === 'checking'
           ? 'Verifying the network before reading the job…'
           : 'The network is not verified, so the job is not read.'}
@@ -328,7 +328,7 @@ export function JobDetail({ jobAddress, escrowProgramId }: { jobAddress: string;
 
   return (
     <div className="grid gap-6">
-      <section aria-labelledby="job-summary" className="rounded-card border border-border bg-surface p-6">
+      <section aria-labelledby="job-summary" className="card p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 id="job-summary" className="text-sm font-medium uppercase tracking-wide text-muted">
             Job
@@ -391,7 +391,7 @@ export function JobDetail({ jobAddress, escrowProgramId }: { jobAddress: string;
       </section>
 
       {jobStatus === 'delivered' && (
-        <section aria-labelledby="challenge-heading" className="rounded-card border border-border bg-surface p-6">
+        <section aria-labelledby="challenge-heading" className="card p-6">
           <h2 id="challenge-heading" className="text-sm font-medium uppercase tracking-wide text-muted">
             Challenge window
           </h2>
@@ -485,7 +485,7 @@ export function JobDetail({ jobAddress, escrowProgramId }: { jobAddress: string;
       />
 
       {isAgent && (jobStatus === 'funded' || jobStatus === 'accepted') && (
-        <section aria-labelledby="agent-heading" className="rounded-card border border-border bg-surface p-6">
+        <section aria-labelledby="agent-heading" className="card p-6">
           <h2 id="agent-heading" className="text-sm font-medium uppercase tracking-wide text-muted">
             Your work
           </h2>
@@ -607,7 +607,7 @@ export function JobDetail({ jobAddress, escrowProgramId }: { jobAddress: string;
         </section>
       )}
 
-      <section aria-labelledby="timeline-heading" className="rounded-card border border-border bg-surface p-6">
+      <section aria-labelledby="timeline-heading" className="card p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 id="timeline-heading" className="text-sm font-medium uppercase tracking-wide text-muted">
             Timeline

@@ -87,7 +87,7 @@ function Field({
 
 function Section({ id, title, children }: { id: string; title: string; children: ReactNode }) {
   return (
-    <section aria-labelledby={id} className="rounded-card border border-border bg-surface p-6">
+    <section aria-labelledby={id} className="card p-6">
       <h2 id={id} className="text-sm font-medium uppercase tracking-wide text-muted">
         {title}
       </h2>
@@ -353,7 +353,7 @@ export function JobWizard({ owner, escrowProgramId }: { owner: string; escrowPro
 
   if (!verified) {
     return (
-      <p className="rounded-card border border-border bg-surface p-6 text-sm text-muted">
+      <p className="card p-6 text-sm text-muted">
         {guard.rpc.state === 'checking'
           ? 'Verifying the network before reading the escrow…'
           : 'The network is not verified, so the escrow is not read and no job can be opened.'}
@@ -365,7 +365,7 @@ export function JobWizard({ owner, escrowProgramId }: { owner: string; escrowPro
     return <p className="text-sm text-danger-text">The escrow config could not be read: {setupLoad.message}</p>;
   if (setupLoad.value.state === 'uninitialized') {
     return (
-      <p className="rounded-card border border-border bg-surface p-6 text-sm text-muted">
+      <p className="card p-6 text-sm text-muted">
         The escrow is not initialized on this network yet (no config at{' '}
         <span className="font-mono">{setupLoad.value.config.toBase58()}</span>).
       </p>
@@ -574,7 +574,7 @@ export function JobWizard({ owner, escrowProgramId }: { owner: string; escrowPro
       </Section>
 
       {!existingJob && travelRule && (
-        <p className="rounded-card border border-border bg-surface p-6 text-sm text-muted">
+        <p className="card p-6 text-sm text-muted">
           This amount is at or above the Travel Rule threshold (
           {formatUnits(setup.travelRuleThreshold, token?.decimals ?? 0)} USDC). Once the job is created, you enter the
           originator and beneficiary here; the Square API stores the record encrypted and you bind its commitment before

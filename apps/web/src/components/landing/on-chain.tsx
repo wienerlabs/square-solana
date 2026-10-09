@@ -6,6 +6,7 @@ import { useConnection } from '@solana/wallet-adapter-react';
 import { NetworkStatus } from '@/components/network-status';
 import { useWebConfig } from '@/components/providers';
 import { Address } from '@/components/ui/address';
+import { Reveal } from '@/components/ui/reveal';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { PROGRAMS, type ProgramName } from '@/lib/config';
 import { PROGRAM_ROLES } from './content';
@@ -68,15 +69,18 @@ function ProgramRow({ name }: { name: ProgramName }) {
 export function OnChain() {
   return (
     <section aria-labelledby="on-chain-title" className="py-12">
-      <h2 id="on-chain-title" className="text-heading-sm font-semibold">
-        On chain
-      </h2>
-      <p className="mt-2 max-w-2xl text-sm text-muted">
-        Read live from the cluster this deployment is configured for. Program addresses come from the deployment’s
-        configuration; a program without one is shown as not configured.
-      </p>
+      <Reveal>
+        <p className="text-caption font-medium tracking-[0.14em] text-muted uppercase">Live</p>
+        <h2 id="on-chain-title" className="mt-2 text-heading-sm font-semibold tracking-tight md:text-heading">
+          On chain
+        </h2>
+        <p className="mt-3 max-w-2xl text-sm leading-relaxed text-muted">
+          Read live from the cluster this deployment is configured for. Program addresses come from the deployment’s
+          configuration; a program without one is shown as not configured.
+        </p>
+      </Reveal>
       <div className="mt-6 grid gap-6 md:grid-cols-2">
-        <section aria-labelledby="programs-title" className="rounded-card border border-border bg-surface p-6">
+        <section aria-labelledby="programs-title" className="card p-6">
           <h3 id="programs-title" className="text-sm font-medium tracking-wide text-muted uppercase">
             Programs
           </h3>

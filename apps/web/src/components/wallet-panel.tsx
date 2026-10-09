@@ -165,7 +165,7 @@ export function WalletPanel() {
   }, [connection, publicKey]);
 
   return (
-    <section className="rounded-card border border-border bg-surface p-6">
+    <section className="card p-6">
       <h2 className="text-sm font-medium uppercase tracking-wide text-muted">Wallet</h2>
       {publicKey ? (
         <dl className="mt-4 grid grid-cols-[max-content_1fr] gap-x-6 gap-y-2 text-sm">

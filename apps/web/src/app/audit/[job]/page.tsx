@@ -18,9 +18,7 @@ export default async function Page({ params }: { params: Promise<{ job: string }
         {isAddress(job) ? (
           <JobAuditPage jobAddress={job} />
         ) : (
-          <p className="rounded-card border border-border bg-surface p-6 text-sm text-muted">
-            This is not a job address.
-          </p>
+          <p className="card p-6 text-sm text-muted">This is not a job address.</p>
         )}
       </div>
     </main>

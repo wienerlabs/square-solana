@@ -21,7 +21,12 @@ export function Table<Row>({ caption, columns, rows, rowKey, empty }: TableProps
   const align = (column: Column<Row>) => (column.align === 'right' ? 'text-right' : 'text-left');
   return (
     // Dar ekranda yatay kaydırılır; klavyeyle kaydırılabilmesi için bölge odaklanabilir.
-    <div role="region" aria-label={caption} tabIndex={0} className="overflow-x-auto rounded-card border border-border">
+    <div
+      role="region"
+      aria-label={caption}
+      tabIndex={0}
+      className="overflow-x-auto rounded-card border border-border bg-surface/40 backdrop-blur-sm"
+    >
       <table className="w-full border-collapse text-sm">
         <caption className="sr-only">{caption}</caption>
         <thead className="bg-surface-muted">
@@ -42,7 +47,7 @@ export function Table<Row>({ caption, columns, rows, rowKey, empty }: TableProps
             </tr>
           ) : (
             rows.map((row) => (
-              <tr key={rowKey(row)} className="border-t border-border">
+              <tr key={rowKey(row)} className="border-t border-border transition-colors hover:bg-surface-muted/60">
                 {columns.map((column) => (
                   <td key={column.key} className={`px-4 py-2.5 ${align(column)}`}>
                     {column.cell(row)}

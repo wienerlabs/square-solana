@@ -11,7 +11,7 @@ import { ROLE_INFO } from '@/lib/roles';
 import { JobWizard } from './job-wizard';
 
 function Notice({ children }: { children: ReactNode }) {
-  return <p className="rounded-card border border-border bg-surface p-6 text-sm text-muted">{children}</p>;
+  return <p className="card p-6 text-sm text-muted">{children}</p>;
 }
 
 // İşi kurum açar ve fonlar: cüzdan ya da kurumun smart account vault'u (FE-21). Diğer programların kimlikleri

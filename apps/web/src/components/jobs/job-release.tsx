@@ -101,7 +101,7 @@ export function JobRelease({
   const isInstitution = Boolean(institution?.equals(account.institution));
 
   return (
-    <section aria-labelledby="release-heading" className="rounded-card border border-border bg-surface p-6">
+    <section aria-labelledby="release-heading" className="card p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 id="release-heading" className="text-sm font-medium uppercase tracking-wide text-muted">
           Compliance proof

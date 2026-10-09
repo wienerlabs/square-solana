@@ -17,9 +17,7 @@ export default async function Page({ params }: { params: Promise<{ agentRecord: 
         {isAddress(agentRecord) ? (
           <AgentProfileView agentRecord={agentRecord} />
         ) : (
-          <p className="rounded-card border border-border bg-surface p-6 text-sm text-muted">
-            This is not an agent record address.
-          </p>
+          <p className="card p-6 text-sm text-muted">This is not an agent record address.</p>
         )}
       </div>
     </main>

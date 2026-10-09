@@ -56,7 +56,7 @@ export function DidResolver({ initialDid }: { initialDid: string }) {
 
   return (
     <div className="grid gap-6">
-      <form onSubmit={submit} className="rounded-card border border-border bg-surface p-6">
+      <form onSubmit={submit} className="card p-6">
         <label htmlFor={inputId} className="text-sm font-medium">
           did:aip identifier
         </label>
@@ -80,14 +80,14 @@ export function DidResolver({ initialDid }: { initialDid: string }) {
       </form>
 
       {resolution.state === 'done' && error && (
-        <section aria-label="Resolution" className="rounded-card border border-border bg-surface p-6">
+        <section aria-label="Resolution" className="card p-6">
           <StatusBadge tone="danger">{statusLabel(error)}</StatusBadge>
           <p className="mt-3 text-sm">{RESOLUTION_ERRORS[error]}</p>
         </section>
       )}
 
       {resolution.state === 'done' && result?.didDocument && metadata && (
-        <section aria-label="Resolution" className="grid gap-5 rounded-card border border-border bg-surface p-6">
+        <section aria-label="Resolution" className="grid gap-5 card p-6">
           <div className="flex flex-wrap items-center gap-2">
             <Did value={result.didDocument.id} />
             {metadata.agentStatus && (

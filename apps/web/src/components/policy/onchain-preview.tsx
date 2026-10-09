@@ -35,7 +35,7 @@ export function OnChainPreview({
   const buyerRoot = rootBytes ? bytesToHex(rootBytes) : null;
 
   return (
-    <section aria-labelledby="onchain-heading" className="rounded-card border border-border bg-surface p-6">
+    <section aria-labelledby="onchain-heading" className="card p-6">
       <h2 id="onchain-heading" className="text-sm font-medium uppercase tracking-wide text-muted">
         What goes on chain
       </h2>

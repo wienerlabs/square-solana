@@ -209,7 +209,7 @@ export function AgentRegistration({ owner, registryProgramId }: { owner: string;
 
   return (
     <div className="grid gap-6">
-      <section aria-labelledby="agent-identity-heading" className="rounded-card border border-border bg-surface p-6">
+      <section aria-labelledby="agent-identity-heading" className="card p-6">
         <h2 id="agent-identity-heading" className="text-sm font-medium uppercase tracking-wide text-muted">
           Identity
         </h2>
@@ -285,7 +285,7 @@ export function AgentRegistration({ owner, registryProgramId }: { owner: string;
         </div>
       </section>
 
-      <section aria-labelledby="agent-card-heading" className="rounded-card border border-border bg-surface p-6">
+      <section aria-labelledby="agent-card-heading" className="card p-6">
         <h2 id="agent-card-heading" className="text-sm font-medium uppercase tracking-wide text-muted">
           Agent card
         </h2>
@@ -440,7 +440,7 @@ export function AgentRegistration({ owner, registryProgramId }: { owner: string;
         </div>
       </section>
 
-      <section aria-labelledby="agent-wallet-heading" className="rounded-card border border-border bg-surface p-6">
+      <section aria-labelledby="agent-wallet-heading" className="card p-6">
         <h2 id="agent-wallet-heading" className="text-sm font-medium uppercase tracking-wide text-muted">
           Agent wallet
         </h2>
@@ -467,7 +467,7 @@ export function AgentRegistration({ owner, registryProgramId }: { owner: string;
         </div>
       </section>
 
-      <section aria-labelledby="agent-onchain-heading" className="rounded-card border border-border bg-surface p-6">
+      <section aria-labelledby="agent-onchain-heading" className="card p-6">
         <h2 id="agent-onchain-heading" className="text-sm font-medium uppercase tracking-wide text-muted">
           What goes on chain
         </h2>

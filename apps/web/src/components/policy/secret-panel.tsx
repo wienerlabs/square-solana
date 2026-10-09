@@ -34,7 +34,7 @@ export function SecretPanel({
   };
 
   return (
-    <section aria-labelledby="secret-heading" className="rounded-card border border-border bg-surface p-6">
+    <section aria-labelledby="secret-heading" className="card p-6">
       <h2 id="secret-heading" className="text-sm font-medium uppercase tracking-wide text-muted">
         Policy secret
       </h2>

@@ -22,11 +22,7 @@ export function TxConfirmation({ stage, signature, error }: { stage: TxStage; si
   const { label, tone } = TX_STAGES[stage];
   const reached = PROGRESS.indexOf(stage);
   return (
-    <div
-      role="status"
-      aria-live="polite"
-      className="flex flex-col gap-3 rounded-card border border-border bg-surface p-4"
-    >
+    <div role="status" aria-live="polite" className="flex flex-col gap-3 card p-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <StatusBadge tone={tone}>{label}</StatusBadge>
         {signature && <Address value={signature} label="signature" />}

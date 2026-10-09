@@ -11,7 +11,7 @@ import { ROLE_INFO } from '@/lib/roles';
 import { InstitutionPolicies } from './institution-policies';
 
 function Notice({ children }: { children: ReactNode }) {
-  return <p className="rounded-card border border-border bg-surface p-6 text-sm text-muted">{children}</p>;
+  return <p className="card p-6 text-sm text-muted">{children}</p>;
 }
 
 // Politikayı kurumun yetkilisi yazar: cüzdan ya da kurumun smart account vault'u (FE-21). Institution PDA'sı

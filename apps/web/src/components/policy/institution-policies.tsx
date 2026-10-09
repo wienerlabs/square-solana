@@ -64,7 +64,7 @@ export function InstitutionPolicies({ owner, policyProgramId }: { owner: string;
     <div className="grid gap-6">
       <SecretPanel owner={owner} cluster={cluster} workspace={workspace} />
       {workspace.secret && (
-        <section aria-labelledby="policies-heading" className="rounded-card border border-border bg-surface p-6">
+        <section aria-labelledby="policies-heading" className="card p-6">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h2 id="policies-heading" className="text-sm font-medium uppercase tracking-wide text-muted">
               Policies

@@ -19,7 +19,7 @@ import { SnippetsPanel } from './snippets-panel';
 import { X402EndpointsPanel } from './x402-endpoints-panel';
 
 function Notice({ children }: { children: ReactNode }) {
-  return <p className="rounded-card border border-border bg-surface p-6 text-sm text-muted">{children}</p>;
+  return <p className="card p-6 text-sm text-muted">{children}</p>;
 }
 
 function Workspace({

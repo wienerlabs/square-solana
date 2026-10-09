@@ -195,7 +195,7 @@ export function JobTravelRule({
   };
 
   return (
-    <section aria-labelledby="travel-rule-heading" className="rounded-card border border-border bg-surface p-6">
+    <section aria-labelledby="travel-rule-heading" className="card p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 id="travel-rule-heading" className="text-sm font-medium uppercase tracking-wide text-muted">
           Travel Rule

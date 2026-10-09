@@ -75,7 +75,7 @@ export function WebhooksPanel({ session, allowHttp }: { session: ApiClientState;
 
   if (!api) return null;
   return (
-    <section aria-labelledby="webhooks-heading" className="rounded-card border border-border bg-surface p-6">
+    <section aria-labelledby="webhooks-heading" className="card p-6">
       <h2 id="webhooks-heading" className="text-sm font-medium uppercase tracking-wide text-muted">
         Notifications
       </h2>

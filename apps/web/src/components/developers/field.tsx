@@ -3,7 +3,7 @@ import { useId, type ReactNode } from 'react';
 export const inputClass =
   'w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text aria-invalid:border-danger-text';
 
-export const panelClass = 'rounded-card border border-border bg-surface p-6';
+export const panelClass = 'card p-6';
 export const headingClass = 'text-sm font-medium uppercase tracking-wide text-muted';
 
 /** Etiketli form alanı: ipucu ve hata `aria-describedby` ile bağlanır. */
