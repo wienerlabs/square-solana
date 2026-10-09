@@ -1,0 +1,43 @@
+{
+  "name": "@squaresdk/solana-demo",
+  "version": "0.1.0",
+  "private": true,
+  "description": "8 adımlı demonun tekrar kurulabilir verisi ve demo agent'ı: tek komutluk seed (kurum, politika ve alıcı listesi, agent kaydı, alıcı, devnet USDC dağıtımı, screening), zincirden hesap raporu üreten agent-sdk agent'ı, ispat onay ve ret senaryoları, localnet koşucusu (BE-21)",
+  "license": "Apache-2.0",
+  "type": "module",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run --coverage",
+    "seed": "node dist/cli.js seed",
+    "scenario": "node dist/cli.js scenario",
+    "agent": "node dist/cli.js agent",
+    "demo:localnet": "node dist/localnet.js"
+  },
+  "dependencies": {
+    "@noble/hashes": "^1.8.0",
+    "@solana/spl-token": "^0.4.15",
+    "@solana/web3.js": "^1.99.0",
+    "@squaresdk/solana-a2a": "workspace:*",
+    "@squaresdk/solana-agent-sdk": "workspace:*",
+    "@squaresdk/solana-policy": "workspace:*",
+    "@squaresdk/solana-sdk": "workspace:*",
+    "@squaresdk/solana-smoke": "workspace:*",
+    "@squaresdk/solana-types": "workspace:*",
+    "bn.js": "^5.2.5",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@squaresdk/solana-config": "workspace:*",
+    "@types/bn.js": "^5.2.0",
+    "@types/node": "^24.0.0",
+    "@vitest/coverage-v8": "^5.0.3",
+    "vitest": "^5.0.3"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}

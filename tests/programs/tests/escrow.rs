@@ -188,7 +188,7 @@ fn create_job_binds_the_agent_and_a_separate_payer_pays_the_rent() {
         w.usdc,
     );
     let executed = w.h.send(&[ix], &[&institution.key]).expect("create_job");
-    cu::within("escrow.create_job", &executed, 40_000);
+    cu::within_profile("escrow.create_job", &executed, "createJob");
 
     let job_key = job_address(&institution.key.pubkey(), &SPEC);
     let job = w.job(&job_key);
@@ -249,7 +249,7 @@ fn a_policy_job_snapshots_the_policy() {
 
     let ix = w.default_create_ix(&institution.key.pubkey(), &agent, Some(policy));
     let executed = w.h.send(&[ix], &[&institution.key]).expect("create_job");
-    cu::within("escrow.create_job (policy)", &executed, 50_000);
+    cu::within_profile("escrow.create_job (policy)", &executed, "createJob");
     let job = w.job(&job_address(&institution.key.pubkey(), &SPEC));
     assert_eq!(job.policy, Some(policy.policy));
     assert_eq!(job.policy_commitment, COMMITMENT);

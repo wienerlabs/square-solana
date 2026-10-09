@@ -111,6 +111,7 @@ export async function createAgent(options: AgentOptions): Promise<Agent> {
     authenticate: options.authenticate,
     executor: createJobExecutor({
       client,
+      commitment,
       sender,
       wallet,
       capabilities: options.capabilities,
@@ -214,6 +215,7 @@ export async function createAgent(options: AgentOptions): Promise<Agent> {
           cardUrl: urls.card,
           api,
           tx,
+          ...(options.logger ? { logger: options.logger } : {}),
         },
         registerOptions,
       ),

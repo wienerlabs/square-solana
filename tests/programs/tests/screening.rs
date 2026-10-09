@@ -237,7 +237,7 @@ fn only_the_screener_records_a_screening() {
         SOURCE_HASH,
     )
     .expect("record_screening");
-    cu::within("registry.record_screening", &executed, 40_000);
+    cu::within_profile("registry.record_screening", &executed, "recordScreening");
 
     let stored: ScreeningRecord = h
         .account(&screening_address(&wallet))

@@ -20,6 +20,7 @@ import {
   startPaidApp,
   type Listening,
   type Wallets,
+  TEST_LIMITS,
 } from './helpers.js';
 
 const TOKEN = 'x'.repeat(16) + crypto.randomUUID();
@@ -37,7 +38,11 @@ beforeAll(async () => {
   app.use(
     '/facilitator',
     createFacilitatorRouter({
-      facilitator: createFacilitatorClient({ feePayer: wallets.feePayer, rpcUrls: { [SOLANA_DEVNET]: rpc.url } }),
+      facilitator: createFacilitatorClient({
+        feePayer: wallets.feePayer,
+        rpcUrls: { [SOLANA_DEVNET]: rpc.url },
+        limits: TEST_LIMITS,
+      }),
       authToken: TOKEN,
       onError: (operation) => errors.push(operation),
     }),
@@ -58,6 +63,7 @@ describe('kendi facilitator', () => {
     const facilitator = createSelfFacilitator({
       feePayer: wallets.feePayer,
       rpcUrls: { [SOLANA_MAINNET]: rpc.url, [SOLANA_TESTNET]: rpc.url },
+      limits: TEST_LIMITS,
     });
     const supported = await localFacilitatorClient(facilitator).getSupported();
     expect(supported.kinds.map((kind) => kind.network).sort()).toEqual([SOLANA_MAINNET, SOLANA_TESTNET].sort());
@@ -65,7 +71,9 @@ describe('kendi facilitator', () => {
   });
 
   it('RPC adresi olmadan kurulmaz', () => {
-    expect(() => createSelfFacilitator({ feePayer: wallets.feePayer, rpcUrls: {} })).toThrow(/rpcUrls/);
+    expect(() => createSelfFacilitator({ feePayer: wallets.feePayer, rpcUrls: {}, limits: TEST_LIMITS })).toThrow(
+      /rpcUrls/,
+    );
   });
 });
 
@@ -152,7 +160,11 @@ describe('uzak facilitator (HTTP)', () => {
     expect(() =>
       createFacilitatorRouter({
         facilitator: localFacilitatorClient(
-          createSelfFacilitator({ feePayer: wallets.feePayer, rpcUrls: { [SOLANA_DEVNET]: rpc.url } }),
+          createSelfFacilitator({
+            feePayer: wallets.feePayer,
+            rpcUrls: { [SOLANA_DEVNET]: rpc.url },
+            limits: TEST_LIMITS,
+          }),
         ),
         authToken: 'kısa',
       }),

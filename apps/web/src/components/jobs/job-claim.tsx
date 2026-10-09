@@ -1,10 +1,10 @@
 'use client';
 
 import { useEffect, useId, useState, type ReactNode } from 'react';
-import { useWallet } from '@solana/wallet-adapter-react';
-import type { PublicKey } from '@solana/web3.js';
+import type { PublicKey, VersionedTransaction } from '@solana/web3.js';
 import type { ClaimListingAccount, JobAccount } from '@squaresdk/solana-sdk';
-import { useNetworkGuard, useSendTransaction } from '@/components/network-guard';
+import { useActor } from '@/components/actor';
+import { useNetworkGuard } from '@/components/network-guard';
 import { useWebConfig } from '@/components/providers';
 import { Address } from '@/components/ui/address';
 import { Button } from '@/components/ui/button';
@@ -22,7 +22,7 @@ import {
   type BuyerList,
 } from '@/lib/claim-market';
 import { readScreening, SCREENING_TEXT, type EscrowSetup, type ScreeningState } from '@/lib/job-wizard';
-import { TransactionBlockedError } from '@/lib/send-transaction';
+import { sendErrorText } from '@/lib/sponsored-send';
 import { formatUnits, settlementAccount, type SettlementToken } from '@/lib/settlement';
 import { CLAIM_STATUS_TONE, statusLabel } from '@/lib/status';
 import { useTokenBalance } from '@/lib/use-settlement';
@@ -41,26 +41,22 @@ interface Shared {
   formatAmount(base: bigint): string;
 }
 
-/** İşlem gönderen panellerin ortak durumu: imza, onay ve hata. */
-function useClaimAction() {
-  const send = useSendTransaction();
+/** İşlem gönderen panellerin ortak durumu: imza, onay ve hata. Tx rol adına (FE-21) kurulur ve gönderilir. */
+function useClaimAction(role: 'agent' | 'buyer') {
+  const actor = useActor(role);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [signature, setSignature] = useState<string | null>(null);
   const status = useSignatureStatus(signature);
   const pending =
     signature !== null && status?.stage !== 'confirmed' && status?.stage !== 'finalized' && status?.stage !== 'failed';
-  const run = async (build: () => Promise<{ transaction: Parameters<typeof send>[0] }>) => {
+  const run = async (build: (options: { feePayer: PublicKey }) => Promise<{ transaction: VersionedTransaction }>) => {
     setBusy(true);
     setError(null);
     try {
-      setSignature(await send((await build()).transaction));
+      setSignature(await actor.send((await build(await actor.options())).transaction));
     } catch (caught) {
-      setError(
-        caught instanceof TransactionBlockedError
-          ? caught.message
-          : (claimErrorMessage(caught) ?? (caught as Error).message),
-      );
+      setError(sendErrorText(caught, claimErrorMessage));
     } finally {
       setBusy(false);
     }
@@ -76,7 +72,8 @@ function useClaimAction() {
 
 /**
  * İşin alacağı (FE-08): listeleme durumu herkese açık; agent cüzdanı teslim edilmiş işin alacağını
- * listeler ya da geri çeker, alıcı onaylı listedeyse alır. `revision` job ya da listeleme değiştikçe artar.
+ * listeler ya da geri çeker, alıcı onaylı listedeyse alır. `revision` job ya da listeleme değiştikçe artar. Agent ve
+ * alıcının adresi cüzdan ya da rolün smart account vault'udur (FE-21).
  */
 export function JobClaim({
   claim,
@@ -84,7 +81,8 @@ export function JobClaim({
   revision,
   ...shared
 }: Shared & { claim: Load<ClaimListingAccount | null>; chainNow: number | null; revision: number }) {
-  const { publicKey } = useWallet();
+  const agent = useActor('agent').address;
+  const buyer = useActor('buyer').address;
   const { account, formatAmount } = shared;
   const delivered = 'delivered' in account.status;
   const listing = claim.state === 'ready' ? claim.value : null;
@@ -94,8 +92,8 @@ export function JobClaim({
   const price = listing ? big(listing.price) : null;
   const faceValue = listing ? big(listing.faceValue) : big(account.amount);
   const stale = listing && status === 'listed' ? notBuyableReason(account, listing) : null;
-  const isSeller = Boolean(listing && status === 'listed' && publicKey?.equals(listing.seller));
-  const isAgent = Boolean(publicKey?.equals(account.agentWallet));
+  const isSeller = Boolean(listing && status === 'listed' && agent?.equals(listing.seller));
+  const isAgent = Boolean(agent?.equals(account.agentWallet));
 
   return (
     <section aria-labelledby="claim-heading" className="rounded-card border border-border bg-surface p-6">
@@ -142,7 +140,7 @@ export function JobClaim({
         </dl>
       )}
       {stale && <p className="mt-3 text-sm text-danger-text">{stale}</p>}
-      {listing && publicKey?.equals(listing.buyer) && (
+      {listing && buyer?.equals(listing.buyer) && (
         <p className="mt-3 text-sm">You own this receivable: the job&apos;s payment goes to your wallet at release.</p>
       )}
 
@@ -150,8 +148,8 @@ export function JobClaim({
       {isSeller && <WithdrawClaim {...shared} />}
       {listing && status === 'listed' && !stale && !isSeller && (
         <div className="mt-4 border-t border-border pt-4">
-          {publicKey ? (
-            <BuyClaim {...shared} listing={listing} buyer={publicKey} chainNow={chainNow} revision={revision} />
+          {buyer ? (
+            <BuyClaim {...shared} listing={listing} buyer={buyer} chainNow={chainNow} revision={revision} />
           ) : (
             <p className="text-sm text-muted">Connect a wallet to buy this receivable.</p>
           )}
@@ -171,11 +169,11 @@ function ClaimRow({ label, children }: { label: string; children: ReactNode }) {
 }
 
 function ListClaim({ escrow, jobKey, token, formatAmount, faceValue }: Shared & { faceValue: bigint }) {
-  const { publicKey } = useWallet();
+  const publicKey = useActor('agent').address;
   const guard = useNetworkGuard();
   const priceId = useId();
   const [text, setText] = useState('');
-  const action = useClaimAction();
+  const action = useClaimAction('agent');
   const parsed = token && text !== '' ? parseClaimPrice(text, token.decimals, faceValue) : null;
 
   return (
@@ -206,11 +204,8 @@ function ListClaim({ escrow, jobKey, token, formatAmount, faceValue }: Shared & 
           onClick={() =>
             parsed?.ok &&
             publicKey &&
-            void action.run(() =>
-              escrow.client.flow.listClaim(
-                { agent: publicKey, job: jobKey, price: parsed.value },
-                { feePayer: publicKey },
-              ),
+            void action.run((options) =>
+              escrow.client.flow.listClaim({ agent: publicKey, job: jobKey, price: parsed.value }, options),
             )
           }
           loading={action.busy}
@@ -225,9 +220,9 @@ function ListClaim({ escrow, jobKey, token, formatAmount, faceValue }: Shared & 
 }
 
 function WithdrawClaim({ escrow, jobKey }: Shared) {
-  const { publicKey } = useWallet();
+  const publicKey = useActor('agent').address;
   const guard = useNetworkGuard();
-  const action = useClaimAction();
+  const action = useClaimAction('agent');
   return (
     <div className="mt-4 grid gap-3 border-t border-border pt-4">
       <div className="flex flex-wrap items-center gap-3">
@@ -235,9 +230,7 @@ function WithdrawClaim({ escrow, jobKey }: Shared) {
           variant="secondary"
           onClick={() =>
             publicKey &&
-            void action.run(() =>
-              escrow.client.flow.cancelClaim({ seller: publicKey, job: jobKey }, { feePayer: publicKey }),
-            )
+            void action.run((options) => escrow.client.flow.cancelClaim({ seller: publicKey, job: jobKey }, options))
           }
           loading={action.busy}
           disabled={!guard.canTransact || action.busy || action.pending}
@@ -271,7 +264,7 @@ function BuyClaim({
   const { cluster } = useWebConfig();
   const guard = useNetworkGuard();
   const proofId = useId();
-  const action = useClaimAction();
+  const action = useClaimAction('buyer');
   const balance = useTokenBalance(buyer, token);
   const [buyers, setBuyers] = useState<Load<BuyerList>>({ state: 'loading' });
   const [screening, setScreening] = useState<Load<ScreeningState>>({ state: 'loading' });
@@ -324,7 +317,7 @@ function BuyClaim({
   const buy = () =>
     eligibility?.state === 'eligible' &&
     token &&
-    void action.run(() =>
+    void action.run((options) =>
       escrow.client.flow.buyClaim(
         {
           buyer,
@@ -334,7 +327,7 @@ function BuyClaim({
           merkleProof: eligibility.merkleProof,
           buyerTokenAccount: settlementAccount(buyer, token),
         },
-        { feePayer: buyer },
+        options,
       ),
     );
 

@@ -60,6 +60,23 @@ başlığıyla aynıdır. Zamanlar Unix saniyesidir.
   | Okuma uçları | Açık; anahtarla gelen istek `read` ister |
 
   Geçersiz bir kimlik herkese açık uçta da 401 alır.
+- **Smart account (FE-21):** Rol adresi bir Squads v4 smart account'un vault'u olan kurum, agent ya da alıcı
+  ([`caller.ts`](src/caller.ts)) API'ye üyesinin oturumuyla ya da anahtarıyla girer. Vault bir PDA'dır, mesaj
+  imzalayamaz.
+  - İstek `X-Square-Smart-Account: <multisig>` başlığını taşır. Çağıran, multisig'in 0 numaralı vault'u
+    (`squadsVaultAddress`) adına da yazar ve okur. Koşul, cüzdanın multisig'te öneri açabilen (`Initiate`) bir
+    üye olmasıdır.
+  - Üyelik, vault adına yapılan denetimde zincirden o anda okunur. Başlık tek başına yetki vermez.
+  - Hesap Squads v4 multisig'i değilse ya da cüzdan Initiate yetkili değilse 403, multisig okunamazsa 503,
+    geçersiz adres 400 döner.
+  - Başlığı kabul eden uçlar: `uploadDelivery`, `putAgentCard` (kayıttan önce yol vault ve `agentId` ile
+    türetilir), `putPolicyMeta`, Travel Rule uçları, `uploadDisputeEvidence`, `listDisputeEvidence`,
+    `getDisputeEvidenceContent` ve fiat ödemesi uçları (`createFiatSetupIntent`, `getFiatCustomer`,
+    `createFiatPayment`, `payFiatJobMpp`, `getFiatAttestation`, `reconcileFiatPayment`). Diğer uçlarda başlık
+    okunmaz. Arbitrator uçları cüzdanla çalışır.
+  - Kayıtlara (yükleyen, erişim kaydı, `updatedBy`) vault değil, üyenin cüzdanı yazılır.
+  - Kurum multisig'i `set_institution_multisig` ile bağlamışsa başlık gerekmez: Initiate yetkili üyeler zaten
+    kurumun yetkilisidir.
 - **Hız sınırı:** Okuma ve yazma uçları ayrı kurallarla sınırlanır. Kimliği olan istekte cüzdan başına,
   olmayanda istemci IP'si başına sayılır. Sayaç Postgres'te paylaşılır (`@squaresdk/solana-hardening`).
   Yanıtta `RateLimit-*` başlıkları döner, sınırı aşan istek 429 ve `Retry-After` alır.
@@ -245,7 +262,9 @@ zincir tarafı [ADR 0024](../../docs/decisions/0024-stripe-mpp-fiat-rayi.md). Ko
   biriminden sente çevrilir (1 sent = 10^(decimals − 2)). Tam sent olmayan ya da 50 sentin altındaki iş ödenmez.
 - **Ön koşul (her yol):**
   - job fiat rayında ve `Delivered`;
-  - çağıran job'un kurumunun güncel yetkilisi;
+  - çağıran job'un kurumunun güncel yetkilisi; kurum anahtarı bir smart account'un vault'uysa
+    `X-Square-Smart-Account` başlığıyla gelen `Initiate` yetkili üye (vault'la açılmış kurum `create_fiat_job` ile
+    fiat iş açar);
   - işin attestation'ı yok (409);
   - ödeme kurumun public günlük tavanını bugünkü sayaçla aşmıyor (400, `details.dailyCeiling`).
 - **Yollar:**
@@ -337,6 +356,26 @@ Agave 4.1.2 ve `anchor build` çıktısı gerekir; senaryo yaklaşık iki dakika
 pnpm turbo build --filter @squaresdk/solana-api... --filter @squaresdk/solana-web
 SQUARE_LOCALNET=1 SQUARE_WEB_E2E=1 SQUARE_WEB_E2E_CHANNEL=chrome SQUARE_LOCALNET_RPC_PORT=8899 \
   pnpm --filter @squaresdk/solana-api exec vitest run test/web-dispute.e2e.test.ts
+```
+
+**Arayüzden 8 adım ve ret (FE-13):** `test/web-flow.e2e.test.ts`, `SQUARE_LOCALNET=1` ve `SQUARE_WEB_E2E=1` ile çalışır.
+- **Kurulum:** FE-17'nin testiyle aynı; prover (BE-11) de gerçek süreçtir. Dört rol (kurum, agent, alıcı, keeper) kendi
+  cüzdanlarıyla ücretlerini öder.
+- **Senaryo:**
+  - Kurum politika sayfasında iki politika yazar. İkisinin de onaylı alıcısı alıcıdır; ikincisinin engelli listesinde
+    de alıcı vardır. Alıcının kanıt dosyaları politika sayfasından indirilir.
+  - **Ödeme:** İş açılır, fonlanır ve kabul öncesi ön-ispat bağlanır. Agent kabul eder, teslimatı API'ye yükler,
+    teslim eder ve alacağı listeler. Alıcı kanıt dosyasıyla alır. Kurum ispatı bağlar, keeper cüzdanı finalize eder;
+    net alıcıya gider.
+  - **Ret:** Aynı adımlar ikinci politikayla. Release ispatı kesin ret verir (engelli payee). Finalize neti kuruma
+    iade eder, listeleme `Defaulted` olur. Sayfa ret sebebini ve zaman çizelgesinde reddi gösterir.
+- **CI:** `Web E2E` iş akışı bu üç testi her PR'da koşar ([docs/ci.md](../../docs/ci.md)). Testler aynı vitest sürecinde
+  arka arkaya koşturulmaz: localnet fixture'ı validator'ı sabit portta açar.
+
+```bash
+pnpm turbo build --filter @squaresdk/solana-api... --filter @squaresdk/solana-web --filter @squaresdk/solana-prover
+SQUARE_LOCALNET=1 SQUARE_WEB_E2E=1 SQUARE_WEB_E2E_CHANNEL=chrome \
+  pnpm --filter @squaresdk/solana-api exec vitest run test/web-flow.e2e.test.ts
 ```
 
 **Devnet uçtan uca (BE-22):** `test/devnet.e2e.test.ts` yalnızca ortamla çalışır; anahtarlar repoda tutulmaz.

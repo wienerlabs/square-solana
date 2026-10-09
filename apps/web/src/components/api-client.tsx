@@ -25,7 +25,11 @@ export interface ApiClientState {
 const nowSeconds = () => Math.floor(Date.now() / 1000);
 const SESSION_REJECTED = 'The session is no longer valid. Sign in again.';
 
-export function useApiClient(): ApiClientState {
+/**
+ * Oturumlu API istemcisi. `smartAccount` verilirse istekler o smart account'un vault'u adına gider
+ * (`X-Square-Smart-Account`, FE-21).
+ */
+export function useApiClient(options?: { smartAccount?: string | null }): ApiClientState {
   const { apiUrl } = useWebConfig();
   const { session, unavailable, signingIn, error, signIn, signOut } = useApiSession();
   const [rejected, setRejected] = useState<string | null>(null);
@@ -34,7 +38,11 @@ export function useApiClient(): ApiClientState {
   const token = live?.token ?? null;
   const dropped = session !== null && session.token === rejected;
   const publicApi = useMemo(() => (apiUrl ? squareApi(apiUrl) : null), [apiUrl]);
-  const api = useMemo(() => (apiUrl && token ? squareApi(apiUrl, token) : null), [apiUrl, token]);
+  const smartAccount = options?.smartAccount ?? null;
+  const api = useMemo(
+    () => (apiUrl && token ? squareApi(apiUrl, token, smartAccount) : null),
+    [apiUrl, token, smartAccount],
+  );
   const open = useCallback(
     () =>
       signIn().then(

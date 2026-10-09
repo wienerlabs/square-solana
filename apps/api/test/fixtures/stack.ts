@@ -26,6 +26,7 @@ import { createAuthService } from '../../src/auth/service.js';
 import { createCardService } from '../../src/cards.js';
 import { createCctpService } from '../../src/cctp.js';
 import { createDeliveryService } from '../../src/deliveries.js';
+import { createCallerAuthority } from '../../src/caller.js';
 import { createArbitrationService } from '../../src/disputes/arbitration.js';
 import { createArbitrators, type Arbitrators } from '../../src/disputes/arbitrators.js';
 import { createEvidenceService } from '../../src/disputes/evidence.js';
@@ -88,7 +89,7 @@ export interface Stack {
   readonly errors: { count(): number };
   /** Fiat rayı açıksa fixture'ı. */
   readonly fiat: FiatFixture | null;
-  api(auth?: { session?: string; apiKey?: string }): SquareApi;
+  api(auth?: { session?: string; apiKey?: string; smartAccount?: string }): SquareApi;
   close(): Promise<void>;
 }
 
@@ -158,6 +159,7 @@ export async function startStack(options: {
     publicBaseUrl: deliveryBaseUrl,
   });
   const authority = createInstitutionAuthority({ db, connection });
+  const callers = createCallerAuthority({ connection });
   const travelRule = createTravelRuleService({
     db,
     client,
@@ -275,13 +277,14 @@ export async function startStack(options: {
       sessionTtlSeconds: 3_600,
       ...(options.clock ? { clock: options.clock } : {}),
     }),
-    deliveries: createDeliveryService({ db, store }),
+    deliveries: createDeliveryService({ db, store, callers }),
     cards: createCardService({
       db,
       pda: client.pda,
       registryProgramId: PROGRAM_IDS.registry,
       chainRef: CHAIN_REF,
       publicBaseUrl: PUBLIC_BASE_URL,
+      callers,
     }),
     policyMeta: createPolicyMetaService({ db, authority }),
     tx,

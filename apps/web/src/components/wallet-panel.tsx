@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { LAMPORTS_PER_SOL, type PublicKey } from '@solana/web3.js';
 import { useConnection, useWallet } from '@solana/wallet-adapter-react';
@@ -7,7 +8,9 @@ import { sessionUsable } from '@/lib/api-session';
 import { ENV_VARS, PROGRAM_ID_ENV } from '@/lib/config';
 import { formatUnits, type SettlementToken } from '@/lib/settlement';
 import { useSettlementToken, useTokenBalance } from '@/lib/use-settlement';
+import { useActor } from './actor';
 import { useApiSession } from './api-session';
+import { useRole } from './role-provider';
 import { useWebConfig } from './providers';
 import { Address } from './ui/address';
 import { Button } from './ui/button';
@@ -108,6 +111,34 @@ function ApiSessionRow({ wallet }: { wallet: PublicKey }) {
   );
 }
 
+/** Seçili rolün hesabı (FE-21): ücreti kim ödüyor, rol smart account'la çalışıyorsa vault ve USDC'si. */
+function ActorRows() {
+  const { role } = useRole();
+  const actor = useActor(role);
+  if (actor.mode === 'wallet') return null;
+  return (
+    <>
+      <dt className="text-muted">Fees</dt>
+      <dd className="flex flex-col items-start gap-1">
+        <span>Paid by the sponsor</span>
+        {actor.problem && <span className="text-danger-text">{actor.problem}</span>}
+        <Link href="/app/account" className="text-link underline">
+          Manage the account
+        </Link>
+      </dd>
+      {actor.mode === 'smartAccount' && actor.address && (
+        <>
+          <dt className="text-muted">Acting as</dt>
+          <dd>
+            <Address value={actor.address.toBase58()} label="vault" />
+          </dd>
+          <UsdcRow owner={actor.address} />
+        </>
+      )}
+    </>
+  );
+}
+
 export function WalletPanel() {
   const { connection } = useConnection();
   const { publicKey, wallet } = useWallet();
@@ -152,6 +183,7 @@ export function WalletPanel() {
           </dd>
           <UsdcRow owner={publicKey} />
           <ApiSessionRow wallet={publicKey} />
+          <ActorRows />
         </dl>
       ) : (
         <p className="mt-4 text-sm text-muted">Connect a wallet to see its address and balances.</p>

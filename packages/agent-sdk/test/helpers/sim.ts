@@ -4,7 +4,7 @@
 // durum kurallarıyla (escrow `agent_job.rs`, `list_claim.rs`; registry `state.rs`) uygulanır. Kural ihlali,
 // gerçek RPC gibi `Program <id> failed: custom program error` loglu bir gönderim hatası verir. Gerçek
 // programlarla uçtan uca akış test/localnet.e2e.test.ts'dedir.
-import { BN, type Idl, type Program } from '@anchor-lang/core';
+import { BN, utils, type Idl, type Program } from '@anchor-lang/core';
 import { ed25519 } from '@noble/curves/ed25519.js';
 import {
   ComputeBudgetProgram,
@@ -12,6 +12,7 @@ import {
   PublicKey,
   VersionedTransaction,
   type AccountInfo,
+  type Commitment,
   type Connection,
 } from '@solana/web3.js';
 import { createSquareClient, SQUARE_IDLS, type SquareClient, type SquareProgramIds } from '@squaresdk/solana-sdk';
@@ -41,6 +42,8 @@ export interface JobFields {
   specHash: string;
   status: JobStatus;
   deadline: number;
+  /** Policy'li iş: escrow `accept_job` kurumun ön-ispatını ister (ADR 0028). */
+  policy?: PublicKey;
 }
 
 class ProgramFailure extends Error {
@@ -65,6 +68,14 @@ export class SimChain {
   failure: ((name: string) => Error | null) | null = null;
   /** Verilirse adı eşleşen talimattan önce beklenir (ör. zincirdeki durumu değiştirmek için). */
   before: ((name: string) => Promise<void>) | null = null;
+  readHook:
+    | ((
+        address: string,
+        info: AccountInfo<Buffer> | null,
+        commitment: Commitment | undefined,
+      ) => AccountInfo<Buffer> | null | Error)
+    | null = null;
+  confirmFailure: (() => Error | null) | null = null;
   private slot = 0;
   private signatures = 0;
 
@@ -124,10 +135,28 @@ export class SimChain {
       workHash: new Array(32).fill(0),
       deliveryUri: '',
       rail: { escrow: {} },
-      policy: null,
+      policy: fields.policy ?? null,
       dispute: { ...(sample.dispute as object), bond: new BN(0) },
     };
     await this.put(address, PROGRAM_IDS.escrow, this.escrow, 'job', data);
+  }
+
+  /**
+   * Kurumun kabul öncesi ön-ispatı (verifier `set_preflight_proof`, ADR 0028): job'un politikası, snapshot'ı ve
+   * bağlamadaki agent cüzdanı (`payee`; verilmezse job'unki).
+   */
+  async setPreflight(address: PublicKey, payee?: PublicKey): Promise<void> {
+    const job = this.job(address);
+    if (!job) throw new Error(`job hesabı yok: ${address.toBase58()}`);
+    const verifier = this.client.verifier.program as unknown as Program<Idl>;
+    const data = {
+      ...this.sample(verifier, 'preflightProof'),
+      job: address,
+      policy: job.policy,
+      payee: payee ?? job.agentWallet,
+      policyCommitment: job.policyCommitment,
+    };
+    await this.put(this.client.pda.preflightProof(address)[0], PROGRAM_IDS.verifier, verifier, 'preflightProof', data);
   }
 
   /** Job hesabının alanlarını değiştirir (Anchor JS biçiminde). */
@@ -233,6 +262,15 @@ export class SimChain {
       if (status === 'open') return fail('JobNotFunded');
       if (status !== 'funded') return fail('InvalidStatus');
       if (hex(data.specHash as number[]) !== hex(job.specHash as number[])) return fail('SpecHashMismatch');
+      // Policy'li işte kurumun ön-ispatı (hesap 4: `["preflight_proof", job]`, verifier), işin güncel cüzdanı için.
+      if (job.policy) {
+        const info = this.accounts.get(accounts[4]!.toBase58());
+        const verifier = this.client.verifier.program as unknown as Program<Idl>;
+        const proof = info
+          ? (verifier.coder.accounts.decode('preflightProof', info.data) as { payee: PublicKey })
+          : null;
+        if (!proof || !proof.payee.equals(job.agentWallet as PublicKey)) return fail('PreflightRequired');
+      }
       await this.put(address, PROGRAM_IDS.escrow, this.escrow, 'job', { ...job, status: { accepted: {} } });
     } else if (name === 'submitWork') {
       if (status !== 'accepted') return fail('InvalidStatus');
@@ -303,6 +341,12 @@ export class SimChain {
   connection(): Connection {
     const nextSlot = () => (this.slot += 1);
     const accounts = this.accounts;
+    const read = (address: PublicKey, commitment?: Commitment) => {
+      const info = accounts.get(address.toBase58()) ?? null;
+      const seen = this.readHook ? this.readHook(address.toBase58(), info, commitment) : info;
+      if (seen instanceof Error) throw seen;
+      return seen;
+    };
     return {
       commitment: 'confirmed',
       rpcEndpoint: 'sim-chain',
@@ -311,19 +355,37 @@ export class SimChain {
         blockhash: new PublicKey(Uint8Array.from({ length: 32 }, (_, i) => i + 1)).toBase58(),
         lastValidBlockHeight: 4242,
       }),
-      getAccountInfo: async (address: PublicKey) => accounts.get(address.toBase58()) ?? null,
-      getAccountInfoAndContext: async (address: PublicKey) => ({
+      getAccountInfo: async (address: PublicKey, commitment?: Commitment) => read(address, commitment),
+      getAccountInfoAndContext: async (address: PublicKey, commitment?: Commitment) => ({
         context: { slot: nextSlot() },
-        value: accounts.get(address.toBase58()) ?? null,
+        value: read(address, commitment),
       }),
-      getMultipleAccountsInfo: async (addresses: PublicKey[]) =>
-        addresses.map((address) => accounts.get(address.toBase58()) ?? null),
+      getMultipleAccountsInfo: async (addresses: PublicKey[]) => addresses.map((address) => read(address)),
+      // Anchor `account.<ad>.all(filters)`: owner'a, `memcmp`'e (base58) ve `dataSize`'a göre.
+      getProgramAccounts: async (
+        programId: PublicKey,
+        config?: { filters?: ({ memcmp: { offset: number; bytes: string } } | { dataSize: number })[] },
+      ) =>
+        [...accounts.entries()]
+          .filter(([, info]) => info.owner.equals(programId))
+          .filter(([, info]) =>
+            (config?.filters ?? []).every((filter) => {
+              if ('dataSize' in filter) return info.data.length === filter.dataSize;
+              const bytes = Buffer.from(utils.bytes.bs58.decode(filter.memcmp.bytes));
+              return info.data.subarray(filter.memcmp.offset, filter.memcmp.offset + bytes.length).equals(bytes);
+            }),
+          )
+          .map(([pubkey, account]) => ({ pubkey: new PublicKey(pubkey), account })),
       sendRawTransaction: async (raw: Uint8Array) => {
         await this.execute(VersionedTransaction.deserialize(raw));
         this.signatures += 1;
         return `sim${this.signatures.toString().padStart(60, '1')}`;
       },
-      confirmTransaction: async () => ({ context: { slot: nextSlot() }, value: { err: null } }),
+      confirmTransaction: async () => {
+        const failure = this.confirmFailure?.();
+        if (failure) throw failure;
+        return { context: { slot: nextSlot() }, value: { err: null } };
+      },
     } as unknown as Connection;
   }
 }

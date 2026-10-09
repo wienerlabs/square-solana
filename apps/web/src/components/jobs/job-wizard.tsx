@@ -5,8 +5,9 @@ import { useCallback, useEffect, useId, useMemo, useState, type ReactNode } from
 import { useConnection } from '@solana/wallet-adapter-react';
 import { PublicKey } from '@solana/web3.js';
 import { useApiClient } from '@/components/api-client';
+import { useActor } from '@/components/actor';
 import { CctpFunding } from '@/components/jobs/job-cctp';
-import { useNetworkGuard, useSendTransaction } from '@/components/network-guard';
+import { useNetworkGuard } from '@/components/network-guard';
 import { useWebConfig } from '@/components/providers';
 import { Address } from '@/components/ui/address';
 import { Button } from '@/components/ui/button';
@@ -36,7 +37,7 @@ import {
 import { readPolicyChain } from '@/lib/policy-chain';
 import { hexToBytes } from '@/lib/policy-draft';
 import { loadDrafts } from '@/lib/policy-local';
-import { TransactionBlockedError } from '@/lib/send-transaction';
+import { sendErrorText } from '@/lib/sponsored-send';
 import { formatUnits, parseUnits, settlementAccount } from '@/lib/settlement';
 import { statusLabel } from '@/lib/status';
 import { isBound, travelRuleFundBlock, travelRuleRequired, type TravelRuleVerification } from '@/lib/travel-rule';
@@ -115,12 +116,15 @@ interface ActivePolicy {
   version: number;
 }
 
-/** Kurum cüzdanının iş açması ve fonlaması: `create_job` + `fund_job` (akışın 3. adımı). */
+/**
+ * Kurumun iş açması ve fonlaması: `create_job` + `fund_job` (akışın 3. adımı). Kurum cüzdan ya da smart account'un
+ * vault'udur (FE-21); fonlama vault'un USDC hesabından.
+ */
 export function JobWizard({ owner, escrowProgramId }: { owner: string; escrowProgramId: string }) {
   const { connection } = useConnection();
   const config = useWebConfig();
   const guard = useNetworkGuard();
-  const send = useSendTransaction();
+  const actor = useActor('institution');
   const ownerKey = useMemo(() => new PublicKey(owner), [owner]);
   const verified = guard.rpc.state === 'ready' && !guard.rpc.mismatch;
   const genesisHash = guard.rpc.state === 'ready' ? guard.rpc.genesisHash : null;
@@ -272,7 +276,7 @@ export function JobWizard({ owner, escrowProgramId }: { owner: string; escrowPro
     fundAmount !== null && balance !== null && (balance.amount === null || balance.amount < fundAmount);
   const travelRule = setup !== null && fundAmount !== null && travelRuleRequired(fundAmount, setup.travelRuleThreshold);
 
-  const apiClient = useApiClient();
+  const apiClient = useApiClient(actor.api);
   const [travelVerification, setTravelVerification] = useState<TravelRuleVerification | null>(null);
   const chainCommitment = existingJob?.commitment ?? NO_COMMITMENT;
   const travelBlock = travelRuleFundBlock({
@@ -300,6 +304,8 @@ export function JobWizard({ owner, escrowProgramId }: { owner: string; escrowPro
     challenge?.ok === true &&
     spec.ok &&
     (policyChoice === '' || policy !== null) &&
+    // Public tavanı aşan iş açılmaz (ADR 0028): escrow `AmountAboveDailyCeiling` döner.
+    !(policy && amountValue !== null && amountValue > policy.dailyCeiling) &&
     guard.canTransact &&
     !pending;
   const canFund =
@@ -318,6 +324,7 @@ export function JobWizard({ owner, escrowProgramId }: { owner: string; escrowPro
     setBusy(kind);
     setError(null);
     try {
+      const options = await actor.options();
       const built =
         kind === 'create'
           ? await setup.client.flow.createJob(
@@ -330,7 +337,7 @@ export function JobWizard({ owner, escrowProgramId }: { owner: string; escrowPro
                 deadline: deadline.ok ? deadline.unix : 0,
                 challengePeriod: challenge?.ok ? challenge.seconds : 0n,
               },
-              { feePayer: ownerKey },
+              options,
             )
           : await setup.client.flow.fundJob(
               {
@@ -338,13 +345,11 @@ export function JobWizard({ owner, escrowProgramId }: { owner: string; escrowPro
                 job: new PublicKey(jobAddress!),
                 institutionTokenAccount: settlementAccount(ownerKey, token),
               },
-              { feePayer: ownerKey },
+              options,
             );
-      setSignature(await send(built.transaction));
+      setSignature(await actor.send(built.transaction));
     } catch (err) {
-      setError(
-        err instanceof TransactionBlockedError ? err.message : (escrowErrorMessage(err) ?? (err as Error).message),
-      );
+      setError(sendErrorText(err, escrowErrorMessage));
     } finally {
       setBusy(null);
     }
@@ -510,7 +515,8 @@ export function JobWizard({ owner, escrowProgramId }: { owner: string; escrowPro
         </Field>
         {policy && amountValue !== null && amountValue > policy.dailyCeiling && (
           <p className="text-sm text-danger-text">
-            The amount is above this policy&apos;s public daily ceiling; its release proof would be refused.
+            The amount is above this policy&apos;s public daily ceiling: the escrow does not open such a job, since no
+            release could be paid under it.
           </p>
         )}
       </Section>
@@ -650,7 +656,8 @@ export function JobWizard({ owner, escrowProgramId }: { owner: string; escrowPro
         <p className="text-caption text-muted">
           Transactions signed by this wallet: create_job opens the job and its vault; above the Travel Rule threshold
           commit_travel_rule binds the record&apos;s commitment; fund_job moves the amount into the vault once both
-          wallets are screened clear.
+          wallets are screened clear. With a policy, you then bind the pre-acceptance proof on the job page: the agent
+          can accept only after it.
         </p>
         {error && <p className="text-sm text-danger-text">{error}</p>}
         {status && <TxConfirmation stage={status.stage} signature={signature ?? undefined} error={status.error} />}

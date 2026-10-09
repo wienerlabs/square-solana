@@ -22,7 +22,7 @@ import { createPayingFetch, readPaymentReceipt } from '../src/client.js';
 import { createFacilitatorClient } from '../src/facilitator.js';
 import { createX402Gateway, getX402Payment, type X402Event } from '../src/gateway.js';
 import { SOLANA_DEVNET, usdcMint } from '../src/networks.js';
-import { listen, paymentRequiredOf, recordingFetch, type Listening } from './helpers.js';
+import { listen, paymentRequiredOf, recordingFetch, TEST_LIMITS, type Listening } from './helpers.js';
 
 const ENV = {
   payer: process.env['X402_E2E_PAYER'],
@@ -74,7 +74,7 @@ describe.skipIf(!ENABLED)('devnet: ücretli uç gerçek USDC ödemesiyle açıl�
     const feePayer = await signer(ENV.feePayer!);
     db = await startIsolatedDatabase();
     const gateway = createX402Gateway({
-      facilitator: createFacilitatorClient({ feePayer, rpcUrls: { [SOLANA_DEVNET]: rpcUrl } }),
+      facilitator: createFacilitatorClient({ feePayer, rpcUrls: { [SOLANA_DEVNET]: rpcUrl }, limits: TEST_LIMITS }),
       networks: [SOLANA_DEVNET],
       replay: createPrismaReplayStore(db.client),
       idempotency: { store: createPrismaIdempotencyStore(db.client), ttlSeconds: IDEMPOTENCY_TTL_SECONDS },

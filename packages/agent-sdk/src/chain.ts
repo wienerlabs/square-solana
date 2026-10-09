@@ -25,10 +25,17 @@ export class AgentTxError extends Error {
     readonly program: string | null = null,
     readonly code: number | null = null,
     options?: { cause?: unknown },
+    readonly errorName: string | null = null,
   ) {
     super(message, options);
     this.name = 'AgentTxError';
   }
+}
+
+const FINALIZED: ReadonlySet<Commitment> = new Set<Commitment>(['finalized', 'max', 'root']);
+
+export function settledCommitment(commitment: Commitment): Commitment {
+  return FINALIZED.has(commitment) ? 'finalized' : 'confirmed';
 }
 
 export interface TxSender {
@@ -41,6 +48,7 @@ export function createTxSender(deps: {
   client: SquareClient;
 }): TxSender {
   const { connection, commitment, client } = deps;
+  const confirmation = settledCommitment(commitment);
   const mapError = (error: unknown) => {
     try {
       return client.mapError(error);
@@ -52,7 +60,7 @@ export function createTxSender(deps: {
     const mapped = mapError(error);
     if (mapped) {
       const message = `${label}: ${mapped.program} ${mapped.name} (${mapped.code})`;
-      return new AgentTxError(message, mapped.program, mapped.code, { cause: error });
+      return new AgentTxError(message, mapped.program, mapped.code, { cause: error }, mapped.name);
     }
     const detail = error instanceof Error ? error.message : JSON.stringify(error);
     return new AgentTxError(`${label}: ${detail}`, null, null, { cause: error });
@@ -72,7 +80,7 @@ export function createTxSender(deps: {
       }
       const { value } = await connection.confirmTransaction(
         { signature, blockhash: built.blockhash, lastValidBlockHeight: built.lastValidBlockHeight },
-        commitment,
+        confirmation,
       );
       if (value.err) throw failure(label, { err: value.err, signature });
       return signature;
@@ -84,15 +92,34 @@ const hex = (bytes: Uint8Array | readonly number[]) => Buffer.from(bytes).toStri
 
 export interface JobState extends JobInfo {
   status: JobStatus;
+  /** Job'un politikası; policy'siz işte null. */
+  policy: PublicKey | null;
+  /**
+   * Policy'li işte kurumun kabul öncesi ön-ispatı (ADR 0028) işin güncel agent cüzdanı için bağlı mı; escrow
+   * `accept_job`'da onu ister. Cüzdan ön-ispattan sonra değiştiyse (`sync_agent_wallet`) false: kurum yeniden bağlar.
+   */
+  preflight: boolean;
   /** Teslim edilmişse `submit_work`'ün argümanları. */
   workHash: string;
   deliveryUri: string;
 }
 
 /** Escrow `Job` hesabı; yoksa null. Durum IDL varyant adıdır (`funded`, `accepted` …). */
-export async function readJob(client: SquareClient, address: PublicKey): Promise<JobState | null> {
-  const account = await client.escrow.fetch('job', address);
+export async function readJob(
+  client: SquareClient,
+  address: PublicKey,
+  commitment: Commitment,
+): Promise<JobState | null> {
+  const account = await client.escrow.program.account.job.fetchNullable(address, commitment);
   if (!account) return null;
+  const policy = account.policy ?? null;
+  const proof = policy
+    ? await client.verifier.program.account.preflightProof.fetchNullable(
+        client.pda.preflightProof(address)[0],
+        commitment,
+      )
+    : null;
+  const preflight = proof !== null && proof.payee.equals(account.agentWallet);
   return {
     address,
     institution: account.institution,
@@ -105,5 +132,7 @@ export async function readJob(client: SquareClient, address: PublicKey): Promise
     status: Object.keys(account.status)[0] as JobStatus,
     workHash: hex(account.workHash),
     deliveryUri: account.deliveryUri,
+    policy,
+    preflight,
   };
 }

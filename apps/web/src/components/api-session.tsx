@@ -21,8 +21,14 @@ export interface ApiSessionState {
   /**
    * Oturumlu API çağrısı. Oturum yoksa ya da bitmek üzereyse önce cüzdana imzalatılır; API eldeki oturumu
    * reddederse (`unauthorized`: süresi dolmuş ya da kapatılmış) bir kez yeniden imzalatılıp tekrarlanır.
+   * `smartAccount` verilirse istek o smart account'un vault'u adına gider (`X-Square-Smart-Account`, FE-21).
    */
-  call<T>(request: (api: SquareApi) => Promise<ApiEnvelope<T>>): Promise<T>;
+  call<T>(request: (api: SquareApi) => Promise<ApiEnvelope<T>>, options?: { smartAccount?: string | null }): Promise<T>;
+  /**
+   * Square API'nin oturumunu kabul eden başka bir servise (sponsorlu işlem servisi) oturumlu istek: `call` ile aynı
+   * imza ve yenileme kuralı; zarf açılmadan döner.
+   */
+  authorized<T>(request: (session: string) => Promise<ApiEnvelope<T>>): Promise<ApiEnvelope<T>>;
 }
 
 const ApiSessionContext = createContext<ApiSessionState | null>(null);
@@ -117,20 +123,28 @@ export function ApiSessionProvider({ apiUrl, children }: { apiUrl: string | unde
     }
   }, [apiUrl, keep]);
 
-  const call = useCallback(
-    async <T,>(request: (api: SquareApi) => Promise<ApiEnvelope<T>>): Promise<T> => {
+  const authorized = useCallback(
+    async <T,>(request: (session: string) => Promise<ApiEnvelope<T>>): Promise<ApiEnvelope<T>> => {
       if (!apiUrl) throw new Error(`${ENV_VARS.apiUrl} is not set.`);
       const current = held.current;
       const reused = sessionUsable(current, connected.current, nowSeconds());
       const first = reused && current ? current : await signIn();
-      const envelope = await request(squareApi(apiUrl, first.token));
-      if (envelope.success || envelope.error.code !== 'unauthorized' || !reused) return unwrap(envelope);
-      // API eldeki oturumu kabul etmedi (süresi dolmuş ya da kapatılmış): yeni imzayla bir kez daha.
+      const envelope = await request(first.token);
+      if (envelope.success || envelope.error.code !== 'unauthorized' || !reused) return envelope;
+      // Servis eldeki oturumu kabul etmedi (süresi dolmuş ya da kapatılmış): yeni imzayla bir kez daha.
       keep(null);
       const renewed = await signIn();
-      return unwrap(await request(squareApi(apiUrl, renewed.token)));
+      return request(renewed.token);
     },
     [apiUrl, signIn, keep],
+  );
+
+  const call = useCallback(
+    async <T,>(
+      request: (api: SquareApi) => Promise<ApiEnvelope<T>>,
+      options?: { smartAccount?: string | null },
+    ): Promise<T> => unwrap(await authorized((token) => request(squareApi(apiUrl!, token, options?.smartAccount)))),
+    [apiUrl, authorized],
   );
 
   const value = useMemo<ApiSessionState>(
@@ -142,8 +156,9 @@ export function ApiSessionProvider({ apiUrl, children }: { apiUrl: string | unde
       signIn,
       signOut,
       call,
+      authorized,
     }),
-    [unavailable, session, wallet, signingIn, error, signIn, signOut, call],
+    [unavailable, session, wallet, signingIn, error, signIn, signOut, call, authorized],
   );
   return <ApiSessionContext.Provider value={value}>{children}</ApiSessionContext.Provider>;
 }

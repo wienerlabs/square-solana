@@ -34,7 +34,7 @@
      `deregister_agent`.
    - **policy:** `init_institution`, `set_policy`, `update_policy`, `set_buyer_root`,
      `set_institution_multisig`, `deactivate_policy`.
-   - **verifier:** `set_compliance_proof`, `verify_mpp_payment_proof`.
+   - **verifier:** `set_preflight_proof` (P-01, ADR 0028), `set_compliance_proof`, `verify_mpp_payment_proof`.
    - **escrow:** `create_job`, `commit_travel_rule`, `fund_job`, `accept_job`, `submit_work`, `list_claim`,
      `buy_claim`, `cancel_claim`, `cancel_job`, `finalize_payment`, `raise_dispute`, `execute_resolution`,
      `lapse_dispute`, `escalate_missing_proof`, `sync_agent_wallet`; fiat rayı (BC-37, ADR 0024)

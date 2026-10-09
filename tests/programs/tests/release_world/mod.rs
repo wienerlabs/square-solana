@@ -1,8 +1,9 @@
 //! Verifier ve finalize testlerinin ortak dünyası: escrow, registry, policy ve verifier yüklü ve kurulu;
 //! kurum, agent cüzdanı, settlement mint'i ve politika release ispatı fikstürünün etiketlerinden
 //! (tests/fixtures/release-proofs.json, circuits/payment-compliance/scripts/program-proofs.mjs).
-//! Dünyanın saati ispatların anından iki saat önce başlar: iş teslim edilir, bir saatlik challenge
-//! penceresi kapanır, ispat bağlanır ve release aynı UTC gününde yapılır (ADR 0012).
+//! Dünyanın saati ispatların anından iki saat önce başlar: kurum kabul öncesi ön-ispatı bağlar (ADR 0028), iş
+//! teslim edilir, bir saatlik challenge penceresi kapanır, ispat bağlanır ve release aynı UTC gününde yapılır
+//! (ADR 0012).
 #![allow(dead_code)]
 
 use anchor_lang::prelude::Pubkey;
@@ -197,12 +198,11 @@ impl ReleaseWorld {
         self.fx["timestamp"].as_i64().unwrap()
     }
 
-    /// `spec` işini policy'yle açar, fonlar, kabul ve teslim ettirir; challenge penceresi bir saat.
-    pub fn delivered_job(&mut self, spec: &str) -> Pubkey {
+    /// `spec` işini policy'yle açar ve fonlar; challenge penceresi bir saat.
+    pub fn funded_job(&mut self, spec: &str) -> Pubkey {
         let amount = self.amount(spec);
         let spec_hash = self.spec(spec);
         let institution = self.institution.key.insecure_clone();
-        let wallet = self.agent.wallet.insecure_clone();
         let w = &mut self.w;
         let ix = w.create_job_ix(
             &institution.pubkey(),
@@ -218,6 +218,16 @@ impl ReleaseWorld {
         let job = job_address(&institution.pubkey(), &spec_hash);
         let ix = w.fund_job_ix(&self.institution, &job);
         w.h.send(&[ix], &[&institution]).expect("fund_job");
+        job
+    }
+
+    /// `spec` işini policy'yle açar, fonlar, ön-ispatı bağlar (ADR 0028), kabul ve teslim ettirir.
+    pub fn delivered_job(&mut self, spec: &str) -> Pubkey {
+        let spec_hash = self.spec(spec);
+        let wallet = self.agent.wallet.insecure_clone();
+        let job = self.funded_job(spec);
+        self.preflight(&job, spec);
+        let w = &mut self.w;
         let ix = w.accept_ix(&wallet.pubkey(), &job, self.agent.record, spec_hash);
         w.h.send(&[ix], &[&wallet]).expect("accept_job");
         let ix = w.submit_ix(&wallet.pubkey(), &job, self.agent.record, DELIVERY_URI);
@@ -257,6 +267,57 @@ impl ReleaseWorld {
             }
             .data(),
         }
+    }
+
+    /// Kabul öncesi ön-ispat (ADR 0028): net işin tutarı, payee agent cüzdanı, sayaç 0; sinyalleri verifier
+    /// job'dan kurar.
+    pub fn preflight_ix(
+        &self,
+        authority: &Pubkey,
+        job: &Pubkey,
+        policy: Pubkey,
+        p: &Proof,
+    ) -> Instruction {
+        Instruction {
+            program_id: square_verifier::ID,
+            accounts: square_verifier::accounts::SetPreflightProof {
+                payer: self.w.h.payer.pubkey(),
+                authority: *authority,
+                config: verifier_config_address(),
+                institution: self.policy.institution,
+                policy,
+                job: *job,
+                preflight_proof: preflight_address(job),
+                system_program: anchor_lang::system_program::ID,
+            }
+            .to_account_metas(None),
+            data: square_verifier::instruction::SetPreflightProof {
+                proof_a: p.proof_a,
+                proof_b: p.proof_b,
+                proof_c: p.proof_c,
+                refusal_code: p.refusal_code,
+                proof_timestamp: p.timestamp,
+            }
+            .data(),
+        }
+    }
+
+    /// Fikstürün `preflight_<spec>` ön-ispatını bağlar. Ön-ispat kabulden önceki an içindir (fikstürde
+    /// ispatların anından iki saat önce); dünyanın saati ilerlemişse bağlama o ana alınır, kabul ve sonrası
+    /// dünyanın saatinde kalır (escrow ön-ispatın anına bakmaz).
+    pub fn preflight(&mut self, job: &Pubkey, spec: &str) {
+        let preflight = self.proof(&format!("preflight_{spec}"));
+        let now = self.w.h.now();
+        self.w.h.set_time(preflight.timestamp);
+        self.bind_preflight(job, &preflight)
+            .expect("set_preflight_proof");
+        self.w.h.set_time(now);
+    }
+
+    pub fn bind_preflight(&mut self, job: &Pubkey, p: &Proof) -> Outcome {
+        let ix = self.preflight_ix(&self.institution.key.pubkey(), job, self.policy.policy, p);
+        let key = self.institution.key.insecure_clone();
+        self.w.h.send(&[compute_unit_limit(CU_LIMIT), ix], &[&key])
     }
 
     pub fn bind(&mut self, job: &Pubkey, p: &Proof) -> Outcome {
@@ -327,6 +388,16 @@ impl ReleaseWorld {
         let buyer = self
             .w
             .buyer_with(keypair(&self.fx, "claimBuyer"), CLAIM_PRICE);
+        self.w.sell_claim(&self.agent, job, &buyer);
+        buyer.key.pubkey()
+    }
+
+    /// Agent alacağı politikanın engelli adresine (`blockedWallet`) satar: registry'de screening'i temiz,
+    /// kurumun gizli politikasında engelli. Release kesin rettir; ADR 0028'den sonra kalıcı retin tek yolu budur.
+    pub fn sell_claim_to_blocked_buyer(&mut self, job: &Pubkey) -> Pubkey {
+        let buyer = self
+            .w
+            .buyer_with(keypair(&self.fx, "blockedWallet"), CLAIM_PRICE);
         self.w.sell_claim(&self.agent, job, &buyer);
         buyer.key.pubkey()
     }

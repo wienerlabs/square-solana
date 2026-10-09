@@ -27,8 +27,8 @@ Programların upgrade authority'si ve config'lerin admin'i 2-of-3 Squads vault'u
 |---|---|---|---|
 | 1 | Kurum | Kurum hesabını açar, harcama politikasının commitment'ını ve günlük tavanını zincire yazar. Politika içeriği zincire çıkmaz | `init_institution`, `set_policy` |
 | 2 | Agent | Kaydolur. Kayıt bir `did:aip` tanımlayıcısıdır; agent card'ın hash'i zincirdedir | `register_agent` |
-| 3 | Screener, kurum | Kurum ve agent cüzdanları taranır (`record_screening`). Kurum job'u agent kaydına bağlar ve fonlar. Eşiği aşan işte önce Travel Rule commitment'ı gelir | `create_job`, `commit_travel_rule`, `fund_job` |
-| 4 | Agent | İşi kabul eder ve teslim eder (işin SHA-256'sı ve URI'si). Challenge penceresi başlar | `accept_job`, `submit_work` |
+| 3 | Screener, kurum | Kurum ve agent cüzdanları taranır (`record_screening`). Kurum job'u agent kaydına bağlar ve fonlar; politikalı işin tutarı public günlük tavanı aşamaz. Eşiği aşan işte önce Travel Rule commitment'ı gelir. Politikalı işte kurum, agent kabul etmeden önce işin kendi koşullarının politikanın kalıcı kurallarını çiğnemediğini Groth16 ispatıyla bağlar (ön-ispat, [ADR 0028](decisions/0028-kabul-oncesi-on-ispat-ve-dispute-duzeltmeleri.md)) | `create_job`, `commit_travel_rule`, `fund_job`, `set_preflight_proof` |
+| 4 | Agent | İşi kabul eder (politikalı işte ön-ispat bağlıysa) ve teslim eder (işin SHA-256'sı ve URI'si). Challenge penceresi başlar | `accept_job`, `submit_work` |
 | 5 | Agent, alıcı | Agent release'in netini (alacak) satabilir. Alıcı kurumun alıcı listesindedir ve screening'i temizdir | `list_claim`, `buy_claim` |
 | 6 | Keeper | Challenge bitince ödemeyi yapar, keeper ücretini alır | `finalize_payment` |
 | 7 | Kurumun yazılımı | Politikalı işte, ödemenin politikaya uyduğunu Groth16 ispatıyla job'a bağlar (finalize'dan önce) | `set_compliance_proof` |
@@ -36,7 +36,9 @@ Programların upgrade authority'si ve config'lerin admin'i 2-of-3 Squads vault'u
 
 Ödeme kime gider: alacak satılmışsa (`ClaimListing.status == Bought`) alıcıya, değilse `Job.agent_wallet`'a.
 İspat bağlama ve ödeme aynı kuralı kullanır. Policy'li işte ispat yoksa `finalize_payment` `ProofRequired` ile
-reddedilir ve escrow bekler.
+reddedilir ve escrow bekler. Ön-ispat sayesinde teslim edilmiş işte kesin ret yalnızca alacak, politikanın engelli
+listesindeki bir alıcıya satıldıysa çıkabilir; ret geçiciyse (zaman penceresi, kategori, dolu günlük sayaç) kurum
+yeniden ispat bağlar.
 
 Fonlama başka zincirden de gelebilir: CCTP ile yakılan USDC aynı tx'te mint edilip job'u fonlar
 ([cctp-funding.md](design/cctp-funding.md)).
@@ -47,7 +49,7 @@ Fonlama başka zincirden de gelebilir: CCTP ile yakılan USDC aynı tx'te mint e
 stateDiagram-v2
   [*] --> Open: create_job
   Open --> Funded: fund_job
-  Funded --> Accepted: accept_job
+  Funded --> Accepted: accept_job (politikalı işte ön-ispatla)
   Accepted --> Delivered: submit_work
   Delivered --> Released: finalize_payment (ispat gerekmez ya da uyumlu)
   Delivered --> Refunded: finalize_payment (ret)
@@ -84,7 +86,8 @@ stateDiagram-v2
   ([apps/api](../apps/api/README.md#uyuşmazlık)).
 - **Fiat rayı** ([ADR 0024](decisions/0024-stripe-mpp-fiat-rayi.md)):
   - Kurum işi `create_fiat_job` ile açar; işin kasası yoktur ve iş her zaman bir politikaya bağlıdır.
-  - Agent işi `Open`'ken kabul eder ve teslim eder. Kurum Stripe ile öder.
+  - Kurum kabul öncesi ön-ispatı bağlar (`set_preflight_proof`). Agent işi `Open`'ken kabul eder ve teslim eder.
+    Kurum Stripe ile öder.
   - MPP authority'nin Ed25519 attestation'ı ve politika ispatı `verify_mpp_payment_proof` ile işe bağlanır.
   - `finalize_fiat_payment` işi `Released` yapar. İtibar, `ValidationRecord` ve günlük sayaç escrow
     yolundaki gibi yazılır; token hareket etmez, keeper ücreti yoktur.
@@ -101,7 +104,7 @@ Event'lerin tek kaynağı IDL'lerdir. Yayım ve sürüm kuralları [event şemas
 |---|---|
 | `square_registry` | `AgentRegistered`, `AgentUpdated`, `AgentStatusChanged`, `AgentOwnershipTransferred`, `AgentDeregistered`, `ScreeningRecorded`, `RegistryConfigUpdated` |
 | `square_policy` | `InstitutionCreated`, `InstitutionMultisigSet`, `PolicyCommitted`, `PolicyUpdated`, `PolicyDeactivated`, `BuyerRootCommitted` |
-| `square_verifier` | `ComplianceProofSet`, `ReleaseRecorded`, `MppPaymentVerified`, `VerifierConfigUpdated` |
+| `square_verifier` | `PreflightProofSet`, `ComplianceProofSet`, `ReleaseRecorded`, `MppPaymentVerified`, `VerifierConfigUpdated` |
 | `square_escrow` | `JobCreated`, `FiatJobCreated`, `TravelRuleCommitted`, `JobFunded`, `JobAccepted`, `WorkSubmitted`, `JobAgentWalletSynced`, `ClaimListed`, `ClaimBought`, `ClaimCancelled`, `ReleaseVerified`, `ReleaseRefused`, `Finalized`, `ReputationRecorded`, `ValidationRecorded`, `DisputeRaised`, `DisputeVote`, `DisputeDecided`, `DisputeResolved`, `DisputeLapsed`, `MissingProofEscalated`, `JobCancelled`, `ArbitratorsUpdated`, `EscrowConfigUpdated` |
 
 Bir job'un geçmişi escrow event'leriyle ve verifier'ın ispat event'leriyle izlenir. Web'in denetim görünümü

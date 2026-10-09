@@ -76,6 +76,7 @@ export interface RetryOptions {
   minDelayMs: number;
   maxDelayMs: number;
   submitMarginSeconds: number;
+  gateLagSeconds: number;
 }
 
 export interface AgentLogger {
@@ -146,6 +147,12 @@ export interface RegistrationResult {
   agentCardHash: string;
   /** Gönderilen tx; değişiklik yoksa null. */
   signature: string | null;
+  /**
+   * Kayıttaki cüzdan değiştiyse kaydın kapanmamış policy'li işleri; değişmediyse boş. Bu işler eski cüzdanda kalır.
+   * Biri `sync_agent_wallet` ile taşınırsa kabulden önce kurum ön-ispatı yeni cüzdan için yeniden bağlamalıdır;
+   * kabulden sonra ön-ispatın güvencesi yeni cüzdanı kapsamaz (ADR 0028).
+   */
+  openPolicyJobs: PublicKey[];
 }
 
 export interface RegisterOptions {

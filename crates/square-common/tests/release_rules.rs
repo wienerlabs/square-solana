@@ -7,7 +7,8 @@ use serde_json::Value;
 use square_common::contract::square_verifier_contract::accounts::{OperatorState, ReleaseProof};
 use square_common::contract::square_verifier_contract::types::ReleaseVerdict;
 use square_common::release::{
-    check_fresh, daily_spent_at, is_final_refusal, refusal, ReleaseFacts, Staleness,
+    check_fresh, daily_spent_at, is_final_refusal, preflight_accepts, refusal, ReleaseFacts,
+    Staleness,
 };
 
 fn vectors() -> Value {
@@ -73,6 +74,12 @@ fn refusal_rules_and_finality_match_typescript() {
             is_final_refusal(code, daily_spent_before),
             case["final"].as_bool().unwrap(),
             "kod {code}, sayaç {daily_spent_before}"
+        );
+        // Kabul öncesi ön-ispat (ADR 0028) sayaçtan bağımsızdır.
+        assert_eq!(
+            preflight_accepts(code),
+            case["preflight"].as_bool().unwrap(),
+            "kod {code}"
         );
     }
 }

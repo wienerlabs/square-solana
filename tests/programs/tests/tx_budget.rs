@@ -376,9 +376,16 @@ fn institution_agent_job_and_claim(profile: &Profile) -> (Vec<Row>, usize) {
     let ix = w.fund_job_ix(&institution, &job);
     meter.run(&mut w.h, &["fundJob"], "", vec![ix], &[&key]);
 
-    // Adım 4: kabul, en uzun URI'yle teslim.
+    // Adım 4: kabul (policy'li işte kurumun ön-ispatı okunur, ADR 0028), en uzun URI'yle teslim.
+    w.preflight_written(&job);
     let ix = w.accept_ix(&agent.wallet.pubkey(), &job, agent.record, SPEC);
-    meter.run(&mut w.h, &["acceptJob"], "", vec![ix], &[&agent.wallet]);
+    meter.run(
+        &mut w.h,
+        &["acceptJob"],
+        "policy'li, ön-ispat okunur",
+        vec![ix],
+        &[&agent.wallet],
+    );
     let delivery_uri = "d".repeat(square_escrow::state::DELIVERY_URI_MAX_LEN);
     let ix = w.submit_ix(&agent.wallet.pubkey(), &job, agent.record, &delivery_uri);
     meter.run(
@@ -506,6 +513,20 @@ fn proof_and_gated_release(profile: &Profile) -> Vec<Row> {
     let mut meter = Meter::new(profile, &mut r.w.h, r.w.usdc);
     let usdc = r.w.usdc;
     let key = r.institution.key.insecure_clone();
+    // Kabul öncesi ön-ispat (ADR 0028): b işi açılıp fonlanır, ön-ispat kendi anında bağlanır.
+    let job_b = r.funded_job("b");
+    let preflight = r.proof("preflight_b");
+    let now = r.w.h.now();
+    r.w.h.set_time(preflight.timestamp);
+    let ix = r.preflight_ix(&key.pubkey(), &job_b, r.policy.policy, &preflight);
+    meter.run(
+        &mut r.w.h,
+        &["setPreflightProof"],
+        "Groth16, 13 sinyal",
+        vec![ix],
+        &[&key],
+    );
+    r.w.h.set_time(now);
     let job = r.delivered_job("a");
     r.w.h.set_time(r.proof_time());
 
@@ -555,6 +576,7 @@ fn fiat_rail(profile: &Profile) -> Vec<Row> {
         &[&key],
     );
     let job = f.r.job_address(FIAT);
+    f.r.preflight(&job, FIAT);
     let wallet = f.r.agent.wallet.insecure_clone();
     let ix =
         f.r.w

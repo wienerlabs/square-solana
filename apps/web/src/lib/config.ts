@@ -12,6 +12,7 @@ export const ENV_VARS = {
   rpcUrl: 'SQUARE_SOLANA_RPC_URL',
   proverUrl: 'SQUARE_PROVER_URL',
   apiUrl: 'SQUARE_API_URL',
+  feePayerUrl: 'SQUARE_FEE_PAYER_URL',
   lookupTable: 'SQUARE_LOOKUP_TABLE',
 } as const;
 
@@ -83,6 +84,12 @@ export interface WebConfig {
   apiUrl?: string;
   /** İsteğe bağlı: CCTP ile başka zincirden fonlama (FE-19); `apiUrl` de gerekir (kayıt ve kurumun tx'i). */
   cctp?: CctpSource;
+  /**
+   * İsteğe bağlı: sponsorlu işlem servisinin kök adresi (`apps/fee-payer`, BE-27; sondaki eğik çizgi olmadan).
+   * Sponsorlu gönderim ve smart account (FE-21) bunu ister; servis Square API'nin oturumunu kabul eder, bu yüzden
+   * `apiUrl` de gerekir.
+   */
+  feePayerUrl?: string;
 }
 
 export type WebConfigResult = { ok: true; config: WebConfig } | { ok: false; errors: string[] };
@@ -114,6 +121,12 @@ export function parseWebConfig(
   // Sondaki eğik çizgi olmadan: yollar buna eklenir.
   const apiUrl = env[ENV_VARS.apiUrl]?.trim().replace(/\/+$/, '') || undefined;
   if (apiUrl) errors.push(...urlProblems(ENV_VARS.apiUrl, apiUrl, cluster));
+  const feePayerUrl = env[ENV_VARS.feePayerUrl]?.trim().replace(/\/+$/, '') || undefined;
+  if (feePayerUrl) {
+    errors.push(...urlProblems(ENV_VARS.feePayerUrl, feePayerUrl, cluster));
+    if (!apiUrl)
+      errors.push(`${ENV_VARS.feePayerUrl} needs ${ENV_VARS.apiUrl}: the fee payer accepts Square API sessions`);
+  }
 
   const programIds: Partial<Record<ProgramName, string>> = {};
   for (const program of PROGRAMS) {
@@ -139,6 +152,7 @@ export function parseWebConfig(
       ...(proverUrl && { proverUrl }),
       ...(apiUrl && { apiUrl }),
       ...(cctp && { cctp }),
+      ...(feePayerUrl && { feePayerUrl }),
     },
   };
 }

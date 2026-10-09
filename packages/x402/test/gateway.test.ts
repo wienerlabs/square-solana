@@ -120,10 +120,87 @@ describe('ödeme ve makbuz', () => {
       const response = await fetch(`${app.url}/report`, { headers });
       expect(response.status).toBe(402);
       expect(app.calls.report).toBe(1);
-      expect(app.events.map((event) => event.type)).toContain('settle_failed');
+      const failed = app.events.find((event) => event.type === 'settle_failed');
+      expect(failed).toMatchObject({ transaction: expect.stringMatching(/^[1-9A-HJ-NP-Za-km-z]{64,88}$/) });
     } finally {
       rpc.setConfirmationError(null);
     }
+  });
+
+  it('uzlaştırma düşerse işleyicinin başlıkları 402 yanıtına sızmaz', async () => {
+    rpc.setConfirmationError({ InstructionError: [2, { Custom: 1 }] });
+    try {
+      const headers = await paymentHeaderFor('/cookie');
+      const response = await fetch(`${app.url}/cookie`, { headers });
+      expect(response.status).toBe(402);
+      expect(app.calls.cookie).toBe(1);
+      expect(response.headers.getSetCookie()).toEqual(['visitor=ziyaretci-1; Path=/']);
+      expect(response.headers.get('link')).toBe('</yardim>; rel="help"');
+      expect(response.headers.get('date')).not.toBeNull();
+      expect(response.headers.get('date')).not.toBe('Wed, 01 Jan 2020 00:00:00 GMT');
+      expect(response.headers.get('x-report-id')).toBeNull();
+      expect(response.headers.get('etag')).not.toBe('"paid-etag"');
+      expect(await response.text()).not.toContain('ücretli içerik');
+    } finally {
+      rpc.setConfirmationError(null);
+    }
+  });
+
+  it('olay işleyicisi hata verse de tekrar koruması kapalı kalır', async () => {
+    await app.close();
+    app = await startPaidApp(wallets, rpc, {
+      replay: {
+        claim: async () => {
+          throw new Error('veritabanı yok');
+        },
+      },
+      onEvent: () => {
+        throw new Error('günlük yok');
+      },
+    });
+    const headers = await paymentHeaderFor('/report');
+    const response = await fetch(`${app.url}/report`, { headers });
+    expect(response.status).toBe(402);
+    expect(paymentRequiredOf(response).error).toBe('replay_guard_unavailable');
+    expect(app.calls.report).toBe(0);
+  });
+
+  it('uzlaşan yanıtta işleyicinin başlıkları korunur', async () => {
+    const response = await fetch(`${app.url}/cookie`, { headers: await paymentHeaderFor('/cookie') });
+    expect(response.status).toBe(200);
+    expect(response.headers.getSetCookie()).toEqual(['visitor=ziyaretci-1; Path=/', 'session=paid-content; Path=/']);
+    expect(response.headers.get('link')).toBe('</files/paid-report.pdf>');
+    expect(response.headers.get('x-report-id')).toBe('rapor-7');
+    expect(response.headers.get('date')).toBe('Wed, 01 Jan 2020 00:00:00 GMT');
+  });
+
+  it('asenkron olay işleyicisinin reddi yakalanır, istek etkilenmez', async () => {
+    const unhandled: unknown[] = [];
+    const record = (reason: unknown) => unhandled.push(reason);
+    process.on('unhandledRejection', record);
+    try {
+      await app.close();
+      app = await startPaidApp(wallets, rpc, {
+        replay: memoryReplayStore(),
+        onEvent: async () => {
+          throw new Error('denetim deposu yok');
+        },
+      });
+      const response = await fetch(`${app.url}/report`, { headers: await paymentHeaderFor('/report') });
+      expect(response.status).toBe(200);
+      await new Promise((resolve) => setImmediate(resolve));
+      expect(unhandled).toEqual([]);
+    } finally {
+      process.off('unhandledRejection', record);
+    }
+  });
+
+  it('res.locals yalnızca ödeme bilgisini taşır ve kopyalanabilir', async () => {
+    const response = await fetch(`${app.url}/locals`, { headers: await paymentHeaderFor('/locals') });
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as { squareX402: { payment: X402Payment } };
+    expect(Object.keys(body.squareX402)).toEqual(['payment']);
+    expect(body.squareX402.payment.fingerprint).toMatch(/^svm:[0-9a-f]{64}$/);
   });
 
   it('makbuzsuz yanıtta readPaymentReceipt null döner', async () => {

@@ -6,7 +6,8 @@ import { useConnection } from '@solana/wallet-adapter-react';
 import { PublicKey } from '@solana/web3.js';
 import type { AgentCard } from '@squaresdk/solana-types';
 import { useApiSession } from '@/components/api-session';
-import { useNetworkGuard, useSendTransaction } from '@/components/network-guard';
+import { useActor } from '@/components/actor';
+import { useNetworkGuard } from '@/components/network-guard';
 import { useWebConfig } from '@/components/providers';
 import { Address, Did } from '@/components/ui/address';
 import { Button } from '@/components/ui/button';
@@ -27,7 +28,7 @@ import {
   type CardCheck,
 } from '@/lib/agent-registration';
 import { ENV_VARS, isAddress } from '@/lib/config';
-import { TransactionBlockedError } from '@/lib/send-transaction';
+import { sendErrorText } from '@/lib/sponsored-send';
 import { useSignatureStatus } from '@/lib/use-signature-status';
 
 const inputClass =
@@ -72,11 +73,14 @@ type CardState = { state: 'idle' } | { state: 'checking' } | ({ uri: string } & 
 /** Square API'de barındırılan kart: hangi kayıt girdisi için barındırıldığıyla. */
 type HostedCard = { uri: string; hash: Uint8Array; card: AgentCard; registrationKey: string };
 
-/** Bağlı cüzdanın (owner ve creator) agent kaydı: `register_agent`, akışın 2. adımı. */
+/**
+ * Agent kaydı (`register_agent`, akışın 2. adımı): sahip ve creator rolün adresidir (cüzdan ya da smart account'un
+ * vault'u, FE-21); kart barındırma API'ye rol adına gider.
+ */
 export function AgentRegistration({ owner, registryProgramId }: { owner: string; registryProgramId: string }) {
   const { connection } = useConnection();
   const guard = useNetworkGuard();
-  const send = useSendTransaction();
+  const actor = useActor('agent');
   const { apiUrl } = useWebConfig();
   const apiSession = useApiSession();
   const ownerKey = useMemo(() => new PublicKey(owner), [owner]);
@@ -151,8 +155,9 @@ export function AgentRegistration({ owner, registryProgramId }: { owner: string;
     setHosting(true);
     setHostError(null);
     try {
-      const result = await apiSession.call((api) =>
-        api.putAgentCard(identity.agentRecord.toBase58(), draft.card, { agentId }),
+      const result = await apiSession.call(
+        (api) => api.putAgentCard(identity.agentRecord.toBase58(), draft.card, { agentId }),
+        actor.api,
       );
       const problem = hostingProblem(result, draft.hash);
       if (problem) {
@@ -181,22 +186,19 @@ export function AgentRegistration({ owner, registryProgramId }: { owner: string;
     setSubmitting(true);
     setSubmitError(null);
     try {
+      const { feePayer } = await actor.options();
       const transaction = await buildRegisterAgentTx(connection, {
         registry,
-        payer: ownerKey,
+        payer: feePayer,
         owner: ownerKey,
         agentId,
         agentCardUri: cardUri,
         agentCardHash: cardHash,
         wallet: new PublicKey(wallet),
       });
-      setSignature(await send(transaction));
+      setSignature(await actor.send(transaction));
     } catch (error) {
-      setSubmitError(
-        error instanceof TransactionBlockedError
-          ? error.message
-          : (registryErrorMessage(error) ?? (error as Error).message),
-      );
+      setSubmitError(sendErrorText(error, registryErrorMessage));
     } finally {
       setSubmitting(false);
     }

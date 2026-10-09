@@ -2,7 +2,8 @@
 
 import Link from 'next/link';
 import type { ReactNode } from 'react';
-import { useWallet } from '@solana/wallet-adapter-react';
+import { useActor } from '@/components/actor';
+import { ActorNotice } from '@/components/actor-notice';
 import { useWebConfig } from '@/components/providers';
 import { useRole } from '@/components/role-provider';
 import { PROGRAM_ID_ENV } from '@/lib/config';
@@ -13,13 +14,15 @@ function Notice({ children }: { children: ReactNode }) {
   return <p className="rounded-card border border-border bg-surface p-6 text-sm text-muted">{children}</p>;
 }
 
-// İşi kurum cüzdanı açar ve fonlar; diğer programların kimlikleri escrow config'inden okunur.
+// İşi kurum açar ve fonlar: cüzdan ya da kurumun smart account vault'u (FE-21). Diğer programların kimlikleri
+// escrow config'inden okunur.
 export function NewJobPage() {
-  const { publicKey } = useWallet();
+  const actor = useActor('institution');
+  const owner = actor.address;
   const { programIds } = useWebConfig();
   const { role } = useRole();
 
-  if (!publicKey) return <Notice>Connect the institution&apos;s wallet to open a job.</Notice>;
+  if (!owner) return <Notice>Connect the institution&apos;s wallet to open a job.</Notice>;
   if (!programIds.escrow) {
     return (
       <Notice>
@@ -40,5 +43,10 @@ export function NewJobPage() {
       </Notice>
     );
   }
-  return <JobWizard owner={publicKey.toBase58()} escrowProgramId={programIds.escrow} />;
+  return (
+    <>
+      <ActorNotice actor={actor} />
+      <JobWizard key={owner.toBase58()} owner={owner.toBase58()} escrowProgramId={programIds.escrow} />
+    </>
+  );
 }

@@ -234,6 +234,7 @@ export const DEFAULT_ALLOWED_INSTRUCTIONS: readonly string[] = Object.freeze([
   'policy:set_institution_multisig',
   'policy:deactivate_policy',
   'verifier:set_compliance_proof',
+  'verifier:set_preflight_proof',
   'verifier:verify_mpp_payment_proof',
   'escrow:create_job',
   'escrow:create_fiat_job',

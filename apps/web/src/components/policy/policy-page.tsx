@@ -2,7 +2,8 @@
 
 import Link from 'next/link';
 import type { ReactNode } from 'react';
-import { useWallet } from '@solana/wallet-adapter-react';
+import { useActor } from '@/components/actor';
+import { ActorNotice } from '@/components/actor-notice';
 import { useWebConfig } from '@/components/providers';
 import { useRole } from '@/components/role-provider';
 import { PROGRAM_ID_ENV } from '@/lib/config';
@@ -13,13 +14,15 @@ function Notice({ children }: { children: ReactNode }) {
   return <p className="rounded-card border border-border bg-surface p-6 text-sm text-muted">{children}</p>;
 }
 
-// Politikayı kurumun yetkili cüzdanı yazar; Institution PDA'sı square_policy'nin kimliğinden türetilir.
+// Politikayı kurumun yetkilisi yazar: cüzdan ya da kurumun smart account vault'u (FE-21). Institution PDA'sı
+// yetkiliden ve square_policy'nin kimliğinden türetilir.
 export function PolicyPage() {
-  const { publicKey } = useWallet();
+  const actor = useActor('institution');
+  const owner = actor.address;
   const { programIds } = useWebConfig();
   const { role } = useRole();
 
-  if (!publicKey) return <Notice>Connect the institution&apos;s wallet to write its spending policies.</Notice>;
+  if (!owner) return <Notice>Connect the institution&apos;s wallet to write its spending policies.</Notice>;
   if (!programIds.policy) {
     return (
       <Notice>
@@ -40,5 +43,10 @@ export function PolicyPage() {
       </Notice>
     );
   }
-  return <InstitutionPolicies owner={publicKey.toBase58()} policyProgramId={programIds.policy} />;
+  return (
+    <>
+      <ActorNotice actor={actor} />
+      <InstitutionPolicies key={owner.toBase58()} owner={owner.toBase58()} policyProgramId={programIds.policy} />
+    </>
+  );
 }

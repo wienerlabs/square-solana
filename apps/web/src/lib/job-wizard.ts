@@ -237,6 +237,12 @@ export function escrowErrorMessage(error: unknown): string | null {
   if (/TravelRuleCommitmentRequired/.test(message)) {
     return `${message}. The job stays open: bind the Travel Rule commitment, then fund it.`;
   }
+  if (/PreflightRequired/.test(message)) {
+    return `${message}. The institution binds its pre-acceptance proof on the job page; the agent can accept after that.`;
+  }
+  if (/AmountAboveDailyCeiling/.test(message)) {
+    return `${message}. No release could ever be paid under this policy; lower the amount or choose another policy.`;
+  }
   return message;
 }
 

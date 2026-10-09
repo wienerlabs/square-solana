@@ -4,9 +4,16 @@
 import { ApiClientError, createApiClient, type SquareApi } from '@squaresdk/solana-sdk';
 import type { ApiEnvelope, ApiErrorCode, KeeperAction, ProgramErrorRef } from '@squaresdk/solana-types';
 
-/** API istemcisi; oturum belirteci verilirse istekler onunla gider. */
-export const squareApi = (apiUrl: string, session?: string): SquareApi =>
-  createApiClient({ baseUrl: apiUrl, ...(session && { auth: { session } }) });
+/**
+ * API istemcisi; oturum belirteci verilirse istekler onunla gider. `smartAccount` (Squads multisig) verilirse
+ * istekler `X-Square-Smart-Account` başlığını taşır: oturumun cüzdanı, multisig'te `Initiate` yetkili üyeyse
+ * multisig'in vault'u adına yazar (FE-21; API sözleşmesi v0.24.0).
+ */
+export const squareApi = (apiUrl: string, session?: string, smartAccount?: string | null): SquareApi =>
+  createApiClient({
+    baseUrl: apiUrl,
+    ...(session && { auth: { session, ...(smartAccount && { smartAccount }) } }),
+  });
 
 /** Başarısız API yanıtı: zarfın hata kodu ve API'nin mesajı. */
 export class SquareApiError extends Error {

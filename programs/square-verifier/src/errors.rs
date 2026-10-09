@@ -29,4 +29,6 @@ pub enum VerifierError {
     InvalidMppAttestation,
     #[msg("Instruction does not apply to the job's settlement rail")]
     RailMismatch,
+    #[msg("Preflight proof breaks a permanent or daily-ceiling rule of the policy")]
+    PreflightRefused,
 }

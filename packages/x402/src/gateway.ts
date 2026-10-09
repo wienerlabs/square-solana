@@ -49,7 +49,13 @@ export type X402Event =
       readonly transaction: string;
       readonly payer: string;
     }
-  | { readonly type: 'settle_failed'; readonly fingerprint: string; readonly network: string; readonly reason: string }
+  | {
+      readonly type: 'settle_failed';
+      readonly fingerprint: string;
+      readonly network: string;
+      readonly reason: string;
+      readonly transaction?: string;
+    }
   | { readonly type: 'settled_callback_error'; readonly fingerprint: string; readonly error: unknown }
   | { readonly type: 'idempotent_replay'; readonly key: string; readonly network: string }
   | { readonly type: 'idempotency_error'; readonly error: unknown };
@@ -112,8 +118,23 @@ export interface X402Gateway {
 
 interface RequestState {
   payment?: X402Payment;
-  readonly onSettled?: (payment: X402SettledPayment) => void;
 }
+
+type HeaderValue = number | string | readonly string[];
+
+interface RequestContext {
+  readonly state: RequestState;
+  readonly onSettled?: (payment: X402SettledPayment) => void;
+  readonly response: Response;
+  readonly headersBeforeHandler: ReadonlyMap<string, HeaderValue>;
+}
+
+const headerSnapshot = (response: Response): ReadonlyMap<string, HeaderValue> =>
+  new Map(
+    Object.entries(response.getHeaders()).flatMap(([name, value]): [string, HeaderValue][] =>
+      value === undefined ? [] : [[name, Array.isArray(value) ? [...value] : value]],
+    ),
+  );
 
 const LOCALS_KEY = 'squareX402';
 
@@ -127,8 +148,14 @@ type Claim = 'ok' | 'replayed' | 'error';
 export function createX402Gateway(options: X402GatewayOptions): X402Gateway {
   const clock = options.clock ?? Date.now;
   const ttlMs = (options.replayTtlSeconds ?? DEFAULT_REPLAY_TTL_SECONDS) * 1000;
-  const emit = (event: X402Event) => options.onEvent?.(event);
-  const storage = new AsyncLocalStorage<RequestState>();
+  const emit = (event: X402Event): void => {
+    try {
+      void Promise.resolve(options.onEvent?.(event)).catch(() => undefined);
+    } catch {
+      return;
+    }
+  };
+  const storage = new AsyncLocalStorage<RequestContext>();
 
   const server = new x402ResourceServer(options.facilitator);
   registerExactSvmScheme(server, {
@@ -172,7 +199,7 @@ export function createX402Gateway(options: X402GatewayOptions): X402Gateway {
     const payment = describe(paymentPayload, requirements, result.payer ?? '');
     const claimed = await claim(payment.fingerprint, payment.network);
     if (claimed !== 'ok') return abort(claimed);
-    const state = storage.getStore();
+    const state = storage.getStore()?.state;
     if (state) state.payment = payment;
     emit({ type: 'verified', payment });
   });
@@ -184,39 +211,56 @@ export function createX402Gateway(options: X402GatewayOptions): X402Gateway {
     if (claimed !== 'ok') return abort(claimed);
   });
 
+  const discardHandlerHeaders = () => {
+    const context = storage.getStore();
+    if (!context || context.response.headersSent) return;
+    const { response, headersBeforeHandler } = context;
+    const { sendDate } = response;
+    for (const name of response.getHeaderNames()) response.removeHeader(name);
+    for (const [name, value] of headersBeforeHandler) {
+      response.setHeader(name, typeof value === 'object' ? [...value] : value);
+    }
+    response.sendDate = sendDate;
+  };
+
   server.onAfterSettle(async ({ paymentPayload, requirements, result, phase }) => {
     const fingerprint = paymentFingerprint(paymentPayload);
     if (!result.success) {
+      discardHandlerHeaders();
       emit({
         type: 'settle_failed',
         fingerprint,
         network: requirements.network,
         reason: result.errorReason ?? 'unknown',
+        ...(result.transaction ? { transaction: result.transaction } : {}),
       });
       return;
     }
     const payer = result.payer ?? '';
     emit({ type: 'settled', fingerprint, network: requirements.network, transaction: result.transaction, payer });
-    const state = storage.getStore();
-    if (!state) return;
+    const context = storage.getStore();
+    if (!context) return;
     const settled: X402SettledPayment = {
       ...describe(paymentPayload, requirements, payer),
       settlement: { transaction: result.transaction, network: result.network },
     };
-    if (phase === 'before-handler') state.payment = settled;
+    if (phase === 'before-handler') context.state.payment = settled;
     try {
-      state.onSettled?.(settled);
+      context.onSettled?.(settled);
     } catch (error) {
       emit({ type: 'settled_callback_error', fingerprint, error });
     }
   });
 
   server.onSettleFailure(async ({ paymentPayload, requirements, error }) => {
+    discardHandlerHeaders();
+    const transaction = (error as { transaction?: unknown }).transaction;
     emit({
       type: 'settle_failed',
       fingerprint: paymentFingerprint(paymentPayload),
       network: requirements.network,
       reason: error.message,
+      ...(typeof transaction === 'string' && transaction ? { transaction } : {}),
     });
   });
 
@@ -239,9 +283,15 @@ export function createX402Gateway(options: X402GatewayOptions): X402Gateway {
       };
       const middleware = paymentMiddleware(config, server);
       const handler: RequestHandler = (req, res, next) => {
-        const state: RequestState = route.onSettled ? { onSettled: route.onSettled } : {};
+        const state: RequestState = {};
         res.locals[LOCALS_KEY] = state;
-        storage.run(state, () => {
+        const context: RequestContext = {
+          state,
+          response: res,
+          headersBeforeHandler: headerSnapshot(res),
+          ...(route.onSettled ? { onSettled: route.onSettled } : {}),
+        };
+        storage.run(context, () => {
           middleware(req, res, next).catch(next);
         });
       };
