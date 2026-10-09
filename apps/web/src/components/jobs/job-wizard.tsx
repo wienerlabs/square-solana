@@ -350,12 +350,15 @@ export function JobWizard({ owner, escrowProgramId }: { owner: string; escrowPro
     amountValue !== null &&
     deadline.ok &&
     spec.ok &&
+    (policyChoice === '' || policy !== null) &&
+    // Public tavanı aşan iş açılmaz (ADR 0028): escrow ve fiat `AmountAboveDailyCeiling` döner.
+    !(policy && amountValue !== null && amountValue > policy.dailyCeiling) &&
     guard.canTransact &&
     !pending &&
     (fiat
       ? // Fiat iş politikasız açılmaz; iki tarafın screening'i açılışta denetlenir (`create_fiat_job`).
         policy !== null && cardAmount?.ok === true && screening?.state === 'ready' && fundBlock === null
-      : challenge?.ok === true && (policyChoice === '' || policy !== null));
+      : challenge?.ok === true);
   const canFund =
     setup !== null &&
     token !== null &&
@@ -620,7 +623,8 @@ export function JobWizard({ owner, escrowProgramId }: { owner: string; escrowPro
         </Field>
         {policy && amountValue !== null && amountValue > policy.dailyCeiling && (
           <p className="text-sm text-danger-text">
-            The amount is above this policy&apos;s public daily ceiling; its release proof would be refused.
+            The amount is above this policy&apos;s public daily ceiling: the escrow does not open such a job, since no
+            release could be paid under it.
           </p>
         )}
       </Section>
@@ -761,8 +765,8 @@ export function JobWizard({ owner, escrowProgramId }: { owner: string; escrowPro
         </div>
         <p className="text-caption text-muted">
           {fiat
-            ? 'Signed by this wallet: create_fiat_job opens the job without a vault once both wallets are screened clear. After the agent delivers, you pay by card on the job page and bind the payment with its compliance proof.'
-            : "Transactions signed by this wallet: create_job opens the job and its vault; above the Travel Rule threshold commit_travel_rule binds the record's commitment; fund_job moves the amount into the vault once both wallets are screened clear."}
+            ? 'Signed by this wallet: create_fiat_job opens the job without a vault once both wallets are screened clear. You then bind the pre-acceptance proof on the job page; the agent can accept only after it. After the agent delivers, you pay by card on the job page and bind the payment with its compliance proof.'
+            : "Transactions signed by this wallet: create_job opens the job and its vault; above the Travel Rule threshold commit_travel_rule binds the record's commitment; fund_job moves the amount into the vault once both wallets are screened clear. With a policy, you then bind the pre-acceptance proof on the job page: the agent can accept only after it."}
         </p>
         {error && <p className="text-sm text-danger-text">{error}</p>}
         {status && <TxConfirmation stage={status.stage} signature={signature ?? undefined} error={status.error} />}

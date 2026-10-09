@@ -140,3 +140,41 @@ export async function buildReleaseWitness(params: {
   };
   return { ...facts, inputs: releaseInputs(params.policy, params.salts, params.paymentCategory, facts) };
 }
+
+/**
+ * Kabul öncesi ön-ispatın witness'ı (ADR 0028, verifier `set_preflight_proof`): işin kendi koşulları. Net işin
+ * tutarının tamamı (agent tarafının her release'inin üst sınırı), payee job'daki agent cüzdanı, sayaç 0, makbuz 0;
+ * politika snapshot'ı job'unki. Agent kabul etmeden önce (`Open` ya da `Funded`) kurulur. Yerel politika job'un
+ * snapshot'ıyla aynı değilse fırlatır.
+ */
+export async function buildPreflightWitness(params: {
+  client: SquareClient;
+  job: PublicKey;
+  policy: PolicyDocument;
+  salts: PolicySalts;
+  paymentCategory: string;
+  /** İspat anı (unix saniyesi); verilmezse şimdi. */
+  now?: number;
+}): Promise<ReleaseWitness> {
+  const { client, job } = params;
+  const account = await client.escrow.fetch('job', job);
+  if (!account) throw new Error(`job bulunamadı: ${job.toBase58()}`);
+  if (!account.policy) throw new Error(`job bir politikaya bağlı değil: ${job.toBase58()}`);
+  const commitment = policyCommitmentField(params.policy, params.salts);
+  if (commitment !== commitmentFromBytes(Uint8Array.from(account.policyCommitment))) {
+    throw new Error("yerel politika ve salt'lar job'un commitment snapshot'ıyla eşleşmiyor");
+  }
+  if (BigInt(params.policy.dailyCeiling) !== toBigInt(account.policyDailyCeiling)) {
+    throw new Error("politikanın public tavanı job'un snapshot'ıyla eşleşmiyor");
+  }
+  const facts: ReleaseFacts = {
+    job,
+    payee: account.agentWallet,
+    netAmount: toBigInt(account.amount),
+    mint: account.mint,
+    dailySpentBefore: 0n,
+    timestamp: params.now ?? Math.floor(Date.now() / 1000),
+    stripeReceiptHash: 0n,
+  };
+  return { ...facts, inputs: releaseInputs(params.policy, params.salts, params.paymentCategory, facts) };
+}

@@ -370,4 +370,17 @@ describe('proof', () => {
     await expect(run('proof', 'bind', { ...values, job: b58(other.address) })).rejects.toThrow(/job'un politikası/);
     await expect(run('policy', 'watch', { ...values, job: b58(other.address) })).rejects.toThrow(/job'un politikası/);
   });
+
+  it('preflight (ADR 0028): aynı koşullar; ön-ispat kabulden önce bağlanır', async () => {
+    const p = policyFiles();
+    const { address } = await job({ policy: p.address });
+    const values = { job: b58(address), policy: p.policy, secret: p.secret, category: 'research' };
+    await expect(run('proof', 'preflight', values)).rejects.toThrow(/prover yapılandırılmamış/);
+    w.config = { ...w.config, prover: { url: 'http://127.0.0.1:9', artifactVersion: 'aa'.repeat(32), apiKey: null } };
+    await expect(run('proof', 'preflight', values)).rejects.toThrow(/SQUARESDK_SOLANA_PROVER_API_KEY/);
+    const other = await job({ policy: Keypair.generate().publicKey });
+    await expect(run('proof', 'preflight', { ...values, job: b58(other.address) })).rejects.toThrow(
+      /job'un politikası/,
+    );
+  });
 });

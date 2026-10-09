@@ -53,13 +53,13 @@ P-02'nin belgeyle çelişen satırı program arayüzünde koda göre düzeltildi
 
 | ID | Önem | Program | Bulgu | Durum |
 |---|---|---|---|---|
-| [P-01](https://github.com/wienerlabs/square-solana/issues/236) | yüksek | escrow, verifier | Kalıcı ret sebeplerinin parametrelerini (tx tavanı, mint listesi, engelli adresler) kurum iş açılmadan önce, agent'tan gizli seçer. Teslimden sonra geçerli bir kesin ret bağlayıp neti geri alabilir; agent'ın zincirde başvurusu yok | Açık (tasarım; ADR gerekir) |
+| [P-01](https://github.com/wienerlabs/square-solana/issues/236) | yüksek | escrow, verifier | Kalıcı ret sebeplerinin parametrelerini (tx tavanı, mint listesi, engelli adresler) kurum iş açılmadan önce, agent'tan gizli seçer. Teslimden sonra geçerli bir kesin ret bağlayıp neti geri alabilir; agent'ın zincirde başvurusu yok | Düzeltildi: kabul öncesi ön-ispat ve public tavan ([ADR 0028](../decisions/0028-kabul-oncesi-on-ispat-ve-dispute-duzeltmeleri.md), program sözleşmesi v0.8.0); devnet'te Squads upgrade'iyle yürürlüğe girer |
 | [P-02](https://github.com/wienerlabs/square-solana/issues/237) | orta | policy, escrow | Multisig bağlandıktan sonra, bağlamadan önce açılmış işlerin kurum yetkisi açan anahtarda kalır: sızmış anahtar fonlanmış işi iptal edip iadeyi kendine alır | Açık; program arayüzü belgesi koda göre düzeltildi |
 | [P-03](https://github.com/wienerlabs/square-solana/issues/238) | orta | escrow | Alacak satışında satıcı, finalize'da keeper taranmaz: işaretli agent cüzdanı alacağını satıp fiyatı alır | Açık |
 | [P-04](https://github.com/wienerlabs/square-solana/issues/239) | orta | registry | Screening kaydında yazım sırası yok: eski bir `Clear` kararı yeni `Flagged` kaydının üstüne yazılıp ömrü yeniler | Açık |
 | [P-05](https://github.com/wienerlabs/square-solana/issues/240) | düşük | escrow | Fiat işte payee yalnızca açılışta taranır; cüzdan rotasyonundan sonra taranmamış cüzdana release kaydı | Açık |
 | [P-06](https://github.com/wienerlabs/square-solana/issues/241) | düşük | verifier | Bağlanmış ispat, doğrulama anahtarı ya da MPP authority değiştikten sonra da tüketilir | Açık |
-| [P-07](https://github.com/wienerlabs/square-solana/issues/242) | düşük | escrow | Yanlış net tutarlı uyumlu bir ispat, agent'ın `escalate_missing_proof`'unu o gün boyunca engeller | Açık |
+| [P-07](https://github.com/wienerlabs/square-solana/issues/242) | düşük | escrow | Yanlış net tutarlı uyumlu bir ispat, agent'ın `escalate_missing_proof`'unu o gün boyunca engeller | Düzeltildi: net ve mint denetimi (program sözleşmesi v0.7.1) |
 | [P-08](https://github.com/wienerlabs/square-solana/issues/243) | düşük | policy, escrow | Kapatılan politikanın alıcı kökü değiştirilemez ama açık işlerin `buy_claim`'i onu okumaya devam eder | Açık |
 | [P-09](https://github.com/wienerlabs/square-solana/issues/244) | düşük | policy | `set_institution_multisig` yeni vault'un imzasını istemez; yanlış multisig'e bağlama geri alınamaz | Açık |
 | [P-10](https://github.com/wienerlabs/square-solana/issues/245) | düşük | registry | Screener rotasyonu eski screener'ın yazdığı kayıtları geçersiz kılmaz | Açık |
@@ -72,7 +72,7 @@ P-02'nin belgeyle çelişen satırı program arayüzünde koda göre düzeltildi
 | [P-17](https://github.com/wienerlabs/square-solana/issues/252) | bilgi | escrow | Token-2022 mint'i kabul edilir; transfer ücreti ve kalıcı delege muhasebeyi bozar; `fund_job` vault'a gelen tutarı denetlemez | Açık |
 | [P-18](https://github.com/wienerlabs/square-solana/issues/253) | bilgi | escrow | Alacak fiyatının sınırı keeper ücretini hesaba katmaz; alıcı ödediğinden az alabilir | Açık |
 | [P-19](https://github.com/wienerlabs/square-solana/issues/254) | bilgi | square-common | Alıcı listesi Merkle ağacında yaprak ile iç düğüm arasında alan ayrımı yok | Açık |
-| [P-20](https://github.com/wienerlabs/square-solana/issues/255) | bilgi | verifier | Sıfır `mpp_authority` yalnızca precompile'ın sıkı doğrulamasıyla reddedilir; açık denetim yok | Açık |
+| [P-20](https://github.com/wienerlabs/square-solana/issues/255) | bilgi | verifier | Sıfır `mpp_authority` yalnızca precompile'ın sıkı doğrulamasıyla reddedilir; açık denetim yok | Düzeltildi: açık denetim (program sözleşmesi v0.7.1) |
 | [P-21](https://github.com/wienerlabs/square-solana/issues/256) | düşük | testler | Güvenlik açısından kritik kısıtların reddi denenmiyordu; kapsam betiği talimat başına "en az bir hata kodu"nu sayar | Düzeltildi: `constraints.rs` (10 test) ve fuzz; kalan boşluklar matristedir |
 
 **Önem ölçeği:**
@@ -155,6 +155,18 @@ kodunun beklenen hata olarak denetlenmesini sayar. Bu yüzden kritik bir kısıt
   - kesin retteki iadeyi agent'ın dispute açabileceği bir pencereye bağlamak.
 
   Karar bir ADR'dir. En azından agent'ın ve alıcının güven varsayımı belgelenmelidir.
+- **Durum: düzeltildi** ([ADR 0028](../decisions/0028-kabul-oncesi-on-ispat-ve-dispute-duzeltmeleri.md) madde 1
+  ve 2, program sözleşmesi v0.8.0):
+  - Verifier `set_preflight_proof`: kurum, agent kabul etmeden önce işin kendi koşullarıyla (net `job.amount`,
+    payee agent cüzdanı, sayaç 0) bir ispat bağlar. Ret kodunda kalıcı bit ya da günlük tavan biti varsa bağlanmaz.
+    Escrow `accept_job` policy'li işte (fiat dahil) bu `PreflightProof`'u ister. Ön-ispat bağlamadaki agent
+    cüzdanını saklar; cüzdan kabulden önce `sync_agent_wallet` ile taşınırsa kurum yeniden bağlar
+    (`preflight.rs::a_wallet_moved_after_the_preflight_needs_a_new_preflight`).
+  - `create_job` / `create_fiat_job` public günlük tavanı aşan tutarı reddeder.
+  - Commitment iş açılışında sabit olduğu için aynı iş, net ve payee için kalıcı bitler değişmez. Kesin ret yalnızca
+    alacak, politikanın gizli engelli listesindeki bir alıcıya satılınca çıkabilir; bu alıcının kendi riskidir
+    (alıcı listesi kurumun, engelli listesi gizli). `release_gate.rs::a_final_refusal_refunds_the_net_to_the_institution`
+    artık bu yolu çalıştırır; iş "c"nin senaryosu `preflight.rs`'te kabulden önce durur.
 
 ### P-02: Multisig'e geçişte açık işlerin yetkisi açan anahtarda kalır (orta)
 
@@ -233,6 +245,10 @@ kodunun beklenen hata olarak denetlenmesini sayar. Bu yüzden kritik bir kısıt
   escalation da gün boyu `InvalidStatus` döner. Gece yarısına yakın yeniden bağlama engeli ertesi güne taşır.
 - **Öneri:** Denetime `net_amount == amount − keeper ücreti` ve `mint == job.mint` eklensin; yeni hesap
   gerekmez.
+- **Durum: düzeltildi** (program sözleşmesi v0.7.1): Neti ya da mint'i tutmayan ispat işi kapatabilecek ispat
+  sayılmaz (`dispute_gate.rs::a_proof_for_another_net_or_mint_does_not_block_the_escalation`). Başka payee ya da
+  sayaç için yapılmış ispat bu denetimin dışındadır; ikisi de talimatta olmayan hesapları (`ClaimListing`,
+  `OperatorState`) ister.
 
 ### P-08: Kapatılan politikanın alıcı kökü donar (düşük)
 
@@ -324,7 +340,9 @@ kodunun beklenen hata olarak denetlenmesini sayar. Bu yüzden kritik bir kısıt
 - **P-19:** Merkle ağacında yaprak ve iç düğüm aynı biçimde hash'lenir. Alıcı imzacı olduğu için ikinci ön-görüntü
   pratik değil. SDK ile birlikte `0x00`/`0x01` önekleri önerilir.
 - **P-20:** Fiat rayını kapatmak için verilen sıfır `mpp_authority` yalnızca Ed25519 precompile'ın sıkı
-  doğrulamasıyla reddedilir. Açık bir `!= Pubkey::default()` denetimi önerilir.
+  doğrulamasıyla reddedilir. Açık bir `!= Pubkey::default()` denetimi önerilir. **Düzeltildi** (v0.7.1):
+  `verify_mpp_payment_proof` sıfır anahtarı Ed25519 talimatını okumadan reddeder
+  (`mpp.rs::a_zero_authority_closes_the_fiat_rail`).
 
 ### P-21: Kritik kısıtların negatif testi yoktu (düşük, düzeltildi)
 
@@ -422,5 +440,5 @@ Sonuç devnet kaydına yazılır.
 
 - Açık bulguların düzeltmeleri. Her biri program kodunu ve çoğu sözleşmeyi değiştirir, devnet'te Squads upgrade'i
   ister.
-- P-01 ve P-04 önce karar ister (ADR).
+- P-04 önce karar ister (ADR). P-01'in kararı ADR 0028'dir ve düzeltildi.
 - Dış audit: firma ve kapsam BC-40 (#96), yürütme BC-41 (#97). Paket: [audit-package.md](audit-package.md).

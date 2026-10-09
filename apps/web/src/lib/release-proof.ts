@@ -1,4 +1,5 @@
-// Uyum ispatı ve release durumu (FE-09, akışın 7. adımı). Politikaya bağlı işte escrow, kurumun bağladığı
+// Uyum ispatı ve release durumu (FE-09, akışın 7. adımı). Kabulden önce (ADR 0028) kurum işin kendi koşullarıyla
+// ön-ispatı bağlar (`PreflightProof`); policy'li işi agent ancak bundan sonra kabul eder. Politikaya bağlı işte escrow, kurumun bağladığı
 // release ispatı (`ReleaseProof`) tazeyse ve uyumluysa öder, kalıcı bir sebeple reddediyorsa kuruma iade
 // eder, değilse bekler (`ProofRequired`). Kurallar (ADR 0012 / 0013) `@squaresdk/solana-policy`'dendir,
 // zincirdekilerle ortak vektörlerle denetlenir; bu modül arayüzün metinlerini ve kararını kurar. İspatı
@@ -75,6 +76,29 @@ export interface ReleaseState {
   institution: PublicKey;
   multisigVault: PublicKey | null;
 }
+
+/** Kabul öncesi ön-ispat (ADR 0028): bağlıysa ret kodu (yalnızca zaman penceresi ve kategori bitleri) ve anı. */
+export interface PreflightView {
+  /** Bağlamadaki agent cüzdanı; escrow `accept_job` işin güncel cüzdanıyla aynı olmasını ister. */
+  payee: PublicKey;
+  refusalCode: number;
+  proofTimestamp: number;
+}
+
+/** Policy'li işin ön-ispatı; bağlanmamışsa null. */
+export async function readPreflight(setup: EscrowSetup, jobKey: PublicKey): Promise<PreflightView | null> {
+  const proof = await setup.client.verifier.fetch('preflightProof', setup.client.pda.preflightProof(jobKey)[0]);
+  return (
+    proof && { payee: proof.payee, refusalCode: proof.refusalCode, proofTimestamp: proof.proofTimestamp.toNumber() }
+  );
+}
+
+/**
+ * Ön-ispat işin güncel agent cüzdanı için mi (`accept_job`'ın kuralı, ADR 0028)? Cüzdan bağlamadan sonra
+ * `sync_agent_wallet` ile taşındıysa değildir: kurum yeniden bağlar.
+ */
+export const preflightBoundFor = (view: PreflightView | null, agentWallet: PublicKey): boolean =>
+  view !== null && view.payee.equals(agentWallet);
 
 /** Job'un release ispatı, kurumun sayacı ve escrow'un keeper ücreti. Job politikaya bağlı olmalı. */
 export async function readReleaseState(setup: EscrowSetup, jobKey: PublicKey, job: JobAccount): Promise<ReleaseState> {
@@ -186,6 +210,9 @@ export function verifierErrorMessage(error: unknown): string | null {
   }
   if (/InvalidProof/.test(message)) {
     return `${message}. The proof does not match the job as it is now (payee, amount or counter); make a new one.`;
+  }
+  if (/PreflightRefused/.test(message)) {
+    return `${message}. The job's own terms break the policy (per-transaction limit, token, blocked payee or a daily limit), so no agent can accept it; cancel it.`;
   }
   return message;
 }

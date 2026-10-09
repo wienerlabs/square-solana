@@ -144,6 +144,14 @@
   - Kurum aracı (web, CLI, policy paketi) işi açtıktan sonra ön-ispatı bağlar.
   - agent-sdk ön-ispatı olmayan işi kabul etmez (zincir de etmez).
   - Arbitrator konsolu ret oyunu sunar.
+- **Agent cüzdanının değişmesi** (P-01'in incelemesi, #262):
+  - `PreflightProof` bağlamadaki `job.agent_wallet`'ı (`payee`) saklar. `accept_job` onun işin güncel cüzdanı
+    olmasını ister; değilse `PreflightRequired`. Ön-ispattan sonra cüzdan `sync_agent_wallet` ile taşınırsa kurum
+    ön-ispatı yeni cüzdan için yeniden bağlar.
+  - Kabulden sonraki `sync_agent_wallet` agent'ın kendi eylemidir. Ön-ispatın güvencesi yeni cüzdanı kapsamaz:
+    yeni cüzdan politikanın engelli listesindeyse release kesin ret alır ve net kuruma döner.
+  - agent-sdk kayıtta cüzdan değişince kaydın kapanmamış policy'li işlerini bildirir (`register`,
+    `openPolicyJobs`). Web'in iş sayfası başka cüzdan için bağlanmış ön-ispatı söyler ve kabulü açmaz.
 
 ## Açık noktalar
 

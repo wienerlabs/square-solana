@@ -1,0 +1,114 @@
+# Arayüzden uçtan uca (FE-13): web derlenmiş hâliyle (`next build`, standalone) ayrı süreçte ve gerçek bir tarayıcıda
+# (Playwright, Chromium); localnet'te gerçek programlar, gerçek indexer ve prover süreçleri, API test sürecinde
+# (apps/api/test/fixtures/localnet.ts). Postgres ve S3 uyumlu depo Testcontainers'la runner'ın Docker'ında.
+# - web-flow: kendi cüzdanlarıyla dört rol, 8 adım ve ret senaryosu (FE-13);
+# - web-dispute: uyuşmazlık arayüzden, karar ve lapse (FE-17);
+# - web-smart-account: smart account'larla sponsorlu 8 adım (FE-21). Squads v4 programı validator açılırken
+#   `SQUARE_SQUADS_CLONE_URL` kümesinden okunarak kopyalanır (varsayılan devnet'in genel RPC'si); kümeye yazılmaz.
+# Araç sürümleri Anchor.toml [toolchain] ile aynıdır (scripts/ci/toolchain.mjs denetler); indirilen dosyalar SHA-256
+# ile, action'lar commit SHA'sıyla sabitlenir.
+name: Web E2E
+
+on:
+  pull_request:
+    paths-ignore:
+      - 'docs/**'
+      - '**/*.md'
+  push:
+    branches: [main]
+    paths-ignore:
+      - 'docs/**'
+      - '**/*.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: web-e2e-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  AGAVE_VERSION: 4.1.2
+  AGAVE_SHA256: 5991d027a686eb419a709a479178b33eb83501e8a2bfbf599a81a286bfcbf770
+  ANCHOR_VERSION: 1.2.0
+  ANCHOR_SHA256: 0c9c41a3292c281cc6eadb78d6e1c8224d8324a34b0736a89d640fd314db05b7
+  TURBO_TELEMETRY_DISABLED: '1'
+
+jobs:
+  web:
+    name: Arayüzden uçtan uca (8 adım, ret, uyuşmazlık, smart account)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - name: Araç sürümleri Anchor.toml ile aynı
+        run: node scripts/ci/toolchain.mjs
+
+      - name: Rust toolchain
+        run: rustup toolchain install || rustup show
+
+      - name: Agave ve Anchor CLI
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP"
+          curl -sSfL -o agave.tar.bz2 \
+            "https://github.com/anza-xyz/agave/releases/download/v${AGAVE_VERSION}/solana-release-x86_64-unknown-linux-gnu.tar.bz2"
+          echo "${AGAVE_SHA256}  agave.tar.bz2" | sha256sum -c -
+          tar -xjf agave.tar.bz2
+          mkdir -p bin
+          curl -sSfL -o bin/anchor \
+            "https://github.com/solana-foundation/anchor/releases/download/v${ANCHOR_VERSION}/anchor-${ANCHOR_VERSION}-x86_64-unknown-linux-gnu"
+          echo "${ANCHOR_SHA256}  bin/anchor" | sha256sum -c -
+          chmod +x bin/anchor
+          echo "$RUNNER_TEMP/solana-release/bin" >> "$GITHUB_PATH"
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            ~/.cache/solana
+            target
+          key: web-e2e-${{ runner.os }}-${{ env.AGAVE_VERSION }}-${{ hashFiles('rust-toolchain.toml', 'Cargo.lock') }}
+          restore-keys: web-e2e-${{ runner.os }}-${{ env.AGAVE_VERSION }}-
+
+      - name: Programlar (anchor build)
+        run: anchor build
+
+      - name: Release devresi
+        run: circuits/payment-compliance/scripts/ci-build.sh
+
+      - name: Derleme (API, indexer, prover, fee payer, web)
+        run: >-
+          pnpm turbo run build --filter @squaresdk/solana-api... --filter @squaresdk/solana-indexer
+          --filter @squaresdk/solana-prover --filter @squaresdk/solana-fee-payer --filter @squaresdk/solana-web
+
+      # Sürüm apps/api'deki playwright-core'unkidir; tarayıcı ve sistem kütüphaneleri runner'a kurulur.
+      - name: Chromium (Playwright)
+        run: pnpm --filter @squaresdk/solana-api exec playwright-core install --with-deps chromium
+
+      # Her dosya kendi sürecinde: localnet fixture'ı validator'ı sabit portta açar; aynı süreçte arka arkaya iki dosya,
+      # öncekinin kapanışıyla yarışabilir.
+      - name: Arayüzden uçtan uca
+        timeout-minutes: 45
+        env:
+          SQUARE_LOCALNET: '1'
+          SQUARE_WEB_E2E: '1'
+          SQUARE_SQUADS_CLONE_URL: ${{ vars.SQUARE_SQUADS_CLONE_URL || 'https://api.devnet.solana.com' }}
+        run: |
+          set -euo pipefail
+          for test in web-flow web-dispute web-smart-account; do
+            pnpm --filter @squaresdk/solana-api exec vitest run "test/${test}.e2e.test.ts"
+          done

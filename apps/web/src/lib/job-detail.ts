@@ -210,6 +210,16 @@ export function describeJobEvent(
     case 'ValidationRecorded':
       return { title: 'Validation recorded' };
     // Verifier event'leri: zaman çizelgesi API'den (indexer) okununca gelir.
+    case 'PreflightProofSet': {
+      const code = Number(d.refusal_code);
+      return {
+        title: 'Pre-acceptance proof bound',
+        detail:
+          code === 0
+            ? "the job's terms satisfy the policy"
+            : `only temporary rules refuse it now: ${refusalReasons(code).join('; ')}`,
+      };
+    }
     case 'ComplianceProofSet': {
       const verdict = typeof d.verdict === 'string' ? d.verdict : Object.keys(d.verdict ?? {})[0];
       return verdict === 'compliant'

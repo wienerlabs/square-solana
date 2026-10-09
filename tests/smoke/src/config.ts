@@ -23,19 +23,19 @@ const isAddress = (value: string) => {
   }
 };
 
-const Address = z
+export const Address = z
   .string()
   .refine(isAddress, { message: 'base58 Solana adresi bekleniyor' })
   .transform((value) => new PublicKey(value));
 
 /** u64: JSON'da sayı güvenli tamsayı sınırını aşabildiği için ondalık dize de kabul edilir. */
-const U64 = z
+export const U64 = z
   .union([z.string().regex(/^\d+$/, 'ondalık tamsayı bekleniyor'), z.number().int().nonnegative()])
   .transform((value) => BigInt(value))
   .refine((value) => value <= U64_MAX, { message: 'u64 aralığı dışında' });
 
-const PositiveSecs = z.number().int().positive();
-const KeyPath = z.string().trim().min(1);
+export const PositiveSecs = z.number().int().positive();
+export const KeyPath = z.string().trim().min(1);
 
 const ProgramIdsSchema = z.object({
   registry: Address,

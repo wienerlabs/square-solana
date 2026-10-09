@@ -55,7 +55,7 @@ fn the_commitment_is_bound_before_funding_and_replaceable_until_then() {
 
     let executed: Executed =
         commit(&mut w, &institution.key, &job, first).expect("commit_travel_rule");
-    cu::within("escrow.commit_travel_rule", &executed, 10_000);
+    cu::within_profile("escrow.commit_travel_rule", &executed, "commitTravelRule");
     let committed: TravelRuleCommitted = event(&executed);
     assert_eq!((committed.job, committed.commitment), (job, first));
     assert_eq!(w.job(&job).travel_rule_commitment, first);

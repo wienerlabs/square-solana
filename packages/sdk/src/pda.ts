@@ -24,6 +24,8 @@ export interface SquarePda {
   operatorState(institution: PublicKey): Pda;
   /** Job'a bağlanan release ispatı. */
   releaseProof(job: PublicKey): Pda;
+  /** Policy'li işin kabul öncesi ön-ispatı (ADR 0028). */
+  preflightProof(job: PublicKey): Pda;
   /** square_escrow tekil config'i. */
   escrowConfig(): Pda;
   /** Job: kurum ve spec hash'i (32 bayt). */
@@ -65,6 +67,7 @@ export const createPda: CreatePda = (programIds) => {
     verifierConfig: seed('verifier', 'VERIFIER_CONFIG_SEED'),
     operatorState: seed('verifier', 'OPERATOR_STATE_SEED'),
     releaseProof: seed('verifier', 'RELEASE_PROOF_SEED'),
+    preflightProof: seed('verifier', 'PREFLIGHT_PROOF_SEED'),
     escrowConfig: seed('escrow', 'CONFIG_SEED'),
     job: seed('escrow', 'JOB_SEED'),
     vault: seed('escrow', 'VAULT_SEED'),
@@ -96,6 +99,7 @@ export const createPda: CreatePda = (programIds) => {
     verifierConfig: () => find('verifier', [SEEDS.verifierConfig]),
     operatorState: (institution) => find('verifier', [SEEDS.operatorState, institution.toBytes()]),
     releaseProof: (job) => find('verifier', [SEEDS.releaseProof, job.toBytes()]),
+    preflightProof: (job) => find('verifier', [SEEDS.preflightProof, job.toBytes()]),
     escrowConfig: () => find('escrow', [SEEDS.escrowConfig]),
     job: (institution, specHash) => find('escrow', [SEEDS.job, institution.toBytes(), bytes32(specHash, 'specHash')]),
     vault: (job) => find('escrow', [SEEDS.vault, job.toBytes()]),

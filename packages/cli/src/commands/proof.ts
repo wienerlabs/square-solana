@@ -1,9 +1,11 @@
 // Adım 7 (kurum): release ispatı ve bağlanması. Witness zincirden ve yerel politikadan kurulur; ispatı uzak prover
 // üretir (Square API ya da prover servisi, `<url>/v1/prove`). CLI snarkjs içermez. `policy watch` ispatı bayatladıkça
-// yeniler (ADR 0012).
+// yeniler (ADR 0012). Kabulden önce (ADR 0028) `proof preflight` işin kendi koşullarıyla ön-ispatı bağlar.
 import {
+  buildPreflightWitness,
   buildReleaseWitness,
   buildSetComplianceProofTx,
+  buildSetPreflightProofTx,
   createRemoteProver,
   watchJobProof,
   type Prover,
@@ -91,6 +93,40 @@ const bind: Command = {
   },
 };
 
+const preflight: Command = {
+  group: 'proof',
+  action: 'preflight',
+  summary:
+    "kabul öncesi ön-ispatı üretir (uzak prover) ve job'a bağlar; policy'li işte agent bundan sonra kabul eder (ADR 0028)",
+  usage: [['--job <adres>', 'politikaya bağlı, açık ya da fonlanmış job'], ...POLICY_USAGE.slice(1)],
+  options: POLICY_OPTIONS,
+  async run(ctx, values) {
+    const { job, policy } = await jobOfPolicy(ctx, values);
+    const category = required(str(values, 'category'), 'category');
+    const prover = remoteProver(ctx);
+    const { signature } = await ctx.send('set_preflight_proof', async () => {
+      const witness = await buildPreflightWitness({
+        client: ctx.client,
+        job,
+        policy: policy.document,
+        salts: policy.salts,
+        paymentCategory: category,
+        now: await ctx.now(),
+      });
+      const proof = await prover.prove(witness);
+      return buildSetPreflightProofTx(
+        ctx.client,
+        { authority: ctx.signer.publicKey, institution: policy.institution, policy: policy.address, job, proof },
+        ctx.options(),
+      );
+    });
+    const address = ctx.client.pda.preflightProof(job)[0];
+    const bound = await ctx.client.verifier.fetch('preflightProof', address);
+    if (!bound) throw new CliError('PreflightProof yazılmadı');
+    return { signature, job, preflightProof: address, refusalCode: bound.refusalCode };
+  },
+};
+
 const watch: Command = {
   group: 'policy',
   action: 'watch',
@@ -135,4 +171,4 @@ const watch: Command = {
   },
 };
 
-export const PROOF_COMMANDS: readonly Command[] = [bind, watch];
+export const PROOF_COMMANDS: readonly Command[] = [bind, preflight, watch];

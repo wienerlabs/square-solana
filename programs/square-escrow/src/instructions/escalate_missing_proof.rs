@@ -8,6 +8,7 @@ use square_common::time::day_start;
 
 use crate::dispute;
 use crate::errors::EscrowError;
+use crate::instructions::finalize_payment::keeper_fee;
 use crate::state::{DisputeInfo, EscrowConfig, Job};
 use crate::{DisputeRaised, MissingProofEscalated};
 
@@ -37,13 +38,28 @@ pub struct EscalateMissingProof<'info> {
 /// Bağlı ispat bugün işi kapatabiliyorsa (`finalize_payment` ödeyebilir ya da iade edebilir) agent'ın
 /// başvurusuna gerek yoktur. İspat yoksa, ret geçiciyse ya da ispat başka bir UTC gününde
 /// değerlendirildiyse (bayat; kurum yenilemezse escrow süresiz bekler) dispute açılabilir (ADR 0016).
-fn proof_can_settle(info: &AccountInfo, verifier_program: &Pubkey, now: i64) -> Result<bool> {
+/// Başka bir net ya da mint için yapılmış ispat da işi kapatamaz: finalize onu bayat sayar
+/// (`StaleReleaseProof`; BC-39 P-07).
+fn proof_can_settle(
+    info: &AccountInfo,
+    verifier_program: &Pubkey,
+    job: &Job,
+    keeper_fee_bps: u16,
+    now: i64,
+) -> Result<bool> {
     if info.data_is_empty() {
         return Ok(false);
     }
     let proof: ReleaseProof = account_read::read_owned(info, verifier_program)
         .map_err(|_| error!(EscrowError::InvalidReleaseProof))?;
     if proof.consumed || day_start(proof.proof_timestamp) != day_start(now) {
+        return Ok(false);
+    }
+    let net = job
+        .amount
+        .checked_sub(keeper_fee(job.amount, keeper_fee_bps)?)
+        .ok_or(EscrowError::MathOverflow)?;
+    if proof.net_amount != net || proof.mint != job.mint {
         return Ok(false);
     }
     Ok(match proof.verdict {
@@ -76,6 +92,8 @@ pub fn handler(ctx: Context<EscalateMissingProof>) -> Result<()> {
         !proof_can_settle(
             &accounts.release_proof,
             &accounts.config.verifier_program,
+            job,
+            params.keeper_fee_bps,
             now
         )?,
         EscrowError::InvalidStatus

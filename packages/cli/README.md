@@ -12,19 +12,19 @@ squaresdk-solana job create --help                        # bir komutun seçenek
 Komut referansı, yapılandırma, çıktı ve çıkış kodları: [docs/cli.md](../../docs/cli.md). Devnet'te 8 adımın
 komutları ve imzaları: [docs/deploy/cli-devnet.md](../../docs/deploy/cli-devnet.md).
 
-| Grup | Komutlar |
-|---|---|
-| `agent` | `register`, `resolve` |
-| `screening` | `record` |
-| `policy` | `secret`, `commit`, `buyers`, `watch` |
-| `job` | `create`, `fund`, `accept`, `submit`, `finalize`, `cancel`, `show` |
-| `claim` | `list`, `buy`, `cancel` |
-| `proof` | `bind` |
-| `dispute` | `raise`, `vote`, `execute`, `lapse`, `escalate` |
+| Grup        | Komutlar                                                           |
+| ----------- | ------------------------------------------------------------------ |
+| `agent`     | `register`, `resolve`                                              |
+| `screening` | `record`                                                           |
+| `policy`    | `secret`, `commit`, `buyers`, `watch`                              |
+| `job`       | `create`, `fund`, `accept`, `submit`, `finalize`, `cancel`, `show` |
+| `claim`     | `list`, `buy`, `cancel`                                            |
+| `proof`     | `bind`                                                             |
+| `dispute`   | `raise`, `vote`, `execute`, `lapse`, `escalate`                    |
 
 - **İmza:** Her komut tx'i SDK'nın akışıyla kurar, `--keypair` (rol) ve `--fee-payer` (ücret ve rent) ile imzalar,
   gönderir ve onayını bekler. Zincire girmeden blockhash'i dolan tx yeniden kurulur.
-- **İspat:** `proof bind` ve `policy watch` ispatı uzak prover'dan alır (Square API ya da `apps/prover`); CLI snarkjs
+- **İspat:** `proof preflight` (kabul öncesi ön-ispat, ADR 0028), `proof bind` ve `policy watch` ispatı uzak prover'dan alır (Square API ya da `apps/prover`); CLI snarkjs
   içermez.
 - **Sırlar:** Politika sırrı ve alıcı listesi dosyaları 0600 yazılır, üstlerine yazılmaz. Prover'ın API anahtarı
   yalnızca ortamdan okunur.

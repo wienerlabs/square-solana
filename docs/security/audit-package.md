@@ -103,7 +103,8 @@ SQUARE_FUZZ_SEEDS=64 SQUARE_FUZZ_STEPS=400 cargo test --locked --manifest-path t
 
 İç incelemenin bulguları ve durumları [review-bc-39.md](review-bc-39.md)'dedir:
 - **Kritik:** 0.
-- **Yüksek, 1 (P-01):** kalıcı retlerin parametrelerini kurum işten önce seçer.
+- **Yüksek, 1 (P-01):** kalıcı retlerin parametrelerini kurum işten önce seçer. Düzeltildi: kabul öncesi ön-ispat
+  ([ADR 0028](../decisions/0028-kabul-oncesi-on-ispat-ve-dispute-duzeltmeleri.md), program sözleşmesi v0.8.0).
 - **Orta, 3:**
   - P-02: multisig'e geçişte açık işlerin yetkisi;
   - P-03: alacak satışında satıcı taranmaz;
