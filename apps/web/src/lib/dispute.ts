@@ -62,10 +62,16 @@ export function minimumBond(amount: bigint, params: Pick<DisputeParams, 'minBond
 /**
  * Zincirdeki karar değerinin API / tip biçimi (`{ kind }`). Anchor'ın programı enum'u camelCase anahtarla
  * (`{ favorAgent: {} }`), ham IDL'le çalışan event çözücüsü IDL adıyla (`{ FavorAgent: {} }`,
- * `agent_amount`) verir; ikisi de kabul edilir.
+ * `agent_amount`), Square API'nin event'leri tip biçimiyle (`{ kind: 'favorAgent' }`, denetim sayfası) verir;
+ * üçü de kabul edilir.
  */
 export function resolutionOf(value: unknown): DisputeResolution {
-  const [variant, inner] = Object.entries((value ?? {}) as Record<string, unknown>)[0] ?? [];
+  const record = (value ?? {}) as Record<string, unknown>;
+  if (typeof record['kind'] === 'string') {
+    const { kind, agentAmount } = record as { kind: string; agentAmount?: unknown };
+    return resolutionOf({ [kind]: kind === 'split' ? { agentAmount } : {} });
+  }
+  const [variant, inner] = Object.entries(record)[0] ?? [];
   const kind = variant ? variant.charAt(0).toLowerCase() + variant.slice(1) : '';
   switch (kind) {
     case 'pending':

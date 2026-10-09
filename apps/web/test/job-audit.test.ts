@@ -153,6 +153,37 @@ describe('audit events', () => {
     expect(history[1]).toMatchObject({ payee, netAmount: 248_750_000n, signature: entries[2]!.signature });
   });
 
+  it('describe the API’s dispute events, whose resolutions come in the type shape', () => {
+    const arbitrator = key();
+    const entries = [
+      event('escrow', 'DisputeVote', {
+        job,
+        arbitrator: arbitrator,
+        resolution: { kind: 'favorAgent' },
+        approvalCount: 1,
+      }),
+      event('escrow', 'DisputeVoteRejected', {
+        job,
+        arbitrator: arbitrator,
+        resolution: { kind: 'split', agentAmount: '4000000' },
+        rejectionCount: 1,
+        proposalReset: false,
+      }),
+      event('escrow', 'DisputeDecided', { job, resolution: { kind: 'favorInstitution' } }),
+    ].map(timelineEntryOf);
+    expect(entries.map((entry) => describeJobEvent(entry.event, usdc))).toEqual([
+      {
+        title: 'Arbitrator vote',
+        detail: `${arbitrator}: In favor of the agent; 1 approval(s) in the count`,
+      },
+      {
+        title: 'Arbitrator rejected the proposal',
+        detail: `${arbitrator}: Split: 4 USDC to the agent, the rest back to the institution; 1 rejection(s)`,
+      },
+      { title: 'Dispute decided', detail: 'In favor of the institution' },
+    ]);
+  });
+
   it('reports an unreachable API instead of an empty history', async () => {
     await expect(readAuditEvents(squareApi('http://127.0.0.1:9'), job)).rejects.toThrow();
   });
