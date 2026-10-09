@@ -5,8 +5,10 @@ FROM node:24-bookworm AS build
 RUN corepack enable
 WORKDIR /repo
 COPY . .
-RUN pnpm install --frozen-lockfile --filter @squaresdk/solana-web... \
-    && pnpm --filter @squaresdk/solana-web... build
+# Kök paket turbo'yu getirir. Web'in bağımlılıkları db'ye uzanır (x402 üzerinden); turbo db'nin Prisma istemcisini
+# (`generate`) derlemeden önce üretir, düz `pnpm --filter … build` üretmez.
+RUN pnpm install --frozen-lockfile --filter . --filter @squaresdk/solana-web... \
+    && pnpm turbo run build --filter=@squaresdk/solana-web...
 
 FROM node:24-bookworm-slim AS runner
 # HOSTNAME: standalone sunucu buna bağlanır; Docker'ın verdiği container adı yerine bütün arayüzler.
