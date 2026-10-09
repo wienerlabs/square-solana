@@ -10,6 +10,7 @@ import { hex } from './agent-registration';
 import { formatDiscount } from './claim-market';
 import { describeResolution, resolutionOf } from './dispute';
 import { refusalReasons } from './release-proof';
+import { readTransactionLogs } from './transaction-logs';
 import { SquareApiError } from './square-api';
 
 /** `Job.delivery_uri` üst sınırı (square_escrow `DELIVERY_URI_MAX_LEN`, `DeliveryUriTooLong`). */
@@ -79,12 +80,12 @@ export async function readJobTimeline(
     .slice(0, TIMELINE_LIMIT)
     .reverse();
   if (ok.length === 0) return { entries: [], newest };
-  const transactions = await connection.getTransactions(
+  const logs = await readTransactionLogs(
+    connection,
     ok.map((s) => s.signature),
-    { commitment: 'confirmed', maxSupportedTransactionVersion: 0 },
   );
-  const entries = ok.flatMap((s, i) =>
-    jobEventsFromLogs(escrowProgramId, transactions[i]?.meta?.logMessages ?? [], job).map((event) => ({
+  const entries = ok.flatMap((s) =>
+    jobEventsFromLogs(escrowProgramId, logs.get(s.signature) ?? [], job).map((event) => ({
       signature: s.signature,
       slot: s.slot,
       blockTime: s.blockTime ?? null,

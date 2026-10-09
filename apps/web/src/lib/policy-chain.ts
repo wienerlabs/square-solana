@@ -15,6 +15,7 @@ import {
 import { SQUARE_IDLS, type SquarePolicyContract } from '@squaresdk/solana-sdk';
 import { institutionAddress, policyAddress } from './idl-pda';
 import { programErrorMessage } from './program-error';
+import { readTransactionLogs } from './transaction-logs';
 
 /** `Institution.name` üst sınırı (square_policy `NameTooLong`). */
 export const MAX_INSTITUTION_NAME_BYTES = 64;
@@ -276,12 +277,12 @@ export async function readPolicyHistory(
   const signatures = await connection.getSignaturesForAddress(policy, { limit: HISTORY_LIMIT }, 'confirmed');
   const ok = signatures.filter((s) => s.err === null);
   if (ok.length === 0) return [];
-  const transactions = await connection.getTransactions(
+  const logs = await readTransactionLogs(
+    connection,
     ok.map((s) => s.signature),
-    { commitment: 'confirmed', maxSupportedTransactionVersion: 0 },
   );
-  return ok.flatMap((s, i) =>
-    policyEventsFromLogs(programId, transactions[i]?.meta?.logMessages ?? [], policy).map((event) => ({
+  return ok.flatMap((s) =>
+    policyEventsFromLogs(programId, logs.get(s.signature) ?? [], policy).map((event) => ({
       signature: s.signature,
       slot: s.slot,
       blockTime: s.blockTime ?? null,
