@@ -10,8 +10,8 @@
 //   Ödemenin attestation'ını arayüzün mutabakat isteği yazar (PaymentIntent Stripe'tan okunur).
 // - Verilmezse API testlerinin fixture Stripe sunucusu. Kart sunucu tarafında kaydedilir (fixture'ın SetupIntent onayı
 //   ve imzalı webhook); ödeme arayüzden kayıtlı kartla (off-session) yapılır, kart alanının yolu atlanır.
-// Adımlar: 1. kurum politikayı yazar · 2. "Card in USD (Stripe)" ile fiat işi açar · 3. agent kabul eder ve teslim
-// eder · 4. kurum API'ye girer, politikayı ödemeden önce prover'da denetler ve öder (gerçek Stripe'ta önce kart
+// Adımlar: 1. kurum politikayı yazar · 2. "Card in USD (Stripe)" ile fiat işi açar ve kabul öncesi ön-ispatı bağlar
+// (P-01) · 3. agent kabul eder ve teslim eder · 4. kurum API'ye girer, politikayı ödemeden önce prover'da denetler ve öder (gerçek Stripe'ta önce kart
 // alanından, sonra hesap sayfasında kaydettiği kartla; fixture'da kayıtlı kartla) · 5. makbuz; ispat makbuz
 // commitment'ıyla üretilip `verify_mpp_payment_proof` ile bağlanır · 6. `finalize_fiat_payment`, iş `Released`.
 // `SQUARE_SQUADS_CLONE_URL` de verilirse ikinci test aynı akışı smart account'lu kurumla yapar: her adım sponsorlu
@@ -367,7 +367,25 @@ describe.skipIf(!ENABLED)(
       return found;
     }
 
-    /** Agent fiat işi açıkken kabul eder ve teslim eder (dosya tarayıcıda hash'lenir, URI elle). */
+    /**
+     * Kurum kabul öncesi ön-ispatı bağlar (P-01, ADR 0028): fiat iş de policy'lidir, ön-ispat iş `Open` iken
+     * bağlanır ve agent ancak bundan sonra kabul eder. Smart account'lu kurumda sponsorlu bir vault tx'idir.
+     */
+    async function bindPreflight(page: Page, job: PublicKey) {
+      await open(page, `/app/jobs/${job.toBase58()}`);
+      const section = page.getByRole('region', { name: 'Pre-acceptance proof' });
+      await section.getByText('Missing', { exact: true }).waitFor();
+      await section.getByLabel('Payment category').selectOption(CATEGORY);
+      await section.getByLabel('Prover API key').fill(PROVER_KEY);
+      await section.getByRole('button', { name: 'Make the pre-acceptance proof' }).click();
+      await section.getByRole('button', { name: 'Bind before acceptance' }).click();
+      const bound = await until('ön-ispat', UI_TIMEOUT_MS, () =>
+        world.stack.client.verifier.fetch('preflightProof', world.stack.client.pda.preflightProof(job)[0]),
+      );
+      expect(bound.payee.equals(world.agentWallet.keypair.publicKey) && bound.refusalCode === 0).toBe(true);
+    }
+
+    /** Agent fiat işi açıkken, ön-ispat bağlıyken kabul eder ve teslim eder (dosya tarayıcıda hash'lenir, URI elle). */
     async function deliverWork(page: Page, job: PublicKey, label: string) {
       await open(page, `/app/jobs/${job.toBase58()}`);
       await page.getByText('Due on delivery').waitFor();
@@ -441,6 +459,7 @@ describe.skipIf(!ENABLED)(
       if (REAL_STRIPE) {
         // A: kart alanından, Stripe.js ve Stripe'ın test kartıyla (PaymentIntent tarayıcıda onaylanır).
         const jobA = await createFiatJob(pages.institution, signer, policy, 'fe20-card-form');
+        await bindPreflight(pages.institution, jobA);
         await deliverWork(agentPage, jobA, 'fe20-card-form');
         const paidA = await payBindAndFinalize(pages.institution, jobA, async (page) => {
           await fillCard(page);
@@ -454,6 +473,7 @@ describe.skipIf(!ENABLED)(
       }
 
       const jobB = await createFiatJob(pages.institution, signer, policy, 'fe20-saved-card');
+      await bindPreflight(pages.institution, jobB);
       await deliverWork(agentPage, jobB, 'fe20-saved-card');
       const paidB = await payBindAndFinalize(pages.institution, jobB, paySaved);
       expect(paidB.source).toBe('reconcile');
@@ -494,6 +514,7 @@ describe.skipIf(!ENABLED)(
         if (REAL_STRIPE) await saveCardInBrowser(page, vault.toBase58());
         else await saveFixtureCard(member, vault.toBase58(), multisig.toBase58());
         const job = await createFiatJob(page, vault, policy, 'fe20-smart-account');
+        await bindPreflight(page, job);
         await deliverWork(agentPage, job, 'fe20-smart-account');
         await payBindAndFinalize(page, job, paySaved, finalizerPage);
 
@@ -504,6 +525,7 @@ describe.skipIf(!ENABLED)(
           select: { instructions: true },
         });
         const names = sponsored.map((row) => row.instructions);
+        expect(names.some((list) => list.includes('vault>verifier:set_preflight_proof'))).toBe(true);
         expect(names.some((list) => list.includes('vault>verifier:verify_mpp_payment_proof'))).toBe(true);
         expect(names.flat()).not.toContain('vault>ed25519:verify');
         const executions = names.filter((list) => list.includes('ed25519:verify'));
