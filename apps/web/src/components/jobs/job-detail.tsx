@@ -18,6 +18,7 @@ import { StatusBadge } from '@/components/ui/status-badge';
 import { TxConfirmation } from '@/components/ui/tx-confirmation';
 import { JobClaim } from './job-claim';
 import { JobDispute } from './job-dispute';
+import { JobFiat } from './job-fiat';
 import { JobPreflight } from './job-preflight';
 import { JobRelease } from './job-release';
 import { JobSettlement } from './job-settlement';
@@ -39,6 +40,7 @@ import {
   type TimelineEntry,
 } from '@/lib/job-detail';
 import { ENV_VARS } from '@/lib/config';
+import { amountInCents, formatUsd, isFiatJob } from '@/lib/fiat';
 import { escrowErrorMessage, formatDuration, readEscrowSetup, type EscrowSetupLookup } from '@/lib/job-wizard';
 import {
   preflightBoundFor,
@@ -81,7 +83,9 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
 
 /**
  * Bir işin zincirdeki durumu, canlı zaman çizelgesi ve challenge sayacı; agent için kabul ve teslim. Rollerin
- * adresi cüzdan ya da rolün smart account vault'udur (FE-21).
+ * adresi cüzdan ya da rolün smart account vault'udur (FE-21). Fiat işte (FE-20, ADR 0024) vault, challenge penceresi,
+ * dispute, Travel Rule ve alacak satışı yoktur: kartla ödeme bölümü (`JobFiat`) ödemeyi, ispatı ve finalize'ı taşır;
+ * agent işi açıkken kabul eder.
  */
 export function JobDetail({ jobAddress, escrowProgramId }: { jobAddress: string; escrowProgramId: string }) {
   const { connection } = useConnection();
@@ -304,6 +308,13 @@ export function JobDetail({ jobAddress, escrowProgramId }: { jobAddress: string;
   if (!account) return <p className="text-sm text-muted">No job exists at this address.</p>;
 
   const jobStatus = statusOf(account);
+  const fiat = isFiatJob(account);
+  // Agent escrow işini fonlandıktan sonra, fiat işi açıkken kabul eder.
+  const acceptable = jobStatus === (fiat ? 'open' : 'funded');
+  const amount = BigInt(account.amount.toString());
+  // Fiat işin tutarı USD'dir: 1 sent = 10^(decimals − 2) taban birim (ADR 0024 §7).
+  const cents = fiat && token ? amountInCents(amount, token.decimals) : null;
+  const amountText = cents === null ? formatAmount(amount) : formatUsd(cents);
   const listing = claim.state === 'ready' ? claim.value : null;
   const payout = payoutOf(account, listing);
   const challengeEnd = account.challengeEnd.toNumber();
@@ -340,7 +351,7 @@ export function JobDetail({ jobAddress, escrowProgramId }: { jobAddress: string;
             <Address value={jobAddress} label="job" />
           </Row>
           <Row label="Amount">
-            <span className="font-mono">{formatAmount(BigInt(account.amount.toString()))}</span>
+            <span className="font-mono">{amountText}</span>
           </Row>
           <Row label="Institution">
             <Address value={account.institution.toBase58()} label="institution" />
@@ -356,14 +367,17 @@ export function JobDetail({ jobAddress, escrowProgramId }: { jobAddress: string;
               </Link>
             )}
           </Row>
-          <Row label="Paid to">
-            <Address value={payout.wallet.toBase58()} label={PAYOUT_TEXT[payoutKey(payout)].label} />
-            <span className="text-caption text-muted">{PAYOUT_TEXT[payoutKey(payout)].caption}</span>
-          </Row>
+          <Row label="Settlement">{fiat ? 'Card payment in USD (Stripe), no escrow' : 'USDC escrow'}</Row>
+          {!fiat && (
+            <Row label="Paid to">
+              <Address value={payout.wallet.toBase58()} label={PAYOUT_TEXT[payoutKey(payout)].label} />
+              <span className="text-caption text-muted">{PAYOUT_TEXT[payoutKey(payout)].caption}</span>
+            </Row>
+          )}
           <Row label="Deadline">
             <time dateTime={iso(deadline)}>{iso(deadline)}</time>
           </Row>
-          <Row label="Challenge period">{formatDuration(BigInt(account.challengePeriod.toString()))}</Row>
+          {!fiat && <Row label="Challenge period">{formatDuration(BigInt(account.challengePeriod.toString()))}</Row>}
           <Row label="Policy">
             {account.policy ? (
               <>
@@ -390,7 +404,7 @@ export function JobDetail({ jobAddress, escrowProgramId }: { jobAddress: string;
         </dl>
       </section>
 
-      {jobStatus === 'delivered' && (
+      {jobStatus === 'delivered' && !fiat && (
         <section aria-labelledby="challenge-heading" className="rounded-card border border-border bg-surface p-6">
           <h2 id="challenge-heading" className="text-sm font-medium uppercase tracking-wide text-muted">
             Challenge window
@@ -412,35 +426,7 @@ export function JobDetail({ jobAddress, escrowProgramId }: { jobAddress: string;
         </section>
       )}
 
-      <JobDispute
-        escrow={escrow}
-        jobKey={jobKey}
-        account={account}
-        token={token}
-        chainNow={chainNow}
-        revision={revision}
-        formatAmount={formatAmount}
-        onConfirmed={refresh}
-      />
-
-      <JobTravelRule
-        setup={escrow}
-        jobAddress={jobAddress}
-        job={{
-          status: jobStatus,
-          amount: BigInt(account.amount.toString()),
-          mint: account.mint,
-          agentWallet: account.agentWallet,
-          commitment: Uint8Array.from(account.travelRuleCommitment),
-        }}
-        institution={institutionKey}
-        api={apiClient}
-        verification={travelVerification}
-        onVerification={setTravelVerification}
-        formatAmount={formatAmount}
-        onConfirmed={refresh}
-      />
-
+      {/* Fiat iş de policy'lidir: ön-ispat iki rayda da kabulden önce, fiat işte `Open` iken bağlanır (ADR 0028). */}
       <JobPreflight
         escrow={escrow}
         jobKey={jobKey}
@@ -450,47 +436,92 @@ export function JobDetail({ jobAddress, escrowProgramId }: { jobAddress: string;
         chainNow={chainNow}
       />
 
-      <JobRelease
-        escrow={escrow}
-        jobKey={jobKey}
-        account={account}
-        listing={listing}
-        release={release}
-        chainNow={chainNow}
-        formatAmount={formatAmount}
-      />
+      {fiat ? (
+        <JobFiat
+          escrow={escrow}
+          jobKey={jobKey}
+          account={account}
+          release={release}
+          chainNow={chainNow}
+          revision={revision}
+          token={token}
+          formatAmount={formatAmount}
+          onConfirmed={refresh}
+        />
+      ) : (
+        <>
+          <JobDispute
+            escrow={escrow}
+            jobKey={jobKey}
+            account={account}
+            token={token}
+            chainNow={chainNow}
+            revision={revision}
+            formatAmount={formatAmount}
+            onConfirmed={refresh}
+          />
 
-      <JobSettlement
-        escrow={escrow}
-        jobKey={jobKey}
-        account={account}
-        listing={listing}
-        release={account.policy ? release : null}
-        timeline={timeline.state === 'ready' ? timeline.value : null}
-        chainNow={chainNow}
-        revision={revision}
-        token={token}
-        formatAmount={formatAmount}
-      />
+          <JobTravelRule
+            setup={escrow}
+            jobAddress={jobAddress}
+            job={{
+              status: jobStatus,
+              amount: BigInt(account.amount.toString()),
+              mint: account.mint,
+              agentWallet: account.agentWallet,
+              commitment: Uint8Array.from(account.travelRuleCommitment),
+            }}
+            institution={institutionKey}
+            api={apiClient}
+            verification={travelVerification}
+            onVerification={setTravelVerification}
+            formatAmount={formatAmount}
+            onConfirmed={refresh}
+          />
 
-      <JobClaim
-        escrow={escrow}
-        jobKey={jobKey}
-        account={account}
-        claim={claim}
-        token={token}
-        formatAmount={formatAmount}
-        chainNow={chainNow}
-        revision={revision}
-      />
+          <JobRelease
+            escrow={escrow}
+            jobKey={jobKey}
+            account={account}
+            listing={listing}
+            release={release}
+            chainNow={chainNow}
+            formatAmount={formatAmount}
+          />
 
-      {isAgent && (jobStatus === 'funded' || jobStatus === 'accepted') && (
+          <JobSettlement
+            escrow={escrow}
+            jobKey={jobKey}
+            account={account}
+            listing={listing}
+            release={account.policy ? release : null}
+            timeline={timeline.state === 'ready' ? timeline.value : null}
+            chainNow={chainNow}
+            revision={revision}
+            token={token}
+            formatAmount={formatAmount}
+          />
+
+          <JobClaim
+            escrow={escrow}
+            jobKey={jobKey}
+            account={account}
+            claim={claim}
+            token={token}
+            formatAmount={formatAmount}
+            chainNow={chainNow}
+            revision={revision}
+          />
+        </>
+      )}
+
+      {isAgent && (acceptable || jobStatus === 'accepted') && (
         <section aria-labelledby="agent-heading" className="rounded-card border border-border bg-surface p-6">
           <h2 id="agent-heading" className="text-sm font-medium uppercase tracking-wide text-muted">
             Your work
           </h2>
           <div className="mt-4 grid gap-4">
-            {jobStatus === 'funded' && (
+            {acceptable && (
               <div className="flex flex-wrap items-center gap-3">
                 <Button
                   onClick={() => void act('accept')}
@@ -626,7 +657,7 @@ export function JobDetail({ jobAddress, escrowProgramId }: { jobAddress: string;
         {timeline.state === 'ready' && timeline.value.length > 0 && (
           <ol aria-label="Job events" className="mt-3 grid gap-3 text-sm">
             {timeline.value.map((entry, index) => {
-              const { title, detail } = describeJobEvent(entry.event, (base) => formatAmount(base));
+              const { title, detail } = describeJobEvent(entry.event, (base) => formatAmount(base), { fiat });
               return (
                 <li key={`${entry.signature}:${index}`} className="grid gap-1 border-l-2 border-border pl-3">
                   <span className="font-medium">{title}</span>

@@ -4,12 +4,14 @@
 // - Ücretler: sponsorlu gönderim tercihi (cüzdan başına) ve sponsorun bugünkü kullanımı.
 // - Smart account: rol için Squads v4 multisig'i sponsorla açma ya da var olanı seçme; seçim cüzdan ve rol başına.
 // - Üyelik: üyeler ve yetkileri, eşik, vault (rolün adresi) ve bakiyeleri, son öneriler; onay ve yürütme sponsorlu.
+// - Kurum rolünde kartla ödeme için kayıtlı kart (FE-20).
 // Okumalar zincirdendir; ağ doğrulanmadan hesap okunmaz.
 import Link from 'next/link';
 import { useCallback, useEffect, useId, useMemo, useState, type ReactNode } from 'react';
 import { useConnection, useWallet } from '@solana/wallet-adapter-react';
 import { LAMPORTS_PER_SOL, PublicKey } from '@solana/web3.js';
 import { useActorState } from '@/components/actor';
+import { FiatCardPanel } from './fiat-card';
 import { useNetworkGuard } from '@/components/network-guard';
 import { useWebConfig } from '@/components/providers';
 import { useRole } from '@/components/role-provider';
@@ -74,6 +76,7 @@ export function AccountPage() {
           .
         </Notice>
       )}
+      {role === 'institution' && <FiatCardPanel key={publicKey.toBase58()} />}
     </div>
   );
 }

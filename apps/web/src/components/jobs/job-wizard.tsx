@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useCallback, useEffect, useId, useMemo, useState, type ReactNode } from 'react';
 import { useConnection } from '@solana/wallet-adapter-react';
 import { PublicKey } from '@solana/web3.js';
+import type { FiatConfig } from '@squaresdk/solana-types';
 import { useApiClient } from '@/components/api-client';
 import { useActor } from '@/components/actor';
 import { useNetworkGuard } from '@/components/network-guard';
@@ -14,6 +15,7 @@ import { StatusBadge, type Tone } from '@/components/ui/status-badge';
 import { TxConfirmation } from '@/components/ui/tx-confirmation';
 import { JobTravelRule } from './job-travel-rule';
 import { chainRefOf, hex } from '@/lib/agent-registration';
+import { fiatAmount, fiatPaymentErrorText, formatUsd } from '@/lib/fiat';
 import { institutionAddress, policyAddress } from '@/lib/idl-pda';
 import {
   escrowErrorMessage,
@@ -36,6 +38,7 @@ import { hexToBytes } from '@/lib/policy-draft';
 import { loadDrafts } from '@/lib/policy-local';
 import { sendErrorText } from '@/lib/sponsored-send';
 import { formatUnits, parseUnits, settlementAccount } from '@/lib/settlement';
+import { unwrap } from '@/lib/square-api';
 import { statusLabel } from '@/lib/status';
 import { isBound, travelRuleFundBlock, travelRuleRequired, type TravelRuleVerification } from '@/lib/travel-rule';
 import { useSettlementToken, useTokenBalance } from '@/lib/use-settlement';
@@ -98,8 +101,11 @@ function Section({ id, title, children }: { id: string; title: string; children:
 
 const NO_COMMITMENT = new Uint8Array(32);
 
+type Rail = 'escrow' | 'fiat';
+
 interface WizardJob {
   status: string;
+  rail: Rail;
   amount: bigint;
   mint: PublicKey;
   agentWallet: PublicKey;
@@ -115,7 +121,9 @@ interface ActivePolicy {
 
 /**
  * Kurumun iş açması ve fonlaması: `create_job` + `fund_job` (akışın 3. adımı). Kurum cüzdan ya da smart account'un
- * vault'udur (FE-21); fonlama vault'un USDC hesabından.
+ * vault'udur (FE-21); fonlama vault'un USDC hesabından. Fiat rayında (FE-20, ADR 0024) `create_fiat_job`: vault,
+ * fonlama, challenge penceresi ve Travel Rule commitment'ı yoktur; iş bir politikaya bağlıdır, iki tarafın screening'i
+ * açılışta okunur ve kurum teslimden sonra iş sayfasında kartla öder.
  */
 export function JobWizard({ owner, escrowProgramId }: { owner: string; escrowProgramId: string }) {
   const { connection } = useConnection();
@@ -147,6 +155,8 @@ export function JobWizard({ owner, escrowProgramId }: { owner: string; escrowPro
   const [deadlineText, setDeadlineText] = useState('');
   const [challengeText, setChallengeText] = useState('');
   const [policyChoice, setPolicyChoice] = useState('');
+  const [railChoice, setRailChoice] = useState<Rail>('escrow');
+  const railHintId = useId();
   const [specText, setSpecText] = useState('');
   const [now, setNow] = useState(() => Math.floor(Date.now() / 1000));
   useEffect(() => {
@@ -228,6 +238,7 @@ export function JobWizard({ owner, escrowProgramId }: { owner: string; escrowPro
           state: 'ready',
           value: value && {
             status: Object.keys(value.status)[0]!,
+            rail: 'fiat' in value.rail ? 'fiat' : 'escrow',
             amount: BigInt(value.amount.toString()),
             mint: value.mint,
             agentWallet: value.agentWallet,
@@ -241,6 +252,9 @@ export function JobWizard({ owner, escrowProgramId }: { owner: string; escrowPro
     };
   }, [setup, jobAddress, refresh]);
   const existingJob = job?.state === 'ready' ? job.value : null;
+  // Var olan işin rayı zincirdendir; yeni işte seçim.
+  const rail: Rail = existingJob?.rail ?? railChoice;
+  const fiat = rail === 'fiat';
 
   // Screening: kurum ve job'un (yoksa agent kaydının) cüzdanı; fonlama ikisini de ister.
   const agentWallet = existingJob?.agentWallet.toBase58() ?? agentSummary?.wallet.toBase58() ?? null;
@@ -269,9 +283,47 @@ export function JobWizard({ owner, escrowProgramId }: { owner: string; escrowPro
   const fundAmount = existingJob?.amount ?? amountValue;
   const insufficient =
     fundAmount !== null && balance !== null && (balance.amount === null || balance.amount < fundAmount);
-  const travelRule = setup !== null && fundAmount !== null && travelRuleRequired(fundAmount, setup.travelRuleThreshold);
+  // Travel Rule commitment'ı fonlama transferine bağlanır; fiat işte zincirde fonlama yoktur (ADR 0024).
+  const travelRule =
+    !fiat && setup !== null && fundAmount !== null && travelRuleRequired(fundAmount, setup.travelRuleThreshold);
 
   const apiClient = useApiClient(actor.api);
+  const { publicApi } = apiClient;
+  // Kartla ödeme: Square API'sinin fiat rayı (yayımlanabilir anahtar, en düşük tutar); yapılandırılmamışsa seçilemez.
+  const [fiatConfig, setFiatConfig] = useState<Load<FiatConfig> | null>(null);
+  useEffect(() => {
+    if (!publicApi) {
+      setFiatConfig(null);
+      return;
+    }
+    let active = true;
+    setFiatConfig({ state: 'loading' });
+    const failed = (caught: unknown) =>
+      active && setFiatConfig({ state: 'error', message: fiatPaymentErrorText(caught) });
+    publicApi.getFiatConfig().then((envelope) => {
+      if (!active) return;
+      try {
+        setFiatConfig({ state: 'ready', value: unwrap(envelope) });
+      } catch (caught) {
+        failed(caught);
+      }
+    }, failed);
+    return () => {
+      active = false;
+    };
+  }, [publicApi]);
+  const fiatUnavailable =
+    fiatConfig === null
+      ? 'Card payments go through the Square API, which is not configured here.'
+      : fiatConfig.state === 'error'
+        ? fiatConfig.message
+        : fiatConfig.state === 'loading'
+          ? 'Reading the card payment settings…'
+          : null;
+  const cardAmount =
+    fiat && token && amountValue !== null && fiatConfig?.state === 'ready'
+      ? fiatAmount(amountValue, token.decimals, fiatConfig.value)
+      : null;
   const [travelVerification, setTravelVerification] = useState<TravelRuleVerification | null>(null);
   const chainCommitment = existingJob?.commitment ?? NO_COMMITMENT;
   const travelBlock = travelRuleFundBlock({
@@ -297,13 +349,16 @@ export function JobWizard({ owner, escrowProgramId }: { owner: string; escrowPro
     agentSummary?.status === 'active' &&
     amountValue !== null &&
     deadline.ok &&
-    challenge?.ok === true &&
     spec.ok &&
     (policyChoice === '' || policy !== null) &&
-    // Public tavanı aşan iş açılmaz (ADR 0028): escrow `AmountAboveDailyCeiling` döner.
+    // Public tavanı aşan iş açılmaz (ADR 0028): escrow ve fiat `AmountAboveDailyCeiling` döner.
     !(policy && amountValue !== null && amountValue > policy.dailyCeiling) &&
     guard.canTransact &&
-    !pending;
+    !pending &&
+    (fiat
+      ? // Fiat iş politikasız açılmaz; iki tarafın screening'i açılışta denetlenir (`create_fiat_job`).
+        policy !== null && cardAmount?.ok === true && screening?.state === 'ready' && fundBlock === null
+      : challenge?.ok === true);
   const canFund =
     setup !== null &&
     token !== null &&
@@ -322,27 +377,39 @@ export function JobWizard({ owner, escrowProgramId }: { owner: string; escrowPro
     try {
       const options = await actor.options();
       const built =
-        kind === 'create'
-          ? await setup.client.flow.createJob(
+        kind === 'create' && fiat
+          ? await setup.client.flow.createFiatJob(
               {
                 institution: ownerKey,
                 agentRecord: new PublicKey(agentRecord!),
-                ...(policy && { policy: new PublicKey(policy.address) }),
+                policy: new PublicKey(policy!.address),
                 spec: spec.spec,
                 amount: amountValue!,
                 deadline: deadline.ok ? deadline.unix : 0,
-                challengePeriod: challenge?.ok ? challenge.seconds : 0n,
               },
               options,
             )
-          : await setup.client.flow.fundJob(
-              {
-                institution: ownerKey,
-                job: new PublicKey(jobAddress!),
-                institutionTokenAccount: settlementAccount(ownerKey, token),
-              },
-              options,
-            );
+          : kind === 'create'
+            ? await setup.client.flow.createJob(
+                {
+                  institution: ownerKey,
+                  agentRecord: new PublicKey(agentRecord!),
+                  ...(policy && { policy: new PublicKey(policy.address) }),
+                  spec: spec.spec,
+                  amount: amountValue!,
+                  deadline: deadline.ok ? deadline.unix : 0,
+                  challengePeriod: challenge?.ok ? challenge.seconds : 0n,
+                },
+                options,
+              )
+            : await setup.client.flow.fundJob(
+                {
+                  institution: ownerKey,
+                  job: new PublicKey(jobAddress!),
+                  institutionTokenAccount: settlementAccount(ownerKey, token),
+                },
+                options,
+              );
       setSignature(await actor.send(built.transaction));
     } catch (err) {
       setError(sendErrorText(err, escrowErrorMessage));
@@ -424,14 +491,55 @@ export function JobWizard({ owner, escrowProgramId }: { owner: string; escrowPro
       </Section>
 
       <Section id="job-terms" title="Terms">
+        <fieldset className="grid gap-2" aria-describedby={railHintId}>
+          <legend className="text-sm font-medium">Settlement</legend>
+          <label className="flex items-start gap-2 text-sm">
+            <input
+              type="radio"
+              name="job-rail"
+              className="mt-1"
+              checked={rail === 'escrow'}
+              onChange={() => setRailChoice('escrow')}
+              disabled={existingJob !== null}
+            />
+            <span>
+              USDC escrow: the amount is locked in the job&apos;s vault when funded and released by the escrow.
+            </span>
+          </label>
+          <label className="flex items-start gap-2 text-sm">
+            <input
+              type="radio"
+              name="job-rail"
+              className="mt-1"
+              checked={rail === 'fiat'}
+              onChange={() => setRailChoice('fiat')}
+              disabled={existingJob !== null || (fiatUnavailable !== null && rail !== 'fiat')}
+            />
+            <span>
+              Card in USD (Stripe): no vault and no funding; the institution pays by card once the agent delivers, and
+              the payment goes to Square&apos;s Stripe account. The job needs a policy.
+            </span>
+          </label>
+          <p id={railHintId} className="text-caption text-muted">
+            {fiatUnavailable && !existingJob
+              ? `Card payments: ${fiatUnavailable}`
+              : 'A card-paid job has no challenge window, dispute or receivable sale: the payment accepts the delivery.'}
+          </p>
+        </fieldset>
         <Field
-          label="Amount (USDC)"
+          label={fiat ? 'Amount (USD)' : 'Amount (USDC)'}
           hint={
-            token
-              ? `Locked in the job's vault when funded. ${token.decimals} decimals.`
-              : 'The settlement mint is read from the escrow config.'
+            !token
+              ? 'The settlement mint is read from the escrow config.'
+              : fiat
+                ? `Paid by card in USD, ${token.decimals} decimals like the settlement mint: whole cents${
+                    fiatConfig?.state === 'ready'
+                      ? `, at least ${formatUsd(fiatConfig.value.minimumAmountMinor)} (Stripe's minimum)`
+                      : ''
+                  }.`
+                : `Locked in the job's vault when funded. ${token.decimals} decimals.`
           }
-          error={amountError}
+          error={amountError ?? (cardAmount && !cardAmount.ok ? cardAmount.reason : null)}
         >
           {({ id, describedBy, invalid }) => (
             <input
@@ -465,25 +573,27 @@ export function JobWizard({ owner, escrowProgramId }: { owner: string; escrowPro
             />
           )}
         </Field>
-        <Field
-          label="Challenge period (minutes)"
-          hint={`How long you can dispute the delivery before it is paid: ${formatDuration(setupLoad.value.setup.minChallengePeriod)} to ${formatDuration(setupLoad.value.setup.maxChallengePeriod)}.`}
-          error={challengeText === '' ? null : challenge && !challenge.ok ? challenge.error : null}
-        >
-          {({ id, describedBy, invalid }) => (
-            <input
-              id={id}
-              className={inputClass}
-              value={challengeText}
-              onChange={(event) => setChallengeText(event.target.value.trim())}
-              aria-describedby={describedBy}
-              aria-invalid={invalid}
-              inputMode="numeric"
-              autoComplete="off"
-              disabled={existingJob !== null}
-            />
-          )}
-        </Field>
+        {!fiat && (
+          <Field
+            label="Challenge period (minutes)"
+            hint={`How long you can dispute the delivery before it is paid: ${formatDuration(setupLoad.value.setup.minChallengePeriod)} to ${formatDuration(setupLoad.value.setup.maxChallengePeriod)}.`}
+            error={challengeText === '' ? null : challenge && !challenge.ok ? challenge.error : null}
+          >
+            {({ id, describedBy, invalid }) => (
+              <input
+                id={id}
+                className={inputClass}
+                value={challengeText}
+                onChange={(event) => setChallengeText(event.target.value.trim())}
+                aria-describedby={describedBy}
+                aria-invalid={invalid}
+                inputMode="numeric"
+                autoComplete="off"
+                disabled={existingJob !== null}
+              />
+            )}
+          </Field>
+        )}
         <Field
           label="Spending policy"
           hint="A bound policy makes the release proof-gated: payment needs a compliance proof against this policy's commitment. Lists the active policies committed from this browser."
@@ -498,7 +608,9 @@ export function JobWizard({ owner, escrowProgramId }: { owner: string; escrowPro
               aria-describedby={describedBy}
               disabled={existingJob !== null}
             >
-              <option value="">No policy (no proof gate)</option>
+              <option value="">
+                {fiat ? 'Choose a policy (required for card payments)' : 'No policy (no proof gate)'}
+              </option>
               {policies.state === 'ready' &&
                 policies.value.map((p) => (
                   <option key={p.address} value={p.address}>
@@ -595,7 +707,7 @@ export function JobWizard({ owner, escrowProgramId }: { owner: string; escrowPro
         />
       )}
 
-      <Section id="job-fund" title="Create and fund">
+      <Section id="job-fund" title={fiat ? 'Create' : 'Create and fund'}>
         {screening?.state === 'loading' && <p className="text-sm text-muted">Reading the sanctions screenings…</p>}
         {screening?.state === 'error' && (
           <p className="text-sm text-danger-text">The screenings could not be read: {screening.message}</p>
@@ -626,7 +738,7 @@ export function JobWizard({ owner, escrowProgramId }: { owner: string; escrowPro
           </dl>
         )}
         {fundBlock && <p className="text-sm text-danger-text">{fundBlock}</p>}
-        {token && balance && (
+        {!fiat && token && balance && (
           <p className="text-sm">
             Balance: <span className="font-mono">{formatUnits(balance.amount ?? 0n, token.decimals)} USDC</span>
             {insufficient && <span className="text-danger-text"> — not enough to fund this job.</span>}
@@ -637,23 +749,24 @@ export function JobWizard({ owner, escrowProgramId }: { owner: string; escrowPro
           <Button onClick={() => void run('create')} loading={busy === 'create'} disabled={!canCreate || busy !== null}>
             Create the job
           </Button>
-          <Button
-            variant="secondary"
-            onClick={() => void run('fund')}
-            loading={busy === 'fund'}
-            disabled={!canFund || busy !== null}
-          >
-            Fund the job
-          </Button>
+          {!fiat && (
+            <Button
+              variant="secondary"
+              onClick={() => void run('fund')}
+              loading={busy === 'fund'}
+              disabled={!canFund || busy !== null}
+            >
+              Fund the job
+            </Button>
+          )}
           {!guard.canTransact && guard.problems.length > 0 && (
             <p className="text-sm text-danger-text">{guard.problems.join(' ')}</p>
           )}
         </div>
         <p className="text-caption text-muted">
-          Transactions signed by this wallet: create_job opens the job and its vault; above the Travel Rule threshold
-          commit_travel_rule binds the record&apos;s commitment; fund_job moves the amount into the vault once both
-          wallets are screened clear. With a policy, you then bind the pre-acceptance proof on the job page: the agent
-          can accept only after it.
+          {fiat
+            ? 'Signed by this wallet: create_fiat_job opens the job without a vault once both wallets are screened clear. You then bind the pre-acceptance proof on the job page; the agent can accept only after it. After the agent delivers, you pay by card on the job page and bind the payment with its compliance proof.'
+            : "Transactions signed by this wallet: create_job opens the job and its vault; above the Travel Rule threshold commit_travel_rule binds the record's commitment; fund_job moves the amount into the vault once both wallets are screened clear. With a policy, you then bind the pre-acceptance proof on the job page: the agent can accept only after it."}
         </p>
         {error && <p className="text-sm text-danger-text">{error}</p>}
         {status && <TxConfirmation stage={status.stage} signature={signature ?? undefined} error={status.error} />}

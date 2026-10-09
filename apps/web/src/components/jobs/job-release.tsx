@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useId, useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import type { PublicKey } from '@solana/web3.js';
 import {
   buildReleaseWitness,
@@ -20,6 +20,7 @@ import { Address } from '@/components/ui/address';
 import { Button } from '@/components/ui/button';
 import { StatusBadge, type Tone } from '@/components/ui/status-badge';
 import { TxConfirmation } from '@/components/ui/tx-confirmation';
+import { ProverInputs } from './prover-inputs';
 import { formatDuration, type EscrowSetup } from '@/lib/job-wizard';
 import { loadDrafts, loadSecret } from '@/lib/policy-local';
 import {
@@ -224,8 +225,6 @@ function BindProof({
   const actor = useActor('institution');
   const { proverUrl } = useWebConfig();
   const guard = useNetworkGuard();
-  const categoryId = useId();
-  const keyId = useId();
   // Yalnızca kurum adına (cüzdan ya da smart account vault'u, FE-21) çizilir.
   const owner = actor.address!;
 
@@ -349,44 +348,14 @@ function BindProof({
           whoever runs that prover sees this policy (limits, blocked addresses, categories, salts).
         </strong>
       </p>
-      <div className="grid gap-3 sm:grid-cols-2">
-        <div className="flex flex-col gap-1.5">
-          <label htmlFor={categoryId} className="text-sm font-medium">
-            Payment category
-          </label>
-          <select
-            id={categoryId}
-            value={chosen}
-            onChange={(event) => setCategory(event.currentTarget.value)}
-            className="rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text"
-            disabled={busy}
-          >
-            {policy.categories.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="flex flex-col gap-1.5">
-          <label htmlFor={keyId} className="text-sm font-medium">
-            Prover API key
-          </label>
-          <input
-            id={keyId}
-            type="password"
-            value={apiKey}
-            onChange={(event) => setApiKey(event.currentTarget.value)}
-            aria-describedby={`${keyId}-hint`}
-            autoComplete="off"
-            className="rounded-lg border border-border bg-surface px-3 py-2 font-mono text-sm text-text"
-            disabled={busy}
-          />
-          <p id={`${keyId}-hint`} className="text-caption text-muted">
-            Kept in this page only and sent only to the prover.
-          </p>
-        </div>
-      </div>
+      <ProverInputs
+        categories={policy.categories}
+        category={chosen}
+        onCategory={setCategory}
+        apiKey={apiKey}
+        onApiKey={setApiKey}
+        disabled={busy}
+      />
       <div>
         <Button
           variant={proved ? 'secondary' : 'primary'}

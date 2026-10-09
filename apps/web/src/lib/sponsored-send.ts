@@ -4,6 +4,9 @@
 // - Smart account: tx'in talimatları vault adına çalışır (rol adresi vault, `payer` sponsor). Talimatlar vault tx'ine
 //   sarılır (SDK `wrapInVault`); öneri ve yürütme ayrı iki sponsorlu işlemdir. Öneri zincirde onaylanınca yürütme
 //   kurulur: yürütmenin hesapları ve compute unit ölçümü önerinin zincirdeki hâline bağlıdır.
+//   Ed25519 precompile talimatı (fiat rayında MPP attestation'ı, ADR 0024) vault mesajına girmez: precompile CPI ile
+//   çağrılamaz ve onu okuyan talimat bir önceki üst düzey talimata bakar. Yürütmenin hemen önüne konur; bu yüzden
+//   yalnızca tek başına yürütebilen üye gönderebilir (öneri beklerse yürütme imzayı taşımaz).
 // Gönderim, ağ korumasından (FE-03) geçmeyen işlemi cüzdana götürmez.
 import {
   SquadsPermission,
@@ -12,6 +15,7 @@ import {
   wrapInVault,
 } from '@squaresdk/solana-sdk/squads';
 import {
+  Ed25519Program,
   Keypair,
   PublicKey,
   VersionedTransaction,
@@ -145,23 +149,34 @@ export interface VaultSendParams {
   readonly lookupTables?: readonly AddressLookupTableAccount[];
 }
 
+const isPrecompile = (instruction: TransactionInstruction) => instruction.programId.equals(Ed25519Program.programId);
+
 /**
  * Talimatları smart account'un vault'u adına çalıştırır: öneri (vault tx + proposal + üyenin onayı), sonra
  * yürütme. Cüzdan tek başına yürütemiyorsa (eşik, zaman kilidi ya da yetki) öneriden sonra `ProposalPendingError`.
- * Dönen imza yürütmeninkidir.
+ * Ed25519 precompile talimatları yürütmenin hemen önüne konur; onları taşıyan adımı yalnızca tek başına yürütebilen
+ * üye gönderebilir, değilse öneri açılmadan reddedilir. Dönen imza yürütmeninkidir.
  */
 export async function sendInstructionsAsVault(
   params: VaultSendParams,
-  instructions: readonly TransactionInstruction[],
+  allInstructions: readonly TransactionInstruction[],
 ): Promise<string> {
   const { connection, gate, channel, signer, multisig } = params;
   guard(gate);
+  const outer = allInstructions.filter(isPrecompile);
+  const instructions = allInstructions.filter((instruction) => !isPrecompile(instruction));
   if (instructions.length === 0) throw new Error('There is nothing to run as the smart account.');
   const sponsor = sponsorKey(channel);
   const view = await readSmartAccount(connection, multisig);
   const wallet = signer.publicKey.toBase58();
   const problem = proposeProblem(view, wallet);
   if (problem) throw new TransactionBlockedError(problem);
+  if (outer.length > 0 && !actsAlone(view, wallet)) {
+    throw new TransactionBlockedError(
+      'This step carries a signature check that runs in the same transaction as its execution, so it cannot wait for ' +
+        'other approvals: send it from a member who approves and executes alone (threshold 1, no time lock).',
+    );
+  }
   const member = view.members.find((entry) => entry.key === wallet)!;
   const votes = (member.permissions & SquadsPermission.vote) !== 0;
   const plan = wrapInVault({
@@ -186,7 +201,7 @@ export async function sendInstructionsAsVault(
   }
   const execute = await prepareSponsoredTx(connection, {
     sponsor,
-    instructions: [plan.execute],
+    instructions: [...outer, plan.execute],
     lookupTables,
     maxComputeUnits,
   });

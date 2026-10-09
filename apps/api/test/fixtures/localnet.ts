@@ -4,6 +4,8 @@
 // agent cüzdanının screening'i yazılır. API bu süreçte (startStack), indexer ve istenirse keeper gerçek süreçlerdir;
 // veritabanı testlerin Postgres'idir. Smart account testi (FE-21) Squads v4 programını ve ProgramConfig hesabını
 // validator açılırken bir kümeden kopyalar (`clone`); ek servisler (fee payer, prover) `spawn` ile aynı ömürde açılır.
+// Fiat testi (FE-20) API'nin fiat rayını açar (`fiat`): verifier config'inin MPP authority'si API'nin attestation'ları
+// imzalayan anahtarıdır; Stripe gerçek test modu (anahtarlar verilirse) ya da API testlerinin fixture sunucusudur.
 // Ortam:
 //   SQUARE_PROGRAMS_DIR   derlenmiş programlar (varsayılan <repo>/target/deploy)
 //   SQUARE_LOCALNET_RPC_PORT, SQUARE_LOCALNET_ARGS (ek validator argümanları, ör. port aralıkları),
@@ -67,6 +69,8 @@ export interface LocalnetOptions {
   webOrigin?: string;
   /** Validator açılırken bu kümeden kopyalanan programlar ve hesaplar (ör. Squads v4; FE-21). */
   clone?: { url: string; programs: readonly PublicKey[]; accounts: readonly PublicKey[] };
+  /** API'nin fiat rayı (FE-20): `stripe` verilirse gerçek Stripe test modu, verilmezse fixture Stripe. */
+  fiat?: { stripe?: { secretKey: string; publishableKey: string } };
 }
 
 export interface Localnet {
@@ -101,6 +105,8 @@ export async function startLocalnet(options: LocalnetOptions): Promise<Localnet>
   const agentWallet = wallet();
   const keeper = wallet();
   const panel = [wallet(), wallet(), wallet()];
+  // MPP authority: verifier config'ine yazılır; fiat rayı açıksa API attestation'ları bununla imzalar.
+  const mppAuthority = Keypair.generate();
 
   const run = (name: string, command: string, args: string[], env: Record<string, string> = {}) => {
     const child = spawn(command, args, { env: { ...process.env, ...env }, stdio: ['ignore', 'pipe', 'pipe'] });
@@ -157,6 +163,15 @@ export async function startLocalnet(options: LocalnetOptions): Promise<Localnet>
     openapi: loadOpenApi(inject('openapiPath'), PUBLIC_BASE_URL),
     rpcUrl: RPC_URL,
     ...(options.webOrigin ? { webOrigin: options.webOrigin } : {}),
+    ...(options.fiat
+      ? {
+          fiat: {
+            ...(options.fiat.stripe ? { stripe: options.fiat.stripe } : {}),
+            authority: mppAuthority,
+            networkId: null,
+          },
+        }
+      : {}),
   });
   await truncate(stack.db);
   for (const name of ['registry', 'policy', 'verifier', 'escrow'] as const) {
@@ -192,11 +207,11 @@ export async function startLocalnet(options: LocalnetOptions): Promise<Localnet>
     ],
     [admin.keypair],
   );
-  // Verifier config'i: ispat bağlama (`set_compliance_proof`) onu ister. MPP yetkilisi bu dünyada kullanılmaz.
+  // Verifier config'i: ispat bağlama (`set_compliance_proof`, `verify_mpp_payment_proof`) onu ister.
   await send(
     [
       await client.verifier.instructions.initVerifierConfig(
-        [PROGRAM_IDS.escrow, PROGRAM_IDS.policy, Keypair.generate().publicKey],
+        [PROGRAM_IDS.escrow, PROGRAM_IDS.policy, mppAuthority.publicKey],
         { admin: admin.keypair.publicKey, programData: programData(PROGRAM_IDS.verifier) },
       ),
     ],

@@ -1,10 +1,13 @@
-// Portal testleri için bellek içi Square API (FE-22): yalnızca portalın çağırdığı uçlar, sözleşmedeki yol, zarf
-// ve kodlarla. SDK'nın `createApiClient`'ine `fetch` olarak verilir; imza Ed25519 ile gerçekten doğrulanır.
+// Portal ve fiat testleri için bellek içi Square API (FE-22, FE-20): yalnızca bu testlerin çağırdığı uçlar,
+// sözleşmedeki yol, zarf ve kodlarla. SDK'nın `createApiClient`'ine `fetch` olarak verilir; imza Ed25519 ile gerçekten doğrulanır.
 // API'nin kendisi apps/api testlerindedir.
 import { createPublicKey, generateKeyPairSync, randomUUID, sign, verify, type KeyObject } from 'node:crypto';
 import type {
   ApiKey,
   ApiKeyScope,
+  FiatAttestation,
+  FiatConfig,
+  FiatCustomer,
   X402Endpoint,
   X402EndpointCreate,
   X402EndpointUpdate,
@@ -49,6 +52,12 @@ export interface FakeSquareApi {
   readonly payments: X402Payment[];
   /** Sonraki isteklerde oturum geçersiz sayılır. */
   expireSessions(): void;
+  /** Fiat rayı: yapılandırma (yoksa 503), işe göre attestation ve kuruma göre kayıtlı kart. */
+  readonly fiat: {
+    config: FiatConfig | null;
+    readonly attestations: Map<string, FiatAttestation>;
+    readonly customers: Map<string, FiatCustomer>;
+  };
 }
 
 export function fakeSquareApi(domain = globalThis.location?.host ?? 'app.square.test'): FakeSquareApi {
@@ -57,8 +66,12 @@ export function fakeSquareApi(domain = globalThis.location?.host ?? 'app.square.
   const keys: (ApiKey & { secret: string })[] = [];
   const endpoints: X402Endpoint[] = [];
   const payments: X402Payment[] = [];
+  const fiat: FakeSquareApi['fiat'] = { config: null, attestations: new Map(), customers: new Map() };
 
   const handle = async (method: string, path: string, headers: Headers, body: unknown): Promise<Response> => {
+    if (method === 'GET' && path === '/v1/fiat/config') {
+      return fiat.config ? ok(fiat.config) : fail(503, 'payment_unavailable', 'fiat rayı yapılandırılmamış');
+    }
     if (method === 'POST' && path === '/v1/auth/challenge') {
       const { wallet } = body as { wallet: string };
       const nonce = randomUUID().replaceAll('-', '');
@@ -86,6 +99,17 @@ export function fakeSquareApi(domain = globalThis.location?.host ?? 'app.square.
     if (method === 'DELETE' && path === '/v1/auth/session') {
       sessions.delete(token);
       return new Response(null, { status: 204 });
+    }
+
+    const attestationMatch = /^\/v1\/jobs\/([^/]+)\/fiat\/attestation$/.exec(path);
+    if (attestationMatch && method === 'GET') {
+      const found = fiat.attestations.get(attestationMatch[1]!);
+      return found ? ok(found) : fail(404, 'not_found', 'işin ödemesi yok');
+    }
+    const customerMatch = /^\/v1\/fiat\/customers\/([^/]+)$/.exec(path);
+    if (customerMatch && method === 'GET') {
+      const found = fiat.customers.get(customerMatch[1]!);
+      return found ? ok(found) : fail(404, 'not_found', 'kurumun Stripe müşterisi yok');
     }
 
     if (path === '/v1/api-keys' && method === 'GET') return ok(keys.map(({ secret: _secret, ...key }) => key));
@@ -149,6 +173,7 @@ export function fakeSquareApi(domain = globalThis.location?.host ?? 'app.square.
     keys,
     endpoints,
     payments,
+    fiat,
     expireSessions: () => sessions.clear(),
     fetch: async (input, init) => {
       const request = new Request(input, init);

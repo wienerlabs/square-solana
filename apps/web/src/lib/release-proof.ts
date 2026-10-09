@@ -21,6 +21,7 @@ import { SQUARE_IDLS, type ClaimListingAccount, type JobAccount } from '@squares
 import type { PolicyDocument } from '@squaresdk/solana-types';
 import manifest from '../../../../circuits/payment-compliance/artifacts/manifest.json';
 import { payeeOf } from './claim-market';
+import { isFiatJob } from './fiat';
 import { institutionAddress, policyAddress } from './idl-pda';
 import type { EscrowSetup } from './job-wizard';
 import { draftDocument, hexToBytes, type PolicyDraft } from './policy-draft';
@@ -136,6 +137,8 @@ export async function readReleaseState(setup: EscrowSetup, jobKey: PublicKey, jo
 /**
  * İspatın şimdi (zincir saatiyle) yapılacak bir release için bayatlık sebebi; tazeyse null. Kural escrow'un
  * `check_fresh`'idir (`checkFresh`, ADR 0012 §4); release'in payee'si, neti ve mint'i job'dan ve alacaktan.
+ * Fiat işte (`finalize_fiat_payment`) payee agent cüzdanı, net tutarın tamamıdır: alacak satılmaz, keeper ücreti
+ * kesilmez.
  */
 export function staleReason(
   proof: ProofView,
@@ -147,13 +150,14 @@ export function staleReason(
     chainNow: number;
   },
 ): string | null {
-  const payee = payeeOf(facts.job, facts.listing);
+  const fiat = isFiatJob(facts.job);
+  const payee = fiat ? { wallet: facts.job.agentWallet, sold: false } : payeeOf(facts.job, facts.listing);
   const reason = checkFresh(
     proof,
     facts.operator,
     {
       payee: payee.wallet,
-      netAmount: releaseNetAmount(big(facts.job.amount), facts.keeperFeeBps),
+      netAmount: fiat ? big(facts.job.amount) : releaseNetAmount(big(facts.job.amount), facts.keeperFeeBps),
       mint: facts.job.mint,
     },
     facts.chainNow,
@@ -261,7 +265,7 @@ export function policyMaterialFor(params: {
     return {
       ok: false,
       reason:
-        'The policy in this browser is not the version the job was opened under: the policy changed after the job was funded, so no proof can match the job.',
+        'The policy in this browser is not the version the job was opened under: the policy changed after the job was opened, so no proof can match the job.',
     };
   }
   return { ok: true, material: { document, salts, categories: draft.allowedCategories } };

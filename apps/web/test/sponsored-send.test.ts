@@ -12,6 +12,7 @@ import {
 } from '@squaresdk/solana-sdk/squads';
 import {
   ComputeBudgetProgram,
+  Ed25519Program,
   Keypair,
   PublicKey,
   SystemProgram,
@@ -204,6 +205,48 @@ describe('as the smart account', () => {
       ]),
     ).rejects.toMatchObject({ approvals: 0 });
     expect(names(instructionsOf(submitted[0]!))).toEqual(['vault_transaction_create', 'proposal_create']);
+  });
+
+  it('runs a signature check right before the execution, never inside the vault message', async () => {
+    // Fiat rayı (ADR 0024): MPP attestation'ı Ed25519 precompile'ıdır; `verify_mpp_payment_proof` bir önceki üst
+    // düzey talimata bakar ve precompile CPI ile çağrılamaz.
+    const { chain, multisig, vault } = smartAccount({});
+    const { channel: sponsorChannel, submitted } = channel();
+    const attestation = Ed25519Program.createInstructionWithPrivateKey({
+      privateKey: Keypair.generate().secretKey,
+      message: new Uint8Array(72).fill(9),
+    });
+    await sendInstructionsAsVault(
+      { connection: chain.connection, gate: OPEN, channel: sponsorChannel, signer, multisig },
+      [attestation, vaultInstruction(vault)],
+    );
+    const [propose, execute] = submitted as [VersionedTransaction, VersionedTransaction];
+    const created = decodeVaultTransactionCreate(instructionsOf(propose)[0]!.data);
+    const inner = created.message.instructions.map((ix) => created.message.accountKeys[ix.programIdIndex]!.toBase58());
+    expect(inner).not.toContain(Ed25519Program.programId.toBase58());
+    const outer = instructionsOf(execute);
+    expect(outer.map((ix) => ix.programId.toBase58())).toEqual([
+      Ed25519Program.programId.toBase58(),
+      SQUADS_PROGRAM_ID.toBase58(),
+    ]);
+    expect(outer[0]!.data.equals(attestation.data)).toBe(true);
+    expect(names(outer.slice(1))).toEqual(['vault_transaction_execute']);
+  });
+
+  it('refuses a signature check before proposing when other approvals are needed', async () => {
+    const { chain, multisig, vault } = smartAccount({ threshold: 2, others: 1 });
+    const { channel: sponsorChannel, submitted } = channel();
+    const attestation = Ed25519Program.createInstructionWithPrivateKey({
+      privateKey: Keypair.generate().secretKey,
+      message: new Uint8Array(72).fill(9),
+    });
+    const refused = sendInstructionsAsVault(
+      { connection: chain.connection, gate: OPEN, channel: sponsorChannel, signer, multisig },
+      [attestation, vaultInstruction(vault)],
+    );
+    await expect(refused).rejects.toBeInstanceOf(TransactionBlockedError);
+    await expect(refused).rejects.toThrow(/approves and executes alone/);
+    expect(submitted).toHaveLength(0);
   });
 
   it('is refused before anything is sent for a wallet that cannot propose or a transaction the sponsor does not pay', async () => {
