@@ -54,6 +54,8 @@ export interface JobFields {
   /** Ödeme rayı (ADR 0024); verilmezse escrow. */
   rail?: 'escrow' | 'fiat';
   settled_at?: number;
+  /** `Job.dispute_rejection_mask` (ADR 0028); yoksa 0. */
+  dispute_rejection_mask?: number;
 }
 
 const bn = (value: number | bigint) => new BN(value.toString());
@@ -103,6 +105,7 @@ export async function encodeJob(fields: JobFields): Promise<Buffer> {
     },
     delivery_uri: 'https://deliveries.example.org/work',
     rail: { [capital(fields.rail ?? 'escrow')]: {} },
+    dispute_rejection_mask: fields.dispute_rejection_mask ?? 0,
   });
 }
 

@@ -83,6 +83,9 @@ pub struct Job {
     /// How the job is paid (ADR 0024). Appended last: accounts created before the field read their
     /// zero padding as `Escrow`.
     pub rail: SettlementRail,
+    /// Arbitrators that rejected the pending proposal (ADR 0028): bit i = `config.arbitrators[i]`.
+    /// Appended last: accounts created before the field read their zero padding as no rejection.
+    pub dispute_rejection_mask: u8,
 }
 
 /// Settlement rail of a job (ADR 0024).

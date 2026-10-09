@@ -177,5 +177,6 @@ pub fn new_job(new: NewJob, now: i64) -> Result<Job> {
         dispute: DisputeInfo::default(),
         delivery_uri: String::new(),
         rail: new.rail,
+        dispute_rejection_mask: 0,
     })
 }

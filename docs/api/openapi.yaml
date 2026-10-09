@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Square Solana API
-  version: 0.27.0
+  version: 0.28.0
   summary: Square HTTP API sözleşmesi (BE-35), uygulaması apps/api (BE-18).
   description: |
     Contract-first API sözleşmesi. Zincirdeki hesaplar, event'ler ve instruction argümanları
@@ -908,8 +908,9 @@ paths:
       summary: Arbitrator oyu için imzasız `resolve_dispute` tx'i hazırlar.
       description: |
         Ön denetimler (zincirdeki job ve escrow config'ine göre): çağıran aktif arbitrator; dispute açık ve son
-        tarih geçmemiş; arbitrator güncel sayımda oy vermemiş; sayımda bir karar varsa oy ona eşit; `pending`
-        oy değil, `split.agentAmount` escrow'u aşamaz. Uymayan istek 409 `conflict` ya da 400 alır.
+        tarih geçmemiş; arbitrator bekleyen öneriye (onay ya da ret) oy vermemiş; `pending` oy değil,
+        `split.agentAmount` escrow'u aşamaz. Uymayan istek 409 `conflict` ya da 400 alır. Bekleyen öneriden farklı
+        bir karar ret oyudur; ret eşiği ulaşılamaz kılarsa öneri sıfırlanır (ADR 0028).
       security:
         - session: []
         - apiKey: []
@@ -2630,15 +2631,34 @@ components:
           type: boolean
           description: Zincirdeki dispute'un reasonHash'i bu içeriğin hash'i mi.
         createdAt: { type: integer, format: int64 }
+    DisputeVoteKind:
+      type: string
+      description: Bekleyen öneriye onay (DisputeVote) ya da ret (DisputeVoteRejected, ADR 0028).
+      enum: [approve, reject]
     DisputeVoteRecord:
       type: object
-      description: DisputeVote event'inden bir oy.
-      required: [arbitrator, resolution, approvalCount, signature, slot, blockTime]
+      description: DisputeVote ya da DisputeVoteRejected event'inden bir oy.
+      required: [kind, arbitrator, resolution, approvalCount, rejectionCount, proposalReset, signature, slot, blockTime]
       additionalProperties: false
       properties:
+        kind: { $ref: '#/components/schemas/DisputeVoteKind' }
         arbitrator: { $ref: './schemas/idl.json#/Address' }
-        resolution: { $ref: './schemas/idl.json#/DisputeResolution' }
-        approvalCount: { type: integer, minimum: 1, maximum: 7 }
+        resolution:
+          $ref: './schemas/idl.json#/DisputeResolution'
+          description: Oyun kararı; retde bekleyen öneriden farklı olan karar.
+        approvalCount:
+          type: [integer, 'null']
+          minimum: 1
+          maximum: 7
+          description: Onayla birlikte sayımdaki onay sayısı; retde null.
+        rejectionCount:
+          type: [integer, 'null']
+          minimum: 1
+          maximum: 7
+          description: Retle birlikte bekleyen önerinin ret sayısı; onayda null.
+        proposalReset:
+          type: boolean
+          description: Ret eşiği ulaşılamaz kıldı ve öneri sıfırlandı; onayda false.
         signature: { type: string, pattern: '^[1-9A-HJ-NP-Za-km-z]{64,88}$' }
         slot: { type: integer, minimum: 0 }
         blockTime: { type: [integer, 'null'], format: int64 }
@@ -2652,7 +2672,7 @@ components:
           type: array
           description: Dispute açıldıktan sonraki oylar, eskiden yeniye.
           items: { $ref: '#/components/schemas/DisputeVoteRecord' }
-        hasVoted: { type: boolean, description: Arbitrator güncel sayımda oy verdi mi. }
+        hasVoted: { type: boolean, description: Arbitrator bekleyen öneriye (onay ya da ret) oy verdi mi. }
         canVote: { type: boolean, description: Oy yok ve son tarih geçmedi. }
         threshold: { type: integer, minimum: 2, maximum: 7, description: Karar için gereken onay (M). }
         evidence:

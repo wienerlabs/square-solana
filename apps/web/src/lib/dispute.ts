@@ -62,10 +62,16 @@ export function minimumBond(amount: bigint, params: Pick<DisputeParams, 'minBond
 /**
  * Zincirdeki karar değerinin API / tip biçimi (`{ kind }`). Anchor'ın programı enum'u camelCase anahtarla
  * (`{ favorAgent: {} }`), ham IDL'le çalışan event çözücüsü IDL adıyla (`{ FavorAgent: {} }`,
- * `agent_amount`) verir; ikisi de kabul edilir.
+ * `agent_amount`), Square API'nin event'leri tip biçimiyle (`{ kind: 'favorAgent' }`, denetim sayfası) verir;
+ * üçü de kabul edilir.
  */
 export function resolutionOf(value: unknown): DisputeResolution {
-  const [variant, inner] = Object.entries((value ?? {}) as Record<string, unknown>)[0] ?? [];
+  const record = (value ?? {}) as Record<string, unknown>;
+  if (typeof record['kind'] === 'string') {
+    const { kind, agentAmount } = record as { kind: string; agentAmount?: unknown };
+    return resolutionOf({ [kind]: kind === 'split' ? { agentAmount } : {} });
+  }
+  const [variant, inner] = Object.entries(record)[0] ?? [];
   const kind = variant ? variant.charAt(0).toLowerCase() + variant.slice(1) : '';
   switch (kind) {
     case 'pending':
@@ -149,12 +155,14 @@ export interface DisputeFacts {
   closedAt: number;
   lapsed: boolean;
   approvalMask: number;
+  /** Bekleyen öneriye ret verenler (`Job.dispute_rejection_mask`, ADR 0028). */
+  rejectionMask: number;
   approvalCount: number;
   arbitratorSetVersion: number;
   resolution: DisputeResolution;
 }
 
-export function disputeFacts(job: Pick<JobAccount, 'dispute'>): DisputeFacts {
+export function disputeFacts(job: Pick<JobAccount, 'dispute' | 'disputeRejectionMask'>): DisputeFacts {
   const d = job.dispute;
   return {
     challenger: d.challenger,
@@ -166,6 +174,7 @@ export function disputeFacts(job: Pick<JobAccount, 'dispute'>): DisputeFacts {
     closedAt: d.closedAt.toNumber(),
     lapsed: d.lapsed,
     approvalMask: d.approvalMask,
+    rejectionMask: job.disputeRejectionMask,
     approvalCount: d.approvalCount,
     arbitratorSetVersion: d.arbitratorSetVersion,
     resolution: resolutionOf(d.resolution),
@@ -197,36 +206,55 @@ export function disputePhase(facts: DisputeFacts, status: string, chainNow: numb
 }
 
 /**
- * Güncel sayım (ADR 0016 madde 2): dispute'un set sürümü config'tekinden eskiyse bir sonraki oy sayımı
- * sıfırlar; o zamana kadar saklı onaylar ve bekleyen karar artık sayılmaz.
+ * Güncel sayım (ADR 0016 madde 2, ADR 0028 madde 4): dispute'un set sürümü config'tekinden eskiyse bir sonraki oy
+ * sayımı sıfırlar; o zamana kadar saklı onaylar, retler ve bekleyen öneri artık sayılmaz.
  */
 export interface VoteTally {
   approvals: number;
+  /** Bekleyen önerinin ret sayısı. */
+  rejections: number;
   threshold: number;
   /** Sayım eski setle yapılmış; bir sonraki oy baştan başlatır. */
   stale: boolean;
-  /** İlk oyun belirlediği karar; yoksa `pending`. */
+  /** İlk oyun açtığı öneri; yoksa `pending`. */
   decision: DisputeResolution;
-  /** Aktif setin her üyesi için güncel sayımda oy verip vermediği, set sırasıyla. */
+  /** Aktif setin her üyesi için bekleyen öneriye oy (onay ya da ret) verip vermediği, set sırasıyla. */
   voted: boolean[];
+}
+
+function bitCount(mask: number): number {
+  let count = 0;
+  for (let rest = mask; rest > 0; rest >>= 1) count += rest & 1;
+  return count;
 }
 
 export function voteTally(facts: DisputeFacts, params: DisputeParams): VoteTally {
   const stale = facts.arbitratorSetVersion !== params.arbitratorSetVersion;
+  const votedMask = facts.approvalMask | facts.rejectionMask;
   return {
     approvals: stale ? 0 : facts.approvalCount,
+    rejections: stale ? 0 : bitCount(facts.rejectionMask),
     threshold: params.threshold,
     stale,
     decision: stale ? { kind: 'pending' } : facts.resolution,
-    voted: params.arbitrators.map((_, index) => !stale && (facts.approvalMask & (1 << index)) !== 0),
+    voted: params.arbitrators.map((_, index) => !stale && (votedMask & (1 << index)) !== 0),
   };
 }
 
-/** Oyun seçenekleri: karar bekliyorsa hepsi, ilk oy belirlediyse yalnızca o karar (`ResolutionMismatch`). */
-export type VoteChoices = { kind: 'any' } | { kind: 'fixed'; resolution: DisputeResolution };
+/**
+ * Oyun seçenekleri: öneri yoksa oy yeni öneri açar; öneri varsa aynı karar onay, farklı karar ret oyudur
+ * (ADR 0028 madde 4).
+ */
+export type VoteChoices = { kind: 'any' } | { kind: 'proposal'; resolution: DisputeResolution };
 
 export function voteChoices(tally: VoteTally): VoteChoices {
-  return tally.decision.kind === 'pending' ? { kind: 'any' } : { kind: 'fixed', resolution: tally.decision };
+  return tally.decision.kind === 'pending' ? { kind: 'any' } : { kind: 'proposal', resolution: tally.decision };
+}
+
+/** Seçilen kararın oy türü: öneri yoksa yeni öneri, varsa onay ya da ret. */
+export function voteKind(choices: VoteChoices, resolution: DisputeResolution): 'propose' | 'approve' | 'reject' {
+  if (choices.kind === 'any') return 'propose';
+  return sameResolution(choices.resolution, resolution) ? 'approve' : 'reject';
 }
 
 /** Bu cüzdanın şimdi oy verememesinin sebebi; verebiliyorsa null (`resolve_dispute`'un ön koşulları). */
@@ -243,7 +271,7 @@ export function voteBlock(params: {
   if (status !== 'disputed') return 'The dispute is no longer open for votes.';
   if (chainNow === null) return 'Reading the chain clock…';
   if (chainNow >= facts.deadline) return 'Voting closed: the dispute deadline has passed.';
-  if (voteTally(facts, disputeParams).voted[index]) return 'You have already voted in the current count.';
+  if (voteTally(facts, disputeParams).voted[index]) return 'You have already voted on the pending proposal.';
   return null;
 }
 
@@ -336,8 +364,8 @@ export const DISPUTE_ERROR_HINTS: Readonly<Record<string, string>> = {
   DisputeAlreadyActive: 'A dispute is already open or decided on this job.',
   NoActiveDispute: 'The job has no open dispute any more; it may have been decided or lapsed already.',
   NotArbitrator: 'The wallet is not in the escrow’s active arbitrator set.',
-  AlreadyVoted: 'This wallet has already voted in the current count.',
-  ResolutionMismatch: 'The first vote set the decision; later votes must match it exactly.',
+  AlreadyVoted: 'This wallet has already voted on the pending proposal (approved or rejected it).',
+  ResolutionMismatch: 'A vote must name a decision; Pending is not a vote.',
   ResolutionNotDecided: 'The dispute has not reached the arbitrator threshold yet.',
   InvalidSplitAmount: 'The agent’s share of a split cannot exceed the escrowed amount.',
   DisputeNotExpired: 'The dispute can be lapsed only at or after its deadline.',

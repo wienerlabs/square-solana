@@ -29,12 +29,22 @@ export type DisputeEvidence = z.infer<typeof DisputeEvidenceSchema>;
 
 // ---------------------------------------------------------------- oy ve kuyruk
 
-/** `DisputeVote` event'inden bir oy. */
+/** Oyun türü: bekleyen öneriye onay (`DisputeVote`) ya da ret (`DisputeVoteRejected`, ADR 0028). */
+export const DisputeVoteKindSchema = z.enum(['approve', 'reject']);
+export type DisputeVoteKind = z.infer<typeof DisputeVoteKindSchema>;
+
+/** `DisputeVote` ya da `DisputeVoteRejected` event'inden bir oy. */
 export const DisputeVoteRecordSchema = z.object({
+  kind: DisputeVoteKindSchema,
   arbitrator: Address,
+  /** Oyun kararı; retde bekleyen öneriden farklı olan karar. */
   resolution: DisputeResolutionSchema,
-  /** Oyla birlikte sayımdaki onay sayısı (set değişiminde sayım sıfırlanır). */
-  approvalCount: z.number().int().min(1).max(7),
+  /** Onayla birlikte sayımdaki onay sayısı (set değişiminde ve öneri sıfırlanınca sayım baştan); retde null. */
+  approvalCount: z.number().int().min(1).max(7).nullable(),
+  /** Retle birlikte bekleyen önerinin ret sayısı; onayda null. */
+  rejectionCount: z.number().int().min(1).max(7).nullable(),
+  /** Ret eşiği ulaşılamaz kıldı ve öneri sıfırlandı; onayda false. */
+  proposalReset: z.boolean(),
   signature: Signature,
   slot: z.number().int().min(0),
   blockTime: I64.nullable(),
@@ -45,7 +55,7 @@ export const ArbitrationQueueItemSchema = z.object({
   dispute: DisputeViewSchema,
   /** Dispute açıldıktan sonraki oylar, eskiden yeniye. */
   votes: z.array(DisputeVoteRecordSchema),
-  /** Oturumdaki arbitrator güncel sayımda oy verdi mi. */
+  /** Oturumdaki arbitrator bekleyen öneriye (onay ya da ret) oy verdi mi. */
   hasVoted: z.boolean(),
   /** Oy verilebilir: oy yok ve son tarih geçmedi. */
   canVote: z.boolean(),
@@ -57,7 +67,7 @@ export type ArbitrationQueueItem = z.infer<typeof ArbitrationQueueItemSchema>;
 
 /** `resolve_dispute` oyu için imzasız tx isteği. */
 export const DisputeVoteRequestSchema = z.object({
-  /** Oy; `pending` olamaz. */
+  /** Oy; `pending` olamaz. Bekleyen öneriden farklı bir karar ret sayılır. */
   resolution: DisputeResolutionSchema,
   /** Boşsa arbitrator'ın kendisi. */
   feePayer: Address.nullable(),

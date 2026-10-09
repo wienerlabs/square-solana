@@ -1,6 +1,6 @@
 # Program arayüz sözleşmesi
 
-**Sözleşme sürümü:** v0.8.0 (taslak) · **Issue:** BC-44 (#101), BC-47 (#119), BE-10 (#42), BC-17 (#25), BC-15 (#24), BC-21 (#29), BC-34 (#71), BC-09 (#9), BC-36 (#77), BC-32 (#69), BC-33 (#70), BC-37 (#78), P-07 (#242), P-20 (#255), P-01 (#236) · **IDL'ler:** [`idl/`](../../idl/)
+**Sözleşme sürümü:** v0.9.0 (taslak) · **Issue:** BC-44 (#101), BC-47 (#119), BE-10 (#42), BC-17 (#25), BC-15 (#24), BC-21 (#29), BC-34 (#71), BC-09 (#9), BC-36 (#77), BC-32 (#69), BC-33 (#70), BC-37 (#78), P-07 (#242), P-20 (#255), P-01 (#236), #259 · **IDL'ler:** [`idl/`](../../idl/)
 
 Bu doküman Square'in dört Solana programının (`square_registry`, `square_policy`, `square_verifier`, `square_escrow`) dış arayüzünü sabitler: instruction adları ve argümanları, hesap sırası ve imzacılar, account düzenleri, PDA seed'leri, event'ler ve hata kodları. Backend (BE-35 API/SDK sözleşmesi, servisler) ve frontend (FE-24 veri katmanı) bu sözleşmeye göre geliştirir. Gerçek programlar `programs/` altında taşındıkça ve değiştikçe bu arayüze uyar; uyum BC-13 ile CI'da denetlenir.
 
@@ -185,6 +185,8 @@ stateDiagram-v2
 - `finalize_payment` yalnızca `challenge_end` geçtikten sonra ve aktif dispute yokken çalışır. Keeper ücreti her dalda ödenir: `net = amount − amount × keeper_fee_bps / 10 000`.
 - Payee çözümlemesi her yerde aynıdır: `ClaimListing.status == Bought` ise alıcı, değilse `Job.agent_wallet`. İspat bağlama (`ReleaseProof.payee`) ve ödeme aynı kuralı kullanır. Settlement'ta listeleme `Settled` olur; iş kuruma iade edilirse `Defaulted` olur ve alıcıya ödeme yapılmaz.
 - Dispute iki adımlıdır: arbitrator oyları (`resolve_dispute`) yalnızca kararı kaydeder. Ödemeyi `execute_resolution` yapar, böylece settlement hesapları ve rentler tek bir çağrıda kullanılır. Her job'da en fazla bir dispute açılabilir.
+- Oy sayımı (ADR 0028 madde 4): ilk oy öneriyi açar; aynı karar onay, farklı karar ret sayılır (`DisputeVoteRejected`). Bir arbitrator bir öneriye bir kez oy verir. Ret sayısı eşiği ulaşılamaz kılınca (`arbitrator_count − ret < M`) öneri, onay maskesi ve `Job.dispute_rejection_mask` sıfırlanır; sonraki oy yeni öneri açar. Son tarih değişmez.
+- Agent payı 0 olan kararda (FavorAgent + kesin ret, Split'te 0) payee'ye giden tek şey bond'dur. Payee `Flagged` ise bond kuruma döner ve iade beklemez; süresi dolmuş ya da olmayan kayıt bekler (ADR 0028 madde 3).
 - İtibar her zaman `AgentRecord`'a yazılır, alacak satılmış olsa da alıcıya yazılmaz. Her settlement bir `ValidationRecord` üretir (`Verified` / `Refused` / `NoGate` / `NoPayout`).
 - Agent cüzdanı değişirse (registry `update_agent`) job eski cüzdanda kalır; kayıt sahibi `sync_agent_wallet` ile job'u güncel cüzdana taşır. `set_agent_status(Inactive)` yeni iş açmayı ve kabulü engeller; kabul edilmiş işler teslim edilip çözülebilir.
 
@@ -194,7 +196,7 @@ Aşağıdakiler sözleşmede **taslak** olarak yer alır; ayrıntılar ilgili is
 
 | Konu | Sözleşmedeki yüzey | Kesinleşeceği issue |
 |---|---|---|
-| M-of-N arbitration | `update_arbitrators(arbitrators: Vec<Pubkey>, threshold)`; N ≤ 7, 2 ≤ M ≤ N; `arbitrator_set_version` ve dispute'taki snapshot'ı; `ArbitratorsUpdated`, `DisputeVote`, `DisputeDecided` | BC-32: v0.6.0'da kesinleşti ([ADR 0016](../decisions/0016-dispute-m-of-n-zaman-asimi-ve-ispatsiz-bekleme.md)); set değişince sonraki oy sayımı yeni setle baştan başlar |
+| M-of-N arbitration | `update_arbitrators(arbitrators: Vec<Pubkey>, threshold)`; N ≤ 7, 2 ≤ M ≤ N; `arbitrator_set_version` ve dispute'taki snapshot'ı; `ArbitratorsUpdated`, `DisputeVote`, `DisputeVoteRejected`, `DisputeDecided`, `Job.dispute_rejection_mask` | BC-32: v0.6.0'da kesinleşti ([ADR 0016](../decisions/0016-dispute-m-of-n-zaman-asimi-ve-ispatsiz-bekleme.md)); set değişince sonraki oy sayımı yeni setle baştan başlar. v0.9.0: ret oyu ([ADR 0028](../decisions/0028-kabul-oncesi-on-ispat-ve-dispute-duzeltmeleri.md) madde 4) |
 | Dispute timeout | `EscrowParams.dispute_timeout_secs` (> 0), `DisputeInfo.deadline`, permissionless `lapse_dispute`: bond iade edilir, dispute düşer, iş `Delivered`'a döner ve normal finalize yolundan çözülür; `DisputeLapsed`, `DisputeNotExpired`, `InvalidDisputeTimeout` | BC-33: v0.6.0'da kesinleşti (ADR 0016) |
 | İspatsız bekleme | `EscrowParams.proof_timeout_secs` (>= 0), `escalate_missing_proof`: policy'li işte `challenge_end + proof_timeout_secs` (lapse'tan sonra kapanıştan) sonra, bugün işi kapatabilecek bir ispat yoksa agent bond'suz dispute açar; `MissingProofEscalated`, `ProofTimeoutNotReached` | BC-33: v0.6.0'da kesinleşti (ADR 0016) |
 | Travel Rule | `EscrowParams.travel_rule_threshold` (0 = kapalı), `commit_travel_rule(commitment)`, `Job.travel_rule_commitment`, `TravelRuleCommitted`, `TravelRuleCommitmentRequired` | BC-34: v0.4.2'de kesinleşti ([ADR 0015](../decisions/0015-travel-rule-commitment-ve-esik.md)) |
@@ -400,7 +402,7 @@ IDL'den üretilmiştir; instruction'lar alfabetik sıradadır. "(w)" yazılabili
 | `update_arbitrators` | `arbitrators: Vec<pubkey>`, `threshold: u8` | `admin` | `config` | — |
 | `update_params` | `params: EscrowParams` | `admin` | `config` | — |
 
-#### Event'ler (24)
+#### Event'ler (25)
 
 | Event | Alanlar |
 |---|---|
@@ -413,6 +415,7 @@ IDL'den üretilmiştir; instruction'lar alfabetik sıradadır. "(w)" yazılabili
 | `DisputeRaised` | `job: pubkey`, `challenger: pubkey`, `bond: u64`, `reason_hash: [u8; 32]`, `deadline: i64` |
 | `DisputeResolved` | `job: pubkey`, `resolution: DisputeResolution`, `agent_side_amount: u64`, `institution_refund: u64`, `bond_to_agent_side: u64`, `bond_returned: u64` |
 | `DisputeVote` | `job: pubkey`, `arbitrator: pubkey`, `resolution: DisputeResolution`, `approval_count: u8` |
+| `DisputeVoteRejected` | `job: pubkey`, `arbitrator: pubkey`, `resolution: DisputeResolution`, `rejection_count: u8`, `proposal_reset: bool` |
 | `EscrowConfigUpdated` | `admin: pubkey`, `settlement_mint: pubkey`, `params: EscrowParams` |
 | `FiatJobCreated` | `job: pubkey`, `institution: pubkey`, `agent_record: pubkey`, `agent_wallet: pubkey`, `policy: pubkey`, `policy_version: u32`, `mint: pubkey`, `amount: u64`, `spec_hash: [u8; 32]`, `deadline: i64` |
 | `Finalized` | `job: pubkey`, `keeper: pubkey`, `keeper_fee: u64` |
@@ -457,8 +460,8 @@ IDL'den üretilmiştir; instruction'lar alfabetik sıradadır. "(w)" yazılabili
 | 6021 | `NoActiveDispute` | No active dispute on this job |
 | 6022 | `InsufficientBond` | Insufficient dispute bond provided |
 | 6023 | `NotArbitrator` | Signer is not an active arbitrator |
-| 6024 | `AlreadyVoted` | Arbitrator has already voted on this dispute |
-| 6025 | `ResolutionMismatch` | Vote does not match the pending resolution |
+| 6024 | `AlreadyVoted` | Arbitrator has already voted on this proposal |
+| 6025 | `ResolutionMismatch` | Vote must name a resolution |
 | 6026 | `ResolutionNotDecided` | Dispute has not reached the arbitrator threshold |
 | 6027 | `InvalidSplitAmount` | Split amount exceeds the escrowed amount |
 | 6028 | `InvalidThreshold` | Threshold must satisfy 2 <= M <= N |
@@ -497,6 +500,7 @@ IDL'den üretilmiştir; instruction'lar alfabetik sıradadır. "(w)" yazılabili
 | v0.3.0 | `set_institution_multisig` multisig hesabını da alır (`squads_multisig`, salt okunur): program, hesabın Squads v4'e ait ve başlatılmış bir `Multisig` olduğunu doğrular; yanlış ya da var olmayan bir multisig bağlanıp kurum kilitlenemez. Hata 6004 `InvalidMultisigVault` → `InvalidSquadsMultisig` ("Account is not an initialized Squads v4 multisig"); kodlar ve sıraları değişmedi. Program ilk kez bu arayüzle yazıldı (BC-17); IDL'i `set_buyer_root` (BC-18) dışında sözleşmeyle aynı | BC-17 (#25) |
 | v0.4.0 | Registry'nin agent kuralları did:aip v2 Solana profili §4.2'yle hizalandı. `AgentIdInvalid` (6000) kimliğin alfabesini de kapsar: `[A-Za-z0-9_-]{1,32}`. Yeni hata 6007 `AgentCardHashInvalid`: kart hash'i tam olarak URI boşken sıfırdır (§4.2/4; dolu URI'nin hash'i kartın SHA-256'sıdır). `transfer_agent_ownership` `wallet`'ı yeni sahibe sıfırlar (§4.2/5), dokümanı buna göre. Mevcut kodlar ve sıraları değişmedi. Program ilk kez bu arayüzle yazıldı (BC-15); IDL'i `init_registry_config`, `update_registry_config`, `record_screening` ve `RegistryConfig` / `ScreeningRecord` (BC-27) dışında sözleşmeyle aynı | BC-15 (#24) |
 | v0.4.1 | Yalnızca doküman: `set_compliance_proof`'un `refusal_code`, `net_amount` ve `proof_timestamp` argümanlarındaki doküman satırları talimatın dokümanına taşındı. Rust fonksiyon argümanları doküman taşıyamadığı için Anchor argümana doküman üretemez; v0.2.0'da IDL'e elle yazılan bu satırları hiçbir program üretemiyordu. Argümanlar, tipleri ve sıraları değişmedi. Verifier ilk kez bu arayüzle yazıldı (BC-21); IDL'i `verify_mpp_payment_proof` ve `update_mpp_authority` (BC-37) dışında sözleşmeyle aynı | BC-21 (#29) |
+| v0.9.0 | Dispute düzeltmeleri ([ADR 0028](../decisions/0028-kabul-oncesi-on-ispat-ve-dispute-duzeltmeleri.md) madde 3–4). Escrow: `Job.dispute_rejection_mask: u8` hesabın sonuna eklendi (eski hesaplar dolgusunu 0 okur); yeni event `DisputeVoteRejected { job, arbitrator, resolution, rejection_count, proposal_reset }`. `resolve_dispute` bekleyen öneriden farklı oyu `ResolutionMismatch` ile reddetmez, ret olarak sayar; ret eşiği ulaşılamaz kılınca öneri sıfırlanır. `ResolutionMismatch` artık yalnızca `Pending` oy içindir. `execute_resolution`: agent payı 0 olan kararda `Flagged` payee'nin bond'u kuruma döner (`DisputeResolved.bond_returned`), iade beklemez. Talimatlar, argümanlar, hesap sıraları ve hata kodları değişmedi. Escrow'un IDL'i sözleşmeyle aynı | #259 |
 | v0.8.0 | Kabul öncesi uyum ön-ispatı ([ADR 0028](../decisions/0028-kabul-oncesi-on-ispat-ve-dispute-duzeltmeleri.md)). Verifier: yeni talimat `set_preflight_proof(proof_a, proof_b, proof_c, refusal_code: u16, proof_timestamp: i64)` (hesaplar `payer`, `authority`, `config`, `institution`, `policy`, `job`, `preflight_proof`, `system_program`); yeni hesap `PreflightProof` (`["preflight_proof", job]`, sabit `PREFLIGHT_PROOF_SEED`; bağlamadaki agent cüzdanı `payee` dahil), yeni event `PreflightProofSet`, yeni hata 6012 `PreflightRefused`. İspat release devresinin aynısıdır; sinyalleri program işin kendi koşullarından kurar (net `job.amount`, payee `job.agent_wallet`, sayaç 0, makbuz 0). Escrow: `accept_job`'a `config` ve `preflight_proof` hesapları eklendi (sırayla, sona); policy'li işte, fiat dahil, `PreflightProof` bağlı değilse, işin snapshot'ına ya da güncel agent cüzdanına ait değilse yeni hata 6050 `PreflightRequired`. `create_job` / `create_fiat_job` policy'li işte public günlük tavanı aşan tutarı yeni hata 6051 `AmountAboveDailyCeiling` ile reddeder. Mevcut kodlar ve sıraları değişmedi. Programların IDL'leri sözleşmeyle aynı | P-01 (#236) |
 | v0.7.1 | Yalnızca doküman ve davranış (BC-39 P-07, P-20); talimatlar, hesaplar, argümanlar, event'ler ve hata kodları değişmedi. Escrow: `escalate_missing_proof` neti `amount − keeper ücreti`'nden ya da mint'i job'unkinden farklı ispatı işi kapatabilecek ispat saymaz; talimatın dokümanı buna göre. Verifier: `verify_mpp_payment_proof` sıfır `mpp_authority`'yi Ed25519 talimatını okumadan `InvalidMppAttestation` ile reddeder (`update_mpp_authority`'nin dokümanındaki "sıfır anahtar fiat rayını kapatır" kuralı artık açık bir denetim) | P-07 (#242), P-20 (#255) |
 | v0.7.0 | Stripe MPP fiat rayı taslaktan çıktı ([ADR 0024](../decisions/0024-stripe-mpp-fiat-rayi.md)). Escrow: `Job.rail: SettlementRail { Escrow, Fiat }` hesabın sonuna eklendi (eski hesaplar dolgusunu `Escrow` okur); yeni talimatlar `create_fiat_job(spec_hash, amount, deadline)`, `cancel_fiat_job`, `finalize_fiat_payment`; yeni event `FiatJobCreated`; yeni hata 6049 `RailMismatch` (fiat işte fonlama, dispute, alacak, Travel Rule; escrow işinde fiat talimatları). `accept_job` fiat işi `Open`'ken kabul eder. Verifier: `verify_mpp_payment_proof` yol A'ya geçti (argümanlar `proof_a/b/c`, `stripe_receipt_hash: [u8; 32]`, `proof_timestamp: i64`; hesaplar `release_proof` ve Instructions sysvar'ı eklendi), `update_mpp_authority` yazıldı, `MppPaymentVerified`'a `job` eklendi (taslak event, daha önce yayımlanmadı), yeni hata 6011 `RailMismatch`; `set_compliance_proof` fiat işi reddeder. Mevcut kodlar ve sıraları değişmedi. Programların IDL'leri sözleşmeyle aynı; `scripts/ci/programs.mjs`'te bekleyen öğe yok | BC-37 (#78) |

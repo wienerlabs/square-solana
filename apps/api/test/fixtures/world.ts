@@ -160,7 +160,8 @@ export class World {
 
   /**
    * Job: ayna satırı ve (PDA çözümü için) zincirdeki hesap. `disputed` ise dispute satırı da; `dispute` dispute
-   * alanlarını (Anchor biçimi), `status` job durumunu değiştirir.
+   * alanlarını (Anchor biçimi), `rejectionMask` ret maskesini (`Job.dispute_rejection_mask`, yoksa 0), `status` job
+   * durumunu değiştirir.
    */
   async job(params: {
     institution: string;
@@ -170,6 +171,7 @@ export class World {
     status?: string;
     amount?: bigint;
     dispute?: Record<string, unknown>;
+    rejectionMask?: number;
   }) {
     const address = key();
     const status = (params.status ?? (params.disputed ? 'disputed' : 'accepted')) as 'disputed';
@@ -185,6 +187,7 @@ export class World {
         lapsed: false,
         ...params.dispute,
       }),
+      disputeRejectionMask: params.rejectionMask ?? 0,
     });
     const account = this.json('escrow', 'job', value);
     const row = this.fresh();
@@ -224,6 +227,7 @@ export class World {
           resolution: (dispute.resolution as { kind: 'pending' }).kind,
           lapsed: dispute.lapsed as boolean,
           approvalMask: dispute.approvalMask as number,
+          rejectionMask: account.disputeRejectionMask as number,
           approvalCount: dispute.approvalCount as number,
           arbitratorSetVersion: BigInt(dispute.arbitratorSetVersion as number),
           ...row,

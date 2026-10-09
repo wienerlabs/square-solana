@@ -288,6 +288,9 @@ model Dispute {
   lapsed               Boolean
   /// Bit i: sayımın dayandığı setteki `arbitrators[i]` karara oy verdi.
   approvalMask         Int               @default(0) @map("approval_mask")
+  /// Bit i: sayımın dayandığı setteki `arbitrators[i]` bekleyen öneriye ret verdi (`Job.dispute_rejection_mask`,
+  /// ADR 0028).
+  rejectionMask        Int               @default(0) @map("rejection_mask")
   approvalCount        Int               @default(0) @map("approval_count")
   /// Sayımın dayandığı arbitrator seti (u32). Config'teki sürüm daha yeniyse sonraki oy sayımı sıfırlar
   /// (ADR 0016).

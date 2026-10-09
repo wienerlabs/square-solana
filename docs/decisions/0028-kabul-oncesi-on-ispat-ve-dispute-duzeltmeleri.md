@@ -137,7 +137,10 @@
   oy.
 - **Uygulama:**
   - P-01 (#236): madde 1 ve 2;
-  - dispute düzeltmeleri: madde 3 ve 4, ayrı issue.
+  - dispute düzeltmeleri (#259): madde 3 ve 4; program sözleşmesi v0.9.0.
+    `DisputeVote::Reject` ayrı bir değer olarak eklenmedi: bekleyen öneriden farklı her karar ret sayılır
+    (`DisputeVoteRejected`), bu yüzden `resolve_dispute`'un argümanı değişmedi. Ret maskesi
+    `Job.dispute_rejection_mask`'tir.
 
   Her biri program sözleşmesinin MINOR'unu artırır ve devnet'te Squads upgrade'i ister.
 - **İstemciler:**
