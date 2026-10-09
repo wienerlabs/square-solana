@@ -1,10 +1,10 @@
-// Square işareti: yuvarlatılmış kare içinde kare boşluk (Arc Square'in işaretinden referans, yeniden çizildi).
+// Square işareti: üst üste binen iki yuvarlatılmış kare; kesiştikleri alan boş kalır (evenodd).
 export function LogoMark({ className = 'size-5' }: { className?: string }) {
   return (
     <svg viewBox="0 0 32 32" aria-hidden="true" className={className} fill="currentColor">
       <path
         fillRule="evenodd"
-        d="M7 2h18a5 5 0 0 1 5 5v18a5 5 0 0 1-5 5H7a5 5 0 0 1-5-5V7a5 5 0 0 1 5-5Zm4.5 9.5v9h9v-9h-9Z"
+        d="M3.3 2h18.4a1.3 1.3 0 0 1 1.3 1.3v18.4a1.3 1.3 0 0 1-1.3 1.3H3.3A1.3 1.3 0 0 1 2 21.7V3.3A1.3 1.3 0 0 1 3.3 2ZM10.3 9h18.4a1.3 1.3 0 0 1 1.3 1.3v18.4a1.3 1.3 0 0 1-1.3 1.3H10.3A1.3 1.3 0 0 1 9 28.7V10.3A1.3 1.3 0 0 1 10.3 9Z"
       />
     </svg>
   );
