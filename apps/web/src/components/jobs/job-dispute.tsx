@@ -422,7 +422,10 @@ function DisputeStatus({
                 {tally.approvals} of {tally.threshold}
               </span>
             </Row>
-            <Row label="Pending decision">{describeResolution(tally.decision, formatAmount)}</Row>
+            <Row label="Rejections">
+              <span className="font-mono">{tally.rejections}</span>
+            </Row>
+            <Row label="Pending proposal">{describeResolution(tally.decision, formatAmount)}</Row>
           </>
         )}
         {(phase.phase === 'decided' || phase.phase === 'closed') && (

@@ -1,6 +1,6 @@
 // Arbitrator bildirimleri (BE-22): outbox + yeniden deneme. Bir tur üç adımdır:
 // 1. **Event'ler:** indexer'ın `chain_events`'inden imleçten (`notification_cursors`) sonraki `DisputeRaised`,
-//    `MissingProofEscalated`, `DisputeVote` ve `DisputeDecided` event'leri, o anda aktif arbitrator'ların
+//    `MissingProofEscalated`, `DisputeVote`, `DisputeVoteRejected` ve `DisputeDecided` event'leri, o anda aktif arbitrator'ların
 //    abone olduğu her uç için kuyruğa girer (`event:<chain_events.id>`). Oy bildirimi oyu veren arbitrator'a
 //    gitmez. İmleç yoksa en son event'ten başlar: geçmiş event'ler bildirilmez. Indexer tek yazıcıdır, event
 //    kimlikleri yazılış sırasıyla görünür.
@@ -32,6 +32,7 @@ const EVENT_TYPES: Readonly<Record<string, ArbitrationEventType>> = {
   DisputeRaised: 'dispute.raised',
   MissingProofEscalated: 'dispute.escalated',
   DisputeVote: 'dispute.vote',
+  DisputeVoteRejected: 'dispute.vote',
   DisputeDecided: 'dispute.decided',
 };
 
@@ -203,7 +204,11 @@ export function createNotifier(deps: {
           if (already.has(`${row.id} ${eventKey}`)) return false;
           const index = set.arbitrators.indexOf(row.wallet);
           return !hasVoted(
-            { approvalMask: dispute.approvalMask, arbitratorSetVersion: Number(dispute.arbitratorSetVersion) },
+            {
+              approvalMask: dispute.approvalMask,
+              rejectionMask: dispute.rejectionMask,
+              arbitratorSetVersion: Number(dispute.arbitratorSetVersion),
+            },
             index,
             set.version,
           );

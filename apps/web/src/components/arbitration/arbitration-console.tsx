@@ -171,8 +171,9 @@ export function ArbitrationConsole({ escrowProgramId }: { escrowProgramId: strin
         </h2>
         <p className="mt-3 text-sm">
           You are one of {disputeParams.arbitrators.length} arbitrators; {disputeParams.threshold} matching votes decide
-          a dispute. The first vote sets the decision, and votes close at the deadline (
-          {formatDuration(BigInt(disputeParams.disputeTimeoutSecs))} after the dispute was raised).
+          a dispute. The first vote opens a proposal; a different decision rejects it, and enough rejections drop it.
+          Votes close at the deadline ({formatDuration(BigInt(disputeParams.disputeTimeoutSecs))} after the dispute was
+          raised).
         </p>
         <div className="mt-4">
           <ApiSessionPanel session={session} purpose="The dispute queue" />
@@ -294,7 +295,7 @@ export function QueueCard({
   // Zincir kuralına API'nin kendi sayımı da eklenir (ör. oy henüz aynaya yansımadıysa `hasVoted`).
   const block =
     voteBlock({ status, facts, disputeParams: params, arbitrator, chainNow }) ??
-    (item.hasVoted ? 'You have already voted in the current count.' : null);
+    (item.hasVoted ? 'You have already voted on the pending proposal.' : null);
 
   return (
     <article aria-labelledby={headingId} className="rounded-card border border-border bg-surface p-6">
@@ -344,7 +345,11 @@ export function QueueCard({
           </dd>
         </div>
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <dt className="text-muted">Pending decision</dt>
+          <dt className="text-muted">Rejections</dt>
+          <dd className="font-mono">{tally.rejections}</dd>
+        </div>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <dt className="text-muted">Pending proposal</dt>
           <dd>{describeResolution(tally.decision, formatAmount)}</dd>
         </div>
       </dl>
@@ -358,7 +363,11 @@ export function QueueCard({
           {item.votes.map((vote) => (
             <li key={vote.signature} className="flex flex-wrap items-center gap-2">
               <Address value={vote.arbitrator} label="arbitrator" />
-              <span>{describeResolution(vote.resolution, formatAmount)}</span>
+              <span>
+                {vote.kind === 'reject' ? 'Rejected for ' : ''}
+                {describeResolution(vote.resolution, formatAmount)}
+                {vote.proposalReset ? ' (proposal dropped)' : ''}
+              </span>
               {vote.blockTime !== null && <time dateTime={iso(vote.blockTime)}>{iso(vote.blockTime)}</time>}
             </li>
           ))}

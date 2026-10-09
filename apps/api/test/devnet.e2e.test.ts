@@ -1,7 +1,8 @@
 // Uyuşmazlık uçtan uca, devnet (BE-22 kabul kriteri): devnet'teki programlar ve escrow config'i, gerçek indexer
 // süreci (devnet'i indexler), API bu dosyada. Kurum kanıtı yükler (reasonHash) → `raise_dispute` → indexer aynası →
-// arbitrator kuyruğu → iki arbitrator API'nin hazırladığı `resolve_dispute` tx'lerini imzalar → üçüncü oy ön
-// denetimde reddedilir → `execute_resolution` → ödeme ve bond agent'a. Son tarih devnet'te 7 gündür; lapse
+// arbitrator kuyruğu → arbitrator'lar API'nin hazırladığı `resolve_dispute` tx'lerini imzalar: ilk oy FavorAgent
+// önerisini açar, iki ret öneriyi düşürür, yeni FavorInstitution önerisi eşiğe ulaşır (ADR 0028 madde 4) → kararlı
+// dispute'ta oy ön denetimde reddedilir → `execute_resolution` → iade ve bond kuruma. Son tarih devnet'te 7 gündür; lapse
 // senaryosu localnet testindedir (localnet.e2e.test.ts). Yalnızca `DISPUTE_E2E_*` ortamıyla çalışır:
 //   DISPUTE_E2E_INSTITUTION   kurum keypair'i (USDC'si, SOL'ü ve temiz screening kaydı var)
 //   DISPUTE_E2E_AGENT         agent cüzdanının keypair'i (SOL'ü ve temiz screening kaydı var)
@@ -231,10 +232,19 @@ describe.skipIf(!ENABLED)('devnet: dispute uçtan uca (kanıt → oylar → exec
     expect(item).toMatchObject({ hasVoted: false, canVote: true, threshold: 2 });
     expect(item.evidence.map((entry) => entry.reasonHash)).toEqual([evidence.data.reasonHash]);
 
-    for (const [index, arbitrator] of [first, second].entries()) {
-      const arbitratorApi = index === 0 ? firstApi : stack.api({ session: await login(stack.api(), arbitrator) });
-      const prepared = await arbitratorApi.prepareDisputeVote(job.toBase58(), {
-        resolution: { kind: 'favorAgent' },
+    const apis = new Map([[first.address, firstApi]]);
+    const apiOf = async (arbitrator: Wallet) => {
+      const known = apis.get(arbitrator.address);
+      if (known) return known;
+      const created = stack.api({ session: await login(stack.api(), arbitrator) });
+      apis.set(arbitrator.address, created);
+      return created;
+    };
+    const vote = async (arbitrator: Wallet, kind: 'favorAgent' | 'favorInstitution', step: string) => {
+      const prepared = await (
+        await apiOf(arbitrator)
+      ).prepareDisputeVote(job.toBase58(), {
+        resolution: { kind },
         feePayer: null,
         computeUnitPrice: null,
       });
@@ -247,9 +257,24 @@ describe.skipIf(!ENABLED)('devnet: dispute uçtan uca (kanıt → oylar → exec
         'confirmed',
       );
       expect(value.err).toBeNull();
-      signatures[`resolve_dispute (${arbitrator.address})`] = signature;
-    }
-    const late = await stack.api({ session: await login(stack.api(), third) }).prepareDisputeVote(job.toBase58(), {
+      signatures[`resolve_dispute ${step} (${arbitrator.address})`] = signature;
+    };
+
+    // Öneri FavorAgent; iki ret eşiği (3 üyeden 2) ulaşılamaz kılar, öneri ve maskeler sıfırlanır.
+    await vote(first, 'favorAgent', 'öneri');
+    await vote(second, 'favorInstitution', 'ret 1');
+    await vote(third, 'favorInstitution', 'ret 2');
+    const reset = await client.escrow.fetch('job', job);
+    expect(Object.keys(reset!.status)).toEqual(['disputed']);
+    expect(Object.keys(reset!.dispute.resolution)).toEqual(['pending']);
+    expect([reset!.dispute.approvalMask, reset!.dispute.approvalCount, reset!.disputeRejectionMask]).toEqual([0, 0, 0]);
+
+    // Yeni öneri: önceki öneride ret verenler yeniden oy verir ve eşiğe ulaşır.
+    await vote(second, 'favorInstitution', 'yeni öneri');
+    await vote(third, 'favorInstitution', 'eşik');
+    const late = await (
+      await apiOf(first)
+    ).prepareDisputeVote(job.toBase58(), {
       resolution: { kind: 'favorAgent' },
       feePayer: null,
       computeUnitPrice: null,
@@ -257,22 +282,34 @@ describe.skipIf(!ENABLED)('devnet: dispute uçtan uca (kanıt → oylar → exec
     expect(late).toMatchObject({ error: { code: 'conflict' } });
     const decided = await client.escrow.fetch('job', job);
     expect(Object.keys(decided!.status)).toEqual(['resolved']);
+    expect(Object.keys(decided!.dispute.resolution)).toEqual(['favorInstitution']);
     expect(decided!.dispute.approvalCount).toBe(2);
 
+    // Kuyruktaki oy geçmişi: onay, iki ret (ikincisi öneriyi düşürdü), yeni önerinin iki onayı.
+    const history = await until('oy geçmişi', INDEX_TIMEOUT_MS, async () => {
+      const rows = await stack.db.chainEvent.count({
+        where: { job: job.toBase58(), name: { in: ['DisputeVote', 'DisputeVoteRejected', 'DisputeDecided'] } },
+      });
+      return rows >= 6 ? rows : null;
+    });
+    expect(history).toBe(6);
+
+    const institutionBefore = await balance(institution.keypair.publicKey);
     const agentBefore = await balance(agent.keypair.publicKey);
     await send(
       'execute_resolution',
       await client.flow.executeResolution({ caller: institution.keypair.publicKey, job }, fee(institution)),
       [institution],
     );
-    // FavorAgent: escrow ve bond agent tarafına (policy'siz iş; keeper ücreti kesilmez).
-    expect((await balance(agent.keypair.publicKey)) - agentBefore).toBe(AMOUNT + bond);
+    // FavorInstitution: escrow ve bond kuruma döner; agent'a ödeme yok.
+    expect((await balance(institution.keypair.publicKey)) - institutionBefore).toBe(AMOUNT + bond);
+    expect(await balance(agent.keypair.publicKey)).toBe(agentBefore);
     // Indexer kararı ve kapanışı aynaya yazar.
     const closed = await until('kapanış aynası', INDEX_TIMEOUT_MS, async () => {
       const row = await stack.db.dispute.findUnique({ where: { job: job.toBase58() } });
       return row && row.closedAt > 0n ? row : null;
     });
-    expect(closed).toMatchObject({ jobStatus: 'released', approvalCount: 2, lapsed: false });
+    expect(closed).toMatchObject({ jobStatus: 'refunded', approvalCount: 2, rejectionMask: 0, lapsed: false });
     expect(closed.decidedAt).toBeGreaterThan(0n);
   }, 1_800_000);
 });

@@ -22,6 +22,7 @@ import {
   toAnchorResolution,
   voteBlock,
   voteChoices,
+  voteKind,
   voteTally,
   type DisputeParams,
 } from '@/lib/dispute';
@@ -43,12 +44,13 @@ const params = async (fields: { version?: number; threshold?: number } = {}): Pr
     }),
   );
 
-const disputed = (dispute: Parameters<typeof jobAccount>[0]['dispute'] = {}, status = 'disputed') =>
+const disputed = (dispute: Parameters<typeof jobAccount>[0]['dispute'] = {}, status = 'disputed', rejectionMask = 0) =>
   jobAccount({
     institution,
     agent_wallet: agent,
     mint,
     status,
+    dispute_rejection_mask: rejectionMask,
     dispute: { challenger: institution, bond: 12_500_000, raised_at: RAISED, deadline: DEADLINE, ...dispute },
   });
 
@@ -157,15 +159,38 @@ describe('dispute phase', () => {
 });
 
 describe('votes', () => {
-  it('counts the approvals towards M and fixes the decision after the first vote', async () => {
+  it('counts the approvals towards M; after the first vote a different decision rejects the proposal', async () => {
     const p = await params();
     const facts = disputeFacts(
       await disputed({ approval_mask: 0b001, approval_count: 1, resolution: { Split: { agent_amount: new BN(40) } } }),
     );
     const tally = voteTally(facts, p);
-    expect(tally).toMatchObject({ approvals: 1, threshold: 2, stale: false, voted: [true, false, false] });
-    expect(voteChoices(tally)).toEqual({ kind: 'fixed', resolution: { kind: 'split', agentAmount: '40' } });
-    expect(voteChoices(voteTally(disputeFacts(await disputed()), p))).toEqual({ kind: 'any' });
+    expect(tally).toMatchObject({
+      approvals: 1,
+      rejections: 0,
+      threshold: 2,
+      stale: false,
+      voted: [true, false, false],
+    });
+    const choices = voteChoices(tally);
+    expect(choices).toEqual({ kind: 'proposal', resolution: { kind: 'split', agentAmount: '40' } });
+    expect(voteKind(choices, { kind: 'split', agentAmount: '40' })).toBe('approve');
+    expect(voteKind(choices, { kind: 'split', agentAmount: '41' })).toBe('reject');
+    expect(voteKind(choices, { kind: 'favorInstitution' })).toBe('reject');
+    const open = voteChoices(voteTally(disputeFacts(await disputed()), p));
+    expect(open).toEqual({ kind: 'any' });
+    expect(voteKind(open, { kind: 'favorAgent' })).toBe('propose');
+  });
+
+  it('counts a rejection as a vote on the pending proposal (ADR 0028)', async () => {
+    const facts = disputeFacts(
+      await disputed({ approval_mask: 0b001, approval_count: 1, resolution: { FavorAgent: {} } }, 'disputed', 0b010),
+    );
+    expect(voteTally(facts, await params())).toMatchObject({
+      approvals: 1,
+      rejections: 1,
+      voted: [true, true, false],
+    });
   });
 
   it('drops the count of an older arbitrator set (ADR 0016 §2)', async () => {

@@ -721,6 +721,36 @@
       }
     }
   },
+  "DisputeVoteRejected": {
+    "type": "object",
+    "required": [
+      "job",
+      "arbitrator",
+      "resolution",
+      "rejectionCount",
+      "proposalReset"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "job": {
+        "$ref": "#/Address"
+      },
+      "arbitrator": {
+        "$ref": "#/Address"
+      },
+      "resolution": {
+        "$ref": "#/DisputeResolution"
+      },
+      "rejectionCount": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 255
+      },
+      "proposalReset": {
+        "type": "boolean"
+      }
+    }
+  },
   "EscrowParams": {
     "type": "object",
     "required": [
@@ -1087,7 +1117,8 @@
       "policy",
       "dispute",
       "deliveryUri",
-      "rail"
+      "rail",
+      "disputeRejectionMask"
     ],
     "additionalProperties": false,
     "properties": {
@@ -1204,6 +1235,12 @@
       "rail": {
         "$ref": "#/SettlementRail",
         "description": "How the job is paid (ADR 0024). Appended last: accounts created before the field read their zero padding as `Escrow`."
+      },
+      "disputeRejectionMask": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 255,
+        "description": "Arbitrators that rejected the pending proposal (ADR 0028): bit i = `config.arbitrators[i]`. Appended last: accounts created before the field read their zero padding as no rejection."
       }
     }
   },
@@ -2748,6 +2785,28 @@
       }
     }
   },
+  "DisputeVoteRejectedEvent": {
+    "type": "object",
+    "required": [
+      "program",
+      "name",
+      "data"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "program": {
+        "type": "string",
+        "const": "escrow"
+      },
+      "name": {
+        "type": "string",
+        "const": "DisputeVoteRejected"
+      },
+      "data": {
+        "$ref": "#/DisputeVoteRejected"
+      }
+    }
+  },
   "EscrowConfigUpdatedEvent": {
     "type": "object",
     "required": [
@@ -3162,6 +3221,9 @@
         "$ref": "#/DisputeVoteEvent"
       },
       {
+        "$ref": "#/DisputeVoteRejectedEvent"
+      },
+      {
         "$ref": "#/EscrowConfigUpdatedEvent"
       },
       {
@@ -3237,6 +3299,7 @@
         "DisputeRaised": "#/DisputeRaisedEvent",
         "DisputeResolved": "#/DisputeResolvedEvent",
         "DisputeVote": "#/DisputeVoteEvent",
+        "DisputeVoteRejected": "#/DisputeVoteRejectedEvent",
         "EscrowConfigUpdated": "#/EscrowConfigUpdatedEvent",
         "FiatJobCreated": "#/FiatJobCreatedEvent",
         "Finalized": "#/FinalizedEvent",
@@ -4682,7 +4745,7 @@
   },
   "ResolveDisputeCall": {
     "type": "object",
-    "description": "One arbitrator vote. The first vote sets the pending resolution, later votes must match it; reaching the threshold moves the job to `Resolved` (`DisputeDecided`). No funds move here.",
+    "description": "One arbitrator vote. The first vote opens a proposal; the same resolution approves it, a different one rejects it (`DisputeVoteRejected`). When rejections make the threshold unreachable the proposal is reset and the next vote opens a new one (ADR 0028). Reaching the threshold moves the job to `Resolved` (`DisputeDecided`). No funds move here.",
     "required": [
       "program",
       "instruction",

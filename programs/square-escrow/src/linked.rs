@@ -182,9 +182,25 @@ pub fn require_clear_screening(
 ) -> Result<()> {
     screening::require_clear(info, registry_program, wallet, now)
         .map(|_| ())
-        .map_err(|rejection| match rejection {
-            ScreeningRejection::Missing => error!(EscrowError::ScreeningRequired),
-            ScreeningRejection::Flagged => error!(EscrowError::ScreeningFlagged),
-            ScreeningRejection::Expired => error!(EscrowError::ScreeningExpired),
-        })
+        .map_err(screening_error)
+}
+
+/// Screening reddinin escrow hatası.
+pub fn screening_error(rejection: ScreeningRejection) -> Error {
+    match rejection {
+        ScreeningRejection::Missing => error!(EscrowError::ScreeningRequired),
+        ScreeningRejection::Flagged => error!(EscrowError::ScreeningFlagged),
+        ScreeningRejection::Expired => error!(EscrowError::ScreeningExpired),
+    }
+}
+
+/// `execute_resolution`: payee'nin kaydı temiz ve tazeyse `None`, değilse reddin sebebi. Karar, sebebe göre
+/// ödemeyi bekletir ya da (`Flagged` payee'ye yalnızca bond kesilecekse) bond'u kuruma döndürür (ADR 0028).
+pub fn payee_screening(
+    info: &AccountInfo,
+    registry_program: &Pubkey,
+    wallet: &Pubkey,
+    now: i64,
+) -> Option<ScreeningRejection> {
+    screening::require_clear(info, registry_program, wallet, now).err()
 }

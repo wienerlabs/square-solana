@@ -17,7 +17,7 @@ use square_escrow::state::{
 };
 use square_escrow::{
     ArbitratorsUpdated, DisputeDecided, DisputeLapsed, DisputeRaised, DisputeResolved, DisputeVote,
-    ReleaseVerified,
+    DisputeVoteRejected, ReleaseVerified,
 };
 use square_program_tests::{anchor_error, cu, event, events};
 use square_registry::ScreeningStatus;
@@ -162,14 +162,49 @@ fn m_of_n_arbitrators_decide_in_favor_of_the_agent() {
         (job, panel[0].pubkey(), DisputeResolution::FavorAgent, 1)
     );
     assert!(events::<DisputeDecided>(&first).is_empty(), "eşik 2");
-    // Aynı arbitrator ikinci kez oy veremez; sonraki oylar ilk kararla aynı olmalı.
+    // Aynı arbitrator ikinci kez oy veremez. Bekleyen öneriden farklı bir oy reddir (ADR 0028); tek ret
+    // eşiği ulaşılamaz kılmadıkça öneri yaşar ve ret veren de aynı öneriye yeniden oy veremez.
     w.h.advance(1);
     w.vote(&panel[0], &job, DisputeResolution::FavorAgent)
         .expect_err("ikinci oy")
         .assert_error(anchor_error(EscrowError::AlreadyVoted));
-    w.vote(&panel[1], &job, DisputeResolution::FavorInstitution)
-        .expect_err("farklı karar")
-        .assert_error(anchor_error(EscrowError::ResolutionMismatch));
+    let rejected = w
+        .vote(&panel[1], &job, DisputeResolution::FavorInstitution)
+        .expect("ret oyu");
+    let rejection: DisputeVoteRejected = event(&rejected);
+    assert_eq!(
+        (
+            rejection.job,
+            rejection.arbitrator,
+            rejection.resolution,
+            rejection.rejection_count,
+            rejection.proposal_reset
+        ),
+        (
+            job,
+            panel[1].pubkey(),
+            DisputeResolution::FavorInstitution,
+            1,
+            false
+        )
+    );
+    assert!(
+        events::<DisputeVote>(&rejected).is_empty(),
+        "ret onay değil"
+    );
+    let state = w.job(&job);
+    assert_eq!(
+        (
+            state.dispute.resolution,
+            state.dispute.approval_mask,
+            state.dispute_rejection_mask
+        ),
+        (DisputeResolution::FavorAgent, 0b001, 0b010)
+    );
+    w.h.advance(1);
+    w.vote(&panel[1], &job, DisputeResolution::FavorAgent)
+        .expect_err("ret verdi")
+        .assert_error(anchor_error(EscrowError::AlreadyVoted));
 
     // Karar yokken ödeme yapılmaz.
     let caller = w.h.funded(LAMPORTS);
@@ -267,6 +302,70 @@ fn m_of_n_arbitrators_decide_in_favor_of_the_agent() {
     w.execute(&again, &job, settlement)
         .expect_err("ikinci execute")
         .assert_error(anchor_error(AnchorErrorCode::AccountNotInitialized));
+}
+
+#[test]
+fn enough_rejections_reset_the_proposal_and_a_new_one_can_pass() {
+    let mut w = World::new(true);
+    let (institution, agent, job) = disputed(&mut w);
+    let panel: Vec<_> = w
+        .panel
+        .arbitrators
+        .iter()
+        .map(|k| k.insecure_clone())
+        .collect();
+    let deadline = w.job(&job).dispute.deadline;
+
+    w.vote(&panel[0], &job, DisputeResolution::FavorAgent)
+        .expect("öneri");
+    w.vote(&panel[1], &job, DisputeResolution::FavorInstitution)
+        .expect("ilk ret");
+    // 3 üyeden 2'si ret verdi: eşik 2'ye ulaşılamaz, öneri ve iki maske sıfırlanır (ADR 0028).
+    let reset = w
+        .vote(&panel[2], &job, DisputeResolution::FavorInstitution)
+        .expect("ikinci ret");
+    let rejection: DisputeVoteRejected = event(&reset);
+    assert_eq!(
+        (rejection.rejection_count, rejection.proposal_reset),
+        (2, true)
+    );
+    let state = w.job(&job);
+    assert_eq!(state.status, JobStatus::Disputed);
+    assert_eq!(
+        (
+            state.dispute.resolution,
+            state.dispute.approval_mask,
+            state.dispute.approval_count,
+            state.dispute_rejection_mask,
+            state.dispute.deadline
+        ),
+        (DisputeResolution::Pending, 0, 0, 0, deadline)
+    );
+
+    // Sonraki oy yeni bir öneri açar; önceki öneride oy verenler yeniden oy verebilir.
+    w.h.advance(1);
+    let opened = w
+        .vote(&panel[2], &job, DisputeResolution::FavorInstitution)
+        .expect("yeni öneri");
+    assert_eq!(event::<DisputeVote>(&opened).approval_count, 1);
+    let decided = w
+        .vote(&panel[0], &job, DisputeResolution::FavorInstitution)
+        .expect("eşik");
+    assert_eq!(
+        event::<DisputeDecided>(&decided).resolution,
+        DisputeResolution::FavorInstitution
+    );
+    assert_eq!(w.job(&job).status, JobStatus::Resolved);
+
+    let before = w.balance(&institution.token_account).unwrap();
+    let caller = w.h.funded(LAMPORTS);
+    let settlement = w.settlement(&institution, &caller.pubkey(), agent.wallet.pubkey());
+    w.execute(&caller, &job, settlement)
+        .expect("execute_resolution");
+    assert_eq!(
+        w.balance(&institution.token_account),
+        Some(before + AMOUNT + MIN_BOND)
+    );
 }
 
 #[test]

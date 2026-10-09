@@ -60,37 +60,63 @@ pub fn validate_vote(resolution: &DisputeResolution, amount: u64) -> Result<()> 
     }
 }
 
-/// Bir oyun sayıma etkisi. Döndürdüğü değer eşiğe ulaşılıp ulaşılmadığıdır.
+/// Bir oyun sayıma etkisi.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum VoteOutcome {
+    /// Oy bekleyen öneriyi onayladı ya da yeni öneriyi açtı; `decided` eşiğe ulaşıldı mı.
+    Approved { decided: bool },
+    /// Oy bekleyen öneriden farklıydı: ret sayıldı. `reset`: retler eşiği imkânsız kıldı, öneri ve maskeler
+    /// sıfırlandı; sonraki oy yeni bir öneri açar (ADR 0028 madde 4).
+    Rejected { rejections: u8, reset: bool },
+}
+
+/// Oyu sayar. Bekleyen öneri yoksa oy öneriyi açar; aynı karar onaydır, farklı karar ret. Retler
+/// aktif arbitrator sayısından çıkınca eşik (`threshold`) imkânsızlaşırsa öneri düşer: tek bir üye ne
+/// kararı dayatabilir ne de engelleyebilir (ADR 0028, ADR 0016 Karar 1'in yerine).
 ///
 /// Aktif dispute'ta set değişimi (ADR 0016): oy, oy anındaki sete göre sayılır. Dispute'un saklı
-/// `arbitrator_set_version`'ı config'ten eskiyse önceki oylar düşer (bit maskesi eski setin
+/// `arbitrator_set_version`'ı config'ten eskiyse önceki oylar ve retler düşer (bit maskeleri eski setin
 /// sıralarına göredir, yeni sette başka anahtarlara denk gelir) ve sayım yeni setle baştan başlar.
 /// Dispute bozulmaz: son tarihi ve bond'u aynı kalır, karar verilmezse `lapse_dispute` ile düşer.
 pub fn tally(
     dispute: &mut DisputeInfo,
+    rejection_mask: &mut u8,
     config: &EscrowConfig,
     index: usize,
     resolution: DisputeResolution,
-) -> Result<bool> {
+) -> Result<VoteOutcome> {
     if dispute.arbitrator_set_version != config.arbitrator_set_version {
         dispute.arbitrator_set_version = config.arbitrator_set_version;
-        dispute.approval_mask = 0;
-        dispute.approval_count = 0;
-        dispute.resolution = DisputeResolution::Pending;
+        reset_proposal(dispute, rejection_mask);
     }
     let bit = 1u8 << index;
-    require!(dispute.approval_mask & bit == 0, EscrowError::AlreadyVoted);
-    if dispute.resolution == DisputeResolution::Pending {
+    require!(
+        (dispute.approval_mask | *rejection_mask) & bit == 0,
+        EscrowError::AlreadyVoted
+    );
+    if dispute.resolution == DisputeResolution::Pending || dispute.resolution == resolution {
         dispute.resolution = resolution;
-    } else {
-        require!(
-            dispute.resolution == resolution,
-            EscrowError::ResolutionMismatch
-        );
+        dispute.approval_mask |= bit;
+        dispute.approval_count += 1;
+        return Ok(VoteOutcome::Approved {
+            decided: dispute.approval_count >= config.threshold,
+        });
     }
-    dispute.approval_mask |= bit;
-    dispute.approval_count += 1;
-    Ok(dispute.approval_count >= config.threshold)
+    *rejection_mask |= bit;
+    let rejections = rejection_mask.count_ones() as u8;
+    let reachable = config.arbitrator_count.saturating_sub(rejections);
+    let reset = reachable < config.threshold;
+    if reset {
+        reset_proposal(dispute, rejection_mask);
+    }
+    Ok(VoteOutcome::Rejected { rejections, reset })
+}
+
+fn reset_proposal(dispute: &mut DisputeInfo, rejection_mask: &mut u8) {
+    dispute.approval_mask = 0;
+    dispute.approval_count = 0;
+    dispute.resolution = DisputeResolution::Pending;
+    *rejection_mask = 0;
 }
 
 /// Kararın settlement'ı: agent tarafına giden escrow tutarı ve bond'un agent tarafına kesilip
@@ -167,34 +193,124 @@ mod tests {
     fn m_votes_decide_and_nobody_votes_twice() {
         let config = config(3, 2, 0);
         let mut dispute = DisputeInfo::default();
+        let mut rejections = 0u8;
         let favor = DisputeResolution::FavorAgent;
-        assert!(!tally(&mut dispute, &config, 0, favor).unwrap());
-        assert!(tally(&mut dispute, &config, 0, favor).is_err());
-        assert!(tally(
-            &mut dispute,
-            &config,
-            1,
-            DisputeResolution::FavorInstitution
-        )
-        .is_err());
-        assert!(tally(&mut dispute, &config, 2, favor).unwrap());
+        let approved = |decided| VoteOutcome::Approved { decided };
+        assert_eq!(
+            tally(&mut dispute, &mut rejections, &config, 0, favor).unwrap(),
+            approved(false)
+        );
+        assert!(tally(&mut dispute, &mut rejections, &config, 0, favor).is_err());
+        assert_eq!(
+            tally(&mut dispute, &mut rejections, &config, 2, favor).unwrap(),
+            approved(true)
+        );
         assert_eq!(dispute.approval_mask, 0b101);
         assert_eq!(dispute.approval_count, 2);
     }
 
     #[test]
+    fn a_different_vote_rejects_and_enough_rejections_reset_the_proposal() {
+        // 3 arbitrator, eşik 2: ilk oy öneri açar; iki ret öneriyi eşiğe ulaşamaz kılar ve düşürür.
+        let config = config(3, 2, 0);
+        let mut dispute = DisputeInfo::default();
+        let mut rejections = 0u8;
+        let favor = DisputeResolution::FavorAgent;
+        let institution = DisputeResolution::FavorInstitution;
+        tally(&mut dispute, &mut rejections, &config, 0, favor).unwrap();
+        assert_eq!(
+            tally(&mut dispute, &mut rejections, &config, 1, institution).unwrap(),
+            VoteOutcome::Rejected {
+                rejections: 1,
+                reset: false
+            }
+        );
+        // Ret veren aynı öneriye yeniden oy veremez.
+        assert!(tally(&mut dispute, &mut rejections, &config, 1, favor).is_err());
+        assert_eq!(
+            tally(&mut dispute, &mut rejections, &config, 2, institution).unwrap(),
+            VoteOutcome::Rejected {
+                rejections: 2,
+                reset: true
+            }
+        );
+        assert_eq!(dispute.resolution, DisputeResolution::Pending);
+        assert_eq!(
+            (dispute.approval_mask, dispute.approval_count, rejections),
+            (0, 0, 0)
+        );
+        // Yeni öneri: herkes yeniden oy verebilir, eşik iki onayla dolar.
+        assert_eq!(
+            tally(&mut dispute, &mut rejections, &config, 1, institution).unwrap(),
+            VoteOutcome::Approved { decided: false }
+        );
+        assert_eq!(
+            tally(&mut dispute, &mut rejections, &config, 2, institution).unwrap(),
+            VoteOutcome::Approved { decided: true }
+        );
+    }
+
+    #[test]
+    fn one_rejection_cannot_block_a_proposal_that_can_still_pass() {
+        // 4 arbitrator, eşik 3: tek ret öneriyi düşürmez, kalan üç onay kararı verir.
+        let config = config(4, 3, 0);
+        let mut dispute = DisputeInfo::default();
+        let mut rejections = 0u8;
+        let split = DisputeResolution::Split { agent_amount: 7 };
+        tally(&mut dispute, &mut rejections, &config, 0, split).unwrap();
+        assert_eq!(
+            tally(
+                &mut dispute,
+                &mut rejections,
+                &config,
+                3,
+                DisputeResolution::FavorAgent
+            )
+            .unwrap(),
+            VoteOutcome::Rejected {
+                rejections: 1,
+                reset: false
+            }
+        );
+        tally(&mut dispute, &mut rejections, &config, 1, split).unwrap();
+        assert_eq!(
+            tally(&mut dispute, &mut rejections, &config, 2, split).unwrap(),
+            VoteOutcome::Approved { decided: true }
+        );
+    }
+
+    #[test]
     fn a_new_arbitrator_set_restarts_the_tally() {
         let mut dispute = DisputeInfo::default();
+        let mut rejections = 0u8;
         let favor = DisputeResolution::Split { agent_amount: 5 };
-        assert!(!tally(&mut dispute, &config(3, 2, 0), 0, favor).unwrap());
-        // Set değişti: eski oy (sıra 0) sayılmaz, karar da serbest kalır.
+        tally(&mut dispute, &mut rejections, &config(3, 2, 0), 0, favor).unwrap();
+        tally(
+            &mut dispute,
+            &mut rejections,
+            &config(3, 2, 0),
+            1,
+            DisputeResolution::FavorAgent,
+        )
+        .unwrap();
+        assert_eq!(rejections, 0b10);
+        // Set değişti: eski oy ve ret (sıra 0 ve 1) sayılmaz, karar da serbest kalır.
         let next = config(4, 3, 1);
         let other = DisputeResolution::FavorInstitution;
-        assert!(!tally(&mut dispute, &next, 0, other).unwrap());
+        assert_eq!(
+            tally(&mut dispute, &mut rejections, &next, 0, other).unwrap(),
+            VoteOutcome::Approved { decided: false }
+        );
         assert_eq!(dispute.arbitrator_set_version, 1);
-        assert_eq!((dispute.approval_mask, dispute.approval_count), (0b1, 1));
-        assert!(!tally(&mut dispute, &next, 1, other).unwrap());
-        assert!(tally(&mut dispute, &next, 3, other).unwrap());
+        assert_eq!(
+            (dispute.approval_mask, dispute.approval_count, rejections),
+            (0b1, 1, 0)
+        );
+        tally(&mut dispute, &mut rejections, &next, 1, other).unwrap();
+        assert_eq!(
+            tally(&mut dispute, &mut rejections, &next, 3, other).unwrap(),
+            VoteOutcome::Approved { decided: true }
+        );
     }
 
     #[test]

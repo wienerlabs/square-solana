@@ -3,8 +3,9 @@
 // çıktısı, `apps/web/.next/standalone`) ayrı süreçte ve gerçek bir tarayıcıda (Playwright). Her rolün tarayıcı
 // bağlamına bir Wallet Standard cüzdanı eklenir: sayfa cüzdanı uygulamanın cüzdan listesinde görür ve bağlanır;
 // işlem ve mesaj imzaları bu test sürecinde rolün keypair'iyle atılır, gizli anahtar sayfaya girmez.
-//   A. Kurum iş sayfasında API'ye girer, kanıt dosyasını seçer ve itiraz eder → iki arbitrator /app/arbitration'da
-//      "In favor of the agent" oyu verir → iş sayfasında "Execute the resolution" → ödeme ve bond agent'a.
+//   A. Kurum iş sayfasında API'ye girer, kanıt dosyasını seçer ve itiraz eder → /app/arbitration'da ilk arbitrator
+//      "In favor of the agent" önerisini açar, ikincisi "In favor of the institution" ile reddeder, üçüncüsü öneriyi
+//      onaylar (ADR 0028 madde 4) → iş sayfasında "Execute the resolution" → ödeme ve bond agent'a.
 //   B. Kurum ikinci işe itiraz eder → son tarih geçince sayfa "Can be lapsed" der → "Lapse the dispute" → bond kuruma
 //      döner, sayfa lapse bilgisini gösterir.
 // `SQUARE_LOCALNET=1` ve `SQUARE_WEB_E2E=1` ile çalışır (web önce derlenir: `pnpm --filter @squaresdk/solana-web
@@ -26,8 +27,8 @@ const WEB_SERVER = join(ROOT, 'apps/web/.next/standalone/apps/web/server.js');
 /** Sayfaya eklenen Wallet Standard cüzdanı (tarayıcıda çalışan düz JS). */
 const WALLET_SCRIPT = readFileSync(new URL('./fixtures/standard-wallet.js', import.meta.url), 'utf8');
 
-/** Dispute son tarihi: arayüzden itiraz, iki oy ve indexer aynası sığar; B senaryosu bunu bekler. */
-const DISPUTE_TIMEOUT_SECS = 120;
+/** Dispute son tarihi: arayüzden itiraz, üç oy ve indexer aynası sığar; B senaryosu bunu bekler. */
+const DISPUTE_TIMEOUT_SECS = 180;
 const AMOUNT = 10_000_000n;
 const WALLET_NAME = 'Square E2E Wallet';
 const UI_TIMEOUT_MS = 90_000;
@@ -154,15 +155,38 @@ describe.skipIf(!ENABLED)('localnet: uyuşmazlık arayüzden uçtan uca (FE-17)'
     await until('dispute aynası', UI_TIMEOUT_MS, () =>
       stack.db.dispute.findUnique({ where: { job: jobA.toBase58() } }),
     );
-    for (const [index, arbitrator] of panel.slice(0, 2).entries()) {
-      const page = await pageAs(arbitrator, '/app/arbitration');
+    // İlk oy öneriyi açar; farklı karar ret oyudur, eşik hâlâ ulaşılabilir olduğu için öneri yaşar; üçüncü üyenin onayı
+    // kararı verir (ADR 0028 madde 4).
+    const votes = [
+      { arbitrator: panel[0]!, choice: 'In favor of the agent', button: 'Vote', approvals: 1, rejections: 0 },
+      {
+        arbitrator: panel[1]!,
+        choice: 'In favor of the institution',
+        button: 'Reject the proposal',
+        approvals: 1,
+        rejections: 1,
+      },
+      {
+        arbitrator: panel[2]!,
+        choice: 'In favor of the agent',
+        button: 'Approve the proposal',
+        approvals: 2,
+        rejections: 1,
+      },
+    ] as const;
+    for (const [index, vote] of votes.entries()) {
+      const page = await pageAs(vote.arbitrator, '/app/arbitration');
       await page.getByRole('button', { name: 'Sign in to the Square API' }).first().click();
       const card = page.locator('article').filter({ hasText: jobA.toBase58() });
-      await card.getByRole('radio', { name: 'In favor of the agent' }).check();
-      await card.getByRole('button', { name: 'Vote' }).click();
+      await card.getByRole('radio', { name: vote.choice }).check();
+      await card.getByRole('button', { name: vote.button }).click();
       await until(`oy ${index + 1}`, UI_TIMEOUT_MS, async () => {
         const job = (await stack.client.escrow.fetch('job', jobA))!;
-        return job.dispute.approvalCount === index + 1;
+        const rejections = job.disputeRejectionMask.toString(2).split('1').length - 1;
+        return (
+          (job.dispute.approvalCount === vote.approvals && rejections === vote.rejections) ||
+          Object.keys(job.status)[0] === 'resolved'
+        );
       });
       await page.context().close();
     }

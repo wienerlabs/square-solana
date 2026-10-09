@@ -45,13 +45,19 @@ async function setupWith(): Promise<EscrowSetup> {
   };
 }
 
-const disputedJob = (status: string, dispute: Record<string, unknown> = {}, policy: PublicKey | null = null) =>
+const disputedJob = (
+  status: string,
+  dispute: Record<string, unknown> = {},
+  policy: PublicKey | null = null,
+  rejectionMask = 0,
+) =>
   jobAccount({
     institution,
     agent_wallet: agent,
     mint,
     status,
     policy,
+    dispute_rejection_mask: rejectionMask,
     dispute: { challenger: institution, bond: 12_500_000, raised_at: RAISED, deadline: DEADLINE, ...dispute },
   });
 
@@ -167,10 +173,10 @@ describe('arbitration console', () => {
     report: (error) => String(error),
   });
 
-  async function mountCard(dispute: Record<string, unknown>, chainNow: number, hasVoted = false) {
+  async function mountCard(dispute: Record<string, unknown>, chainNow: number, hasVoted = false, rejectionMask = 0) {
     const setup = await setupWith();
     const params = disputeParamsOf(await configAccount({ arbitrators, threshold: 2 }));
-    const account = await disputedJob('disputed', dispute);
+    const account = await disputedJob('disputed', dispute, null, rejectionMask);
     const item: ArbitrationQueueItem = {
       dispute: {
         job: jobKey.toBase58(),
@@ -196,12 +202,26 @@ describe('arbitration console', () => {
       },
       votes: [
         {
+          kind: 'approve',
           arbitrator: arbitrators[1]!.toBase58(),
           resolution: { kind: 'favorAgent' },
           approvalCount: 1,
+          rejectionCount: null,
+          proposalReset: false,
           signature: '5'.repeat(88),
           slot: 9,
           blockTime: RAISED + 60,
+        },
+        {
+          kind: 'reject',
+          arbitrator: arbitrators[2]!.toBase58(),
+          resolution: { kind: 'favorInstitution' },
+          approvalCount: null,
+          rejectionCount: 1,
+          proposalReset: false,
+          signature: '6'.repeat(88),
+          slot: 10,
+          blockTime: RAISED + 120,
         },
       ],
       hasVoted,
@@ -241,26 +261,37 @@ describe('arbitration console', () => {
     );
   }
 
-  it('shows the votes and evidence and allows only the decision the first vote set', { timeout: 20000 }, async () => {
-    const { container } = await mountCard(
-      { approval_mask: 0b010, approval_count: 1, resolution: { FavorAgent: {} } },
-      DEADLINE - 7_200,
-    );
-    expect(screen.getByText('2 h left')).toBeTruthy();
-    expect(screen.getByText('1 of 2')).toBeTruthy();
-    expect(screen.getByRole('list', { name: 'Votes' }).textContent).toContain('In favor of the agent');
-    const evidence = screen.getByRole('list', { name: 'Dispute evidence' });
-    expect(within(evidence).getByText('Dispute reason')).toBeTruthy();
-    expect(within(evidence).getByRole('button', { name: 'Download' })).toBeTruthy();
-    expect(screen.getByText(/The first vote set the decision \(In favor of the agent\)/)).toBeTruthy();
-    const radio = (name: string) => screen.getByRole('radio', { name }) as HTMLInputElement;
-    expect(radio('In favor of the agent').checked).toBe(true);
-    expect(radio('In favor of the institution').disabled).toBe(true);
-    expect(radio('Split').disabled).toBe(true);
-    // Ağ doğrulanmadı: oy düğmesi kapalı, tx kurulmaz.
-    expect((screen.getByRole('button', { name: 'Vote' }) as HTMLButtonElement).disabled).toBe(true);
-    expect(await axeViolations(container)).toEqual([]);
-  });
+  it(
+    'shows the votes and evidence; a different decision rejects the pending proposal',
+    { timeout: 20000 },
+    async () => {
+      const { container } = await mountCard(
+        { approval_mask: 0b010, approval_count: 1, resolution: { FavorAgent: {} } },
+        DEADLINE - 7_200,
+        false,
+        0b100,
+      );
+      expect(screen.getByText('2 h left')).toBeTruthy();
+      expect(screen.getByText('1 of 2')).toBeTruthy();
+      const votes = screen.getByRole('list', { name: 'Votes' }).textContent;
+      expect(votes).toContain('In favor of the agent');
+      expect(votes).toContain('Rejected for In favor of the institution');
+      const evidence = screen.getByRole('list', { name: 'Dispute evidence' });
+      expect(within(evidence).getByText('Dispute reason')).toBeTruthy();
+      expect(within(evidence).getByRole('button', { name: 'Download' })).toBeTruthy();
+      expect(screen.getByText(/Pending proposal: In favor of the agent\. Voting for it approves it/)).toBeTruthy();
+      const radio = (name: string) => screen.getByRole('radio', { name }) as HTMLInputElement;
+      expect(
+        [radio('In favor of the agent'), radio('In favor of the institution'), radio('Split')].map((r) => r.disabled),
+      ).toEqual([false, false, false]);
+      fireEvent.click(radio('In favor of the agent'));
+      expect(screen.getByRole('button', { name: 'Approve the proposal' })).toBeTruthy();
+      fireEvent.click(radio('In favor of the institution'));
+      // Ağ doğrulanmadı: oy düğmesi kapalı, tx kurulmaz.
+      expect((screen.getByRole('button', { name: 'Reject the proposal' }) as HTMLButtonElement).disabled).toBe(true);
+      expect(await axeViolations(container)).toEqual([]);
+    },
+  );
 
   it('closes the vote at the deadline and after voting', { timeout: 20000 }, async () => {
     await mountCard({}, DEADLINE);
@@ -269,7 +300,7 @@ describe('arbitration console', () => {
     expect(screen.getByRole('radio', { name: 'Split' }).matches(':disabled')).toBe(true);
     cleanup();
     await mountCard({ approval_mask: 0b001, approval_count: 1, resolution: { FavorAgent: {} } }, RAISED + 100);
-    expect(screen.getByText('You have already voted in the current count.')).toBeTruthy();
+    expect(screen.getByText('You have already voted on the pending proposal.')).toBeTruthy();
   });
 
   it('pages through a queue longer than one page', async () => {

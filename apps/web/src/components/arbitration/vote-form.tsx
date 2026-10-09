@@ -19,6 +19,7 @@ import {
   disputeErrorMessage,
   disputeHint,
   RESOLUTION_LABEL,
+  voteKind,
   type DisputeResolution,
   type VoteChoices,
 } from '@/lib/dispute';
@@ -32,8 +33,8 @@ const CHOICES: readonly Choice[] = ['favorAgent', 'favorInstitution', 'split'];
 
 /**
  * Oy: karar seçilir, API imzasız `resolve_dispute` tx'ini hazırlar, tx çözülüp seçimle karşılaştırılır,
- * cüzdana imzalatılıp gönderilir. İlk oy kararı belirlediyse yalnızca o karar seçilebilir; `block` varsa
- * (son tarih geçti, oy verildi, aktif arbitrator değil) oy kapalıdır.
+ * cüzdana imzalatılıp gönderilir. Bekleyen öneri varsa aynı karar onay, farklı karar ret oyudur (ADR 0028);
+ * `block` varsa (son tarih geçti, oy verildi, aktif arbitrator değil) oy kapalıdır.
  */
 export function VoteForm({
   session,
@@ -65,13 +66,12 @@ export function VoteForm({
   const send = useSendTransaction();
   const name = useId();
   const splitId = useId();
-  const fixed = choices.kind === 'fixed' ? choices.resolution : null;
+  const proposal = choices.kind === 'proposal' ? choices.resolution : null;
   const [choice, setChoice] = useState<Choice | null>(null);
-  const [splitText, setSplitText] = useState('');
-  const shownChoice = (fixed?.kind as Choice | undefined) ?? choice;
-  const shownSplit =
-    fixed?.kind === 'split' ? formatUnits(BigInt(fixed.agentAmount), decimals, { grouping: false }) : splitText;
-  const split = shownChoice === 'split' ? parseSplitAmount(shownSplit, decimals, amount) : null;
+  const [splitText, setSplitText] = useState(
+    proposal?.kind === 'split' ? formatUnits(BigInt(proposal.agentAmount), decimals, { grouping: false }) : '',
+  );
+  const split = choice === 'split' ? parseSplitAmount(splitText, decimals, amount) : null;
 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -84,13 +84,14 @@ export function VoteForm({
   const pending = signature !== null && !confirmed && status?.stage !== 'failed';
 
   const resolution: DisputeResolution | null =
-    shownChoice === null
+    choice === null
       ? null
-      : shownChoice === 'split'
+      : choice === 'split'
         ? split?.ok
           ? { kind: 'split', agentAmount: split.value.toString() }
           : null
-        : { kind: shownChoice };
+        : { kind: choice };
+  const kind = resolution ? voteKind(choices, resolution) : null;
 
   const vote = async () => {
     if (!resolution || !session.api) return;
@@ -131,9 +132,11 @@ export function VoteForm({
     <div className="grid gap-3">
       <fieldset disabled={closed || busy || pending} className="grid gap-2">
         <legend className="text-sm font-medium">Your vote</legend>
-        {fixed && (
+        {proposal && (
           <p className="text-caption text-muted">
-            The first vote set the decision ({describeResolution(fixed, formatAmount)}); a vote must match it.
+            Pending proposal: {describeResolution(proposal, formatAmount)}. Voting for it approves it; any other
+            decision rejects it. When rejections leave too few arbitrators to reach the threshold, the proposal is
+            dropped and the next vote opens a new one.
           </p>
         )}
         {CHOICES.map((option) => (
@@ -142,15 +145,14 @@ export function VoteForm({
               type="radio"
               name={name}
               value={option}
-              checked={shownChoice === option}
-              disabled={fixed !== null && fixed.kind !== option}
+              checked={choice === option}
               onChange={() => setChoice(option)}
               className="accent-accent"
             />
             {RESOLUTION_LABEL[option]}
           </label>
         ))}
-        {shownChoice === 'split' && (
+        {choice === 'split' && (
           <div className="flex flex-col gap-1.5 pl-6">
             <label htmlFor={splitId} className="text-sm">
               Agent’s share (USDC), of {formatAmount(amount)}
@@ -159,13 +161,12 @@ export function VoteForm({
               id={splitId}
               inputMode="decimal"
               className="w-full max-w-xs rounded-lg border border-border bg-surface px-3 py-2 font-mono text-sm text-text"
-              value={shownSplit}
-              readOnly={fixed !== null}
+              value={splitText}
               onChange={(event) => setSplitText(event.target.value)}
-              aria-invalid={split !== null && !split.ok && shownSplit !== ''}
+              aria-invalid={split !== null && !split.ok && splitText !== ''}
               autoComplete="off"
             />
-            {split && !split.ok && shownSplit !== '' && <p className="text-caption text-danger-text">{split.error}</p>}
+            {split && !split.ok && splitText !== '' && <p className="text-caption text-danger-text">{split.error}</p>}
             {split?.ok && (
               <p className="text-caption text-muted">
                 The rest, {formatAmount(amount - split.value)}, goes back to the institution.
@@ -181,7 +182,7 @@ export function VoteForm({
           loading={busy}
           disabled={closed || !resolution || !guard.canTransact || pending}
         >
-          Vote
+          {kind === 'approve' ? 'Approve the proposal' : kind === 'reject' ? 'Reject the proposal' : 'Vote'}
         </Button>
       </div>
       {error && <p className="text-sm text-danger-text">{error}</p>}

@@ -200,15 +200,16 @@ dispute'u keeper'ın lapse crank'i düşürür ([apps/keeper](../keeper/README.m
   - Aynı içerik ikinci kez yüklenirse ilk kayıt döner (`(job, hash)` tekil); istek doğal olarak idempotenttir.
 - **Kuyruk:** `GET /v1/arbitration/queue`, yalnızca aktif arbitrator içindir. Açık (`disputed`) dispute'lar
   son tarihi en yakın önce gelir.
-  - Oylar `DisputeVote` event'lerindendir (dispute'un son açılışından sonra).
-  - `hasVoted`, aynadaki `approval_mask` ve set sürümünden gelir. Sürüm config'tekinden eskiyse sonraki oy
-    sayımı sıfırlar; arbitrator oy vermemiş sayılır.
+  - Oylar `DisputeVote` (`kind: approve`) ve `DisputeVoteRejected` (`kind: reject`, ADR 0028) event'lerindendir
+    (dispute'un son açılışından sonra). Ret öneriyi sıfırladıysa `proposalReset` true'dur.
+  - `hasVoted`, aynadaki onay ve ret maskeleriyle (`approval_mask`, `rejection_mask`) set sürümünden gelir. Sürüm
+    config'tekinden eskiyse sonraki oy sayımı sıfırlar; arbitrator oy vermemiş sayılır.
   - `canVote`: oy yok ve son tarih geçmedi.
 - **Oy:** `POST /v1/disputes/{job}/votes` → `resolve_dispute` için imzasız tx (genel tx hazırlayıcıyla, simüle
   edilmiş). Ön denetim zincirdeki job ve config'le yapılır:
   - aktif arbitrator değil → 403;
   - dispute açık değil ya da son tarih geçti → 409;
-  - güncel sayımda oy verdi ya da oy ilk oyun kararından farklı → 409;
+  - bekleyen öneriye oy (onay ya da ret) verdi → 409. Bekleyen öneriden farklı bir karar ret oyudur;
   - `pending` oy ya da escrow'u aşan `split` → 400.
 
   Fee payer verilmezse arbitrator'ın kendisidir. Kesin kural programdadır; zincirde düşecek tx 422 alır.
@@ -217,7 +218,7 @@ dispute'u keeper'ın lapse crank'i düşürür ([apps/keeper](../keeper/README.m
     (`whsec_…`) yalnızca bu yanıtta döner. Veritabanında secret box'la (`API_WEBHOOK_SECRET_KEYS`, AAD kaydın
     kimliği) şifreli durur.
   - Olaylar:
-    - `dispute.raised`, `dispute.escalated`, `dispute.vote` (oyu verene gitmez), `dispute.decided`: indexer'ın
+    - `dispute.raised`, `dispute.escalated`, `dispute.vote` (onay ya da ret; oyu verene gitmez), `dispute.decided`: indexer'ın
       `chain_events`'inden.
     - `dispute.deadline`: son tarihe `API_NOTIFY_DEADLINE_WARNING_SECONDS` kala, oy vermemiş arbitrator'lara bir
       kez. Bir tur en çok `API_NOTIFY_BATCH_SIZE` dispute için uyarı kuyruğa alır; kuyruğa girmiş uyarılar atlanır,

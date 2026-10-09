@@ -312,4 +312,52 @@ Program sözleşmesi v0.7.0 ([ADR 0024](../decisions/0024-stripe-mpp-fiat-rayi.m
 
 Buffer'lar `upgrade-program.mjs` ile yazıldı; authority'leri vault'a verildi, rent'leri deployer'a döndü (spill).
 
+### Verifier ve escrow v0.9.0: P-07, P-20, kabul öncesi ön-ispat, ret oyu (#265, #262, #259), 2026-10-09
+
+Program sözleşmesi v0.7.0'dan v0.9.0'a tek upgrade'le:
+- **v0.7.1** (#265): `escalate_missing_proof` neti ya da mint'i tutmayan ispatı işi kapatabilir saymaz (P-07); verifier
+  sıfır `mpp_authority`'yi açıkça reddeder (P-20).
+- **v0.8.0** (#262): verifier `set_preflight_proof` ve `PreflightProof`; escrow `accept_job` policy'li işte ön-ispat
+  ister, `create_job` / `create_fiat_job` public tavanı aşan tutarı reddeder
+  ([ADR 0028](../decisions/0028-kabul-oncesi-on-ispat-ve-dispute-duzeltmeleri.md) madde 1–2).
+- **v0.9.0** (#259): `resolve_dispute`'ta ret oyu ve önerinin sıfırlanması, `Job.dispute_rejection_mask`, agent payı 0
+  iken `Flagged` payee'nin bond'u kuruma döner (ADR 0028 madde 3–4).
+
+`Job.dispute_rejection_mask` hesabın sonuna eklendi. Upgrade'den önce ve sonra devnet'teki 19 job salt okunur tarandı:
+`rail`'den sonraki baytlar sıfır, yeni IDL'le hepsinin ret maskesi 0 (9 `Released`, 3 `Refunded`, 4 `Delivered`,
+3 `Funded`). Verifier ve escrow config'leri değişmedi.
+
+| | Verifier | Escrow |
+|---|---|---|
+| Kaynak | `feat/259-dispute-bond-reject`, commit `9f464b1` (main `d4ccea8` dahil) | aynı |
+| Build | `solana-verify build`, imaj `solanafoundation/solana-verifiable-build:4.1.2` ([Deploy](#deploy-bc-30-2026-10-06)'taki digest), `--library-name square_verifier` | `--library-name square_escrow` |
+| Executable hash (buffer ve zincir) | `4eaa720461ac17050aba253ea4d4b6b3686e1e6a779665284039b54236b028bf` | `3d69668fd705133e8d562f531ded285ab99862f943b1a95cddbe651bdcd2c78c` |
+| Buffer | `FJMNoVnDF2qdghnkhWY4EumQRmFwg5zvfdV2ZmQDNJeq` | `GFeXqPkJ2AkYMjaPGmY6f2pr9fMsGMgXpDeczhuJ4yxL` |
+| Squads işlemi | 7 | 8 |
+| Oluşturma / öneri | `34zmX1Md…` / `2asNdaro…` | `34WPHqjE…` / `5KjmQgA1…` |
+| Onaylar (muhammedakinci, mehmethayirli) | `Ry3NGAyw…`, `4g8ZGTpZ…` | `2r7nmcNm…`, `Zu2yMZZv…` |
+| Yürütme | `56ST6TUZqU1ckZTemDBY9RoBtTEbUcUMZMJnLGthRNPjET82WT1LdzdkUNpKtKg8apHDKK6E7R6TXBHAkAQob1th` | `5Xk8nWtEGmYGpoA58FneQ14Azh8CVZ4fAY8TrgpGQEGjDbYuGsu5zhwS2TeVSnNr56XHtWiSt8eGpgbCHYArRH3g` |
+| Son deploy slot'u | 508252508 → 509128797 | 508253095 → 509128841 |
+
+Buffer'ları deployer yazdı, authority'leri vault'a verildi, rent'leri deployer'a döndü (spill). Verifier önce yükseltildi:
+escrow'un `accept_job`'u verifier'ın `PreflightProof` hesabını okur.
+
+**Ret oyu, devnet** (`apps/api/test/devnet.e2e.test.ts`, 2026-10-09): Taraflar ve indexer
+[Uyuşmazlık](#uyuşmazlık-be-22) bölümündeki gibi; iş `F4vKZ88ffyWBeD28ZRffMtYEeAVHmrCiz4hR2Pu8AEXH`, 1 USDC, bond 1 USDC.
+Arbitrator'lar escrow config'indeki üç üye, eşik 2.
+
+| Adım | Tx |
+|---|---|
+| `create_job` → `fund_job` → `accept_job` → `submit_work` | `58gt2pN8…`, `65UDLcQY…`, `2oxTtmSs…`, `3gCAo1ya…` |
+| Kanıt → `raise_dispute` | `62zNtdCmuhrXjeNnPsgFKyv3j9a54xj5y6DRb8msmR8AzFJ9FKi8tMpQucqZZKrvxXKCaYwzP8PKQLhCm1FdTKe9` |
+| Öneri: `DPF8Myr3…` FavorAgent | `4DXt9922cHELbPm8MnULKAcFHsqGL8YCSEaLssJ7M9DxcvTGy27WCp1T1FQyKEUWuDxWBEnv5HfMLm85qNAP4b7q` |
+| Ret 1: `EZggdp7B…` FavorInstitution (`DisputeVoteRejected`, sayı 1) | `5PDdPt5n63uDwefNV2Bqw3wVRSEzz1C5gyut96KUd8SZePvU8VREnn5D2aC1B34RD5Dzt5UZXpTuKufnGwZxFBTa` |
+| Ret 2: `4DepaL4D…` FavorInstitution; eşik ulaşılamaz, öneri ve maskeler sıfırlandı | `aGwMPVxaWBeQqPoEkLzHQrSiQw4XdjvDZeU2yjpKmJzXw5vBe5LeE1sCY51s7GibPfAmB8BgtgmjnDKzGFUZPhn` |
+| Yeni öneri: `EZggdp7B…` FavorInstitution | `6oiTEKnPXBMabuuKrihvGq3ZJ4LkmrnaNYqPTnE2pfJsRJvd62JUXPkod7ikR6VdfjaEYfGfYCZ18KXQ6eBaVLV` |
+| Eşik: `4DepaL4D…`; karar FavorInstitution. Kararlı dispute'ta oy API'de 409 | `5cVN7KgMiiea323JxgEyftrNu7BaCuMXnYuMsXbfXsgXVUL6sVJ9SzAS1U1kcz9mrxL3nMrsd5vwJHYkQMFQU5Vq` |
+| `execute_resolution`: 1 USDC iş + 1 USDC bond kuruma | `4ip9dK5mjU2fi1QVzj4R26uDmS1NpCQQsyCYhA4qjSSogBsgpSF2qWKDiB7TX5szZxzQEnHTNcFWtR4RDRAeY7LM` |
+
+Indexer altı event'i (öneri, iki ret, yeni önerinin iki onayı, karar) ve kapanışı aynaya yazdı; aynada
+iş `refunded`, ret maskesi 0.
+
 Sonraki yükseltmeler runbook'un 6. adımıyla yapılır ve buraya eklenir.

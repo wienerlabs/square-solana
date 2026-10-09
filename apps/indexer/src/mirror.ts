@@ -183,6 +183,7 @@ export function disputeColumns(job: Json): MirrorColumns | null {
     resolution: str(resolution, 'kind'),
     lapsed: bool(dispute, 'lapsed'),
     approvalMask: num(dispute, 'approvalMask'),
+    rejectionMask: num(job, 'disputeRejectionMask'),
     approvalCount: num(dispute, 'approvalCount'),
     arbitratorSetVersion: big(dispute, 'arbitratorSetVersion'),
   };
