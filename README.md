@@ -38,6 +38,8 @@ Square resolves all three on Solana:
 - On a policy-bound job **no payment leaves escrow** until the institution binds a Groth16 proof that this exact
   payment (payee, amount, mint, day and running daily total) complies with the committed mandate. A refusing proof
   is a valid proof: it refunds the institution instead.
+- Before the agent accepts, the institution also proves that the job's own terms (the full amount, paid to the
+  agent's wallet) fit the mandate, so delivered work is never refused on terms the agent was shown up front.
 - After delivery, the agent can sell the receivable at a discount during the challenge window, but **only to buyers
   the institution has approved**.
 
@@ -46,10 +48,10 @@ Square resolves all three on Solana:
 | | |
 |---|---|
 | **Private mandates** | A salted policy commitment and a buyer allow list (Merkle root) on chain; the policy document stays off chain. |
-| **Zero-knowledge release gate** | A Circom circuit proves compliance with per-transaction and daily ceilings, mint and payee lists, categories and time windows. `square_verifier` checks the Groth16 proof and keeps the institution's daily counter. |
+| **Zero-knowledge release gate** | A Circom circuit proves compliance with per-transaction and daily ceilings, mint and payee lists, categories and time windows. `square_verifier` checks the Groth16 proof, once before acceptance and once before payout, and keeps the institution's daily counter. |
 | **On-chain screening** | Wallets are screened against the OFAC SDN list and the Chainalysis sanctions API; a `Flagged` party can neither fund nor be paid. |
 | **Receivables market** | Delivered work becomes a claim that can be listed and bought at a discount by allow-listed, screened buyers. |
-| **M-of-N arbitration** | Bonded disputes, arbitrator sets of up to seven, deadlines and lapse, and payouts that still pass the proof gate. |
+| **M-of-N arbitration** | Bonded disputes, arbitrator sets of up to seven, approve and reject votes, deadlines and lapse, and payouts that still pass the proof gate. |
 | **Travel Rule** | A salted, job-bound commitment at or above the threshold; IVMS101 records are envelope-encrypted off chain with permissioned reads and an access log. |
 | **Agent native** | `did:aip` v2 identities, signed agent cards, the A2A v1.0 task protocol, an agent SDK and a hosted agent runtime with per-capability MCP tools. |
 | **Every rail** | USDC on Solana, cross-chain funding through CCTP, a Stripe MPP fiat rail, x402 paid HTTP endpoints, and sponsored transactions through a policy-checked fee payer. |
@@ -75,14 +77,15 @@ Eight steps take a job from mandate to payout ([protocol](docs/protocol.md),
 stateDiagram-v2
   [*] --> Open: create_job
   Open --> Funded: fund_job
-  Funded --> Accepted: accept_job
+  Funded --> Accepted: accept_job (pre-acceptance proof on a policy job)
   Accepted --> Delivered: submit_work
   Delivered --> Released: finalize_payment (no gate or compliant proof)
   Delivered --> Refunded: finalize_payment (final refusal)
-  Delivered --> Disputed: raise_dispute
-  Disputed --> Resolved: resolve_dispute (M votes)
-  Resolved --> Released: execute_resolution
-  Resolved --> Refunded: execute_resolution
+  Delivered --> Disputed: raise_dispute / escalate_missing_proof
+  Disputed --> Resolved: resolve_dispute (M approvals)
+  Disputed --> Delivered: lapse_dispute (after the deadline)
+  Resolved --> Released: execute_resolution (favor agent / split)
+  Resolved --> Refunded: execute_resolution (favor institution)
   Open --> Cancelled: cancel_job
   Funded --> Cancelled: cancel_job
   Accepted --> Cancelled: cancel_job (after deadline)
@@ -90,6 +93,11 @@ stateDiagram-v2
 
 Funding can also arrive from another chain: USDC burned through CCTP is minted and funds the job in the same
 transaction ([CCTP funding](docs/design/cctp-funding.md)).
+
+A fiat job (`create_fiat_job`) has no vault, challenge window, dispute or claim sale. After delivery the institution
+pays by card through Stripe; the payment's attestation is bound together with the compliance proof
+(`verify_mpp_payment_proof`) and `finalize_fiat_payment` releases the job
+([ADR 0024](docs/decisions/0024-stripe-mpp-fiat-rayi.md), [ADR 0026](docs/decisions/0026-stripe-mpp-fiat-odemesi.md)).
 
 ## Architecture
 
@@ -107,7 +115,10 @@ flowchart TB
     KEEP[keeper]
     PROV[prover]
     SCR[screener]
+    FEE[fee payer]
   end
+  WEB[web app] -- REST --> API
+  WEB -- sponsored txs --> FEE
   I[Institution] -- policy / buyer root --> POL
   A[Agent] -- register --> REG
   I -- create + fund job --> ESC
@@ -149,7 +160,7 @@ through [`crates/square-common`](crates/).
 | [`apps/screener`](apps/screener/) | Sanctions screening (OFAC SDN and Chainalysis) that writes screening records as the screener authority. |
 | [`apps/fee-payer`](apps/fee-payer/) | Sponsored transactions: decodes and policy-checks v0 transactions (allowed programs and instructions, compute budget, per-transaction and daily caps). |
 | [`apps/compliance-api`](apps/compliance-api/) | Proof records and batch attestations, an unattested-payment watcher and an x402-paid compliance report. |
-| [`apps/web`](apps/web/) | Next.js app: institution and agent flows, jobs, claims, policies, arbitration console, developer portal, `did:aip` resolver and network status. |
+| [`apps/web`](apps/web/) | Next.js app: institution and agent flows, jobs, claims, policies, arbitration console, developer portal, `did:aip` resolver, network status, a public audit view per job (`/audit/[job]`) and in-app docs (`/docs`). |
 | [`apps/demo`](apps/demo/) | Demo data and agent: a one-command, idempotent seed (funding, screening, policies, agent registration), a demo agent that does real work over A2A, and a scenario runner that checks every step on chain. |
 
 ### Packages
@@ -175,12 +186,17 @@ through [`crates/square-common`](crates/).
 
 Square runs on **Solana devnet** ([deploy record](docs/deploy/devnet.md)).
 
-- Programs were deployed from a verifiable build (`solana-verify`), and the on-chain hashes match the build.
+- Programs were deployed, and every upgrade since applied, from a verifiable build (`solana-verify`); the on-chain
+  hashes match the builds.
+- The latest upgrade (2026-10-09) brought the verifier and escrow to program contract v0.9.0: the pre-acceptance
+  proof and reject votes in disputes ([upgrades](docs/deploy/devnet.md#yükseltmeler)).
 - The upgrade authority and every config admin is a **2-of-3 Squads v4 vault**
   ([ADR 0008](docs/decisions/0008-upgrade-authority-2-of-3-squads.md)).
 - The eight-step smoke test has run on devnet with real transactions ([report](docs/deploy/smoke-devnet.md)).
 - There is no mainnet environment ([ADR 0027](docs/decisions/0027-yalnizca-devnet.md)); network-independent code
   (CAIP-2, `did:aip`, cluster options) is kept.
+- The web app and the services are hosted on Railway ([ADR 0002](docs/decisions/0002-web-hosting-railway.md),
+  [deploy](#deploy)).
 - Contracts: [program interface](docs/design/program-interface.md) and [API and SDK contract](docs/design/api-sdk-contract.md);
   the current version is in each document's header.
 
@@ -244,6 +260,36 @@ pnpm --filter @squaresdk/solana-demo demo:localnet
 
 This seeds a throwaway validator twice (the second run must change nothing), starts the demo agent and runs the
 approved, claim-sale and refused scenarios, checking every payout and refund on chain ([demo](apps/demo/)).
+
+### Run the web flows in a real browser
+
+```bash
+pnpm turbo build --filter @squaresdk/solana-api... --filter @squaresdk/solana-web --filter @squaresdk/solana-prover
+SQUARE_LOCALNET=1 SQUARE_WEB_E2E=1 pnpm --filter @squaresdk/solana-api exec vitest run test/web-flow.e2e.test.ts
+```
+
+After `anchor build` and the circuit build, Playwright drives the built web app against localnet, Postgres (Docker),
+the indexer and the prover: four roles with their own wallets go through the eight steps and the refused-proof case.
+It uses Playwright's Chromium, or an installed browser through `SQUARE_WEB_E2E_CHANNEL=chrome`. `web-dispute` and
+`web-smart-account` cover disputes and Squads smart accounts; each test runs in its own process
+([apps/api](apps/api/README.md#testler)).
+
+## Deploy
+
+Each service builds from its own Dockerfile (`apps/<service>/Dockerfile`) with the repository root as the build
+context, and validates its environment at startup: a missing or invalid variable stops it. The order matters
+([services runbook](docs/runbooks/services.md)):
+
+1. **Database:** apply the migrations, then seed the program IDs (`pnpm --filter @squaresdk/solana-db migrate:deploy`,
+   then `seed`).
+2. **Indexer** (backfills the programs' history), **prover**, then the **API**, which needs the prover and an
+   S3-compatible store for deliveries and dispute evidence. The **keeper** runs as a single instance; the **fee
+   payer** needs a funded sponsor key.
+3. **Web:** `SQUARE_*` variables point it at the API, the prover and the fee payer; the API's `CORS_ORIGINS` and
+   `API_AUTH_DOMAIN` must match the web app's address.
+
+Variables and secrets per service are in [`docs/environments.md`](docs/environments.md); devnet values (program IDs,
+lookup table) are in the [deploy record](docs/deploy/devnet.md#servislerin-devnet-değerleri).
 
 ## Repository layout
 
