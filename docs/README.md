@@ -31,6 +31,7 @@ Proje belgeleri. Mevcut olanlar bağlantılı; diğerleri ilgili issue ile eklen
 | [`licensing.md`](licensing.md) | lisans politikası: proje lisansı, taşınan kodun bildirimleri, bağımlılık lisansları | [BC-02] |
 | [`THIRD_PARTY_LICENSES.md`](THIRD_PARTY_LICENSES.md) | üçüncü taraf lisans envanteri (üretilir) | [BC-02] |
 | `legal/relicensing/` | Covenant LGPL kodu için yazılı yeniden lisanslama onayları | [BC-03] |
+| [`ceremony/`](ceremony/) | release devresinin kamusal phase-2 töreni: [plan ve açık kararlar](ceremony/README.md), [yürütme](ceremony/running.md), [doğrulama](ceremony/verifying.md), [beacon](ceremony/beacon.md) | [BC-38] |
 | [`deploy/`](deploy/) | ağ bazında deploy kayıtları ([`devnet.md`](deploy/devnet.md)) ve smoke raporları ([`smoke-localnet.md`](deploy/smoke-localnet.md), [`smoke-devnet.md`](deploy/smoke-devnet.md); üreten [`tests/smoke`](../tests/smoke/)), CLI'nin devnet kabul koşusu ([`cli-devnet.md`](deploy/cli-devnet.md)) | [BC-30], [BC-31], [BE-30] |
 | [`runbooks/`](runbooks/README.md) | operasyon runbook'ları: [program deploy ve upgrade](runbooks/upgrade.md), [servisler](runbooks/services.md), [keeper](runbooks/keeper.md), [screener](runbooks/screener.md) | [BC-09], [BE-31] |
 | [`security/`](security/) | off-chain güvenlik: [threat model](security/threat-model.md), [iç inceleme ve bulgular](security/review-be-32.md), [pen-test listesi](security/pentest-checklist.md). Programlar: [threat model](security/program-threat-model.md), [hesap kısıtı matrisi](security/program-constraints.md), [iç inceleme ve bulgular](security/review-bc-39.md), [dış audit paketi](security/audit-package.md) | [BE-32], [BC-39] |
@@ -50,6 +51,7 @@ Proje belgeleri. Mevcut olanlar bağlantılı; diğerleri ilgili issue ile eklen
 [BC-30]: https://github.com/wienerlabs/square-solana/issues/38
 [BC-36]: https://github.com/wienerlabs/square-solana/issues/77
 [BC-31]: https://github.com/wienerlabs/square-solana/issues/43
+[BC-38]: https://github.com/wienerlabs/square-solana/issues/92
 [BC-44]: https://github.com/wienerlabs/square-solana/issues/101
 [BE-01]: https://github.com/wienerlabs/square-solana/issues/15
 [BE-04]: https://github.com/wienerlabs/square-solana/issues/18

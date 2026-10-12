@@ -1,7 +1,7 @@
 # Release devresi (BC-13): circom 2.2.3 ile derleme, devre testleri, test girdilerinin ve release
 # artefaktlarının (r1cs ve wasm hash'leri, zkey'in r1cs ve PPoT'tan türediği, doğrulama anahtarı, verifier'ın
-# Rust VK'sı ve ispat vektörü) commit'lenmiş hâliyle aynılığı; verifier'ın program testlerindeki ispatların
-# (BC-21) bu anahtarla ve sinyallerle geçerliliği. CI'da derleme ya da PPoT dosyası eksikse
+# Rust VK'sı ve ispat vektörü) commit'lenmiş hâliyle aynılığı; kamusal tören yapıldıysa kaydının doğrulanması
+# (BC-38); verifier'ın program testlerindeki ispatların (BC-21) bu anahtarla ve sinyallerle geçerliliği. CI'da derleme ya da PPoT dosyası eksikse
 # devre testleri atlanmaz, düşer (CIRCUIT_TESTS_STRICT). circom ve PPoT hash'leriyle doğrulanır.
 name: Circuits
 
@@ -89,6 +89,12 @@ jobs:
 
       - name: Release artefaktları commit'lenmiş hâliyle aynı
         run: npm run artifacts:check
+
+      # Kamusal phase-2 töreni (BC-38) yapıldıysa kaydı baştan doğrulanır: katkılar, beacon (drand'dan canlı),
+      # doğrulama anahtarı ve manifest. Tören yapılmadıysa (dev anahtarı) adım koşmaz.
+      - name: Phase-2 töreni doğrulanır
+        if: hashFiles('circuits/payment-compliance/artifacts/ceremony/transcript.json') != ''
+        run: npm run ceremony:verify
 
       - name: Verifier'ın program testlerindeki ispatlar geçerli
         run: npm run program-proofs:check

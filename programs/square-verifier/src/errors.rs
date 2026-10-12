@@ -31,4 +31,6 @@ pub enum VerifierError {
     RailMismatch,
     #[msg("Preflight proof breaks a permanent or daily-ceiling rule of the policy")]
     PreflightRefused,
+    #[msg("Config already records the embedded verifying key version")]
+    VkVersionAlreadySynced,
 }

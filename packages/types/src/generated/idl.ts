@@ -807,6 +807,7 @@ export const IDL_PROGRAMS = {
       "record_release",
       "set_compliance_proof",
       "set_preflight_proof",
+      "sync_vk_version",
       "update_mpp_authority",
       "verify_mpp_payment_proof"
     ],
@@ -875,6 +876,11 @@ export const IDL_PROGRAMS = {
         "code": 6012,
         "name": "PreflightRefused",
         "msg": "Preflight proof breaks a permanent or daily-ceiling rule of the policy"
+      },
+      {
+        "code": 6013,
+        "name": "VkVersionAlreadySynced",
+        "msg": "Config already records the embedded verifying key version"
       }
     ]
   },
@@ -1380,6 +1386,10 @@ export const SetPreflightProofArgsSchema = z.object({
 });
 export type SetPreflightProofArgs = z.infer<typeof SetPreflightProofArgsSchema>;
 
+/** verifier.sync_vk_version argümanları. */
+export const SyncVkVersionArgsSchema = z.object({});
+export type SyncVkVersionArgs = z.infer<typeof SyncVkVersionArgsSchema>;
+
 /** verifier.update_mpp_authority argümanları. */
 export const UpdateMppAuthorityArgsSchema = z.object({
   mppAuthority: Address,
@@ -1542,6 +1552,7 @@ export const InstructionCallSchema = z.discriminatedUnion('instruction', [
   z.object({ program: z.literal('verifier'), instruction: z.literal('recordRelease'), args: RecordReleaseArgsSchema }),
   z.object({ program: z.literal('verifier'), instruction: z.literal('setComplianceProof'), args: SetComplianceProofArgsSchema }),
   z.object({ program: z.literal('verifier'), instruction: z.literal('setPreflightProof'), args: SetPreflightProofArgsSchema }),
+  z.object({ program: z.literal('verifier'), instruction: z.literal('syncVkVersion'), args: SyncVkVersionArgsSchema }),
   z.object({ program: z.literal('verifier'), instruction: z.literal('updateMppAuthority'), args: UpdateMppAuthorityArgsSchema }),
   z.object({ program: z.literal('verifier'), instruction: z.literal('verifyMppPaymentProof'), args: VerifyMppPaymentProofArgsSchema }),
   z.object({ program: z.literal('escrow'), instruction: z.literal('acceptJob'), args: AcceptJobArgsSchema }),
