@@ -1,4 +1,4 @@
-import { CLUSTERS, ENV_VARS, PROGRAMS, PROGRAM_ID_ENV } from '@/lib/config';
+import { CCTP_ENV_PREFIX, CLUSTERS, ENV_VARS, PROGRAMS, PROGRAM_ID_ENV } from '@/lib/config';
 
 // Sunucu bileşeni: yapılandırma eksikse uygulamanın yerine gösterilir. Varsayılana düşülmez.
 export function ConfigError({ errors }: { errors: string[] }) {
@@ -24,6 +24,8 @@ export function ConfigError({ errors }: { errors: string[] }) {
             <dd className="text-muted">Optional: address of the {program} program on that cluster</dd>
           </div>
         ))}
+        <dt className="font-mono">{CCTP_ENV_PREFIX}*</dt>
+        <dd className="text-muted">Optional, all or none: funding a job from another chain with CCTP</dd>
       </dl>
     </main>
   );

@@ -6,7 +6,9 @@ import { useConnection } from '@solana/wallet-adapter-react';
 import { PublicKey } from '@solana/web3.js';
 import { useApiClient } from '@/components/api-client';
 import { useActor } from '@/components/actor';
+import { CctpFunding } from '@/components/jobs/job-cctp';
 import { useNetworkGuard } from '@/components/network-guard';
+import { useWebConfig } from '@/components/providers';
 import { Address } from '@/components/ui/address';
 import { Button } from '@/components/ui/button';
 import { CopyButton } from '@/components/ui/copy-button';
@@ -14,6 +16,7 @@ import { StatusBadge, type Tone } from '@/components/ui/status-badge';
 import { TxConfirmation } from '@/components/ui/tx-confirmation';
 import { JobTravelRule } from './job-travel-rule';
 import { chainRefOf, hex } from '@/lib/agent-registration';
+import { CCTP_ENV_PREFIX, ENV_VARS } from '@/lib/config';
 import { institutionAddress, policyAddress } from '@/lib/idl-pda';
 import {
   escrowErrorMessage,
@@ -119,6 +122,7 @@ interface ActivePolicy {
  */
 export function JobWizard({ owner, escrowProgramId }: { owner: string; escrowProgramId: string }) {
   const { connection } = useConnection();
+  const config = useWebConfig();
   const guard = useNetworkGuard();
   const actor = useActor('institution');
   const ownerKey = useMemo(() => new PublicKey(owner), [owner]);
@@ -213,6 +217,7 @@ export function JobWizard({ owner, escrowProgramId }: { owner: string; escrowPro
 
   const jobAddress = setup && spec.ok ? setup.client.pda.job(ownerKey, spec.hash)[0].toBase58() : null;
   const [refresh, setRefresh] = useState(0);
+  const reread = useCallback(() => setRefresh((n) => n + 1), []);
   const [job, setJob] = useState<Load<WizardJob | null> | null>(null);
   useEffect(() => {
     if (!setup || !jobAddress) {
@@ -279,7 +284,6 @@ export function JobWizard({ owner, escrowProgramId }: { owner: string; escrowPro
     chainCommitment,
     verification: travelVerification,
   });
-  const onTravelRuleConfirmed = useCallback(() => setRefresh((n) => n + 1), []);
 
   const [busy, setBusy] = useState<'create' | 'fund' | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -591,7 +595,7 @@ export function JobWizard({ owner, escrowProgramId }: { owner: string; escrowPro
           verification={travelVerification}
           onVerification={setTravelVerification}
           formatAmount={(base) => (token ? `${formatUnits(base, token.decimals)} USDC` : base.toString())}
-          onConfirmed={onTravelRuleConfirmed}
+          onConfirmed={reread}
         />
       )}
 
@@ -657,6 +661,34 @@ export function JobWizard({ owner, escrowProgramId }: { owner: string; escrowPro
         </p>
         {error && <p className="text-sm text-danger-text">{error}</p>}
         {status && <TxConfirmation stage={status.stage} signature={signature ?? undefined} error={status.error} />}
+        {existingJob &&
+          jobAddress &&
+          token &&
+          (config.cctp && config.apiUrl ? (
+            <CctpFunding
+              source={config.cctp}
+              apiUrl={config.apiUrl}
+              owner={ownerKey}
+              job={jobAddress}
+              jobAmount={existingJob.amount}
+              jobStatus={existingJob.status}
+              token={token}
+              balance={balance ? balance.amount : undefined}
+              escrowProgramId={escrowProgramId}
+              blocked={
+                screening?.state !== 'ready' ? 'The sanctions screenings are not read yet.' : (fundBlock ?? travelBlock)
+              }
+              onFunded={reread}
+            />
+          ) : (
+            existingJob.status === 'open' && (
+              <p className="text-caption text-muted">
+                Funding from another chain (CCTP) is not configured here: it needs{' '}
+                <span className="font-mono">{ENV_VARS.apiUrl}</span> and the{' '}
+                <span className="font-mono">{CCTP_ENV_PREFIX}*</span> variables.
+              </p>
+            )
+          ))}
       </Section>
     </div>
   );

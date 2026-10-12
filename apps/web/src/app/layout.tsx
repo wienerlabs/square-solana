@@ -10,6 +10,7 @@ import { NetworkBanner } from '@/components/network-banner';
 import { Providers } from '@/components/providers';
 import { ThemeProvider } from '@/components/theme-provider';
 import { parseWebConfig } from '@/lib/config';
+import { evmChainInfo } from '@/lib/evm-chains';
 import { openRunde } from './fonts';
 import './globals.css';
 
@@ -21,7 +22,7 @@ export const metadata: Metadata = {
 export default async function RootLayout({ children }: { children: ReactNode }) {
   // Yapılandırma istek anında okunur: aynı imaj, Railway'in her environment'ında kendi değerleriyle çalışır.
   await connection();
-  const result = parseWebConfig(process.env);
+  const result = parseWebConfig(process.env, evmChainInfo);
 
   return (
     // suppressHydrationWarning: next-themes, temayı boyamadan önce <html data-theme>'e yazar.

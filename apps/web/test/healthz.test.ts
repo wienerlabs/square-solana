@@ -24,7 +24,7 @@ describe('GET /healthz', () => {
     const body = await res.text();
     expect(JSON.parse(body).errors).toEqual([
       'SQUARE_SOLANA_CLUSTER is not set',
-      'SQUARE_SOLANA_RPC_URL must use https unless SQUARE_SOLANA_CLUSTER is localnet',
+      'SQUARE_SOLANA_RPC_URL must use https unless SQUARE_SOLANA_CLUSTER is localnet or the host is local (localhost, 127.0.0.1, [::1])',
     ]);
     expect(body).not.toContain('secret');
   });

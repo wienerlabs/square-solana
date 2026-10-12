@@ -143,7 +143,9 @@ describe('SQUARE_API_URL', () => {
     });
     expect(parseWebConfig({ ...base, SQUARE_API_URL: 'http://api.square.test' })).toEqual({
       ok: false,
-      errors: ['SQUARE_API_URL must use https unless SQUARE_SOLANA_CLUSTER is localnet'],
+      errors: [
+        'SQUARE_API_URL must use https unless SQUARE_SOLANA_CLUSTER is localnet or the host is local (localhost, 127.0.0.1, [::1])',
+      ],
     });
   });
 });
